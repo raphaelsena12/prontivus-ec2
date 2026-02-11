@@ -1,0 +1,425 @@
+"use client";
+
+import * as React from "react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Search, Calendar } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Edit, Trash2, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils";
+
+interface Movimentacao {
+  id: string;
+  tipo: "ENTRADA" | "SAIDA";
+  descricao: string;
+  valor: number;
+  data: string;
+  formaPagamento: {
+    id: string;
+    nome: string;
+  } | null;
+  observacoes: string | null;
+  createdAt: string;
+}
+
+interface FluxoCaixaTableProps {
+  data: Movimentacao[];
+  tipoFilter: string;
+  onTipoFilterChange: (value: string) => void;
+  dataInicio: string;
+  onDataInicioChange: (value: string) => void;
+  dataFim: string;
+  onDataFimChange: (value: string) => void;
+  onDelete?: (movimentacao: Movimentacao) => void;
+  newButtonUrl?: string;
+}
+
+const formatDate = (dateString: string) => {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(dateString));
+};
+
+export function FluxoCaixaTable({
+  data: initialData,
+  tipoFilter,
+  onTipoFilterChange,
+  dataInicio,
+  onDataInicioChange,
+  dataFim,
+  onDataFimChange,
+  onDelete,
+  newButtonUrl,
+}: FluxoCaixaTableProps) {
+  const router = useRouter();
+  const [data] = React.useState(() => initialData);
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  // Filtrar dados localmente por tipo, data e busca
+  const filteredData = React.useMemo(() => {
+    let filtered = data;
+    if (tipoFilter !== "all") {
+      filtered = filtered.filter((mov) => mov.tipo === tipoFilter);
+    }
+    if (dataInicio) {
+      filtered = filtered.filter((mov) => new Date(mov.data) >= new Date(dataInicio));
+    }
+    if (dataFim) {
+      filtered = filtered.filter((mov) => new Date(mov.data) <= new Date(dataFim));
+    }
+    if (globalFilter) {
+      const search = globalFilter.toLowerCase();
+      filtered = filtered.filter((mov) => {
+        const descricao = mov.descricao?.toLowerCase() || "";
+        return descricao.includes(search);
+      });
+    }
+    return filtered;
+  }, [data, tipoFilter, dataInicio, dataFim, globalFilter]);
+
+  const columns: ColumnDef<Movimentacao>[] = React.useMemo(
+    () => [
+      {
+        accessorKey: "data",
+        header: "Data",
+        cell: ({ row }) => formatDate(row.original.data),
+      },
+      {
+        accessorKey: "tipo",
+        header: "Tipo",
+        cell: ({ row }) => (
+          row.original.tipo === "ENTRADA" ? (
+            <Badge 
+              variant="outline" 
+              className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight"
+            >
+              Entrada
+            </Badge>
+          ) : (
+            <Badge 
+              variant="outline" 
+              className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight"
+            >
+              Saída
+            </Badge>
+          )
+        ),
+      },
+      {
+        accessorKey: "descricao",
+        header: "Descrição",
+        cell: ({ row }) => (
+          <div className="max-w-md truncate">{row.original.descricao}</div>
+        ),
+        enableHiding: false,
+      },
+      {
+        accessorKey: "valor",
+        header: "Valor",
+        cell: ({ row }) => (
+          <div
+            className={`font-medium ${
+              row.original.tipo === "ENTRADA" ? "text-green-600" : "text-red-600"
+            }`}
+          >
+            {row.original.tipo === "ENTRADA" ? "+" : "-"} {formatCurrency(row.original.valor)}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "formaPagamento.nome",
+        header: "Forma de Pagamento",
+        cell: ({ row }) => (
+          <div>{row.original.formaPagamento?.nome || "-"}</div>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                router.push(
+                  `/admin-clinica/fluxo-caixa/editar/${row.original.id}`
+                )
+              }
+              title="Editar movimentação"
+              className="h-7 w-7 p-0"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            {onDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDelete(row.original)}
+                title="Excluir movimentação"
+                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        ),
+        enableHiding: false,
+      },
+    ],
+    [router, onDelete]
+  );
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    state: {
+      sorting,
+      columnVisibility,
+      columnFilters,
+      pagination,
+    },
+    getRowId: (row) => row.id,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+  });
+
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4 gap-2 flex-wrap">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+          <Input 
+            type="search"
+            placeholder="Buscar por descrição..." 
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="pl-9 h-8 text-xs bg-background" 
+          />
+        </div>
+        <Select
+          value={tipoFilter}
+          onValueChange={onTipoFilterChange}
+        >
+          <SelectTrigger className="w-[180px] h-8 text-xs">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="ENTRADA">Entrada</SelectItem>
+            <SelectItem value="SAIDA">Saída</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            type="date"
+            placeholder="Data início"
+            value={dataInicio}
+            onChange={(e) => onDataInicioChange(e.target.value)}
+            className="w-[150px] h-8 text-xs"
+          />
+          <span className="text-muted-foreground text-xs">até</span>
+          <Input
+            type="date"
+            placeholder="Data fim"
+            value={dataFim}
+            onChange={(e) => onDataFimChange(e.target.value)}
+            className="w-[150px] h-8 text-xs"
+          />
+        </div>
+        {newButtonUrl && (
+          <Button onClick={() => router.push(newButtonUrl)} className="text-xs">
+            <Plus className="mr-2 h-3.5 w-3.5" />
+            Nova Movimentação
+          </Button>
+        )}
+      </div>
+      <div className="px-4 lg:px-6">
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader className="bg-slate-100 sticky top-0 z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan} className="text-xs font-semibold py-3">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-xs py-3">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-xs"
+                  >
+                    Nenhuma movimentação encontrada.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+      <div className="flex items-center justify-between px-4 lg:px-6 pt-4">
+        <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
+          {table.getFilteredRowModel().rows.length} movimentação(ões) encontrada(s).
+        </div>
+          <div className="flex w-full items-center gap-8 lg:w-fit">
+          <div className="hidden items-center gap-2 lg:flex">
+            <Label htmlFor="rows-per-page" className="text-xs font-medium">
+              Linhas por página
+            </Label>
+            <Select
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => {
+                table.setPageSize(Number(value));
+              }}
+            >
+              <SelectTrigger size="sm" className="w-20 h-7 text-xs" id="rows-per-page">
+                <SelectValue
+                  placeholder={table.getState().pagination.pageSize}
+                />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex w-fit items-center justify-center text-xs font-medium">
+            Página {table.getState().pagination.pageIndex + 1} de{" "}
+            {table.getPageCount()}
+          </div>
+          <div className="ml-auto flex items-center gap-2 lg:ml-0">
+            <Button
+              variant="outline"
+              className="hidden h-7 w-7 p-0 lg:flex text-xs"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Primeira página</span>
+              <IconChevronsLeft className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-7 w-7 text-xs"
+              size="icon"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Página anterior</span>
+              <IconChevronLeft className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-7 w-7 text-xs"
+              size="icon"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Próxima página</span>
+              <IconChevronRight className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="outline"
+              className="hidden h-7 w-7 lg:flex text-xs"
+              size="icon"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Última página</span>
+              <IconChevronsRight className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

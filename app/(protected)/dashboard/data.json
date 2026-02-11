@@ -1,0 +1,89 @@
+[
+  {
+    "id": 1,
+    "header": "Pacientes Ativos",
+    "type": "Pacientes",
+    "status": "Done",
+    "target": "150",
+    "limit": "200",
+    "reviewer": "Dr. João Silva"
+  },
+  {
+    "id": 2,
+    "header": "Consultas do Mês",
+    "type": "Consultas",
+    "status": "In Process",
+    "target": "80",
+    "limit": "100",
+    "reviewer": "Maria Santos"
+  },
+  {
+    "id": 3,
+    "header": "Prontuários Pendentes",
+    "type": "Prontuários",
+    "status": "In Process",
+    "target": "25",
+    "limit": "30",
+    "reviewer": "Dr. João Silva"
+  },
+  {
+    "id": 4,
+    "header": "Exames Agendados",
+    "type": "Exames",
+    "status": "Done",
+    "target": "45",
+    "limit": "50",
+    "reviewer": "Maria Santos"
+  },
+  {
+    "id": 5,
+    "header": "Teleconsultas",
+    "type": "Telemedicina",
+    "status": "In Process",
+    "target": "20",
+    "limit": "30",
+    "reviewer": "Dr. João Silva"
+  },
+  {
+    "id": 6,
+    "header": "Relatórios Mensais",
+    "type": "Relatórios",
+    "status": "Done",
+    "target": "12",
+    "limit": "12",
+    "reviewer": "Admin Clínica"
+  },
+  {
+    "id": 7,
+    "header": "Agendamentos Pendentes",
+    "type": "Agendamentos",
+    "status": "In Process",
+    "target": "15",
+    "limit": "20",
+    "reviewer": "Maria Santos"
+  },
+  {
+    "id": 8,
+    "header": "Prescrições Digitais",
+    "type": "Prescrições",
+    "status": "Done",
+    "target": "60",
+    "limit": "70",
+    "reviewer": "Dr. João Silva"
+  }
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

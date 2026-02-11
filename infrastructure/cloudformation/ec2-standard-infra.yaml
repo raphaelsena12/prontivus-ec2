@@ -1,0 +1,546 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Infraestrutura EC2 para rodar Prontivus 3.0 sem containers (Node.js nativo)'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - development
+      - staging
+      - production
+    Description: Ambiente de deploy
+  
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+    Description: Tipo de instância EC2 (t3.micro recomendado para Windows)
+  
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome do Key Pair para acesso SSH à instância
+  
+  VpcId:
+    Type: String
+    Description: ID da VPC existente (deixe vazio para criar nova)
+    Default: ''
+  
+  SubnetId:
+    Type: String
+    Description: ID da Subnet existente (deixe vazio para criar nova)
+    Default: ''
+  
+  DatabaseUrl:
+    Type: String
+    Description: URL de conexão do banco de dados PostgreSQL
+    NoEcho: true
+  
+  NextAuthSecret:
+    Type: String
+    Description: Secret do NextAuth
+    NoEcho: true
+  
+  NextAuthUrl:
+    Type: String
+    Default: http://localhost:3000
+    Description: URL base da aplicação
+  
+  StripeSecretKey:
+    Type: String
+    Default: ''
+    Description: Chave secreta do Stripe
+    NoEcho: true
+  
+  AwsRegion:
+    Type: String
+    Default: sa-east-1
+    Description: Região AWS
+  
+  AwsAccessKeyId:
+    Type: String
+    Default: ''
+    Description: AWS Access Key ID
+    NoEcho: true
+  
+  AwsSecretAccessKey:
+    Type: String
+    Default: ''
+    Description: AWS Secret Access Key
+    NoEcho: true
+  
+  GitRepositoryUrl:
+    Type: String
+    Default: ''
+    Description: URL do repositório Git (opcional, deixe vazio para fazer upload manual via SSH)
+  
+  GitBranch:
+    Type: String
+    Default: main
+    Description: Branch do repositório Git
+  
+  NodeVersion:
+    Type: String
+    Default: '20'
+    Description: Versão do Node.js (18, 20, 22)
+    AllowedValues:
+      - '18'
+      - '20'
+      - '22'
+
+Conditions:
+  CreateVpc: !Equals [!Ref VpcId, '']
+  CreateSubnet: !Equals [!Ref SubnetId, '']
+  UseGitRepository: !Not [!Equals [!Ref GitRepositoryUrl, '']]
+  HasStripeKey: !Not [!Equals [!Ref StripeSecretKey, '']]
+  HasAwsCredentials: !Not [!Equals [!Ref AwsAccessKeyId, '']]
+
+Resources:
+  # VPC (se não fornecida)
+  VPC:
+    Type: AWS::EC2::VPC
+    Condition: CreateVpc
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-vpc'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Internet Gateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: CreateVpc
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: CreateVpc
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  # Subnet Pública
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-subnet'
+
+  # Route Table Pública
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: CreateVpc
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-rt'
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    Condition: CreateVpc
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: CreateVpc
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet
+
+  # Security Group para EC2
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Prontivus EC2 instance
+      GroupName: !Sub '${AWS::StackName}-ec2-sg'
+      VpcId: !If [CreateVpc, !Ref VPC, !Ref VpcId]
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: Next.js Application
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: HTTP
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-sg'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Role para EC2
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudWatchLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: '*'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource: '*'
+        - PolicyName: TranscribeAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transcribe:StartStreamTranscription
+                  - transcribe:StartTranscriptionJob
+                  - transcribe:GetTranscriptionJob
+                Resource: '*'
+        - PolicyName: ComprehendMedicalAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - comprehendmedical:DetectEntities
+                  - comprehendmedical:DetectPHI
+                Resource: '*'
+        - PolicyName: SESAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-role'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # EC2 Instance
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - AMI
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      SubnetId: !If
+        - CreateSubnet
+        - !Ref PublicSubnet
+        - !Ref SubnetId
+      UserData:
+        Fn::Base64: !Sub |
+          <powershell>
+          # Log script
+          $logPath = "C:\UserData.log"
+          Start-Transcript -Path $logPath
+          
+          Write-Host "=== Iniciando configuracao da instancia EC2 (Windows) ==="
+          
+          # Habilitar execução de scripts
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Force
+          
+          # Instalar Chocolatey
+          Write-Host "=== Instalando Chocolatey ==="
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          
+          # Atualizar PATH
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          
+          # Instalar Git
+          Write-Host "=== Instalando Git ==="
+          choco install git -y
+          
+          # Instalar Node.js
+          Write-Host "=== Instalando Node.js ${NodeVersion} ==="
+          choco install nodejs-lts --version=${NodeVersion}.0.0 -y
+          
+          # Atualizar PATH novamente
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          refreshenv
+          
+          # Verificar instalacao
+          node --version
+          npm --version
+          
+          # Instalar PM2 globalmente
+          Write-Host "=== Instalando PM2 ==="
+          npm install -g pm2
+          npm install -g pm2-windows-startup
+          pm2-startup install
+          
+          # Criar diretorio da aplicacao
+          $APP_DIR = "C:\prontivus"
+          New-Item -ItemType Directory -Force -Path $APP_DIR
+          Set-Location $APP_DIR
+          
+          # Clonar repositorio ou preparar para upload manual
+          if ("${GitRepositoryUrl}") {
+            Write-Host "=== Clonando repositorio Git ==="
+            git clone -b ${GitBranch} "${GitRepositoryUrl}" .
+          } else {
+            Write-Host "=== Repositorio Git nao fornecido ==="
+            Write-Host "Voce precisara fazer upload do codigo via RDP ou SCP"
+            Write-Host "Diretorio da aplicacao: $APP_DIR"
+          }
+          
+          # Criar arquivo .env
+          Write-Host "=== Criando arquivo .env ==="
+          $envContent = @"
+          DATABASE_URL=${DatabaseUrl}
+          NODE_ENV=production
+          PORT=3000
+          HOSTNAME=0.0.0.0
+          NEXTAUTH_URL=${NextAuthUrl}
+          NEXTAUTH_SECRET=${NextAuthSecret}
+          AWS_REGION=${AwsRegion}
+          "@
+          
+          # Adicionar credenciais AWS se fornecidas
+          if ("${AwsAccessKeyId}") {
+            $envContent += "`nAWS_ACCESS_KEY_ID=${AwsAccessKeyId}"
+            $envContent += "`nAWS_SECRET_ACCESS_KEY=${AwsSecretAccessKey}"
+          }
+          
+          # Adicionar Stripe se fornecido
+          if ("${StripeSecretKey}") {
+            $envContent += "`nSTRIPE_SECRET_KEY=${StripeSecretKey}"
+          }
+          
+          $envContent | Out-File -FilePath ".env" -Encoding utf8
+          
+          # Se o codigo foi clonado, instalar dependencias e iniciar
+          if (Test-Path "package.json") {
+            Write-Host "=== Instalando dependencias ==="
+            npm ci --production=false
+            
+            Write-Host "=== Gerando Prisma Client ==="
+            npx prisma generate
+            
+            Write-Host "=== Executando migrations do Prisma ==="
+            npx prisma migrate deploy
+            
+            Write-Host "=== Fazendo build da aplicacao ==="
+            npm run build
+            
+            Write-Host "=== Configurando PM2 ==="
+            # Criar arquivo de configuracao do PM2
+            $ecosystemConfig = @"
+          module.exports = {
+            apps: [{
+              name: 'prontivus',
+              script: 'server.ts',
+              interpreter: 'npx',
+              interpreter_args: 'tsx',
+              instances: 1,
+              exec_mode: 'fork',
+              env: {
+                NODE_ENV: 'production',
+                PORT: 3000,
+                HOSTNAME: '0.0.0.0'
+              },
+              error_file: 'C:\logs\prontivus-error.log',
+              out_file: 'C:\logs\prontivus-out.log',
+              log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+              merge_logs: true,
+              autorestart: true,
+              max_restarts: 10,
+              min_uptime: '10s'
+            }]
+          };
+          "@
+            $ecosystemConfig | Out-File -FilePath "ecosystem.config.js" -Encoding utf8
+            
+            # Criar diretorio de logs
+            New-Item -ItemType Directory -Force -Path "C:\logs"
+            
+            # Iniciar aplicacao com PM2
+            Write-Host "=== Iniciando aplicacao com PM2 ==="
+            pm2 start ecosystem.config.js
+            pm2 save
+            
+            Write-Host "=== Aplicacao iniciada com sucesso ==="
+            pm2 status
+          } else {
+            Write-Host "=== package.json nao encontrado ==="
+            Write-Host "Por favor, faca upload do codigo para $APP_DIR via RDP"
+            Write-Host "Depois execute:"
+            Write-Host "  cd $APP_DIR"
+            Write-Host "  npm install"
+            Write-Host "  npx prisma generate"
+            Write-Host "  npx prisma migrate deploy"
+            Write-Host "  npm run build"
+            Write-Host "  pm2 start ecosystem.config.js"
+            Write-Host "  pm2 save"
+          }
+          
+          # Health check
+          Write-Host "=== Aguardando aplicacao iniciar ==="
+          Start-Sleep -Seconds 30
+          for ($i = 1; $i -le 30; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri "http://localhost:3000/api/health" -UseBasicParsing -TimeoutSec 5
+              if ($response.StatusCode -eq 200) {
+                Write-Host "=== Aplicacao respondendo ao health check ==="
+                break
+              }
+            } catch {
+              Write-Host "Tentativa $i/30: Aplicacao ainda nao esta respondendo..."
+            }
+            Start-Sleep -Seconds 10
+          }
+          
+          Write-Host "=== Configuracao concluida ==="
+          Stop-Transcript
+          </powershell>
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-instance'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Elastic IP (opcional)
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref EC2Instance
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-eip'
+
+Outputs:
+  VpcId:
+    Description: ID da VPC
+    Value: !If [CreateVpc, !Ref VPC, !Ref VpcId]
+    Export:
+      Name: !Sub '${AWS::StackName}-VpcId'
+
+  SubnetId:
+    Description: ID da Subnet
+    Value: !If [CreateSubnet, !Ref PublicSubnet, !Ref SubnetId]
+    Export:
+      Name: !Sub '${AWS::StackName}-SubnetId'
+
+  SecurityGroupId:
+    Description: ID do Security Group
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+
+  InstanceId:
+    Description: ID da instância EC2
+    Value: !Ref EC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+
+  PublicIP:
+    Description: IP público da instância
+    Value: !GetAtt ElasticIP.PublicIp
+    Export:
+      Name: !Sub '${AWS::StackName}-PublicIP'
+
+  ApplicationURL:
+    Description: URL da aplicação
+    Value: !Sub 'http://${ElasticIP.PublicIp}:3000'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationURL'
+
+  RDPCommand:
+    Description: Informações para acessar a instância via RDP
+    Value: !Sub 'Use o arquivo .pem da key pair ${KeyPairName} para obter a senha do Administrador. Execute: aws ec2 get-password-data --instance-id ${EC2Instance} --priv-launch-key file://~/.ssh/${KeyPairName}.pem --region ${AWS::Region}'
+    Export:
+      Name: !Sub '${AWS::StackName}-RDPCommand'
+
+  ApplicationDirectory:
+    Description: Diretório da aplicação na instância
+    Value: C:\prontivus
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationDirectory'
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0c55b159cbfafe1f0  # Amazon Linux 2023
+    us-west-2:
+      AMI: ami-0c55b159cbfafe1f0
+    sa-east-1:
+      AMI: ami-0bd43c691aea9e40a  # Windows Server 2022
+    eu-west-1:
+      AMI: ami-0c55b159cbfafe1f0
+
+# Nota: Para obter o AMI ID mais recente do Amazon Linux 2023, execute:
+# aws ec2 describe-images --owners amazon --filters "Name=name,Values=al2023-ami-2023*" "Name=architecture,Values=x86_64" --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' --region sa-east-1

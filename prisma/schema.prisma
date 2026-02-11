@@ -1,0 +1,958 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum TipoUsuario {
+  SUPER_ADMIN
+  ADMIN_CLINICA
+  MEDICO
+  SECRETARIA
+  PACIENTE
+}
+
+enum StatusClinica {
+  ATIVA
+  INATIVA
+  SUSPENSA
+}
+
+enum TipoPlano {
+  BASICO
+  INTERMEDIARIO
+  PROFISSIONAL
+}
+
+enum StatusPagamento {
+  PENDENTE
+  PAGO
+  CANCELADO
+  REEMBOLSADO
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Tenant {
+  id                       String        @id @default(uuid())
+  nome                     String
+  cnpj                     String        @unique
+  email                    String
+  telefone                 String?
+  status                   StatusClinica @default(ATIVA)
+  planoId                  String
+  tokensMensaisDisponiveis Int
+  tokensConsumidos         Int           @default(0)
+  telemedicineHabilitada   Boolean       @default(false)
+  dataContratacao          DateTime
+  dataExpiracao            DateTime?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+  stripeCustomerId         String?       @unique
+  stripeSubscriptionId     String?       @unique
+  cep                      String?
+  endereco                 String?
+  numero                   String?
+  complemento              String?
+  bairro                   String?
+  cidade                   String?
+  estado                   String?
+  pais                     String?       @default("Brasil")
+  logoUrl                  String?       @map("logourl")
+
+  // Relations
+  plano                     Plano                      @relation(fields: [planoId], references: [id])
+  usuarios                  Usuario[]
+  usuariosTenants           UsuarioTenant[]
+  pagamentos                Pagamento[]
+  pacientes                 Paciente[]
+  medicos                   Medico[]
+  exames                    Exame[]
+  medicamentos              Medicamento[]
+  procedimentos             Procedimento[]
+  formasPagamento           FormaPagamento[]
+  contasPagar               ContaPagar[]
+  contasReceber             ContaReceber[]
+  fluxoCaixa                FluxoCaixa[]
+  estoqueMedicamentos       EstoqueMedicamento[]
+  movimentacoesEstoque      MovimentacaoEstoque[]
+  consultas                 Consulta[]
+  prontuarios               Prontuario[]
+  solicitacoesExames        SolicitacaoExame[]
+  prescricoesMedicamentos   PrescricaoMedicamento[]
+  operadoras                Operadora[]
+  tussValores               TussValor[]
+  guiasTiss                 GuiaTiss[]
+  mensagens                 Mensagem[]
+  mensagensMedicoSecretaria MensagemMedicoSecretaria[] @relation("MensagensMedicoSecretaria")
+  bloqueiosAgenda           BloqueioAgenda[]
+  manipulados               Manipulado[]
+  documentosGerados         DocumentoGerado[]
+
+  @@index([cnpj])
+  @@index([dataExpiracao])
+  @@index([status])
+  @@index([stripeCustomerId])
+  @@map("tenants")
+}
+
+model Plano {
+  id                     String    @id @default(uuid())
+  nome                   TipoPlano @unique
+  tokensMensais          Int
+  telemedicineHabilitada Boolean   @default(false)
+  preco                  Decimal   @db.Decimal(10, 2)
+  descricao              String?
+  ativo                  Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  tenants Tenant[]
+
+  @@map("planos")
+}
+
+model Usuario {
+  id                          String                     @id @default(uuid())
+  email                       String                     @unique
+  senha                       String
+  nome                        String
+  cpf                         String                     @unique
+  telefone                    String?
+  avatar                      String?
+  tipo                        TipoUsuario
+  clinicaId                   String?
+  ativo                       Boolean                    @default(true)
+  primeiroAcesso              Boolean                    @default(true)
+  ultimoAcesso                DateTime?
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
+  resetToken                  String?
+  resetTokenExpires           DateTime?
+
+  clinica                     Tenant?                    @relation(fields: [clinicaId], references: [id])
+  medicos                     Medico[]
+  pacientes                   Paciente[]
+  sessoes                     Sessao[]
+  usuariosTenants             UsuarioTenant[]
+  mensagensMedicoSecretaria   MensagemMedicoSecretaria[]
+
+  @@index([email])
+  @@index([clinicaId])
+  @@index([resetToken])
+  @@map("usuarios")
+}
+
+model Sessao {
+  id        String   @id @default(uuid())
+  usuarioId String
+  token     String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("sessoes")
+}
+
+model UsuarioTenant {
+  id        String      @id @default(uuid())
+  usuarioId String
+  tenantId  String
+  tipo      TipoUsuario
+  ativo     Boolean     @default(true)
+  isPrimary Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, tenantId])
+  @@index([usuarioId])
+  @@index([tenantId])
+  @@index([tipo])
+  @@map("usuarios_tenants")
+}
+
+model Pagamento {
+  id              String          @id @default(uuid())
+  tenantId        String
+  valor           Decimal         @db.Decimal(10, 2)
+  mesReferencia   DateTime
+  status          StatusPagamento @default(PENDENTE)
+  metodoPagamento String?
+  transacaoId     String?
+  dataPagamento   DateTime?
+  dataVencimento  DateTime
+  observacoes     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([mesReferencia])
+  @@index([dataVencimento])
+  @@map("pagamentos")
+}
+
+model Paciente {
+  id             String   @id @default(uuid())
+  clinicaId      String
+  usuarioId      String?
+  nome           String
+  cpf            String
+  rg             String?
+  dataNascimento DateTime
+  sexo           String
+  email          String?
+  telefone       String?
+  celular        String?
+  cep            String?
+  endereco       String?
+  numero         String?
+  complemento    String?
+  bairro         String?
+  cidade         String?
+  estado         String?
+  nomeMae        String?
+  nomePai        String?
+  profissao      String?
+  estadoCivil    String?
+  observacoes    String?
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinica          Tenant           @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  usuario          Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  consultas        Consulta[]
+  contasReceber    ContaReceber[]
+  mensagens        Mensagem[]
+  pacientesPlanos  PacientePlano[]
+  prontuarios      Prontuario[]
+
+  @@unique([clinicaId, usuarioId])
+  @@index([clinicaId])
+  @@index([cpf])
+  @@index([nome])
+  @@index([usuarioId])
+  @@map("pacientes")
+}
+
+model Medico {
+  id                         String   @id @default(uuid())
+  clinicaId                  String
+  usuarioId                  String
+  crm                        String
+  especialidade              String
+  ativo                      Boolean  @default(true)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  limiteMaximoRetornosPorDia Int?
+
+  clinica                     Tenant                     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  usuario                     Usuario                    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  consultas                   Consulta[]
+  prontuarios                 Prontuario[]
+  mensagens                   Mensagem[]
+  mensagensMedicoSecretaria   MensagemMedicoSecretaria[]
+  medicoEspecialidades        MedicoEspecialidade[]
+  bloqueiosAgenda             BloqueioAgenda[]
+  manipulados                 Manipulado[]
+  documentos                  DocumentoGerado[]
+
+  @@unique([clinicaId, usuarioId])
+  @@index([clinicaId])
+  @@index([crm])
+  @@index([usuarioId])
+  @@map("medicos")
+}
+
+model Exame {
+  id        String   @id @default(uuid())
+  clinicaId String
+  nome      String
+  descricao String?
+  tipo      String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinica             Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  solicitacoesExames  SolicitacaoExame[]
+
+  @@index([clinicaId])
+  @@index([nome])
+  @@map("exames")
+}
+
+model Medicamento {
+  id             String   @id @default(uuid())
+  clinicaId      String
+  nome           String
+  principioAtivo String?
+  laboratorio    String?
+  apresentacao   String?
+  concentracao   String?
+  unidade        String?
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinica                  Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  estoqueMedicamento       EstoqueMedicamento?
+  prescricoesMedicamentos  PrescricaoMedicamento[]
+
+  @@index([clinicaId])
+  @@index([nome])
+  @@map("medicamentos")
+}
+
+model Procedimento {
+  id        String   @id @default(uuid())
+  clinicaId String
+  codigo    String
+  nome      String
+  descricao String?
+  valor     Decimal  @db.Decimal(10, 2)
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinica   Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consultas Consulta[]
+
+  @@index([clinicaId])
+  @@index([codigo])
+  @@map("procedimentos")
+}
+
+model FormaPagamento {
+  id        String   @id @default(uuid())
+  clinicaId String
+  nome      String
+  descricao String?
+  tipo      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinica        Tenant         @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  contasReceber  ContaReceber[]
+  fluxoCaixa     FluxoCaixa[]
+
+  @@index([clinicaId])
+  @@index([nome])
+  @@map("formas_pagamento")
+}
+
+model ContaPagar {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  descricao        String
+  fornecedor       String?
+  valor            Decimal   @db.Decimal(10, 2)
+  dataVencimento   DateTime
+  dataPagamento    DateTime?
+  status           String    @default("PENDENTE")
+  formaPagamentoId String?
+  observacoes      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([dataVencimento])
+  @@index([status])
+  @@map("contas_pagar")
+}
+
+model ContaReceber {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  descricao        String
+  pacienteId       String?
+  valor            Decimal   @db.Decimal(10, 2)
+  dataVencimento   DateTime
+  dataRecebimento  DateTime?
+  status           String    @default("PENDENTE")
+  formaPagamentoId String?
+  observacoes      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica        Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente       Paciente?       @relation(fields: [pacienteId], references: [id])
+  formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
+
+  @@index([clinicaId])
+  @@index([dataVencimento])
+  @@index([status])
+  @@map("contas_receber")
+}
+
+model FluxoCaixa {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  tipo             String
+  descricao        String
+  valor            Decimal   @db.Decimal(10, 2)
+  data             DateTime
+  formaPagamentoId String?
+  observacoes      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica        Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
+
+  @@index([clinicaId])
+  @@index([tipo])
+  @@index([data])
+  @@map("fluxo_caixa")
+}
+
+model EstoqueMedicamento {
+  id               String   @id @default(uuid())
+  clinicaId        String
+  medicamentoId    String   @unique
+  quantidadeAtual  Int      @default(0)
+  quantidadeMinima Int      @default(0)
+  quantidadeMaxima Int?
+  unidade          String   @default("UN")
+  localizacao      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clinica              Tenant                @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medicamento          Medicamento           @relation(fields: [medicamentoId], references: [id], onDelete: Cascade)
+  movimentacoesEstoque MovimentacaoEstoque[]
+
+  @@index([clinicaId])
+  @@index([medicamentoId])
+  @@map("estoque_medicamentos")
+}
+
+model MovimentacaoEstoque {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  estoqueId   String
+  tipo        String
+  quantidade  Int
+  motivo      String?
+  observacoes String?
+  data        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinica  Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  estoque  EstoqueMedicamento @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([estoqueId])
+  @@index([tipo])
+  @@index([data])
+  @@map("movimentacoes_estoque")
+}
+
+model Consulta {
+  id                String    @id @default(uuid())
+  clinicaId         String
+  pacienteId        String
+  medicoId          String
+  dataHora          DateTime
+  status            String    @default("AGENDADA")
+  observacoes       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  codigoTussId      String
+  dataAutorizacao   DateTime?
+  numeroAutorizacao String?
+  numeroCarteirinha String?
+  operadoraId       String?
+  planoSaudeId      String?
+  preparadoTiss     Boolean   @default(false)
+  tipoConsultaId    String?
+  valorCobrado      Decimal?  @db.Decimal(10, 2)
+  valorRepassado    Decimal?  @db.Decimal(10, 2)
+  procedimentoId    String?
+
+  clinica                  Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente                 Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medico                   Medico                  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  codigoTuss               CodigoTuss              @relation(fields: [codigoTussId], references: [id])
+  operadora                Operadora?              @relation(fields: [operadoraId], references: [id])
+  planoSaude               PlanoSaude?             @relation(fields: [planoSaudeId], references: [id])
+  tipoConsulta             TipoConsulta?           @relation(fields: [tipoConsultaId], references: [id])
+  procedimento             Procedimento?           @relation(fields: [procedimentoId], references: [id])
+  prontuarios              Prontuario[]
+  solicitacoesExames       SolicitacaoExame[]
+  prescricoesMedicamentos  PrescricaoMedicamento[]
+  guiasTiss                GuiaTiss[]
+  documentos               DocumentoGerado[]
+
+  @@index([clinicaId])
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@index([dataHora])
+  @@index([codigoTussId])
+  @@index([operadoraId])
+  @@index([planoSaudeId])
+  @@index([tipoConsultaId])
+  @@map("consultas")
+}
+
+model Prontuario {
+  id          String    @id @default(uuid())
+  clinicaId   String
+  pacienteId  String
+  medicoId    String
+  consultaId  String?
+  anamnese    String?
+  exameFisico String?
+  diagnostico String?
+  conduta     String?
+  evolucao    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  clinica  Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medico   Medico    @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  consulta Consulta? @relation(fields: [consultaId], references: [id])
+
+  @@index([clinicaId])
+  @@index([pacienteId])
+  @@index([medicoId])
+  @@map("prontuarios")
+}
+
+model SolicitacaoExame {
+  id              String    @id @default(uuid())
+  clinicaId       String
+  consultaId      String
+  exameId         String
+  status          String    @default("SOLICITADO")
+  dataSolicitacao DateTime  @default(now())
+  dataRealizacao  DateTime?
+  resultado       String?
+  observacoes     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  exame    Exame    @relation(fields: [exameId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@index([exameId])
+  @@map("solicitacoes_exames")
+}
+
+model PrescricaoMedicamento {
+  id            String   @id @default(uuid())
+  clinicaId     String
+  consultaId    String
+  medicamentoId String
+  posologia     String
+  quantidade    Int
+  observacoes   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clinica     Tenant      @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta    Consulta    @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  medicamento Medicamento @relation(fields: [medicamentoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@index([medicamentoId])
+  @@map("prescricoes_medicamentos")
+}
+
+model EspecialidadeMedica {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nome      String
+  descricao String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  medicoEspecialidades MedicoEspecialidade[]
+  tussEspecialidades   TussEspecialidade[]
+
+  @@index([codigo])
+  @@index([ativo])
+  @@map("especialidades_medicas")
+}
+
+model MedicoEspecialidade {
+  id              String   @id @default(uuid())
+  medicoId        String
+  especialidadeId String
+  createdAt       DateTime @default(now())
+
+  medico        Medico              @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  especialidade EspecialidadeMedica @relation(fields: [especialidadeId], references: [id], onDelete: Cascade)
+
+  @@unique([medicoId, especialidadeId])
+  @@index([medicoId])
+  @@index([especialidadeId])
+  @@map("medicos_especialidades")
+}
+
+model TussGrupo {
+  id         String   @id @default(uuid())
+  codigo     String   @unique
+  nome       String
+  tipo       String
+  grupoPaiId String?
+  descricao  String?
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  grupoPai     TussGrupo?   @relation("TussGrupoHierarquia", fields: [grupoPaiId], references: [id])
+  subGrupos    TussGrupo[]  @relation("TussGrupoHierarquia")
+  codigosTuss  CodigoTuss[]
+
+  @@index([codigo])
+  @@index([grupoPaiId])
+  @@index([ativo])
+  @@map("tuss_grupos")
+}
+
+model CodigoTuss {
+  id                 String    @id @default(uuid())
+  codigoTuss         String    @unique
+  descricao          String    @db.VarChar(500)
+  descricaoDetalhada String?
+  tipoProcedimento   String
+  grupoId            String?
+  dataVigenciaInicio DateTime
+  dataVigenciaFim    DateTime?
+  ativo              Boolean   @default(true)
+  observacoes        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  grupo              TussGrupo?          @relation(fields: [grupoId], references: [id])
+  consultas          Consulta[]
+  tussEspecialidades TussEspecialidade[]
+  tussOperadoras     TussOperadora[]
+  tussValores        TussValor[]
+
+  @@index([codigoTuss])
+  @@index([tipoProcedimento])
+  @@index([grupoId])
+  @@index([dataVigenciaInicio, dataVigenciaFim])
+  @@index([ativo])
+  @@map("codigos_tuss")
+}
+
+model TussEspecialidade {
+  id              String   @id @default(uuid())
+  codigoTussId    String
+  especialidadeId String
+  createdAt       DateTime @default(now())
+
+  codigoTuss    CodigoTuss          @relation(fields: [codigoTussId], references: [id], onDelete: Cascade)
+  especialidade EspecialidadeMedica @relation(fields: [especialidadeId], references: [id], onDelete: Cascade)
+
+  @@unique([codigoTussId, especialidadeId])
+  @@index([codigoTussId])
+  @@index([especialidadeId])
+  @@map("tuss_especialidades")
+}
+
+model TipoConsulta {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nome      String
+  descricao String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consultas    Consulta[]
+  tussValores  TussValor[]
+
+  @@index([codigo])
+  @@index([ativo])
+  @@map("tipos_consulta")
+}
+
+model Operadora {
+  id           String   @id @default(uuid())
+  clinicaId    String
+  codigoAns    String
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String?
+  telefone     String?
+  email        String?
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinica         Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consultas       Consulta[]
+  planosSaude     PlanoSaude[]
+  tussOperadoras  TussOperadora[]
+  tussValores     TussValor[]
+
+  @@index([clinicaId])
+  @@index([codigoAns])
+  @@index([cnpj])
+  @@index([ativo])
+  @@map("operadoras")
+}
+
+model PlanoSaude {
+  id          String   @id @default(uuid())
+  operadoraId String
+  codigoAns   String?
+  nome        String
+  tipoPlano   String
+  abrangencia String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  operadora       Operadora        @relation(fields: [operadoraId], references: [id], onDelete: Cascade)
+  consultas       Consulta[]
+  pacientesPlanos PacientePlano[]
+  tussOperadoras  TussOperadora[]
+  tussValores     TussValor[]
+
+  @@index([operadoraId])
+  @@index([codigoAns])
+  @@index([ativo])
+  @@map("planos_saude")
+}
+
+model TussValor {
+  id                 String    @id @default(uuid())
+  clinicaId          String
+  codigoTussId       String
+  operadoraId        String?
+  planoSaudeId       String?
+  tipoConsultaId     String?
+  valor              Decimal   @db.Decimal(10, 2)
+  dataVigenciaInicio DateTime
+  dataVigenciaFim    DateTime?
+  ativo              Boolean   @default(true)
+  observacoes        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  clinica        Tenant        @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  codigoTuss     CodigoTuss    @relation(fields: [codigoTussId], references: [id])
+  operadora      Operadora?    @relation(fields: [operadoraId], references: [id])
+  planoSaude     PlanoSaude?   @relation(fields: [planoSaudeId], references: [id])
+  tipoConsulta   TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
+
+  @@index([clinicaId])
+  @@index([codigoTussId])
+  @@index([operadoraId])
+  @@index([planoSaudeId])
+  @@index([tipoConsultaId])
+  @@index([dataVigenciaInicio, dataVigenciaFim])
+  @@index([ativo])
+  @@map("tuss_valores")
+}
+
+model TussOperadora {
+  id           String   @id @default(uuid())
+  codigoTussId String
+  operadoraId  String?
+  planoSaudeId String?
+  aceito       Boolean  @default(true)
+  observacoes  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  codigoTuss CodigoTuss  @relation(fields: [codigoTussId], references: [id], onDelete: Cascade)
+  operadora  Operadora?  @relation(fields: [operadoraId], references: [id], onDelete: Cascade)
+  planoSaude PlanoSaude? @relation(fields: [planoSaudeId], references: [id], onDelete: Cascade)
+
+  @@unique([codigoTussId, operadoraId, planoSaudeId])
+  @@index([codigoTussId])
+  @@index([operadoraId])
+  @@index([planoSaudeId])
+  @@map("tuss_operadoras")
+}
+
+model PacientePlano {
+  id                String    @id @default(uuid())
+  pacienteId        String
+  planoSaudeId      String
+  numeroCarteirinha String
+  dataInicio        DateTime
+  dataFim           DateTime?
+  titular           Boolean   @default(false)
+  ativo             Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  planoSaude PlanoSaude @relation(fields: [planoSaudeId], references: [id])
+
+  @@index([pacienteId])
+  @@index([planoSaudeId])
+  @@index([ativo])
+  @@index([numeroCarteirinha])
+  @@map("pacientes_planos")
+}
+
+model GuiaTiss {
+  id           String    @id @default(uuid())
+  clinicaId    String
+  consultaId   String
+  tipoGuia     String
+  numeroGuia   String?   @unique
+  xmlGuia      String?
+  status       String    @default("GERADA")
+  dataGeracao  DateTime  @default(now())
+  dataEnvio    DateTime?
+  dataResposta DateTime?
+  observacoes  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@index([numeroGuia])
+  @@index([status])
+  @@index([tipoGuia])
+  @@map("guias_tiss")
+}
+
+model Mensagem {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  medicoId         String
+  pacienteId       String
+  conteudo         String
+  enviadoPorMedico Boolean   @default(true)
+  lida             Boolean   @default(false)
+  dataLeitura      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico   Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([pacienteId])
+  @@index([createdAt])
+  @@map("mensagens")
+}
+
+model MensagemMedicoSecretaria {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  medicoId         String
+  secretariaId     String
+  conteudo         String
+  enviadoPorMedico Boolean   @default(true)
+  lida             Boolean   @default(false)
+  dataLeitura      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica    Tenant  @relation("MensagensMedicoSecretaria", fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico     Medico  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  secretaria Usuario @relation(fields: [secretariaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([secretariaId])
+  @@index([createdAt])
+  @@map("mensagens_medico_secretaria")
+}
+
+model BloqueioAgenda {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  medicoId    String
+  dataInicio  DateTime
+  horaInicio  String
+  dataFim     DateTime
+  horaFim     String
+  observacoes String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([dataInicio, dataFim])
+  @@map("bloqueios_agenda")
+}
+
+model Manipulado {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  medicoId    String
+  descricao   String
+  informacoes String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([descricao])
+  @@map("manipulados")
+}
+
+model DocumentoGerado {
+  id            String   @id @default(uuid())
+  clinicaId     String
+  consultaId    String
+  medicoId      String
+  tipoDocumento String   // "receita-medica", "atestado-afastamento", etc
+  nomeDocumento String   // Nome amigável do documento
+  dados         Json?    // Dados usados para gerar o documento (prescrições, CID, etc)
+  s3Key         String?  // Chave do arquivo no S3 (ex: "documentos/1234567890-receita.pdf")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relações
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  medico   Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@index([medicoId])
+  @@index([tipoDocumento])
+  @@map("documentos_gerados")
+}
