@@ -88,20 +88,15 @@ export function generateAtestadoAptidaoPDF(data: AptidaoData): ArrayBuffer {
   // VALIDADE (para piscinas e aptidão física)
   // =====================================================
   if (data.tipo === "piscinas" || data.tipo === "fisica") {
+    y += 6;
     const meses = data.mesesValidade || "__";
-
-    doc.setFillColor(...COLORS.slate50);
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "F");
-    doc.setDrawColor(...COLORS.slate200);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "S");
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate800);
-    doc.text(`Atestado medico valido por ${meses} mes(es)`, MARGIN + 5, y + 9);
+    doc.text(`Atestado medico valido por ${meses} mes(es)`, MARGIN, y);
 
-    y += 22;
+    y += 12;
   }
 
   // =====================================================
@@ -110,23 +105,14 @@ export function generateAtestadoAptidaoPDF(data: AptidaoData): ArrayBuffer {
   if (data.observacoes && data.observacoes.trim()) {
     y = drawSectionLabel(doc, "OBSERVACOES", y);
 
-    doc.setFillColor(...COLORS.slate50);
-    const obsText = doc.splitTextToSize(data.observacoes, CONTENT_WIDTH - 14);
-    const obsHeight = obsText.length * 4.5 + 8;
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, obsHeight, 2, 2, "F");
-    doc.setDrawColor(...COLORS.slate200);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, obsHeight, 2, 2, "S");
-
-    doc.setFillColor(...COLORS.blue600);
-    doc.roundedRect(MARGIN, y, 2, obsHeight, 1, 1, "F");
-
+    const obsText = doc.splitTextToSize(data.observacoes, CONTENT_WIDTH);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.slate600);
-    doc.text(obsText, MARGIN + 7, y + 5);
+    doc.setTextColor(...COLORS.slate800);
+    doc.setLineHeightFactor(1.4);
+    doc.text(obsText, MARGIN, y);
 
-    y += obsHeight + 10;
+    y += obsText.length * 4.5 + 10;
   }
 
   drawFooterSignature(doc, data, y + 20);

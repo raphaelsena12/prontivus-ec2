@@ -51,19 +51,10 @@ export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer
   // =====================================================
   // CAMPOS DE AVALIAÇÃO
   // =====================================================
-  const cardX = MARGIN;
-  const cardW = CONTENT_WIDTH;
-  const fieldX = cardX + 5;
-  const fieldW = cardW - 10;
+  const fieldX = MARGIN;
+  const fieldW = CONTENT_WIDTH;
 
-  // Card principal
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(cardX, y, cardW, 120, 3, 3, "F");
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(cardX, y, cardW, 120, 3, 3, "S");
-
-  let fieldY = y + 6;
+  let fieldY = y;
 
   fieldY = drawFieldRow(doc, "RISCO CIRURGICO CARDIACO", data.riscoCirurgicoCardiaco || "", fieldX, fieldY, fieldW);
   fieldY = drawFieldRow(doc, "GOLDMAN", data.goldman || "", fieldX, fieldY, fieldW);
@@ -75,25 +66,19 @@ export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer
   fieldY = drawFieldRow(doc, "MEDICACOES EM USO", data.medicacoesEmUso || "", fieldX, fieldY, fieldW);
   fieldY = drawFieldRow(doc, "ANTECEDENTES PESSOAIS", data.antecedentesPessoais || "", fieldX, fieldY, fieldW);
 
-  y += 126;
+  y = fieldY + 6;
 
   // =====================================================
   // EXAMES
   // =====================================================
   y = drawSectionLabel(doc, "EXAMES", y);
 
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(cardX, y, cardW, 30, 3, 3, "F");
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(cardX, y, cardW, 30, 3, 3, "S");
-
-  let examY = y + 6;
+  let examY = y;
   examY = drawFieldRow(doc, "ECOCARDIOGRAMA", data.ecocardiograma || "", fieldX, examY, fieldW);
   examY = drawFieldRow(doc, "ERGOMETRIA", data.ergometria || "", fieldX, examY, fieldW);
-  drawFieldRow(doc, "RX - TORAX", data.rxTorax || "", fieldX, examY, fieldW);
+  examY = drawFieldRow(doc, "RX - TORAX", data.rxTorax || "", fieldX, examY, fieldW);
 
-  y += 36;
+  y = examY + 6;
 
   // =====================================================
   // OBSERVAÇÕES

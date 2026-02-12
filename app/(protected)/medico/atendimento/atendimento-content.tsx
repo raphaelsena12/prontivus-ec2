@@ -985,13 +985,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {/* Instrução de seleção */}
-                        <div className="mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
-                          <p className="text-xs text-blue-700 font-medium flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            Selecione os exames que deseja que a IA analise junto com a transcrição
-                          </p>
-                        </div>
                         {examesAnexados.map((exame) => (
                           <div
                             key={exame.id}
@@ -1059,32 +1052,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                             )}
                           </div>
                         ))}
-                        {examesSelecionadosParaIA.size > 0 && (
-                          <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                            <div className="flex items-start gap-2">
-                              <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-xs font-semibold text-purple-700 mb-1">
-                                  {examesSelecionadosParaIA.size} exame(s) será(ão) analisado(s) pela IA
-                                </p>
-                                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                  {Array.from(examesSelecionadosParaIA).map((exameId) => {
-                                    const exame = examesAnexados.find(e => e.id === exameId);
-                                    if (!exame) return null;
-                                    return (
-                                      <Badge key={exameId} variant="outline" className="text-xs bg-white border-purple-300 text-purple-700">
-                                        {exame.isImage ? '🖼️' : '📄'} {exame.nome}
-                                      </Badge>
-                                    );
-                                  })}
-                                </div>
-                                <p className="text-xs text-purple-600 mt-2">
-                                  Ao processar a transcrição, a IA analisará {examesAnexados.filter(e => examesSelecionadosParaIA.has(e.id) && e.isImage).length} imagem(ns) e incluirá {examesAnexados.filter(e => examesSelecionadosParaIA.has(e.id) && e.isPdf).length} PDF(s) no contexto.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </CardContent>
@@ -1094,12 +1061,19 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               {/* Coluna Direita - Histórico de Consultas */}
               <div className="col-span-4">
                 <Card className="border border-slate-200 shadow-sm overflow-hidden bg-white h-full">
-                  <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-4">
-                    <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-500" />
-                      Histórico de Consultas
-                    </CardTitle>
-                    <Badge variant="outline" className="text-xs bg-slate-50 text-slate-600">
+                  <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white flex flex-row items-center justify-between py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                        <Calendar className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-semibold text-slate-800">
+                          Histórico de Consultas
+                        </CardTitle>
+                        <p className="text-xs text-slate-500 mt-0.5">Consultas anteriores do paciente</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-semibold">
                       {historicoConsultas.length}
                     </Badge>
                   </CardHeader>
@@ -1110,13 +1084,15 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
                         </div>
                       ) : historicoConsultas.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                          <FileText className="w-10 h-10 text-slate-200 mb-3" />
-                          <p className="text-sm text-slate-500 font-medium">Primeira consulta</p>
-                          <p className="text-xs text-slate-400 mt-1">Nenhum histórico anterior</p>
+                        <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
+                            <FileText className="w-8 h-8 text-slate-300" />
+                          </div>
+                          <p className="text-sm text-slate-600 font-semibold mb-1">Primeira consulta</p>
+                          <p className="text-xs text-slate-400">Nenhum histórico anterior disponível</p>
                         </div>
                       ) : (
-                        <div className="divide-y divide-slate-100">
+                        <div className="p-3 space-y-3">
                           {historicoConsultas.map((consultaHist) => {
                             const dataHora = new Date(consultaHist.dataHora);
                             const prontuario = consultaHist.prontuarios?.[0];
@@ -1125,70 +1101,123 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                             return (
                               <div
                                 key={consultaHist.id}
-                                className={`p-4 transition-colors ${
+                                className={`group relative rounded-xl border transition-all duration-200 ${
                                   isCurrent
-                                    ? 'bg-slate-50 border-l-2 border-l-slate-800'
-                                    : 'hover:bg-slate-50'
+                                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm'
+                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'
                                 }`}
                               >
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-sm font-semibold text-slate-800">
-                                    {formatDate(dataHora)}
-                                  </span>
-                                  {isCurrent && (
-                                    <Badge className="bg-slate-800 text-white text-xs px-1.5 py-0">
+                                {isCurrent && (
+                                  <div className="absolute top-0 right-0 -mt-2 -mr-2">
+                                    <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 shadow-md">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse" />
                                       Atual
                                     </Badge>
-                                  )}
-                                </div>
-                                <span className="text-xs text-slate-500">
-                                  {formatTime(dataHora)}
-                                </span>
-
-                                {consultaHist.medico?.usuario?.nome && (
-                                  <p className="text-xs text-slate-600 mt-1">
-                                    {consultaHist.medico.usuario.nome}
-                                  </p>
+                                  </div>
                                 )}
+                                
+                                <div className="p-4">
+                                  {/* Header com data e hora */}
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                        isCurrent 
+                                          ? 'bg-blue-500 text-white' 
+                                          : 'bg-slate-100 text-slate-600'
+                                      }`}>
+                                        <Calendar className="w-4 h-4" />
+                                      </div>
+                                      <div>
+                                        <p className={`text-sm font-semibold ${
+                                          isCurrent ? 'text-blue-900' : 'text-slate-800'
+                                        }`}>
+                                          {formatDate(dataHora)}
+                                        </p>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                          <Clock className="w-3 h-3 text-slate-400" />
+                                          <span className="text-xs text-slate-500">
+                                            {formatTime(dataHora)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
 
-                                {consultaHist.tipoConsulta?.nome && (
-                                  <Badge variant="secondary" className="text-xs mt-2">
-                                    {consultaHist.tipoConsulta.nome}
-                                  </Badge>
-                                )}
-
-                                {prontuario?.diagnostico && (
-                                  <p className="text-xs text-slate-500 mt-2 line-clamp-2">
-                                    {prontuario.diagnostico}
-                                  </p>
-                                )}
-
-                                <div className="flex items-center gap-2 mt-2">
-                                  {prontuario && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 text-xs text-slate-600 hover:text-slate-800 hover:bg-slate-100 p-0"
-                                      onClick={() => handleViewProntuario(consultaHist.id)}
-                                    >
-                                      Ver prontuário
-                                    </Button>
+                                  {/* Médico */}
+                                  {consultaHist.medico?.usuario?.nome && (
+                                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
+                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                                        <User className="w-3.5 h-3.5 text-slate-500" />
+                                      </div>
+                                      <p className="text-xs font-medium text-slate-700">
+                                        {consultaHist.medico.usuario.nome}
+                                      </p>
+                                    </div>
                                   )}
-                                  {consultaHist.documentos && consultaHist.documentos.length > 0 && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 text-xs text-slate-600 hover:text-slate-800 hover:bg-slate-100 p-0 flex items-center gap-1"
-                                      onClick={() => {
-                                        setSelectedConsultaForDocumentos(consultaHist.id);
-                                        setSelectedConsultaDataForDocumentos(consultaHist.dataHora);
-                                        setDocumentosDialogOpen(true);
-                                      }}
-                                    >
-                                      <FileCheck className="w-3 h-3" />
-                                      Documentos ({consultaHist.documentos.length})
-                                    </Button>
+
+                                  {/* Tipo de consulta */}
+                                  {consultaHist.tipoConsulta?.nome && (
+                                    <div className="mb-3">
+                                      <Badge 
+                                        variant="outline" 
+                                        className={`text-xs ${
+                                          isCurrent 
+                                            ? 'bg-blue-100 text-blue-700 border-blue-300' 
+                                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                                        }`}
+                                      >
+                                        {consultaHist.tipoConsulta.nome}
+                                      </Badge>
+                                    </div>
                                   )}
+
+                                  {/* Diagnóstico */}
+                                  {prontuario?.diagnostico && (
+                                    <div className="mb-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                                      <p className="text-xs font-medium text-slate-600 mb-1">Diagnóstico:</p>
+                                      <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed">
+                                        {prontuario.diagnostico}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Ações */}
+                                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                    {prontuario && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className={`h-8 text-xs gap-1.5 flex-1 ${
+                                          isCurrent
+                                            ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-100'
+                                            : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
+                                        }`}
+                                        onClick={() => handleViewProntuario(consultaHist.id)}
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Ver prontuário
+                                      </Button>
+                                    )}
+                                    {consultaHist.documentos && consultaHist.documentos.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className={`h-8 text-xs gap-1.5 ${
+                                          isCurrent
+                                            ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-100'
+                                            : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
+                                        }`}
+                                        onClick={() => {
+                                          setSelectedConsultaForDocumentos(consultaHist.id);
+                                          setSelectedConsultaDataForDocumentos(consultaHist.dataHora);
+                                          setDocumentosDialogOpen(true);
+                                        }}
+                                      >
+                                        <FileCheck className="w-3.5 h-3.5" />
+                                        <span className="font-semibold">{consultaHist.documentos.length}</span>
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             );
@@ -2029,7 +2058,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 mr-[60px]">
                     <Button
                       variant="outline"
                       className="h-9 px-4 text-sm gap-2"

@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
-import { ProntuariosTable } from "./prontuarios-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2, FileText, Filter, Search } from "lucide-react";
+import { ProntuariosTable } from "./prontuarios-table";
 
 interface Prontuario {
   id: string;
@@ -78,46 +77,49 @@ export function ProntuariosContent() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-2">
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        <div className="flex items-center justify-between px-4 lg:px-6">
-          <div>
-            <h1 className="text-3xl font-bold">Histórico de Prontuários</h1>
-            <p className="text-muted-foreground">
-              Visualize e gerencie o histórico de prontuários médicos
-            </p>
-          </div>
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <FileText className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Prontuários</h1>
         </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Visualize e gerencie os prontuários dos pacientes
+        </p>
+      </div>
 
-        <div className="px-4 lg:px-6">
-          <div className="mb-4">
-            <Label htmlFor="search">Buscar</Label>
-            <Input
-              id="search"
-              placeholder="Buscar por paciente, CPF ou diagnóstico..."
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Prontuários</CardTitle>
+          </div>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+            <Input 
+              type="search"
+              placeholder="Buscar por paciente..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-md"
+              className="pl-9 h-8 text-xs bg-background w-64" 
             />
           </div>
-
+        </CardHeader>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
+            <div className="flex items-center justify-center py-12 px-6">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Carregando prontuários...</p>
+              </div>
             </div>
-          ) : prontuarios.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-8">
-                <p className="text-muted-foreground">
-                  Nenhum prontuário encontrado
-                </p>
-              </CardContent>
-            </Card>
           ) : (
-            <ProntuariosTable data={prontuarios} />
+            <ProntuariosTable data={prontuarios} search={search} onSearchChange={setSearch} />
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

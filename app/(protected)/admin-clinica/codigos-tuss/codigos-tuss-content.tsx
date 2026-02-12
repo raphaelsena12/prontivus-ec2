@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileCode } from "lucide-react";
+import { Loader2, FileCode, Filter, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { CodigosTussTable } from "./components/codigos-tuss-table";
 import { CodigoTussDeleteDialog } from "./components/codigo-tuss-delete-dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface CodigoTuss {
   id: string;
@@ -94,27 +95,47 @@ export function CodigosTussContent({ clinicaId }: CodigosTussContentProps) {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        {loading ? (
-          <div className="flex items-center justify-center py-12 px-4 lg:px-6">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Carregando códigos TUSS...</p>
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <FileText className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Códigos TUSS</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie os códigos TUSS cadastrados na clínica
+        </p>
+      </div>
+
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Códigos TUSS</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 px-6">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Carregando códigos TUSS...</p>
+              </div>
             </div>
-          </div>
-        ) : codigosTuss.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 lg:px-6">
-            <p className="text-muted-foreground text-center">Nenhum código TUSS encontrado</p>
-          </div>
-        ) : (
-          <CodigosTussTable 
+          ) : codigosTuss.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-6">
+              <p className="text-muted-foreground text-center">Nenhum código TUSS encontrado</p>
+            </div>
+          ) : (
+            <CodigosTussTable 
             data={codigosTuss} 
             onDelete={handleDeleteClick}
             newButtonUrl="/admin-clinica/codigos-tuss/novo"
           />
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       <CodigoTussDeleteDialog
         open={deleteDialogOpen}

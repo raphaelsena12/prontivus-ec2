@@ -23,9 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Calendar } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -41,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 
@@ -67,8 +65,9 @@ interface FluxoCaixaTableProps {
   onDataInicioChange: (value: string) => void;
   dataFim: string;
   onDataFimChange: (value: string) => void;
+  globalFilter: string;
+  onGlobalFilterChange: (value: string) => void;
   onDelete?: (movimentacao: Movimentacao) => void;
-  newButtonUrl?: string;
 }
 
 const formatDate = (dateString: string) => {
@@ -87,14 +86,14 @@ export function FluxoCaixaTable({
   onDataInicioChange,
   dataFim,
   onDataFimChange,
+  globalFilter,
+  onGlobalFilterChange,
   onDelete,
-  newButtonUrl,
 }: FluxoCaixaTableProps) {
   const router = useRouter();
   const [data] = React.useState(() => initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
-  const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -242,57 +241,8 @@ export function FluxoCaixaTable({
   });
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4 gap-2 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-          <Input 
-            type="search"
-            placeholder="Buscar por descrição..." 
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9 h-8 text-xs bg-background" 
-          />
-        </div>
-        <Select
-          value={tipoFilter}
-          onValueChange={onTipoFilterChange}
-        >
-          <SelectTrigger className="w-[180px] h-8 text-xs">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
-            <SelectItem value="ENTRADA">Entrada</SelectItem>
-            <SelectItem value="SAIDA">Saída</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="flex items-center gap-2">
-          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="date"
-            placeholder="Data início"
-            value={dataInicio}
-            onChange={(e) => onDataInicioChange(e.target.value)}
-            className="w-[150px] h-8 text-xs"
-          />
-          <span className="text-muted-foreground text-xs">até</span>
-          <Input
-            type="date"
-            placeholder="Data fim"
-            value={dataFim}
-            onChange={(e) => onDataFimChange(e.target.value)}
-            className="w-[150px] h-8 text-xs"
-          />
-        </div>
-        {newButtonUrl && (
-          <Button onClick={() => router.push(newButtonUrl)} className="text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Nova Movimentação
-          </Button>
-        )}
-      </div>
-      <div className="px-4 lg:px-6">
+    <div className="flex flex-col gap-4 overflow-auto">
+      <div className="overflow-hidden px-6 pt-6">
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader className="bg-slate-100 sticky top-0 z-10">
@@ -343,7 +293,7 @@ export function FluxoCaixaTable({
           </Table>
         </div>
       </div>
-      <div className="flex items-center justify-between px-4 lg:px-6 pt-4">
+      <div className="flex items-center justify-between px-6 pb-6">
         <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
           {table.getFilteredRowModel().rows.length} movimentação(ões) encontrada(s).
         </div>

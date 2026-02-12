@@ -21,6 +21,32 @@ interface SendEmailOptions {
 }
 
 /**
+ * Verifica se um email está no domínio verificado (prontivus.com ou *.prontivus.com)
+ */
+function isProntivusEmail(email: string): boolean {
+  const emailLower = email.toLowerCase();
+  // Aceita qualquer email do domínio prontivus.com ou subdomínios (*.prontivus.com)
+  return emailLower.includes("@") && emailLower.endsWith(".prontivus.com");
+}
+
+/**
+ * Obtém o endereço para usar como Source
+ * 
+ * IMPORTANTE: Se o domínio prontivus.com está verificado no SES,
+ * qualquer email @prontivus.com ou @*.prontivus.com deve funcionar.
+ * Sempre usamos o email personalizado se for do domínio prontivus.com.
+ */
+function getSourceEmail(customFrom?: string): string {
+  // Se houver email personalizado e for do domínio prontivus.com, usar ele
+  if (customFrom && isProntivusEmail(customFrom)) {
+    return customFrom;
+  }
+  
+  // Se não houver email personalizado ou não for do domínio, usar padrão
+  return process.env.SES_FROM_EMAIL || "noreply@prontivus.com";
+}
+
+/**
  * Envia um email usando AWS SES com retry automático
  */
 export async function sendEmail({
@@ -39,17 +65,23 @@ export async function sendEmail({
   const maxRetries = 3;
   let lastError: Error | null = null;
 
-  // Email remetente padrão
-  const emailFrom = from || process.env.SES_FROM_EMAIL || "noreply@prontivus.com";
-  const fromAddress = fromName
-    ? `${fromName} <${emailFrom}>`
-    : emailFrom;
+  // Obter email para Source (sempre será do domínio prontivus.com)
+  const sourceEmail = getSourceEmail(from);
+  
+  // Formatar endereço Source com nome se fornecido
+  const sourceAddress = fromName
+    ? `${fromName} <${sourceEmail}>`
+    : sourceEmail;
 
   // Tentar enviar com retry
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const params: SendEmailCommandInput = {
-        Source: fromAddress,
+        // SEMPRE usar email do domínio prontivus.com no Source
+        // Se foi fornecido email personalizado (*@*.prontivus.com), usar ele
+        Source: sourceAddress,
+        // ReturnPath deve ser o mesmo email do Source para melhor autenticação
+        ReturnPath: sourceEmail,
         Destination: {
           ToAddresses: [to],
         },
@@ -87,6 +119,7 @@ export async function sendEmail({
       const result = await sesClient.send(command);
 
       console.log("Email enviado com sucesso via SES:", result.MessageId);
+      console.log(`Source: ${sourceEmail}${fromName ? ` (${fromName})` : ""}`);
       return; // Sucesso, sair do loop
     } catch (error: any) {
       lastError = error;

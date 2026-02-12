@@ -107,7 +107,10 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData): number {
 
   if (data.logoBase64) {
     try {
-      doc.addImage(data.logoBase64, "WEBP", MARGIN, y, 40, 12);
+      // Renderizar logo com dimensões proporcionais para evitar distorção
+      const logoHeight = 12;
+      const logoWidth = 40;
+      doc.addImage(data.logoBase64, "WEBP", MARGIN, y, logoWidth, logoHeight);
     } catch {
       doc.setFontSize(16);
       doc.setFont("helvetica", "bold");
@@ -170,39 +173,40 @@ export function drawTitle(doc: jsPDF, title: string, subtitle?: string): number 
   return y + 14;
 }
 
-/** Desenha card de identificação do paciente. Retorna Y após card */
+/** Desenha identificação do paciente sem box colorido. Retorna Y após seção */
 export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): number {
-  const cardX = MARGIN;
-  const cardW = CONTENT_WIDTH;
-  const cardRadius = 3;
+  const startY = y;
 
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(cardX, y, cardW, 28, cardRadius, cardRadius, "F");
-
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(cardX, y, cardW, 28, cardRadius, cardRadius, "S");
-
-  y += 6;
+  // Label da seção
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate400);
-  doc.text("PACIENTE", cardX + 5, y);
-
+  doc.text("PACIENTE", MARGIN, y);
   y += 5;
+
+  // Nome do paciente em destaque
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome, cardX + 5, y);
+  doc.text(data.pacienteNome, MARGIN, y);
 
   y += 6;
+
+  // Informações do paciente
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate600);
   const pacienteInfo = `CPF: ${formatCPF(data.pacienteCpf)}     |     Data de Nascimento: ${data.pacienteDataNascimento}`;
-  doc.text(pacienteInfo, cardX + 5, y);
+  doc.text(pacienteInfo, MARGIN, y);
 
-  return y + 16;
+  y += 8;
+
+  // Linha separadora sutil
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+
+  return y + 10;
 }
 
 /** Desenha rodapé com assinatura do médico. Posiciona fixo no fim da página */
@@ -317,26 +321,26 @@ export function drawSectionLabel(doc: jsPDF, label: string, y: number): number {
   return y + 6;
 }
 
-/** Desenha card de observações com barra lateral azul */
+/** Desenha seção de observações sem box colorido. Retorna Y após seção */
 export function drawObservationCard(doc: jsPDF, text: string, y: number): number {
-  doc.setFillColor(...COLORS.slate50);
-  const obsText = doc.splitTextToSize(text, CONTENT_WIDTH - 14);
-  const obsHeight = obsText.length * 4.5 + 8;
+  // Label da seção
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("OBSERVAÇÕES", MARGIN, y);
+  y += 6;
 
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, obsHeight, 2, 2, "F");
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, obsHeight, 2, 2, "S");
-
-  doc.setFillColor(...COLORS.blue600);
-  doc.roundedRect(MARGIN, y, 2, obsHeight, 1, 1, "F");
-
-  doc.setFontSize(9);
+  // Texto das observações
+  const obsText = doc.splitTextToSize(text, CONTENT_WIDTH);
+  doc.setFontSize(9.5);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(obsText, MARGIN + 7, y + 5);
+  doc.setTextColor(...COLORS.slate800);
+  doc.setLineHeightFactor(1.5);
+  doc.text(obsText, MARGIN, y);
 
-  return y + obsHeight + 10;
+  y += obsText.length * 5 + 8;
+
+  return y;
 }
 
 /** Desenha campo de formulário inline (label: valor) dentro de um card */

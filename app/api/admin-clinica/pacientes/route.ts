@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import bcrypt from "bcryptjs";
 
 // Schema de validação
 const pacienteSchema = z.object({
@@ -162,12 +163,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verificar se já existe usuário com este CPF
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: { cpf: cpfLimpo },
+    });
+
+    if (usuarioExistente) {
+      return NextResponse.json(
+        { error: "CPF já está cadastrado como usuário" },
+        { status: 409 }
+      );
+    }
+
+    // Gerar email se não fornecido (baseado no CPF)
+    const emailPaciente = (data.email && data.email.trim() !== "") 
+      ? data.email.trim() 
+      : `${cpfLimpo}@temp.prontivus.com`;
+
+    // Verificar se email já existe
+    const emailExistente = await prisma.usuario.findUnique({
+      where: { email: emailPaciente },
+    });
+
+    if (emailExistente) {
+      return NextResponse.json(
+        { error: "Email já cadastrado" },
+        { status: 409 }
+      );
+    }
+
+    // Hash da senha (CPF)
+    const senhaHash = await bcrypt.hash(cpfLimpo, 10);
+
+    // Criar usuário automaticamente
+    const usuario = await prisma.usuario.create({
+      data: {
+        nome: data.nome,
+        email: emailPaciente,
+        cpf: cpfLimpo,
+        telefone: (data.telefone && data.telefone.trim() !== "") 
+          ? data.telefone.replace(/\D/g, "") 
+          : null,
+        tipo: TipoUsuario.PACIENTE,
+        senha: senhaHash,
+        clinicaId: auth.clinicaId!,
+        ativo: true,
+        primeiroAcesso: true,
+      },
+    });
+
+    // Criar paciente associado ao usuário
     const paciente = await prisma.paciente.create({
       data: {
         ...data,
         cpf: cpfLimpo,
         clinicaId: auth.clinicaId!,
         email: data.email || null,
+        usuarioId: usuario.id,
       },
     });
 

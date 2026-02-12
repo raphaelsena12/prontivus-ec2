@@ -97,6 +97,7 @@ model Tenant {
   bloqueiosAgenda           BloqueioAgenda[]
   manipulados               Manipulado[]
   documentosGerados         DocumentoGerado[]
+  pagamentosConsultas       PagamentoConsulta[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -243,6 +244,7 @@ model Paciente {
   mensagens        Mensagem[]
   pacientesPlanos  PacientePlano[]
   prontuarios      Prontuario[]
+  pagamentosConsultas PagamentoConsulta[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -504,6 +506,7 @@ model Consulta {
   prescricoesMedicamentos  PrescricaoMedicamento[]
   guiasTiss                GuiaTiss[]
   documentos               DocumentoGerado[]
+  pagamentos               PagamentoConsulta[]
 
   @@index([clinicaId])
   @@index([pacienteId])
@@ -955,4 +958,34 @@ model DocumentoGerado {
   @@index([medicoId])
   @@index([tipoDocumento])
   @@map("documentos_gerados")
+}
+
+model PagamentoConsulta {
+  id                String          @id @default(uuid())
+  clinicaId         String
+  pacienteId        String
+  consultaId        String?
+  valor             Decimal         @db.Decimal(10, 2)
+  status            StatusPagamento @default(PENDENTE)
+  metodoPagamento   String?         // "STRIPE", "PIX", etc
+  stripeSessionId   String?         @unique
+  stripePaymentId   String?
+  transacaoId       String?
+  dataPagamento     DateTime?
+  dataVencimento    DateTime?
+  observacoes       String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  clinica   Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente  Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  consulta  Consulta? @relation(fields: [consultaId], references: [id], onDelete: SetNull)
+
+  @@index([clinicaId])
+  @@index([pacienteId])
+  @@index([consultaId])
+  @@index([status])
+  @@index([stripeSessionId])
+  @@index([dataPagamento])
+  @@map("pagamentos_consultas")
 }

@@ -19,6 +19,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { TenantSelector } from "@/components/tenant-selector";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+
+const capitalizeWords = (str: string): string => {
+  return str
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
 
 const getPageTitle = (pathname: string): string => {
   const routes: Record<string, string> = {
@@ -44,6 +59,7 @@ const getPageTitle = (pathname: string): string => {
     "/medico/agendamentos": "Agendamentos",
     "/medico/fila-atendimento": "Fila de Atendimento",
     "/medico/prontuarios": "Prontuários",
+    "/medico/dashboard-financeiro": "Dashboard Financeiro",
     "/medico/contas-pagar": "Contas a Pagar",
     "/medico/contas-receber": "Contas a Receber",
     "/medico/fluxo-caixa": "Fluxo de Caixa",
@@ -57,7 +73,6 @@ const getPageTitle = (pathname: string): string => {
     "/secretaria/medicamentos": "Medicamentos",
     "/secretaria/pacientes": "Pacientes",
     "/secretaria/check-in": "Check-in",
-    "/secretaria/agendamentos/novo": "Novo Agendamento",
     "/paciente": "Início",
     "/paciente/novo-agendamento": "Novo Agendamento",
     "/paciente/historico-consultas": "Histórico de Consultas",
@@ -70,7 +85,66 @@ const getPageTitle = (pathname: string): string => {
     "/configuracoes": "Configurações",
   };
 
-  return routes[pathname] || pathname.split("/").pop()?.replace(/-/g, " ") || "Dashboard";
+  if (routes[pathname]) {
+    return routes[pathname];
+  }
+
+  // Se não houver rota mapeada, capitaliza a primeira letra de cada palavra
+  const lastSegment = pathname.split("/").pop() || "";
+  const formatted = lastSegment.replace(/-/g, " ");
+  return capitalizeWords(formatted) || "Dashboard";
+};
+
+const getBreadcrumbItems = (pathname: string) => {
+  const segments = pathname.split("/").filter(Boolean);
+  const items: Array<{ label: string; href: string; isLast: boolean }> = [];
+
+  const routeLabels: Record<string, string> = {
+    "super-admin": "Super Admin",
+    "clinicas": "Clínicas",
+    "pagamentos": "Pagamentos",
+    "configuracoes": "Configurações",
+    "admin-clinica": "Admin Clínica",
+    "exames": "Exames",
+    "especialidades": "Especialidades",
+    "medicamentos": "Medicamentos",
+    "pacientes": "Pacientes",
+    "usuarios": "Usuários",
+    "medicos": "Médicos",
+    "procedimentos": "Procedimentos",
+    "formas-pagamento": "Formas de Pagamento",
+    "estoque": "Estoque",
+    "contas-pagar": "Contas a Pagar",
+    "contas-receber": "Contas a Receber",
+    "fluxo-caixa": "Fluxo de Caixa",
+    "medico": "Médico",
+    "agendamentos": "Agendamentos",
+    "fila-atendimento": "Fila de Atendimento",
+    "prontuarios": "Prontuários",
+    "dashboard-financeiro": "Dashboard Financeiro",
+    "inadimplencia": "Inadimplência",
+    "manipulados": "Manipulados",
+    "secretaria": "Secretária",
+    "painel-chamadas": "Painel de Chamadas",
+    "check-in": "Check-in",
+    "paciente": "Paciente",
+    "novo-agendamento": "Novo Agendamento",
+    "historico-consultas": "Histórico de Consultas",
+    "historico-prescricoes": "Histórico de Prescrições",
+    "dashboard": "Dashboard",
+  };
+
+  segments.forEach((segment, index) => {
+    const href = "/" + segments.slice(0, index + 1).join("/");
+    const label = routeLabels[segment] || capitalizeWords(segment.replace(/-/g, " "));
+    items.push({
+      label,
+      href,
+      isLast: index === segments.length - 1,
+    });
+  });
+
+  return items;
 };
 
 interface SiteHeaderProps {
@@ -124,9 +198,22 @@ export function SiteHeader({ user }: SiteHeaderProps) {
               Bem-vindo, {user.name}.
             </h1>
           ) : (
-            <h1 className="text-[1.35rem] font-semibold tracking-tight text-foreground">
-              {pageTitle}
-            </h1>
+            <Breadcrumb>
+              <BreadcrumbList>
+                {getBreadcrumbItems(pathname).map((item, index) => (
+                  <React.Fragment key={item.href}>
+                    <BreadcrumbItem>
+                      {item.isLast ? (
+                        <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                    {!item.isLast && <BreadcrumbSeparator />}
+                  </React.Fragment>
+                ))}
+              </BreadcrumbList>
+            </Breadcrumb>
           )}
         </div>
 

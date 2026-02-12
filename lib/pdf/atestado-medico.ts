@@ -74,11 +74,19 @@ export function generateAtestadoPDF(data: AtestadoData): ArrayBuffer {
   // =====================================================
   // CORPO DO ATESTADO
   // =====================================================
-  y = drawSectionLabel(doc, "DECLARACAO", y);
+  y += 8;
+  
+  // Label da seção
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("DECLARAÇÃO", MARGIN, y);
+  y += 6;
 
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate800);
+  doc.setLineHeightFactor(1.6);
 
   let textoAtestado: string;
 
@@ -107,16 +115,16 @@ export function generateAtestadoPDF(data: AtestadoData): ArrayBuffer {
     }
   }
 
-  const splitText = doc.splitTextToSize(textoAtestado, CONTENT_WIDTH - 4);
-  doc.text(splitText, MARGIN + 2, y);
-  y += splitText.length * 5 + 8;
+  const splitText = doc.splitTextToSize(textoAtestado, CONTENT_WIDTH);
+  doc.text(splitText, MARGIN, y);
+  y += splitText.length * 5 + 10;
 
   // =====================================================
   // HISTÓRICO DE CIDs (para tipo historico-cid)
   // =====================================================
   if (tipo === "afastamento-historico-cid") {
-    y = drawSectionLabel(doc, "HISTORICO DE CID", y);
-
+    y += 4;
+    
     const cids = data.historicoCids && data.historicoCids.length > 0
       ? data.historicoCids
       : data.cidCodigo
@@ -124,28 +132,35 @@ export function generateAtestadoPDF(data: AtestadoData): ArrayBuffer {
         : [];
 
     if (cids.length > 0) {
-      doc.setFillColor(...COLORS.slate50);
-      const cidHeight = cids.length * 8 + 8;
-      doc.roundedRect(MARGIN, y, CONTENT_WIDTH, cidHeight, 2, 2, "F");
-      doc.setDrawColor(...COLORS.slate200);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(MARGIN, y, CONTENT_WIDTH, cidHeight, 2, 2, "S");
-
-      let cidY = y + 6;
-      cids.forEach((cid) => {
+      // Label da seção
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COLORS.slate400);
+      doc.text("HISTÓRICO DE CID-10", MARGIN, y);
+      y += 6;
+      
+      cids.forEach((cid, index) => {
+        // Separador entre itens (exceto o primeiro)
+        if (index > 0) {
+          doc.setDrawColor(...COLORS.slate200);
+          doc.setLineWidth(0.2);
+          doc.line(MARGIN, y - 2, PAGE_WIDTH - MARGIN, y - 2);
+          y += 2;
+        }
+        
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(cid.codigo, MARGIN + 5, cidY);
+        doc.text(cid.codigo, MARGIN, y);
 
         doc.setFont("helvetica", "normal");
         doc.setTextColor(...COLORS.slate600);
-        doc.text(` — ${cid.descricao}`, MARGIN + 5 + doc.getTextWidth(cid.codigo), cidY);
+        doc.text(` — ${cid.descricao}`, MARGIN + doc.getTextWidth(cid.codigo), y);
 
-        cidY += 8;
+        y += 9;
       });
 
-      y += cidHeight + 8;
+      y += 6;
     }
   }
 
@@ -153,49 +168,58 @@ export function generateAtestadoPDF(data: AtestadoData): ArrayBuffer {
   // SEÇÃO CID (para tipo indeterminado)
   // =====================================================
   if (tipo === "afastamento-indeterminado" && data.cidCodigo) {
-    y = drawSectionLabel(doc, "CID-10", y);
+    y += 6;
+    
+    // Label da seção
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.slate400);
+    doc.text("CID-10", MARGIN, y);
+    y += 6;
 
-    doc.setFillColor(...COLORS.slate50);
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "F");
-    doc.setDrawColor(...COLORS.slate200);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "S");
-
-    doc.setFontSize(10);
+    doc.setFontSize(10.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.slate800);
     const cidText = data.cidDescricao
       ? `${data.cidCodigo} — ${data.cidDescricao}`
       : data.cidCodigo;
-    doc.text(cidText, MARGIN + 5, y + 9);
+    doc.text(cidText, MARGIN, y);
 
-    y += 22;
+    y += 12;
   }
 
   // =====================================================
   // AUTORIZAÇÃO DE SIGILO (para tipos com CID)
   // =====================================================
   if (tipo === "afastamento-cid" || tipo === "afastamento-historico-cid" || tipo === "afastamento-indeterminado") {
-    y = drawSectionLabel(doc, "AUTORIZACAO", y);
+    y += 8;
+    
+    // Label da seção
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.slate400);
+    doc.text("AUTORIZAÇÃO", MARGIN, y);
+    y += 6;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate800);
+    doc.setLineHeightFactor(1.5);
 
     const textoAutorizacao =
       `Eu, ${data.pacienteNome}, autorizo o medico a declarar nominalmente, ou atraves do CID, ` +
       `meu diagnostico, liberando-o da guarda do sigilo profissional.`;
 
-    const splitAuth = doc.splitTextToSize(textoAutorizacao, CONTENT_WIDTH - 4);
-    doc.text(splitAuth, MARGIN + 2, y);
-    y += splitAuth.length * 4.5 + 8;
+    const splitAuth = doc.splitTextToSize(textoAutorizacao, CONTENT_WIDTH);
+    doc.text(splitAuth, MARGIN, y);
+    y += splitAuth.length * 5 + 8;
   }
 
   // =====================================================
   // OBSERVAÇÕES (se houver)
   // =====================================================
   if (data.observacoes && data.observacoes.trim()) {
-    y = drawSectionLabel(doc, "OBSERVACOES", y);
+    y += 4;
     y = drawObservationCard(doc, data.observacoes, y);
   }
 

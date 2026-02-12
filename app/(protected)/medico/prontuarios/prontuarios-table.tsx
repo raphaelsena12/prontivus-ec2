@@ -16,21 +16,12 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import {
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconLayoutColumns,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -86,6 +77,8 @@ interface Prontuario {
 
 interface ProntuariosTableProps {
   data: Prontuario[];
+  search?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 const formatDate = (date: Date | null) => {
@@ -110,9 +103,10 @@ const formatDateOnly = (date: Date | null) => {
 
 export function ProntuariosTable({
   data: initialData,
+  search = "",
+  onSearchChange,
 }: ProntuariosTableProps) {
   const [data] = React.useState(() => initialData);
-  const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -129,114 +123,88 @@ export function ProntuariosTable({
   const columns: ColumnDef<Prontuario>[] = React.useMemo(
     () => [
       {
-        id: "select",
-        header: ({ table }) => (
-          <div className="flex items-center justify-center">
-            <Checkbox
-              checked={
-                table.getIsAllPageRowsSelected() ||
-                (table.getIsSomePageRowsSelected() && "indeterminate")
-              }
-              onCheckedChange={(value) =>
-                table.toggleAllPageRowsSelected(!!value)
-              }
-              aria-label="Select all"
-            />
-          </div>
-        ),
-        cell: ({ row }) => (
-          <div className="flex items-center justify-center">
-            <Checkbox
-              checked={row.getIsSelected()}
-              onCheckedChange={(value) => row.toggleSelected(!!value)}
-              aria-label="Select row"
-            />
-          </div>
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-      {
         accessorKey: "paciente.nome",
-        header: "Paciente",
+        header: () => <span className="text-xs font-semibold">Paciente</span>,
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.paciente.nome}</div>
+          <div className="text-xs font-medium">{row.original.paciente.nome}</div>
         ),
         enableHiding: false,
       },
       {
         accessorKey: "paciente.cpf",
-        header: "CPF",
-        cell: ({ row }) => formatCPF(row.original.paciente.cpf),
+        header: () => <span className="text-xs font-semibold">CPF</span>,
+        cell: ({ row }) => <span className="text-xs">{formatCPF(row.original.paciente.cpf)}</span>,
       },
       {
         accessorKey: "medico.usuario.nome",
-        header: "Médico",
-        cell: ({ row }) => row.original.medico.usuario.nome,
+        header: () => <span className="text-xs font-semibold">Médico</span>,
+        cell: ({ row }) => <span className="text-xs">{row.original.medico.usuario.nome}</span>,
       },
       {
         accessorKey: "consulta.dataHora",
-        header: "Data da Consulta",
-        cell: ({ row }) => formatDate(row.original.consulta?.dataHora || null),
+        header: () => <span className="text-xs font-semibold">Data da Consulta</span>,
+        cell: ({ row }) => <span className="text-xs">{formatDate(row.original.consulta?.dataHora || null)}</span>,
       },
       {
         accessorKey: "diagnostico",
-        header: "Diagnóstico",
+        header: () => <span className="text-xs font-semibold">Diagnóstico</span>,
         cell: ({ row }) => (
-          <div className="max-w-[200px] truncate">
+          <div className="max-w-[200px] truncate text-xs">
             {row.original.diagnostico || "-"}
           </div>
         ),
       },
       {
         accessorKey: "createdAt",
-        header: "Data de Criação",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        header: () => <span className="text-xs font-semibold">Data de Criação</span>,
+        cell: ({ row }) => <span className="text-xs">{formatDate(row.original.createdAt)}</span>,
       },
       {
         id: "actions",
-        header: () => <div className="w-full text-right">Ações</div>,
+        header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
         cell: ({ row }) => (
           <Dialog>
             <DialogTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => setSelectedProntuario(row.original)}
+                className="text-xs h-7"
               >
-                <Eye className="h-4 w-4" />
+                <Eye className="h-3 w-3 mr-1.5" />
+                Ver
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Detalhes do Prontuário</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-base">Detalhes do Prontuário</DialogTitle>
+                <DialogDescription className="text-xs">
                   Informações completas do prontuário médico
                 </DialogDescription>
               </DialogHeader>
               {selectedProntuario && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h3 className="font-semibold text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-xs text-muted-foreground">
                         Paciente
                       </h3>
-                      <p className="text-base">{selectedProntuario.paciente.nome}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs mt-1">{selectedProntuario.paciente.nome}</p>
+                      <p className="text-xs text-muted-foreground">
                         CPF: {formatCPF(selectedProntuario.paciente.cpf)}
                       </p>
                       {selectedProntuario.paciente.dataNascimento && (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Nascimento:{" "}
                           {formatDateOnly(selectedProntuario.paciente.dataNascimento)}
                         </p>
                       )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-xs text-muted-foreground">
                         Médico
                       </h3>
-                      <p className="text-base">
+                      <p className="text-xs mt-1">
                         {selectedProntuario.medico.usuario.nome}
                       </p>
                     </div>
@@ -244,74 +212,74 @@ export function ProntuariosTable({
 
                   {selectedProntuario.consulta && (
                     <div>
-                      <h3 className="font-semibold text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-xs text-muted-foreground">
                         Consulta
                       </h3>
-                      <p className="text-base">
+                      <p className="text-xs mt-1">
                         {formatDate(selectedProntuario.consulta.dataHora)}
                       </p>
                     </div>
                   )}
 
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
                       Anamnese
                     </h3>
-                    <p className="text-base whitespace-pre-wrap">
+                    <p className="text-xs whitespace-pre-wrap">
                       {selectedProntuario.anamnese || "-"}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
                       Exame Físico
                     </h3>
-                    <p className="text-base whitespace-pre-wrap">
+                    <p className="text-xs whitespace-pre-wrap">
                       {selectedProntuario.exameFisico || "-"}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
                       Diagnóstico
                     </h3>
-                    <p className="text-base whitespace-pre-wrap">
+                    <p className="text-xs whitespace-pre-wrap">
                       {selectedProntuario.diagnostico || "-"}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
                       Conduta
                     </h3>
-                    <p className="text-base whitespace-pre-wrap">
+                    <p className="text-xs whitespace-pre-wrap">
                       {selectedProntuario.conduta || "-"}
                     </p>
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-sm text-muted-foreground mb-2">
+                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
                       Evolução
                     </h3>
-                    <p className="text-base whitespace-pre-wrap">
+                    <p className="text-xs whitespace-pre-wrap">
                       {selectedProntuario.evolucao || "-"}
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
                     <div>
-                      <h3 className="font-semibold text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-xs text-muted-foreground">
                         Criado em
                       </h3>
-                      <p className="text-sm">
+                      <p className="text-xs">
                         {formatDate(selectedProntuario.createdAt)}
                       </p>
                     </div>
                     <div>
-                      <h3 className="font-semibold text-sm text-muted-foreground">
+                      <h3 className="font-semibold text-xs text-muted-foreground">
                         Atualizado em
                       </h3>
-                      <p className="text-sm">
+                      <p className="text-xs">
                         {formatDate(selectedProntuario.updatedAt)}
                       </p>
                     </div>
@@ -334,13 +302,10 @@ export function ProntuariosTable({
     state: {
       sorting,
       columnVisibility,
-      rowSelection,
       columnFilters,
       pagination,
     },
     getRowId: (row) => row.id,
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
@@ -354,105 +319,65 @@ export function ProntuariosTable({
   });
 
   return (
-    <div className="flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-      <div className="flex items-center justify-between">
-        <div className="text-muted-foreground flex-1 text-sm">
-          {table.getFilteredSelectedRowModel().rows.length} de{" "}
-          {table.getFilteredRowModel().rows.length} prontuário(s) selecionado(s).
-        </div>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Colunas</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  );
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader className="bg-muted sticky top-0 z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
+    <div className="flex flex-col gap-4 overflow-auto">
+      <div className="overflow-hidden">
+        <div className="px-6 pt-6">
+          <Table>
+            <TableHeader className="bg-muted sticky top-0 z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} colSpan={header.colSpan} className="text-xs font-semibold py-3">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  Nenhum prontuário encontrado.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-xs py-3">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-xs"
+                  >
+                    Nenhum prontuário encontrado.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
-      <div className="flex items-center justify-between px-4">
-        <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-          {table.getFilteredSelectedRowModel().rows.length} de{" "}
-          {table.getFilteredRowModel().rows.length} prontuário(s) selecionado(s).
+      <div className="flex items-center justify-between px-6 pb-6">
+        <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
+          {table.getFilteredRowModel().rows.length} prontuário(s) encontrado(s).
         </div>
         <div className="flex w-full items-center gap-8 lg:w-fit">
           <div className="hidden items-center gap-2 lg:flex">
-            <Label htmlFor="rows-per-page" className="text-sm font-medium">
+            <Label htmlFor="rows-per-page" className="text-xs font-medium">
               Linhas por página
             </Label>
             <Select
@@ -461,7 +386,7 @@ export function ProntuariosTable({
                 table.setPageSize(Number(value));
               }}
             >
-              <SelectTrigger size="sm" className="w-20" id="rows-per-page">
+              <SelectTrigger size="sm" className="w-20 text-xs" id="rows-per-page">
                 <SelectValue
                   placeholder={table.getState().pagination.pageSize}
                 />
@@ -475,49 +400,49 @@ export function ProntuariosTable({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex w-fit items-center justify-center text-sm font-medium">
+          <div className="flex w-fit items-center justify-center text-xs font-medium">
             Página {table.getState().pagination.pageIndex + 1} de{" "}
             {table.getPageCount()}
           </div>
           <div className="ml-auto flex items-center gap-2 lg:ml-0">
             <Button
               variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
+              className="hidden h-7 w-7 p-0 lg:flex text-xs"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
               <span className="sr-only">Primeira página</span>
-              <IconChevronsLeft />
+              <IconChevronsLeft className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="outline"
-              className="size-8"
+              className="h-7 w-7 text-xs"
               size="icon"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
               <span className="sr-only">Página anterior</span>
-              <IconChevronLeft />
+              <IconChevronLeft className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="outline"
-              className="size-8"
+              className="h-7 w-7 text-xs"
               size="icon"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
               <span className="sr-only">Próxima página</span>
-              <IconChevronRight />
+              <IconChevronRight className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="outline"
-              className="hidden size-8 lg:flex"
+              className="hidden h-7 w-7 lg:flex text-xs"
               size="icon"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
             >
               <span className="sr-only">Última página</span>
-              <IconChevronsRight />
+              <IconChevronsRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>

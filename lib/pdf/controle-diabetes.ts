@@ -37,39 +37,58 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   // =====================================================
   let y = 40;
 
-  doc.setFontSize(16);
+  doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text("CONTROLE DE DIABETES", MARGIN, y);
+  doc.text("CONTROLE DE DIABETES", PAGE_WIDTH / 2, y, { align: "center" });
 
-  // Aviso importante em vermelho
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.red600);
-  doc.text("*IMPORTANTE - manter jejum de 2 horas antes da verificacao", PAGE_WIDTH - MARGIN, y, { align: "right" });
+  y += 12;
 
-  y += 4;
-
-  // =====================================================
-  // CARD PACIENTE COMPACTO
-  // =====================================================
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 16, 2, 2, "F");
+  // Linha separadora sutil
   doc.setDrawColor(...COLORS.slate200);
   doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 16, 2, 2, "S");
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
 
-  doc.setFontSize(9);
+  y += 10;
+
+  // Aviso importante
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome, MARGIN + 4, y + 7);
+  doc.text("IMPORTANTE: Manter jejum de 2 horas antes da verificação", PAGE_WIDTH / 2, y, { align: "center" });
 
-  doc.setFontSize(7);
+  y += 10;
+
+  // =====================================================
+  // DADOS DO PACIENTE
+  // =====================================================
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("PACIENTE", MARGIN, y);
+
+  y += 6;
+
+  doc.setFontSize(10.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.pacienteNome, MARGIN, y);
+
+  y += 6;
+
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`Data Nasc.: ${data.pacienteDataNascimento}`, MARGIN + 4, y + 12);
+  doc.text(`Data de Nascimento: ${data.pacienteDataNascimento}`, MARGIN, y);
 
-  y += 20;
+  y += 10;
+
+  // Linha separadora
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+
+  y += 10;
 
   if (data.analitico) {
     return generateAnalitico(doc, data, y);
@@ -85,40 +104,51 @@ function generateSimples(doc: any, data: ControleDiabetesData, startY: number): 
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate600);
-  doc.text("VERIFICAR 1 VEZ AO DIA EM HORARIOS DIFERENTES", MARGIN, y);
+  doc.text("VERIFICAR 1 VEZ AO DIA EM HORÁRIOS DIFERENTES", PAGE_WIDTH / 2, y, { align: "center" });
 
-  y += 5;
+  y += 10;
 
-  // Tabela de 30 linhas
-  const lineHeight = 6.2;
+  // Tabela de 30 linhas com design melhorado
+  const lineHeight = 6.5;
   const colData = MARGIN;
   const colHora = MARGIN + 50;
   const colMg = MARGIN + 85;
 
-  // Header
-  doc.setFontSize(7);
+  // Header da tabela
+  doc.setFillColor(...COLORS.slate800);
+  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 8, 2, 2, "F");
+  
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate400);
-  doc.text("Data", colData + 10, y);
-  doc.text("Hora", colHora, y);
-  doc.text("mg/dL", colMg + 20, y);
+  doc.setTextColor(...COLORS.white);
+  doc.text("#", colData + 3, y + 5.5);
+  doc.text("Data", colData + 12, y + 5.5);
+  doc.text("Hora", colHora, y + 5.5);
+  doc.text("mg/dL", colMg + 15, y + 5.5);
 
-  y += 4;
+  y += 10;
 
   doc.setDrawColor(...COLORS.slate200);
   doc.setLineWidth(0.2);
 
   for (let i = 1; i <= 30; i++) {
     const num = String(i).padStart(2, "0");
+    
+    // Linha alternada sutil (sem fundo, apenas linha)
+    if (i % 2 === 0) {
+      doc.setDrawColor(...COLORS.slate200);
+      doc.setLineWidth(0.1);
+      doc.line(MARGIN, y - 1, PAGE_WIDTH - MARGIN, y - 1);
+    }
 
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.slate800);
-    doc.text(`${num}`, colData, y);
+    doc.text(`${num}`, colData + 3, y);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate600);
-    doc.text("Data ____/____/________", colData + 8, y);
+    doc.text("Data ____/____/________", colData + 10, y);
     doc.text("Hora ____:____", colHora, y);
     doc.text("_____________ mg/dL", colMg, y);
 
@@ -151,34 +181,46 @@ function generateSimples(doc: any, data: ControleDiabetesData, startY: number): 
 function generateAnalitico(doc: any, data: ControleDiabetesData, startY: number): ArrayBuffer {
   let y = startY;
 
-  // Header colunas
+  // Header colunas com design melhorado
   const colData = MARGIN;
   const colManha = MARGIN + 50;
   const colTarde = MARGIN + 90;
   const colNoite = MARGIN + 130;
 
-  doc.setFontSize(9);
+  doc.setFillColor(...COLORS.slate800);
+  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 8, 2, 2, "F");
+  
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("MANHA", colManha, y);
-  doc.text("TARDE", colTarde, y);
-  doc.text("NOITE", colNoite, y);
+  doc.setTextColor(...COLORS.white);
+  doc.text("#", colData + 3, y + 5.5);
+  doc.text("Data", colData + 12, y + 5.5);
+  doc.text("MANHÃ", colManha + 5, y + 5.5);
+  doc.text("TARDE", colTarde + 5, y + 5.5);
+  doc.text("NOITE", colNoite + 5, y + 5.5);
 
-  y += 5;
+  y += 10;
 
-  const lineHeight = 6.2;
+  const lineHeight = 6.5;
 
   for (let i = 1; i <= 30; i++) {
     const num = String(i).padStart(2, "0");
+    
+    // Linha alternada sutil (sem fundo, apenas linha)
+    if (i % 2 === 0) {
+      doc.setDrawColor(...COLORS.slate200);
+      doc.setLineWidth(0.1);
+      doc.line(MARGIN, y - 1, PAGE_WIDTH - MARGIN, y - 1);
+    }
 
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.slate800);
-    doc.text(`${num}`, colData, y);
+    doc.text(`${num}`, colData + 3, y);
 
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate600);
-    doc.text("Data ____/____/____", colData + 8, y);
+    doc.text("Data ____/____/____", colData + 10, y);
     doc.text("________ mg/dL", colManha, y);
     doc.text("________ mg/dL", colTarde, y);
     doc.text("________ mg/dL", colNoite, y);

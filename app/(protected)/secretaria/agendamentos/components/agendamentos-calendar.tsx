@@ -227,10 +227,6 @@ export function AgendamentosCalendar({
   const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
     if (onSlotSelect) {
       onSlotSelect(slotInfo);
-    } else {
-      const startDate = format(slotInfo.start, "yyyy-MM-dd");
-      const startTime = format(slotInfo.start, "HH:mm");
-      router.push(`/secretaria/agendamentos/novo?data=${startDate}&hora=${startTime}`);
     }
   };
 

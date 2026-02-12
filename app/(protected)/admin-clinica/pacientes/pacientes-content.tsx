@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Edit, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Upload, UserCircle, Filter } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { PacienteDeleteDialog } from "./components/paciente-delete-dialog";
 import { PacienteDialog } from "./components/paciente-dialog";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Paciente {
   id: string;
@@ -117,33 +118,50 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4 gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-            <Input 
-              placeholder="Buscar por nome, CPF ou email..." 
-              value={search} 
-              onChange={(e) => { 
-                setSearch(e.target.value); 
-                setPage(1); 
-              }} 
-              className="pl-9 h-8 text-xs bg-background" 
-            />
-          </div>
-          <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="text-xs">
-            <Upload className="mr-2 h-3.5 w-3.5" />
-            Upload em Massa
-          </Button>
-          <Button onClick={handleCreate} className="text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Novo Paciente
-          </Button>
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <UserCircle className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Pacientes</h1>
         </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie os pacientes cadastrados na clínica
+        </p>
+      </div>
 
-        <div className="px-4 lg:px-6">
-          <div className="overflow-hidden rounded-lg border">
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Pacientes</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input 
+                placeholder="Buscar por nome, CPF ou email..." 
+                value={search} 
+                onChange={(e) => { 
+                  setSearch(e.target.value); 
+                  setPage(1); 
+                }} 
+                className="pl-9 h-7 text-xs bg-background w-64" 
+              />
+            </div>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
+              <Upload className="mr-1.5 h-3 w-3" />
+              Upload em Massa
+            </Button>
+            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
+              <Plus className="mr-1.5 h-3 w-3" />
+              Novo Paciente
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-hidden px-6 pt-6">
             <Table>
               <TableHeader className="bg-slate-100 sticky top-0 z-10">
                 <TableRow>
@@ -180,23 +198,21 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
                         <div className="flex justify-end gap-2">
                           <Button 
                             variant="outline" 
-                            size="sm" 
+                            size="icon"
                             onClick={() => handleEdit(paciente)}
                             title="Editar paciente"
-                            className="text-xs h-7"
+                            className="h-7 w-7"
                           >
-                            <Edit className="h-3 w-3 mr-1.5" />
-                            Editar
+                            <Edit className="h-3 w-3" />
                           </Button>
                           <Button 
                             variant="outline" 
-                            size="sm" 
+                            size="icon"
                             onClick={() => handleDeleteClick(paciente)}
                             title="Excluir paciente"
-                            className="text-xs h-7 text-destructive hover:text-destructive"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
                           >
-                            <Trash2 className="h-3 w-3 mr-1.5" />
-                            Excluir
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
                       </TableCell>
@@ -206,10 +222,9 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
               </TableBody>
             </Table>
           </div>
-        </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 lg:px-6 pt-4">
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 pb-6 pt-4">
             <p className="text-xs text-muted-foreground">
               Página {page} de {totalPages}
             </p>
@@ -234,8 +249,9 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
               </Button>
             </div>
           </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       <PacienteDialog
         open={pacienteDialogOpen}

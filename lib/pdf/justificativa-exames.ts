@@ -42,48 +42,33 @@ export function generateJustificativaExamesPDF(data: JustificativaExamesData): A
   // =====================================================
   y = drawSectionLabel(doc, "CONVENIO", y);
 
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "F");
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "S");
-
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.convenio || "________________________________", MARGIN + 5, y + 9);
+  doc.text(data.convenio || "________________________________", MARGIN, y);
 
-  y += 22;
+  y += 12;
 
   // =====================================================
   // JUSTIFICATIVA
   // =====================================================
   y = drawSectionLabel(doc, "JUSTIFICATIVA", y);
 
-  doc.setFillColor(...COLORS.slate50);
-
   const justText = data.justificativa || "";
   const justLines = justText
-    ? doc.splitTextToSize(justText, CONTENT_WIDTH - 14)
+    ? doc.splitTextToSize(justText, CONTENT_WIDTH)
     : [];
-  const justHeight = Math.max(justLines.length * 4.5 + 8, 60);
-
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, justHeight, 2, 2, "F");
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, justHeight, 2, 2, "S");
-
-  doc.setFillColor(...COLORS.blue600);
-  doc.roundedRect(MARGIN, y, 2, justHeight, 1, 1, "F");
 
   if (justLines.length > 0) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate800);
-    doc.text(justLines, MARGIN + 7, y + 6);
+    doc.setLineHeightFactor(1.4);
+    doc.text(justLines, MARGIN, y);
+    y += justLines.length * 4.5 + 8;
+  } else {
+    y += 8;
   }
-
-  y += justHeight + 10;
 
   drawFooterSignature(doc, data, y + 10);
   drawBottomBar(doc);

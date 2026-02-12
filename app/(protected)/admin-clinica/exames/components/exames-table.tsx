@@ -236,34 +236,9 @@ export function ExamesTable({
   });
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4 gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-          <Input 
-            type="search"
-            placeholder="Buscar por nome ou descrição..." 
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9 h-8 text-xs bg-background" 
-          />
-        </div>
-        {onUpload && (
-          <Button onClick={onUpload} variant="outline" className="text-xs">
-            <Upload className="mr-2 h-3.5 w-3.5" />
-            Upload em Massa
-          </Button>
-        )}
-        {(newButtonUrl || onCreate) && (
-          <Button onClick={() => onCreate ? onCreate() : router.push(newButtonUrl!)} className="text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Novo Exame
-          </Button>
-        )}
-      </div>
-      <div className="px-4 lg:px-6">
-        <div className="overflow-hidden rounded-lg border">
-          <Table>
+    <div className="flex flex-col gap-4 overflow-auto">
+      <div className="overflow-hidden px-6 pt-6">
+        <Table>
             <TableHeader className="bg-slate-100 sticky top-0 z-10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -311,8 +286,7 @@ export function ExamesTable({
             </TableBody>
           </Table>
         </div>
-      </div>
-      <div className="flex items-center justify-between px-4 lg:px-6 pt-4">
+        <div className="flex items-center justify-between px-6 pb-6">
         <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
           {table.getFilteredRowModel().rows.length} exame(s) encontrado(s).
         </div>

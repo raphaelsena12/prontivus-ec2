@@ -11,11 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, DollarSign, Filter } from "lucide-react";
 import { StatusPagamento } from "@/lib/generated/prisma/enums";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { PagamentosTable } from "@/components/pagamentos-table";
 import { PagamentoDialog } from "./pagamento-dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Pagamento {
   id: string;
@@ -110,107 +111,122 @@ export function PagamentosContent({
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        {/* Botão de ação alinhado à direita */}
-        <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <DollarSign className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Pagamentos</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie os pagamentos e renovações de licenças das clínicas
+        </p>
+      </div>
+
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Pagamentos</CardTitle>
+          </div>
           <Button
             onClick={() => setDialogNovoPagamentoOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 text-xs px-3"
           >
-            <Plus className="mr-2 h-3.5 w-3.5" />
+            <Plus className="mr-1.5 h-3 w-3" />
             Novo Pagamento
           </Button>
-        </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <PagamentosTable data={pagamentos} onConfirmar={handleConfirmar} />
+        </CardContent>
+      </Card>
 
-        {/* Tabela de Pagamentos */}
-        <PagamentosTable data={pagamentos} onConfirmar={handleConfirmar} />
-
-        {/* Dialog de Confirmação */}
-        <Dialog
-          open={dialogConfirmarOpen}
-          onOpenChange={setDialogConfirmarOpen}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirmar Pagamento</DialogTitle>
-              <DialogDescription>
-                Ao confirmar este pagamento, a licença da clínica será
-                renovada automaticamente por mais 1 mês.
-              </DialogDescription>
-            </DialogHeader>
-            {pagamentoSelecionado && (
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Clínica</Label>
-                    <p className="text-sm font-medium">
-                      {pagamentoSelecionado.clinicaNome}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Valor</Label>
-                    <p className="text-sm font-medium">
-                      {formatCurrency(pagamentoSelecionado.valor)}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Mês Referência</Label>
-                    <p className="text-sm font-medium">
-                      {new Intl.DateTimeFormat("pt-BR", {
-                        month: "long",
-                        year: "numeric",
-                      }).format(
-                        new Date(pagamentoSelecionado.mesReferencia)
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <Label>Método de Pagamento</Label>
-                    <p className="text-sm font-medium">
-                      {pagamentoSelecionado.metodoPagamento || "Não informado"}
-                    </p>
-                  </div>
+      {/* Dialog de Confirmação */}
+      <Dialog
+        open={dialogConfirmarOpen}
+        onOpenChange={setDialogConfirmarOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento</DialogTitle>
+            <DialogDescription>
+              Ao confirmar este pagamento, a licença da clínica será
+              renovada automaticamente por mais 1 mês.
+            </DialogDescription>
+          </DialogHeader>
+          {pagamentoSelecionado && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Clínica</Label>
+                  <p className="text-sm font-medium">
+                    {pagamentoSelecionado.clinicaNome}
+                  </p>
                 </div>
-                {pagamentoSelecionado.transacaoId && (
-                  <div>
-                    <Label>ID da Transação</Label>
-                    <p className="text-sm font-mono">
-                      {pagamentoSelecionado.transacaoId}
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <Label>Valor</Label>
+                  <p className="text-sm font-medium">
+                    {formatCurrency(pagamentoSelecionado.valor)}
+                  </p>
+                </div>
+                <div>
+                  <Label>Mês Referência</Label>
+                  <p className="text-sm font-medium">
+                    {new Intl.DateTimeFormat("pt-BR", {
+                      month: "long",
+                      year: "numeric",
+                    }).format(
+                      new Date(pagamentoSelecionado.mesReferencia)
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <Label>Método de Pagamento</Label>
+                  <p className="text-sm font-medium">
+                    {pagamentoSelecionado.metodoPagamento || "Não informado"}
+                  </p>
+                </div>
               </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setDialogConfirmarOpen(false);
-                  setPagamentoSelecionado(null);
-                }}
-                disabled={isConfirmando}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleConfirmarPagamento}
-                disabled={isConfirmando}
-              >
-                {isConfirmando ? "Confirmando..." : "Confirmar Pagamento"}
-              </Button>
+              {pagamentoSelecionado.transacaoId && (
+                <div>
+                  <Label>ID da Transação</Label>
+                  <p className="text-sm font-mono">
+                    {pagamentoSelecionado.transacaoId}
+                  </p>
+                </div>
+              )}
             </div>
-          </DialogContent>
-        </Dialog>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogConfirmarOpen(false);
+                setPagamentoSelecionado(null);
+              }}
+              disabled={isConfirmando}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarPagamento}
+              disabled={isConfirmando}
+            >
+              {isConfirmando ? "Confirmando..." : "Confirmar Pagamento"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Dialog de Novo Pagamento */}
-        <PagamentoDialog
-          open={dialogNovoPagamentoOpen}
-          onOpenChange={setDialogNovoPagamentoOpen}
-          onSuccess={handleNovoPagamentoSuccess}
-          clinicas={clinicas}
-        />
-      </div>
+      {/* Dialog de Novo Pagamento */}
+      <PagamentoDialog
+        open={dialogNovoPagamentoOpen}
+        onOpenChange={setDialogNovoPagamentoOpen}
+        onSuccess={handleNovoPagamentoSuccess}
+        clinicas={clinicas}
+      />
     </div>
   );
 }

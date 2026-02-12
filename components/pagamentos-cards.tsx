@@ -33,15 +33,15 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
       : "0";
 
   return (
-    <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="border border-border/50 bg-card shadow-sm">
-        <CardHeader className="p-4">
+        <CardHeader className="p-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600 mb-2">
                 Total de Pagamentos
               </p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xl font-bold text-slate-800">
                 {estatisticas.totalPagamentos}
               </p>
               <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
@@ -50,8 +50,8 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
               </div>
             </div>
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
-                <FileText className="size-6 text-blue-600" />
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <FileText className="size-4 text-blue-600" />
               </div>
             </div>
           </div>
@@ -59,13 +59,13 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
       </Card>
 
       <Card className="border border-border/50 bg-card shadow-sm">
-        <CardHeader className="p-4">
+        <CardHeader className="p-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600 mb-2">
                 Pagamentos Pendentes
               </p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xl font-bold text-slate-800">
                 {estatisticas.pagamentosPendentes}
               </p>
               <div className={`flex items-center gap-1 mt-2 text-xs ${estatisticas.pagamentosVencidos > 0 ? "text-red-600" : "text-orange-600"}`}>
@@ -83,8 +83,8 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
               </div>
             </div>
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
-                <Clock className="size-6 text-orange-600" />
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                <Clock className="size-4 text-orange-600" />
               </div>
             </div>
           </div>
@@ -92,13 +92,13 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
       </Card>
 
       <Card className="border border-border/50 bg-card shadow-sm">
-        <CardHeader className="p-4">
+        <CardHeader className="p-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600 mb-2">
                 Receita do Mês
               </p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xl font-bold text-slate-800">
                 {formatCurrency(estatisticas.receitaMesAtual)}
               </p>
               <div className="flex items-center gap-1 mt-2 text-xs text-green-600">
@@ -107,8 +107,8 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
               </div>
             </div>
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                <TrendingUp className="size-6 text-green-600" />
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                <TrendingUp className="size-4 text-green-600" />
               </div>
             </div>
           </div>
@@ -116,19 +116,19 @@ export function PagamentosCards({ estatisticas }: PagamentosCardsProps) {
       </Card>
 
       <Card className="border border-border/50 bg-card shadow-sm">
-        <CardHeader className="p-4">
+        <CardHeader className="p-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-600 mb-2">
                 Receita Total
               </p>
-              <p className="text-2xl font-bold text-slate-800">
+              <p className="text-xl font-bold text-slate-800">
                 {formatCurrency(estatisticas.receitaTotal)}
               </p>
             </div>
             <div className="flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
-                <DollarSign className="size-6 text-purple-600" />
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <DollarSign className="size-4 text-purple-600" />
               </div>
             </div>
           </div>

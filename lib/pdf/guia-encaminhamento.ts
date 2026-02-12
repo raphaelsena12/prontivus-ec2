@@ -1,5 +1,5 @@
 import {
-  createDoc, drawTopBar, drawBottomBar, formatCPF, formatCNPJ,
+  createDoc, drawTopBar, drawBottomBar, drawClinicHeader, formatCPF, formatCNPJ,
   COLORS, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, CONTENT_WIDTH,
 } from "./pdf-base";
 
@@ -39,79 +39,66 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   const doc = createDoc();
 
   drawTopBar(doc);
+  drawClinicHeader(doc, data);
 
-  // =====================================================
-  // CABEÇALHO COM LOGO
-  // =====================================================
-  let y = 10;
-
-  if (data.logoBase64) {
-    try {
-      doc.addImage(data.logoBase64, "WEBP", MARGIN, y, 35, 10);
-    } catch { /* fallback abaixo */ }
-  }
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(`${data.clinicaNome} - CNPJ ${formatCNPJ(data.clinicaCnpj)}`, MARGIN, y + 14);
-  if (data.clinicaEndereco) {
-    doc.text(data.clinicaEndereco, MARGIN, y + 18);
-  }
-
-  y += 24;
+  let y = 40;
 
   // =====================================================
   // TÍTULO + TIPO DE VAGA
   // =====================================================
-  doc.setFillColor(...COLORS.slate800);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH - 45, 16, 1, 1, "F");
-
-  doc.setFontSize(12);
+  doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.white);
-  doc.text("GUIA DE ENCAMINHAMENTO", MARGIN + 5, y + 7);
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("GUIA DE ENCAMINHAMENTO", PAGE_WIDTH / 2, y, { align: "center" });
+
+  y += 6;
 
   doc.setFontSize(8);
-  doc.text("REFERENCIA E CONTRA REFERENCIA", MARGIN + 5, y + 12);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("REFERÊNCIA E CONTRA-REFERÊNCIA", PAGE_WIDTH / 2, y, { align: "center" });
 
-  // Box tipo de vaga
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(PAGE_WIDTH - MARGIN - 42, y, 42, 16, 1, 1, "S");
+  y += 8;
 
+  // Tipo de vaga à direita
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate400);
-  doc.text("Tipo de vaga:", PAGE_WIDTH - MARGIN - 38, y + 5);
+  doc.text("Tipo de vaga:", PAGE_WIDTH - MARGIN, y, { align: "right" });
+
+  y += 5;
 
   doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.tipoVaga || "ELETIVO", PAGE_WIDTH - MARGIN - 38, y + 12);
+  doc.text(data.tipoVaga || "ELETIVO", PAGE_WIDTH - MARGIN, y, { align: "right" });
 
-  y += 22;
+  y += 10;
+
+  // Linha separadora
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+  y += 10;
 
   // =====================================================
   // SEÇÃO REFERÊNCIA
   // =====================================================
-  doc.setFillColor(...COLORS.slate50);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 8, 1, 1, "F");
-
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text("REFERENCIA", MARGIN + 4, y + 6);
+  doc.text("REFERÊNCIA", MARGIN, y);
 
-  y += 12;
+  y += 8;
 
   // De / Para
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Do", MARGIN, y);
+  doc.text("De:", MARGIN, y);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.clinicaNome, MARGIN + 8, y);
+  doc.text(data.clinicaNome, MARGIN + 12, y);
 
   y += 6;
 
@@ -120,174 +107,196 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   // =====================================================
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("I - Identificacao", MARGIN, y);
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("I - IDENTIFICAÇÃO", MARGIN, y);
+  
+  let identY = y + 6;
 
-  y += 5;
-
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("Nome", MARGIN + 2, y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome, MARGIN + 16, y);
+  identY += 6;
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Data Nascimento", PAGE_WIDTH - MARGIN - 45, y);
+  doc.setFontSize(7.5);
+  doc.text("Nome:", MARGIN, identY);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteDataNascimento, PAGE_WIDTH - MARGIN - 10, y);
+  doc.text(data.pacienteNome, MARGIN + 17, identY);
 
-  y += 5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...COLORS.slate600);
+  doc.text("Data Nascimento:", PAGE_WIDTH - MARGIN - 50, identY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.pacienteDataNascimento, PAGE_WIDTH - MARGIN, identY);
 
-  const idadeText = data.pacienteIdade ? `${data.pacienteIdade}A` : "N/I";
+  identY += 6;
+
+  const idadeText = data.pacienteIdade ? `${data.pacienteIdade} anos` : "N/I";
   const sexoText = data.pacienteSexo || "N/I";
 
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Idade", MARGIN + 2, y);
+  doc.text("Idade:", MARGIN, identY);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.slate800);
-  doc.text(idadeText, MARGIN + 16, y);
+  doc.text(idadeText, MARGIN + 17, identY);
 
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Sexo", MARGIN + 40, y);
+  doc.text("Sexo:", MARGIN + 42, identY);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.slate800);
-  doc.text(sexoText, MARGIN + 50, y);
+  doc.text(sexoText, MARGIN + 54, identY);
 
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
   doc.setTextColor(...COLORS.slate600);
-  doc.text("CPF", MARGIN + 70, y);
+  doc.text("CPF:", MARGIN + 77, identY);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.slate800);
-  doc.text(formatCPF(data.pacienteCpf), MARGIN + 80, y);
+  doc.text(formatCPF(data.pacienteCpf), MARGIN + 92, identY);
 
-  y += 5;
+  identY += 6;
 
   if (data.pacienteEndereco) {
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
     doc.setTextColor(...COLORS.slate600);
-    doc.text("Endereco", MARGIN + 2, y);
+    doc.text("Endereço:", MARGIN, identY);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    doc.text(data.pacienteEndereco, MARGIN + 22, y);
-    y += 5;
+    doc.text(data.pacienteEndereco, MARGIN + 22, identY);
+    identY += 5;
   }
 
   if (data.cidade) {
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
     doc.setTextColor(...COLORS.slate600);
-    doc.text("Cidade", MARGIN + 2, y);
+    doc.text("Cidade:", MARGIN, identY);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    doc.text(data.cidade, MARGIN + 16, y);
-    y += 5;
+    doc.text(data.cidade, MARGIN + 17, identY);
+    identY += 5;
   }
 
   if (data.pacienteCelular) {
     doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
     doc.setTextColor(...COLORS.slate600);
-    doc.text("Celular", MARGIN + 2, y);
+    doc.text("Celular:", MARGIN, identY);
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    doc.text(data.pacienteCelular, MARGIN + 16, y);
-    y += 5;
+    doc.text(data.pacienteCelular, MARGIN + 17, identY);
+    identY += 5;
   }
 
-  y += 4;
+  y = identY + 6;
 
   // =====================================================
   // II - PARA / III - PROCEDIMENTOS
   // =====================================================
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-  y += 5;
-
+  y += 6;
+  
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
+  doc.setTextColor(...COLORS.slate400);
   doc.text("II - PARA:", MARGIN, y);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.encaminharPara || "", MARGIN + 20, y);
+  doc.text(data.encaminharPara || "", MARGIN + 22, y);
 
+  y += 8;
+  
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("III - PROCEDIMENTOS SOLICITADOS:", MARGIN + 80, y);
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("III - PROCEDIMENTOS SOLICITADOS:", MARGIN, y);
 
-  y += 5;
+  y += 6;
 
   if (data.procedimentosSolicitados) {
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    const procLines = doc.splitTextToSize(data.procedimentosSolicitados, CONTENT_WIDTH - 4);
-    doc.text(procLines, MARGIN + 2, y);
-    y += procLines.length * 4 + 4;
+    doc.setLineHeightFactor(1.4);
+    const procLines = doc.splitTextToSize(data.procedimentosSolicitados, CONTENT_WIDTH);
+    doc.text(procLines, MARGIN, y);
+    y += procLines.length * 4.5 + 6;
+  } else {
+    y += 6;
   }
-
-  y += 8;
 
   // =====================================================
   // IV - RESUMO DA HISTÓRIA CLÍNICA
   // =====================================================
-  doc.setDrawColor(...COLORS.slate200);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-  y += 5;
-
+  y += 6;
+  
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("IV - Resumo da Historia Clinica e Exames ja Realizados", MARGIN, y);
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("IV - RESUMO DA HISTÓRIA CLÍNICA E EXAMES JÁ REALIZADOS", MARGIN, y);
 
-  y += 5;
+  y += 6;
 
   if (data.resumoHistoriaClinica) {
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    const resLines = doc.splitTextToSize(data.resumoHistoriaClinica, CONTENT_WIDTH - 4);
-    doc.text(resLines, MARGIN + 2, y);
-    y += resLines.length * 4 + 4;
+    doc.setLineHeightFactor(1.4);
+    const resLines = doc.splitTextToSize(data.resumoHistoriaClinica, CONTENT_WIDTH);
+    doc.text(resLines, MARGIN, y);
+    y += resLines.length * 4.5 + 6;
+  } else {
+    y += 6;
   }
-
-  y += 8;
 
   // =====================================================
   // V - HIPÓTESE DIAGNÓSTICA
   // =====================================================
-  doc.setDrawColor(...COLORS.slate200);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-  y += 5;
-
+  y += 6;
+  
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("V - Hipotese Diagnostica", MARGIN, y);
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("V - HIPÓTESE DIAGNÓSTICA", MARGIN, y);
 
-  y += 5;
+  y += 6;
 
   if (data.cidCodigo) {
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
     doc.setTextColor(...COLORS.slate800);
     const hipText = data.cidDescricao
       ? `${data.cidCodigo} - ${data.cidDescricao}`
       : data.cidCodigo;
-    doc.text(hipText, MARGIN + 2, y);
-    y += 6;
+    doc.text(hipText, MARGIN, y);
+    y += 7;
   }
 
   if (data.hipoteseDiagnostica) {
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.slate800);
-    const hipLines = doc.splitTextToSize(data.hipoteseDiagnostica, CONTENT_WIDTH - 4);
-    doc.text(hipLines, MARGIN + 2, y);
-    y += hipLines.length * 4 + 4;
+    doc.setLineHeightFactor(1.4);
+    const hipLines = doc.splitTextToSize(data.hipoteseDiagnostica, CONTENT_WIDTH);
+    doc.text(hipLines, MARGIN, y);
+    y += hipLines.length * 4.5 + 6;
+  } else {
+    y += 6;
   }
-
-  y += 8;
 
   // =====================================================
   // ASSINATURA REFERÊNCIA

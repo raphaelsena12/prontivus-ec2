@@ -17,10 +17,15 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);
 
-// Verificar se o client em cache tem o modelo BloqueioAgenda
+// Verificar se o client em cache tem os modelos necessários
 // Se não tiver, limpar o cache para forçar recriação
 if (process.env.NODE_ENV !== "production" && globalForPrisma.prisma) {
-  if (!('bloqueioAgenda' in globalForPrisma.prisma)) {
+  const hasRequiredModels = 
+    'bloqueioAgenda' in globalForPrisma.prisma &&
+    'pagamentoConsulta' in globalForPrisma.prisma &&
+    'paciente' in globalForPrisma.prisma;
+    
+  if (!hasRequiredModels) {
     // Limpar cache antigo
     try {
       (globalForPrisma.prisma as any).$disconnect?.();

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, History, FileText, Plus } from "lucide-react";
+import { Calendar, History, FileText, Plus, CreditCard } from "lucide-react";
 import Link from "next/link";
 
 interface PacienteContentProps {
@@ -75,6 +75,24 @@ export function PacienteContent({ nome }: PacienteContentProps) {
                 <CardContent className="p-0">
                   <CardDescription className="text-xs">
                     Acesse suas receitas e prescrições médicas
+                  </CardDescription>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/paciente/historico-pagamentos">
+              <Card className="p-3 hover:bg-accent transition-colors cursor-pointer">
+                <CardHeader className="p-0 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950">
+                      <CreditCard className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <CardTitle className="text-xl">Histórico de Pagamentos</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <CardDescription className="text-xs">
+                    Visualize todos os seus pagamentos realizados
                   </CardDescription>
                 </CardContent>
               </Card>

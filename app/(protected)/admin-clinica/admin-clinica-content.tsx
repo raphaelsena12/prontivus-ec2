@@ -298,20 +298,26 @@ export function AdminClinicaContent({ data }: AdminClinicaContentProps) {
   }, []);
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        <div className="px-4 lg:px-6 pt-2">
-
-          {/* Cards de Estatísticas */}
-          <div className="pb-3">
-            {loadingEstatisticas ? (
-              <div className="flex items-center justify-center py-6">
-                <Loader2 className="h-5 w-5 animate-spin" />
-              </div>
-            ) : estatisticas ? (
-              <PagamentosCards estatisticas={estatisticas} />
-            ) : null}
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Cards de Estatísticas */}
+      <div className="mb-6">
+        {loadingEstatisticas ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin" />
           </div>
+        ) : (
+          <PagamentosCards 
+            estatisticas={estatisticas || {
+              totalPagamentos: 0,
+              pagamentosPendentes: 0,
+              pagamentosPagos: 0,
+              pagamentosVencidos: 0,
+              receitaMesAtual: 0,
+              receitaTotal: 0,
+            }} 
+          />
+        )}
+      </div>
 
           {/* Gráficos do Dashboard */}
           {loadingGraficos ? (
@@ -594,8 +600,6 @@ export function AdminClinicaContent({ data }: AdminClinicaContentProps) {
               </div>
             </div>
           )}
-        </div>
-      </div>
     </div>
   );
 }

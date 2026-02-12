@@ -23,9 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -41,7 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 
@@ -61,8 +59,9 @@ interface ContasPagarTableProps {
   data: ContaPagar[];
   statusFilter: string;
   onStatusFilterChange: (value: string) => void;
+  globalFilter: string;
+  onGlobalFilterChange: (value: string) => void;
   onDelete?: (conta: ContaPagar) => void;
-  newButtonUrl?: string;
 }
 
 const formatDate = (date: Date | null) => {
@@ -119,14 +118,14 @@ export function ContasPagarTable({
   data: initialData,
   statusFilter,
   onStatusFilterChange,
+  globalFilter,
+  onGlobalFilterChange,
   onDelete,
-  newButtonUrl,
 }: ContasPagarTableProps) {
   const router = useRouter();
   const [data] = React.useState(() => initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
-  const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -254,41 +253,8 @@ export function ContasPagarTable({
   });
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4 gap-2">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-          <Input 
-            type="search"
-            placeholder="Buscar por descrição ou fornecedor..." 
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9 h-8 text-xs bg-background" 
-          />
-        </div>
-        <Select
-          value={statusFilter}
-          onValueChange={onStatusFilterChange}
-        >
-          <SelectTrigger className="w-[180px] h-8 text-xs">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            <SelectItem value="PENDENTE">Pendente</SelectItem>
-            <SelectItem value="PAGO">Pago</SelectItem>
-            <SelectItem value="VENCIDO">Vencido</SelectItem>
-            <SelectItem value="CANCELADO">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
-        {newButtonUrl && (
-          <Button onClick={() => router.push(newButtonUrl)} className="text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Nova Conta
-          </Button>
-        )}
-      </div>
-      <div className="px-4 lg:px-6">
+    <div className="flex flex-col gap-4 overflow-auto">
+      <div className="overflow-hidden px-6 pt-6">
         <div className="overflow-hidden rounded-lg border">
           <Table>
             <TableHeader className="bg-slate-100 sticky top-0 z-10">
@@ -339,7 +305,7 @@ export function ContasPagarTable({
           </Table>
         </div>
       </div>
-      <div className="flex items-center justify-between px-4 lg:px-6 pt-4">
+      <div className="flex items-center justify-between px-6 pb-6">
         <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
           {table.getFilteredRowModel().rows.length} conta(s) a pagar encontrada(s).
         </div>

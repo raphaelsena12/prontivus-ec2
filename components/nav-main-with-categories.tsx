@@ -123,7 +123,7 @@ export function NavMainWithCategories({
                       <span className="flex-1 text-left">{category.title}</span>
                       <ChevronRight
                         className={cn(
-                          "h-4 w-4 transition-transform duration-200",
+                          "h-4 w-4 transition-transform duration-200 text-sidebar-foreground",
                           isOpen && "rotate-90"
                         )}
                       />

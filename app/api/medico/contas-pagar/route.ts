@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const contaPagarSchema = z.object({
+  descricao: z.string().min(1, "Descrição é obrigatória"),
+  fornecedor: z.string().optional(),
+  valor: z.number().min(0, "Valor deve ser maior ou igual a zero"),
+  dataVencimento: z.string().min(1, "Data de vencimento é obrigatória"),
+  formaPagamentoId: z.string().uuid().optional(),
+  observacoes: z.string().optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,3 +60,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  try {
+    const auth = await checkMedicoAuth();
+    if (!auth.authorized) return auth.response;
+
+    const body = await request.json();
+    const validation = contaPagarSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Dados inválidos", details: validation.error.issues },
+        { status: 400 }
+      );
+    }
+
+    const conta = await prisma.contaPagar.create({
+      data: {
+        ...validation.data,
+        dataVencimento: new Date(validation.data.dataVencimento),
+        clinicaId: auth.clinicaId,
+        status: "PENDENTE",
+      },
+    });
+
+    return NextResponse.json({ conta }, { status: 201 });
+  } catch (error) {
+    console.error("Erro ao criar conta a pagar:", error);
+    return NextResponse.json(
+      { error: "Erro ao criar conta a pagar" },
+      { status: 500 }
+    );
+  }
+}

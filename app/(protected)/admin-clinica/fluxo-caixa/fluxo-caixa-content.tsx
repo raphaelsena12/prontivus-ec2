@@ -3,11 +3,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Wallet, Filter, Search, Plus, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { FluxoCaixaTable } from "./components/fluxo-caixa-table";
 import { MovimentacaoDeleteDialog } from "./components/movimentacao-delete-dialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Movimentacao {
   id: string;
@@ -34,6 +43,7 @@ export function FluxoCaixaContent({ clinicaId }: FluxoCaixaContentProps) {
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [dataInicio, setDataInicio] = useState<string>("");
   const [dataFim, setDataFim] = useState<string>("");
+  const [globalFilter, setGlobalFilter] = useState<string>("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [movimentacaoToDelete, setMovimentacaoToDelete] = useState<{ id: string; descricao: string; tipo: "ENTRADA" | "SAIDA"; valor: number } | null>(null);
 
@@ -111,10 +121,20 @@ export function FluxoCaixaContent({ clinicaId }: FluxoCaixaContentProps) {
   const totalSaidas = calcularTotalSaidas();
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        {/* Resumo */}
-        <div className="grid gap-4 px-4 lg:px-6 pt-2 pb-4 md:grid-cols-3">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Wallet className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Fluxo de Caixa</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie as movimentações financeiras da clínica
+        </p>
+      </div>
+
+      {/* Cards de Resumo */}
+      <div className="grid gap-4 mb-6 md:grid-cols-3">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -152,21 +172,77 @@ export function FluxoCaixaContent({ clinicaId }: FluxoCaixaContentProps) {
               <TrendingDown className="h-8 w-8 text-red-600" />
             </div>
           </div>
-        </div>
+      </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12 px-4 lg:px-6">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Carregando movimentações...</p>
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Movimentações</CardTitle>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input 
+                type="search"
+                placeholder="Buscar por descrição..." 
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="pl-9 h-8 text-xs bg-background w-64" 
+              />
             </div>
+            <Select
+              value={tipoFilter}
+              onValueChange={setTipoFilter}
+            >
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="ENTRADA">Entrada</SelectItem>
+                <SelectItem value="SAIDA">Saída</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="date"
+                placeholder="Data início"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="w-[150px] h-8 text-xs"
+              />
+              <span className="text-muted-foreground text-xs">até</span>
+              <Input
+                type="date"
+                placeholder="Data fim"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="w-[150px] h-8 text-xs"
+              />
+            </div>
+            <Button onClick={() => router.push("/admin-clinica/fluxo-caixa/novo")} className="h-8 text-xs">
+              <Plus className="mr-2 h-3.5 w-3.5" />
+              Nova Movimentação
+            </Button>
           </div>
-        ) : movimentacoes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 lg:px-6">
-            <p className="text-muted-foreground text-center">Nenhuma movimentação encontrada</p>
-          </div>
-        ) : (
-          <FluxoCaixaTable 
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 px-6">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Carregando movimentações...</p>
+              </div>
+            </div>
+          ) : movimentacoes.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-6">
+              <p className="text-muted-foreground text-center">Nenhuma movimentação encontrada</p>
+            </div>
+          ) : (
+            <FluxoCaixaTable 
             data={movimentacoes.map(m => ({ ...m, valor: parseValor(m.valor) }))} 
             tipoFilter={tipoFilter}
             onTipoFilterChange={setTipoFilter}
@@ -174,11 +250,13 @@ export function FluxoCaixaContent({ clinicaId }: FluxoCaixaContentProps) {
             onDataInicioChange={setDataInicio}
             dataFim={dataFim}
             onDataFimChange={setDataFim}
+            globalFilter={globalFilter}
+            onGlobalFilterChange={setGlobalFilter}
             onDelete={handleDeleteClick}
-            newButtonUrl="/admin-clinica/fluxo-caixa/novo"
           />
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       <MovimentacaoDeleteDialog
         open={deleteDialogOpen}

@@ -144,28 +144,10 @@ export function MedicoContent({ nome }: MedicoContentProps) {
   return (
     <div className="@container/main flex flex-1 flex-col">
       <div className="flex flex-col">
-        {/* Header */}
-        <div className="mx-4 lg:mx-6 pt-6 pb-0">
-          <div className="flex items-end justify-between">
-            <h1 className="text-[1.35rem] font-semibold tracking-tight text-slate-800 pb-2.5">
-              Bem-vindo, {nome}.
-            </h1>
-            <span className="text-sm text-slate-400 pb-2.5">
-              {new Date().toLocaleDateString("pt-BR", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
-          </div>
-          <div className="h-px bg-slate-200" />
-        </div>
-
         {/* Cards */}
-        <div className="pt-5">
+        <div className="pt-2 px-4 lg:px-6">
           {loading ? (
-            <div className="flex items-center justify-center py-8 px-4 lg:px-6">
+            <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
             </div>
           ) : estatisticas ? (
@@ -174,12 +156,12 @@ export function MedicoContent({ nome }: MedicoContentProps) {
         </div>
 
         {/* Charts */}
-        <div className="px-4 lg:px-6 pt-5 pb-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="px-4 lg:px-6 pt-3 pb-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {/* Consultas Presenciais × Telemedicina */}
-              <div className="rounded-lg border border-border/50 bg-card p-5">
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-slate-800">Presencial vs Telemedicina</h3>
+              <div className="rounded-lg border border-border/50 bg-card p-3">
+                <div className="mb-3">
+                  <h3 className="text-xs font-semibold text-slate-800">Presencial vs Telemedicina</h3>
                   <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
                 </div>
                 <ChartContainer config={presencialTeleConfig} className="h-[220px] w-full">
@@ -206,10 +188,10 @@ export function MedicoContent({ nome }: MedicoContentProps) {
               </div>
 
               {/* Taxa de Faltas (No-show) */}
-              <div className="rounded-lg border border-border/50 bg-card p-5">
-                <div className="mb-4 flex items-start justify-between">
+              <div className="rounded-lg border border-border/50 bg-card p-3">
+                <div className="mb-3 flex items-start justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Taxa de Faltas</h3>
+                    <h3 className="text-xs font-semibold text-slate-800">Taxa de Faltas</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Percentual de no-show por mês</p>
                   </div>
                   {chartData.noShowPorMes.length > 0 && (
@@ -274,10 +256,10 @@ export function MedicoContent({ nome }: MedicoContentProps) {
               </div>
 
               {/* Tempo Médio de Consulta */}
-              <div className="rounded-lg border border-border/50 bg-card p-5">
-                <div className="mb-4 flex items-start justify-between">
+              <div className="rounded-lg border border-border/50 bg-card p-3">
+                <div className="mb-3 flex items-start justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Tempo Médio de Consulta</h3>
+                    <h3 className="text-xs font-semibold text-slate-800">Tempo Médio de Consulta</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Duração média em minutos</p>
                   </div>
                   {chartData.tempoMedioPorMes.length > 0 && (
@@ -325,10 +307,10 @@ export function MedicoContent({ nome }: MedicoContentProps) {
               </div>
 
               {/* Faturamento Particular */}
-              <div className="rounded-lg border border-border/50 bg-card p-5">
-                <div className="mb-4 flex items-start justify-between">
+              <div className="rounded-lg border border-border/50 bg-card p-3">
+                <div className="mb-3 flex items-start justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-800">Faturamento Particular</h3>
+                    <h3 className="text-xs font-semibold text-slate-800">Faturamento Particular</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Mês atual por semana</p>
                   </div>
                   <div className="flex items-center gap-3">

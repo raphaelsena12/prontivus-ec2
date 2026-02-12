@@ -3,12 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Calendar, List, CalendarDays, Printer } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CalendarDays, List, Loader2, Printer, Filter, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { AgendamentosTable } from "./components/agendamentos-table";
 import { AgendamentosCalendar } from "./components/agendamentos-calendar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Agendamento {
   id: string;
@@ -251,111 +250,128 @@ export function AgendamentosContent() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-2">
-      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-        <div className="mx-4 lg:mx-6 rounded-lg border bg-card shadow-sm">
-          <div className="flex items-center justify-between p-6">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                <Calendar className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Agendamentos</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Visualize e gerencie seus agendamentos
-                </p>
-              </div>
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Calendar className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Agendamentos</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie seus agendamentos e visualize sua agenda
+        </p>
+      </div>
+
+      {/* Card Branco */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Agendamentos</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Tabs */}
+            <div className="flex items-center gap-1 -mb-px">
+              <button
+                onClick={() => setView("calendar")}
+                className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
+                  view === "calendar"
+                    ? 'text-slate-800'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <CalendarDays className="w-3.5 h-3.5 inline mr-1.5" />
+                Calendário
+                {view === "calendar" && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800" />
+                )}
+              </button>
+              <button
+                onClick={() => setView("table")}
+                className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
+                  view === "table"
+                    ? 'text-slate-800'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <List className="w-3.5 h-3.5 inline mr-1.5" />
+                Lista
+                {view === "table" && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800" />
+                )}
+              </button>
             </div>
             <Button
               variant="outline"
               onClick={handleImprimirAgenda}
               disabled={loading || agendamentos.length === 0}
+              className="h-8 text-xs"
             >
-              <Printer className="mr-2 h-4 w-4" />
+              <Printer className="mr-1.5 h-3.5 w-3.5" />
               Imprimir Agenda
             </Button>
           </div>
-        </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {/* Tab Content */}
+          <div className="min-h-[400px]">
+            {view === "calendar" && (
+              <div className="p-3">
+                {loading ? (
+                  <div className="flex items-center justify-center h-[600px]">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <AgendamentosCalendar
+                    agendamentos={agendamentos}
+                    onEventClick={(agendamento) => {
+                      if (agendamento.status === "AGENDADO" || agendamento.status === "CONFIRMADO") {
+                        router.push(`/medico/atendimento?consultaId=${agendamento.id}`);
+                      }
+                    }}
+                  />
+                )}
+              </div>
+            )}
 
-        <div className="px-4 lg:px-6">
-          <Tabs value={view} onValueChange={(v) => setView(v as "calendar" | "table")} className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="calendar">
-                <CalendarDays className="mr-2 h-4 w-4" />
-                Calendário
-              </TabsTrigger>
-              <TabsTrigger value="table">
-                <List className="mr-2 h-4 w-4" />
-                Lista
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="calendar" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Calendário de Agendamentos</CardTitle>
-                  <CardDescription>
-                    Visualize seus agendamentos em formato de calendário
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center h-[600px]">
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Carregando agendamentos...</p>
+            {view === "table" && (
+              <div className="px-6 pt-6">
+                {loading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
+                    </div>
+                  </div>
+                ) : agendamentos.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
+                        <CalendarDays className="h-7 w-7 text-muted-foreground/50" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-foreground">
+                          Nenhum agendamento encontrado
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/70">
+                          Não há agendamentos no momento
+                        </p>
                       </div>
                     </div>
-                  ) : agendamentos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-[600px]">
-                      <p className="text-muted-foreground text-center">Nenhum agendamento encontrado</p>
-                    </div>
-                  ) : (
-                    <AgendamentosCalendar
-                      agendamentos={agendamentos}
-                      onEventClick={(agendamento) => {
-                        if (agendamento.status === "AGENDADO" || agendamento.status === "CONFIRMADO") {
-                          router.push(`/medico/atendimento?consultaId=${agendamento.id}`);
-                        }
-                      }}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="table" className="mt-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Lista de Agendamentos</CardTitle>
-                  <CardDescription>
-                    {agendamentos.length} {agendamentos.length === 1 ? "agendamento encontrado" : "agendamentos encontrados"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        <p className="text-sm text-muted-foreground">Carregando agendamentos...</p>
-                      </div>
-                    </div>
-                  ) : agendamentos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12">
-                      <p className="text-muted-foreground text-center">Nenhum agendamento encontrado</p>
-                    </div>
-                  ) : (
-                    <AgendamentosTable
-                      data={agendamentos}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+                  </div>
+                ) : (
+                  <AgendamentosTable
+                    data={agendamentos}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
-

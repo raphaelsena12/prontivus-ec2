@@ -200,19 +200,6 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
         },
       ],
     });
-
-    categories.push({
-      title: "Cadastros",
-      icon: IconLayoutGrid,
-      defaultOpen: false,
-      items: [
-        {
-          title: "Manipulados",
-          url: "/medico/manipulados",
-          icon: IconFlask,
-        },
-      ],
-    });
   }
 
   return categories;
@@ -328,6 +315,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         title: "Histórico de Prontuários",
         url: "/medico/prontuarios",
         icon: IconFileText,
+      },
+      {
+        title: "Manipulados",
+        url: "/medico/manipulados",
+        icon: IconFlask,
       },
     ];
   } else if (hasCategories) {

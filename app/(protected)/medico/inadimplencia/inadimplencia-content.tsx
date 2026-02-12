@@ -17,9 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Filter, Search } from "lucide-react";
+import { IconAlertCircle } from "@tabler/icons-react";
 
 interface ContaReceber {
   id: string;
@@ -102,50 +102,55 @@ export function InadimplenciaContent() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Inadimplência</h1>
-        <p className="text-muted-foreground">
-          Contas a receber em atraso dos seus pacientes
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <AlertCircle className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Inadimplência</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie as contas em atraso
         </p>
       </div>
 
+      {/* Cards de Resumo */}
       {resumo && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 mb-6 md:grid-cols-3">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="p-3">
+              <CardTitle className="text-xs font-medium">
                 Total Inadimplente
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold">
                 {formatCurrency(resumo.totalInadimplente)}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="p-3">
+              <CardTitle className="text-xs font-medium">
                 Quantidade de Contas
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold">
                 {resumo.quantidadeContas}
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">
+            <CardHeader className="p-3">
+              <CardTitle className="text-xs font-medium">
                 Dias Médio de Atraso
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl font-bold">
                 {resumo.diasMedioAtraso} dias
               </div>
             </CardContent>
@@ -153,90 +158,94 @@ export function InadimplenciaContent() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtros</CardTitle>
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Contas Inadimplentes</CardTitle>
+          </div>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+            <Input 
+              type="search"
+              placeholder="Buscar por descrição ou paciente..." 
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="pl-9 h-8 text-xs bg-background w-64" 
+            />
+          </div>
         </CardHeader>
-        <CardContent>
-          <Input
-            placeholder="Buscar por descrição ou paciente..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            className="max-w-sm"
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Contas Inadimplentes</CardTitle>
-          <CardDescription>
-            Lista de contas a receber em atraso
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+            <div className="flex items-center justify-center py-12 px-6">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Carregando contas inadimplentes...</p>
+              </div>
             </div>
           ) : contas.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhuma conta inadimplente encontrada
+            <div className="flex flex-col items-center justify-center py-12 px-6">
+              <p className="text-muted-foreground text-center">Nenhuma conta inadimplente encontrada</p>
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Paciente</TableHead>
-                    <TableHead>CPF</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Dias em Atraso</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contas.map((conta) => {
-                    const diasAtraso = calcularDiasAtraso(conta.dataVencimento);
-                    return (
-                      <TableRow key={conta.id}>
-                        <TableCell>{conta.descricao}</TableCell>
-                        <TableCell>{conta.paciente?.nome || "-"}</TableCell>
-                        <TableCell>{conta.paciente?.cpf || "-"}</TableCell>
-                        <TableCell>{formatCurrency(Number(conta.valor))}</TableCell>
-                        <TableCell>
-                          {formatDate(conta.dataVencimento)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="destructive">
-                            {diasAtraso} dias
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="destructive">{conta.status}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto px-6 pt-6">
+                <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs font-semibold py-3">Descrição</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">Paciente</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">CPF</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">Valor</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">Vencimento</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">Dias em Atraso</TableHead>
+                            <TableHead className="text-xs font-semibold py-3">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {contas.map((conta) => {
+                            const diasAtraso = calcularDiasAtraso(conta.dataVencimento);
+                            return (
+                              <TableRow key={conta.id}>
+                                <TableCell className="text-xs py-3">{conta.descricao}</TableCell>
+                                <TableCell className="text-xs py-3">{conta.paciente?.nome || "-"}</TableCell>
+                                <TableCell className="text-xs py-3">{conta.paciente?.cpf || "-"}</TableCell>
+                                <TableCell className="text-xs py-3">{formatCurrency(Number(conta.valor))}</TableCell>
+                                <TableCell className="text-xs py-3">
+                                  {formatDate(conta.dataVencimento)}
+                                </TableCell>
+                                <TableCell className="text-xs py-3">
+                                  <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
+                                    <IconAlertCircle className="mr-1 h-3 w-3" />
+                                    {diasAtraso} dias
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs py-3">
+                                  <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
+                                    <IconAlertCircle className="mr-1 h-3 w-3" />
+                                    {conta.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+              </div>
               {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-4">
+                <div className="flex justify-center gap-2 px-6 pb-6 mt-4">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-4 py-2 border rounded disabled:opacity-50"
+                    className="px-4 py-2 border rounded disabled:opacity-50 text-xs"
                   >
                     Anterior
                   </button>
-                  <span className="px-4 py-2">
+                  <span className="px-4 py-2 text-xs">
                     Página {page} de {totalPages}
                   </span>
                   <button
@@ -244,7 +253,7 @@ export function InadimplenciaContent() {
                       setPage((p) => Math.min(totalPages, p + 1))
                     }
                     disabled={page === totalPages}
-                    className="px-4 py-2 border rounded disabled:opacity-50"
+                    className="px-4 py-2 border rounded disabled:opacity-50 text-xs"
                   >
                     Próxima
                   </button>

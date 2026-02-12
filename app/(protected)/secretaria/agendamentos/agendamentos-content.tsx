@@ -111,6 +111,11 @@ export function AgendamentosContent() {
   const [view, setView] = useState<"calendar" | "table">("calendar");
   const [bloqueioModalOpen, setBloqueioModalOpen] = useState(false);
   const [novoAgendamentoModalOpen, setNovoAgendamentoModalOpen] = useState(false);
+  const [novoAgendamentoInitialData, setNovoAgendamentoInitialData] = useState<{
+    data?: string;
+    hora?: string;
+    medicoId?: string;
+  } | undefined>(undefined);
 
   // Carregar médicos ao montar o componente
   useEffect(() => {
@@ -392,7 +397,12 @@ export function AgendamentosContent() {
                 Bloqueio
               </Button>
               <Button 
-                onClick={() => setNovoAgendamentoModalOpen(true)}
+                onClick={() => {
+                  setNovoAgendamentoInitialData({
+                    medicoId: medicoSelecionado || undefined,
+                  });
+                  setNovoAgendamentoModalOpen(true);
+                }}
                 className="text-xs h-8 shadow-sm hover:shadow transition-shadow"
               >
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
@@ -428,7 +438,12 @@ export function AgendamentosContent() {
                       onSlotSelect={(slotInfo) => {
                         const startDate = slotInfo.start.toISOString().split("T")[0];
                         const startTime = slotInfo.start.toTimeString().split(" ")[0].slice(0, 5);
-                        router.push(`/secretaria/agendamentos/novo?data=${startDate}&hora=${startTime}`);
+                        setNovoAgendamentoInitialData({
+                          data: startDate,
+                          hora: startTime,
+                          medicoId: medicoSelecionado || undefined,
+                        });
+                        setNovoAgendamentoModalOpen(true);
                       }}
                     />
                   )}
@@ -447,6 +462,7 @@ export function AgendamentosContent() {
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Hora</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Paciente</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Médico</TableHead>
+                  <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Tipo de Consulta</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Código TUSS</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Convênio</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Valor</TableHead>
@@ -457,7 +473,7 @@ export function AgendamentosContent() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary/20 border-t-primary"></div>
                         <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
@@ -466,7 +482,7 @@ export function AgendamentosContent() {
                   </TableRow>
                 ) : agendamentos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
                           <Calendar className="h-7 w-7 text-muted-foreground/50" />
@@ -515,6 +531,11 @@ export function AgendamentosContent() {
                       <TableCell className="text-xs py-3">
                         <span className="text-foreground/90">
                           {agendamento.medico?.usuario.nome || <span className="text-muted-foreground/60">-</span>}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs py-3">
+                        <span className="text-foreground/90">
+                          {agendamento.tipoConsulta?.nome || <span className="text-muted-foreground/60">-</span>}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs py-3">
@@ -636,17 +657,16 @@ export function AgendamentosContent() {
 
       <NovoAgendamentoModal
         open={novoAgendamentoModalOpen}
-        onOpenChange={setNovoAgendamentoModalOpen}
+        onOpenChange={(open) => {
+          setNovoAgendamentoModalOpen(open);
+          if (!open) {
+            setNovoAgendamentoInitialData(undefined);
+          }
+        }}
         onSuccess={() => {
           fetchAgendamentos();
         }}
-        initialData={
-          medicoSelecionado
-            ? {
-                medicoId: medicoSelecionado,
-              }
-            : undefined
-        }
+        initialData={novoAgendamentoInitialData}
       />
     </div>
   );

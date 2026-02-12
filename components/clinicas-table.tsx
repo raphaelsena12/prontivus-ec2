@@ -306,8 +306,8 @@ export function ClinicasTable({
   });
 
   return (
-    <div className="flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-      <div className="overflow-hidden rounded-lg border">
+    <div className="flex flex-col gap-4 overflow-auto">
+      <div className="overflow-hidden px-6 pt-6">
         <Table>
           <TableHeader className="bg-slate-100 sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -356,7 +356,7 @@ export function ClinicasTable({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-6 pb-6">
         <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
           {table.getFilteredRowModel().rows.length} clínica(s) encontrada(s).
         </div>

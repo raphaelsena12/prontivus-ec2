@@ -54,11 +54,19 @@ export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): Array
   // =====================================================
   // CORPO
   // =====================================================
-  y = drawSectionLabel(doc, "DECLARACAO", y);
+  y += 8;
+  
+  // Label da seção
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("DECLARAÇÃO", MARGIN, y);
+  y += 6;
 
-  doc.setFontSize(11);
+  doc.setFontSize(10.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.slate800);
+  doc.setLineHeightFactor(1.6);
 
   const horaInicio = data.horaInicio || "____";
   const horaFim = data.horaFim || "____";
@@ -88,47 +96,56 @@ export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): Array
       break;
   }
 
-  const splitText = doc.splitTextToSize(texto, CONTENT_WIDTH - 4);
-  doc.text(splitText, MARGIN + 2, y);
+  const splitText = doc.splitTextToSize(texto, CONTENT_WIDTH);
+  doc.text(splitText, MARGIN, y);
   y += splitText.length * 5 + 10;
 
   // =====================================================
   // AUTORIZAÇÃO + CID (acompanhante e horario-cid)
   // =====================================================
   if (data.tipo === "acompanhante" || data.tipo === "horario-cid") {
-    y = drawSectionLabel(doc, "AUTORIZACAO", y);
+    y += 8;
+    
+    // Label da seção
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.slate400);
+    doc.text("AUTORIZAÇÃO", MARGIN, y);
+    y += 6;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.slate800);
+    doc.setLineHeightFactor(1.5);
 
     const textoAuth =
       `Eu, ${data.pacienteNome}, autorizo o medico a declarar nominalmente, ou atraves do CID, ` +
       `meu diagnostico, liberando-o da guarda do sigilo profissional.`;
 
-    const splitAuth = doc.splitTextToSize(textoAuth, CONTENT_WIDTH - 4);
-    doc.text(splitAuth, MARGIN + 2, y);
-    y += splitAuth.length * 4.5 + 8;
+    const splitAuth = doc.splitTextToSize(textoAuth, CONTENT_WIDTH);
+    doc.text(splitAuth, MARGIN, y);
+    y += splitAuth.length * 5 + 8;
 
     // CID
     if (data.cidCodigo) {
-      y = drawSectionLabel(doc, "CID-10", y);
+      y += 6;
+      
+      // Label da seção
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COLORS.slate400);
+      doc.text("CID-10", MARGIN, y);
+      y += 6;
 
-      doc.setFillColor(...COLORS.slate50);
-      doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "F");
-      doc.setDrawColor(...COLORS.slate200);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 14, 2, 2, "S");
-
-      doc.setFontSize(10);
+      doc.setFontSize(10.5);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...COLORS.slate800);
       const cidText = data.cidDescricao
         ? `${data.cidCodigo} — ${data.cidDescricao}`
         : data.cidCodigo;
-      doc.text(cidText, MARGIN + 5, y + 9);
+      doc.text(cidText, MARGIN, y);
 
-      y += 22;
+      y += 12;
     }
   }
 

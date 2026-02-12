@@ -116,7 +116,7 @@ const getStatusBadge = (status: string) => {
   };
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${config.className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight ${config.className}`}
     >
       <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
       {config.label}
@@ -162,13 +162,13 @@ export function AgendamentosTable({
       {
         accessorKey: "dataHora",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Data
           </span>
         ),
         cell: ({ row }) => (
-          <div className="flex items-center gap-2 text-sm">
-            <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+          <div className="flex items-center gap-2 text-xs">
+            <Calendar className="h-3 w-3 text-neutral-400" />
             <span className="text-foreground">{formatDate(row.original.dataHora)}</span>
           </div>
         ),
@@ -177,13 +177,13 @@ export function AgendamentosTable({
         accessorKey: "dataHora",
         id: "hora",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Hora
           </span>
         ),
         cell: ({ row }) => (
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-3.5 w-3.5 text-neutral-400" />
+          <div className="flex items-center gap-2 text-xs">
+            <Clock className="h-3 w-3 text-neutral-400" />
             <span className="text-foreground font-medium">{formatTime(row.original.dataHora)}</span>
           </div>
         ),
@@ -191,14 +191,14 @@ export function AgendamentosTable({
       {
         accessorKey: "paciente.nome",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Paciente
           </span>
         ),
         cell: ({ row }) => (
           <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-medium text-foreground">{row.original.paciente.nome}</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs font-medium text-foreground">{row.original.paciente.nome}</span>
+            <span className="text-[10px] text-muted-foreground">
               {row.original.paciente.telefone || row.original.paciente.celular || "-"}
             </span>
           </div>
@@ -206,58 +206,71 @@ export function AgendamentosTable({
         enableHiding: false,
       },
       {
+        accessorKey: "tipoConsulta.nome",
+        header: () => (
+          <span className="text-xs font-semibold">
+            Tipo de Consulta
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-xs text-foreground">
+            {row.original.tipoConsulta?.nome || "-"}
+          </span>
+        ),
+      },
+      {
         accessorKey: "codigoTuss",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Código TUSS
           </span>
         ),
         cell: ({ row }) => (
           row.original.codigoTuss ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-mono text-foreground">{row.original.codigoTuss.codigoTuss}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+              <span className="text-xs font-mono text-foreground">{row.original.codigoTuss.codigoTuss}</span>
+              <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">
                 {row.original.codigoTuss.descricao}
               </span>
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">-</span>
+            <span className="text-xs text-muted-foreground">-</span>
           )
         ),
       },
       {
         accessorKey: "operadora",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Convênio
           </span>
         ),
         cell: ({ row }) => (
           row.original.operadora ? (
             <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-foreground">
+              <span className="text-xs font-medium text-foreground">
                 {row.original.operadora.nomeFantasia || row.original.operadora.razaoSocial}
               </span>
               {row.original.planoSaude && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] text-muted-foreground">
                   {row.original.planoSaude.nome}
                 </span>
               )}
             </div>
           ) : (
-            <span className="text-sm text-muted-foreground">Particular</span>
+            <span className="text-xs text-muted-foreground">Particular</span>
           )
         ),
       },
       {
         accessorKey: "valorCobrado",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Valor
           </span>
         ),
         cell: ({ row }) => (
-          <span className="text-sm text-foreground">
+          <span className="text-xs text-foreground">
             {row.original.valorCobrado
               ? `R$ ${Number(row.original.valorCobrado).toFixed(2)}`
               : "-"}
@@ -267,7 +280,7 @@ export function AgendamentosTable({
       {
         accessorKey: "status",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <span className="text-xs font-semibold">
             Status
           </span>
         ),
@@ -276,7 +289,7 @@ export function AgendamentosTable({
       {
         id: "actions",
         header: () => (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-right block">
+          <span className="text-xs font-semibold text-right block">
             Ações
           </span>
         ),
@@ -284,13 +297,13 @@ export function AgendamentosTable({
           <div className="flex justify-end">
             {(row.original.status === "AGENDADO" || row.original.status === "CONFIRMADO") ? (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => handleIniciarAtendimento(row.original.id)}
-                className="h-8 text-xs font-medium text-neutral-600 hover:text-foreground hover:bg-neutral-100 gap-1.5"
+                className="text-xs h-7"
               >
                 Iniciar Atendimento
-                <ArrowRight className="h-3 w-3" />
+                <ArrowRight className="h-3 w-3 mr-1.5" />
               </Button>
             ) : (
               <span className="text-xs text-muted-foreground/50">-</span>
@@ -336,7 +349,7 @@ export function AgendamentosTable({
             placeholder="Buscar por paciente, CPF ou telefone..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="pl-9 w-[400px] h-9 text-sm bg-neutral-50/50 border-border/50 focus:bg-white placeholder:text-muted-foreground/50"
+            className="pl-9 w-[400px] h-9 text-xs bg-neutral-50/50 border-border/50 focus:bg-white placeholder:text-muted-foreground/50"
           />
         </div>
         <span className="text-xs text-muted-foreground">
@@ -355,7 +368,7 @@ export function AgendamentosTable({
                     <TableHead
                       key={header.id}
                       colSpan={header.colSpan}
-                      className="h-10 bg-slate-100 px-4"
+                      className="text-xs font-semibold py-3 bg-slate-100 px-4"
                     >
                       {header.isPlaceholder
                         ? null
@@ -377,7 +390,7 @@ export function AgendamentosTable({
                   className="border-b border-border/30 hover:bg-neutral-50/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-3">
+                    <TableCell key={cell.id} className="text-xs py-3 px-4">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -390,7 +403,7 @@ export function AgendamentosTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-sm text-muted-foreground"
+                  className="h-24 text-center text-xs text-muted-foreground"
                 >
                   Nenhum agendamento encontrado.
                 </TableCell>

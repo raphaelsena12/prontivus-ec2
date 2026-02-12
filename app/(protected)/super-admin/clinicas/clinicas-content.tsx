@@ -10,12 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Plus, Building2, Filter } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { StatusClinica, TipoPlano } from "@/lib/generated/prisma/enums";
 import { ClinicaDialog } from "./clinica-dialog";
 import { toggleClinicaStatus } from "./actions";
 import { ClinicasTable } from "@/components/clinicas-table";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Clinica {
   id: string;
@@ -122,22 +123,42 @@ export function ClinicasContent({
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4">
-          <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Building2 className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Clínicas</h1>
+        </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Gerencie as clínicas cadastradas no sistema
+        </p>
+      </div>
+
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Clínicas</CardTitle>
+          </div>
+          <Button 
+            onClick={handleCreate} 
+            className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 text-xs px-3"
+          >
+            <Plus className="mr-1.5 h-3 w-3" />
             Nova Clínica
           </Button>
-        </div>
-
-        <ClinicasTable
-          data={clinicas}
-          onEdit={handleEdit}
-          onToggleStatus={handleToggleStatus}
-          onManageUsers={handleManageUsers}
-        />
-      </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ClinicasTable
+            data={clinicas}
+            onEdit={handleEdit}
+            onToggleStatus={handleToggleStatus}
+            onManageUsers={handleManageUsers}
+          />
+        </CardContent>
+      </Card>
 
       <ClinicaDialog
         open={dialogOpen}

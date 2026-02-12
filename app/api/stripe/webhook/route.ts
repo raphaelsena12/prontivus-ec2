@@ -70,7 +70,12 @@ export async function POST(request: NextRequest) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      await handleCheckoutComplete(session);
+      // Verificar se é pagamento de telemedicina ou assinatura
+      if (session.metadata?.tipo === "TELEMEDICINA") {
+        await handleTelemedicinaPaymentComplete(session);
+      } else {
+        await handleCheckoutComplete(session);
+      }
       break;
     }
     case "customer.subscription.created":
@@ -572,4 +577,41 @@ function generateTempCnpj(): string {
   const timestamp = Date.now().toString().slice(-10);
   const random = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
   return timestamp + random;
+}
+
+// Processar pagamento de telemedicina
+async function handleTelemedicinaPaymentComplete(session: Stripe.Checkout.Session) {
+  try {
+    console.log("Processando pagamento de telemedicina:", session.id);
+
+    const metadata = session.metadata;
+    if (!metadata) {
+      console.error("Metadata não encontrada na sessão");
+      return;
+    }
+
+    const pagamentoId = metadata.pagamentoId;
+    if (!pagamentoId) {
+      console.error("PagamentoId não encontrado nos metadados");
+      return;
+    }
+
+    // Atualizar status do pagamento
+    const pagamento = await prisma.pagamentoConsulta.update({
+      where: { id: pagamentoId },
+      data: {
+        status: "PAGO",
+        stripePaymentId: session.payment_intent as string || null,
+        transacaoId: session.id,
+        dataPagamento: new Date(),
+      },
+    });
+
+    console.log("Pagamento de telemedicina confirmado:", pagamento.id);
+
+    // O agendamento será criado quando o paciente retornar da página de sucesso
+    // ou através de uma verificação na rota de agendamento
+  } catch (error) {
+    console.error("Erro ao processar pagamento de telemedicina:", error);
+  }
 }

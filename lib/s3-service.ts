@@ -28,6 +28,7 @@ function getCategoriaFromTipoDocumento(tipoDocumento: string): string {
   const mapping: Record<string, string> = {
     'exame-imagem': 'Exames',
     'exame-pdf': 'Exames',
+    'exame-documento': 'Exames',
     'prontuario': 'Prontuários',
     'receita-medica': 'Receita',
     'receita': 'Receita',
@@ -40,6 +41,15 @@ function getCategoriaFromTipoDocumento(tipoDocumento: string): string {
   
   // Retorna o mapeamento ou usa o tipo de documento capitalizado como fallback
   return mapping[tipoDocumento.toLowerCase()] || tipoDocumento.charAt(0).toUpperCase() + tipoDocumento.slice(1);
+}
+
+/**
+ * Verifica se as credenciais AWS estão configuradas
+ */
+export function areAwsCredentialsConfigured(): boolean {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  return !!(accessKeyId && secretAccessKey);
 }
 
 export async function uploadPDFToS3(
@@ -61,16 +71,14 @@ export async function uploadPDFToS3(
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
     const region = process.env.AWS_REGION || "sa-east-1";
 
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error("Credenciais AWS não configuradas. Configure AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY nas variáveis de ambiente.");
+    }
+
     console.log("=== Iniciando upload S3 ===");
     console.log("Bucket:", BUCKET_NAME);
     console.log("Region:", region);
-    console.log("AccessKeyId configurado:", !!accessKeyId);
-    console.log("SecretAccessKey configurado:", !!secretAccessKey);
     console.log("Tamanho do buffer:", fileBuffer.length, "bytes");
-
-    if (!accessKeyId || !secretAccessKey) {
-      throw new Error("Credenciais AWS não configuradas. Configure AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY.");
-    }
 
     // Determinar categoria (pasta)
     const categoria = options.categoria || getCategoriaFromTipoDocumento(options.tipoDocumento);

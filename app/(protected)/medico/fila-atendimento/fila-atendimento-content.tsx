@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -11,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Calendar, Clock, User, Stethoscope, Loader2, ArrowRight, RefreshCw } from "lucide-react";
+import { Calendar, Clock, User, Stethoscope, Loader2, ArrowRight, RefreshCw, Filter, List } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate, formatTime, formatCPF } from "@/lib/utils";
 
@@ -104,82 +105,88 @@ export function FilaAtendimentoContent() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        {/* Header */}
-        <div className="mx-4 lg:mx-6 pt-6 pb-0">
-          <div className="flex items-end justify-between">
-            <div className="flex items-end gap-8">
-              <h1 className="text-[1.35rem] font-semibold tracking-tight text-slate-800 pb-2.5">
-                Fila de Atendimento
-              </h1>
-              {!loading && (
-                <span className="text-sm text-slate-400 pb-2.5">
-                  {consultas.length} {consultas.length === 1 ? "paciente aguardando" : "pacientes aguardando"}
-                </span>
-              )}
-            </div>
-
-            <button
-              onClick={() => fetchConsultas(true)}
-              disabled={refreshing}
-              className="mb-2.5 p-1.5 text-slate-400 hover:text-slate-600 disabled:opacity-30 transition-colors rounded-md hover:bg-slate-100"
-              title="Atualizar fila"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            </button>
-          </div>
-          <div className="h-px bg-slate-200" />
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      {/* Título e Subtítulo */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <List className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold text-foreground">Fila de Atendimento</h1>
         </div>
+        <p className="text-sm text-muted-foreground ml-9">
+          Visualize e gerencie os pacientes aguardando atendimento
+        </p>
+      </div>
 
-        {/* Table */}
-        <div className="px-4 lg:px-6 pt-5 pb-6">
-          <div className="rounded-lg border border-border/50 bg-card overflow-hidden">
+      {/* Card Branco com Tabela */}
+      <Card className="bg-white border shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de Pacientes Aguardando</CardTitle>
+            {!loading && (
+              <span className="text-xs text-muted-foreground ml-2">
+                ({consultas.length} {consultas.length === 1 ? "paciente" : "pacientes"})
+              </span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => fetchConsultas(true)}
+            disabled={refreshing}
+            className="h-8 text-xs"
+            title="Atualizar fila"
+          >
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-hidden px-6 pt-6">
             <Table>
               <TableHeader>
                 <TableRow className="border-b-0 hover:bg-transparent">
-                  <TableHead className="h-10 bg-slate-100 px-4 first:rounded-tl-lg">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Paciente</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4 first:rounded-tl-lg">
+                    Paciente
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">CPF</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    CPF
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Horário</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    Horário
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Procedimento</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    Procedimento
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tipo</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    Tipo
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Convênio</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    Convênio
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4">
+                    Status
                   </TableHead>
-                  <TableHead className="h-10 bg-slate-100 px-4 text-right last:rounded-tr-lg">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</span>
+                  <TableHead className="text-xs font-semibold py-3 bg-slate-100 px-4 text-right last:rounded-tr-lg">
+                    Ações
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-16">
-                      <div className="flex flex-col items-center gap-3">
+                    <TableCell colSpan={8} className="text-xs py-3 px-4">
+                      <div className="flex flex-col items-center gap-3 py-12">
                         <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-                        <span className="text-sm text-slate-400">Carregando fila...</span>
+                        <span className="text-xs text-slate-400">Carregando fila...</span>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : consultas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-16">
-                      <div className="flex flex-col items-center gap-3">
+                    <TableCell colSpan={8} className="text-xs py-3 px-4">
+                      <div className="flex flex-col items-center gap-3 py-12">
                         <User className="h-10 w-10 text-slate-200" />
-                        <span className="text-sm text-slate-400">
+                        <span className="text-xs text-slate-400">
                           Nenhum paciente aguardando atendimento
                         </span>
                       </div>
@@ -191,79 +198,79 @@ export function FilaAtendimentoContent() {
                       key={consulta.id}
                       className="border-b border-border/30 hover:bg-neutral-50/50 transition-colors"
                     >
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="text-xs py-3 px-4">
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-foreground">
+                          <span className="text-xs font-medium text-foreground">
                             {consulta.paciente.nome}
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[10px] text-muted-foreground">
                             {consulta.paciente.telefone || consulta.paciente.celular || ""}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="text-sm text-foreground font-mono">
+                      <TableCell className="text-xs py-3 px-4">
+                        <span className="text-xs text-foreground font-mono">
                           {formatCPF(consulta.paciente.cpf)}
                         </span>
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Clock className="h-3.5 w-3.5 text-neutral-400" />
+                      <TableCell className="text-xs py-3 px-4">
+                        <div className="flex items-center gap-2 text-xs">
+                          <Clock className="h-3 w-3 text-neutral-400" />
                           <span className="text-foreground font-medium">
                             {formatTime(consulta.dataHora)}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="text-xs py-3 px-4">
                         {consulta.codigoTuss ? (
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-mono text-foreground">{consulta.codigoTuss.codigoTuss}</span>
-                            <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                            <span className="text-xs font-mono text-foreground">{consulta.codigoTuss.codigoTuss}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">
                               {consulta.codigoTuss.descricao}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="text-xs py-3 px-4">
                         {consulta.tipoConsulta ? (
-                          <span className="text-sm text-foreground">{consulta.tipoConsulta.nome}</span>
+                          <span className="text-xs text-foreground">{consulta.tipoConsulta.nome}</span>
                         ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
+                          <span className="text-xs text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
+                      <TableCell className="text-xs py-3 px-4">
                         {consulta.operadora ? (
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-foreground">
+                            <span className="text-xs font-medium text-foreground">
                               {consulta.operadora.nomeFantasia || consulta.operadora.razaoSocial}
                             </span>
                             {consulta.planoSaude && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-[10px] text-muted-foreground">
                                 {consulta.planoSaude.nome}
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Particular</span>
+                          <span className="text-xs text-muted-foreground">Particular</span>
                         )}
                       </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                      <TableCell className="text-xs py-3 px-4">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-amber-50 text-amber-700 border border-amber-200">
                           <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                           Aguardando
                         </span>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-right">
+                      <TableCell className="text-xs py-3 px-4 text-right">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleIniciarAtendimento(consulta.id)}
-                          className="h-8 text-xs font-medium text-neutral-600 hover:text-foreground hover:bg-neutral-100 gap-1.5"
+                          className="text-xs h-7"
                         >
                           Iniciar
-                          <ArrowRight className="h-3 w-3" />
+                          <ArrowRight className="h-3 w-3 mr-1.5" />
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -272,8 +279,8 @@ export function FilaAtendimentoContent() {
               </TableBody>
             </Table>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

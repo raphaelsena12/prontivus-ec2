@@ -1,5 +1,5 @@
 import {
-  createDoc, drawTopBar, drawBottomBar,
+  createDoc, drawTopBar, drawBottomBar, drawClinicHeader,
   formatCPF, COLORS, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, CONTENT_WIDTH,
 } from "./pdf-base";
 
@@ -39,184 +39,212 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   const doc = createDoc();
 
   drawTopBar(doc);
+  drawClinicHeader(doc, data);
 
-  let y = 10;
+  let y = 40;
 
   // =====================================================
   // TÍTULO
   // =====================================================
-  doc.setFillColor(...COLORS.slate800);
-  doc.roundedRect(MARGIN, y, CONTENT_WIDTH, 10, 1, 1, "F");
-
-  doc.setFontSize(11);
+  doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.white);
-  doc.text("RECEITUARIO DE CONTROLE ESPECIAL", PAGE_WIDTH / 2, y + 7, { align: "center" });
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("RECEITUÁRIO DE CONTROLE ESPECIAL", PAGE_WIDTH / 2, y, { align: "center" });
 
-  y += 16;
+  y += 12;
 
-  // =====================================================
-  // DUAS COLUNAS: EMITENTE | DATAS
-  // =====================================================
-  const boxLeft = MARGIN;
-  const boxRight = PAGE_WIDTH / 2 + 5;
-
-  // Box esquerda - Identificação do Emitente
+  // Linha separadora sutil
   doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(boxLeft, y, CONTENT_WIDTH / 2 - 2, 45, 2, 2, "S");
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate400);
-  doc.text("IDENTIFICACAO DO EMITENTE", boxLeft + 4, y + 5);
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, boxLeft + 4, y + 12);
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(data.medicoEspecialidade, boxLeft + 4, y + 17);
-
-  doc.text(`CRM: ${data.medicoCrm}`, boxLeft + 4, y + 23);
-
-  if (data.clinicaEndereco) {
-    const addrLines = doc.splitTextToSize(data.clinicaEndereco, CONTENT_WIDTH / 2 - 12);
-    doc.text(addrLines, boxLeft + 4, y + 29);
-  }
-
-  if (data.clinicaTelefone) {
-    doc.text(`Telefone: ${data.clinicaTelefone}`, boxLeft + 4, y + 35);
-  }
-
-  if (data.cidade) {
-    doc.text(`Cidade: ${data.cidade}`, boxLeft + 4, y + 40);
-    if (data.uf) {
-      doc.text(`UF: ${data.uf}`, boxLeft + CONTENT_WIDTH / 2 - 20, y + 40);
-    }
-  }
-
-  // Box direita - Datas e Vias
-  doc.roundedRect(boxRight, y, CONTENT_WIDTH / 2 - 2, 45, 2, 2, "S");
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("Data de Emissao:", boxRight + 4, y + 8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(data.dataEmissao, boxRight + 40, y + 8);
-
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("Data de Validade:", boxRight + 4, y + 15);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(data.dataValidade || "30 dias", boxRight + 40, y + 15);
-
-  y += 6;
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("1a VIA FARMACIA", boxRight + 4, y + 20);
-  doc.text("2a VIA PACIENTE", boxRight + 4, y + 26);
-
-  y += 51;
-
-  // =====================================================
-  // DADOS DO PACIENTE
-  // =====================================================
-  doc.setDrawColor(...COLORS.slate800);
-  doc.setLineWidth(0.8);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-
-  y += 5;
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("Paciente:", MARGIN, y);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(`${formatCPF(data.pacienteCpf)} - ${data.pacienteNome}`, MARGIN + 18, y);
-
-  const sexoText = data.pacienteSexo || "N/I";
-  const idadeText = data.pacienteIdade ? `${data.pacienteIdade}` : "N/I";
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(`Sexo: ${sexoText}`, PAGE_WIDTH - MARGIN - 40, y);
-  doc.text(`Idade: ${idadeText}`, PAGE_WIDTH - MARGIN - 14, y);
-
-  y += 5;
-
-  if (data.pacienteEndereco) {
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COLORS.slate600);
-    doc.text("Endereco:", MARGIN, y);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.slate800);
-    const pAddr = doc.splitTextToSize(data.pacienteEndereco, CONTENT_WIDTH - 20);
-    doc.text(pAddr, MARGIN + 18, y);
-    y += pAddr.length * 3.5 + 2;
-  }
-
-  y += 3;
-
-  doc.setDrawColor(...COLORS.slate800);
-  doc.setLineWidth(0.8);
+  doc.setLineWidth(0.3);
   doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
 
   y += 10;
 
   // =====================================================
+  // DUAS COLUNAS: EMITENTE | DATAS
+  // =====================================================
+  const colLeft = MARGIN;
+  const colRight = PAGE_WIDTH / 2 + 5;
+
+  // Coluna esquerda - Identificação do Emitente
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("IDENTIFICAÇÃO DO EMITENTE", colLeft, y);
+
+  y += 6;
+
+  doc.setFontSize(10.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(`Dr(a). ${data.medicoNome}`, colLeft, y);
+
+  y += 6;
+
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text(data.medicoEspecialidade, colLeft, y);
+
+  y += 5;
+
+  doc.text(`CRM: ${data.medicoCrm}`, colLeft, y);
+
+  y += 5;
+
+  if (data.clinicaEndereco) {
+    const addrLines = doc.splitTextToSize(data.clinicaEndereco, CONTENT_WIDTH / 2 - 5);
+    doc.text(addrLines, colLeft, y);
+    y += addrLines.length * 4;
+  }
+
+  if (data.clinicaTelefone) {
+    doc.text(`Telefone: ${data.clinicaTelefone}`, colLeft, y);
+    y += 5;
+  }
+
+  if (data.cidade) {
+    doc.text(`Cidade: ${data.cidade}`, colLeft, y);
+    if (data.uf) {
+      doc.text(`UF: ${data.uf}`, colLeft + 40, y);
+    }
+    y += 5;
+  }
+
+  // Coluna direita - Datas e Vias
+  let rightY = 40 + 12 + 10; // Mesmo Y inicial da coluna esquerda
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("DATAS E VIAS", colRight, rightY);
+
+  rightY += 6;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text("Data de Emissão:", colRight, rightY);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.dataEmissao, colRight, rightY + 5);
+
+  rightY += 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text("Data de Validade:", colRight, rightY);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.dataValidade || "30 dias", colRight, rightY + 5);
+
+  rightY += 10;
+
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("1ª VIA - FARMÁCIA", colRight, rightY);
+  doc.text("2ª VIA - PACIENTE", colRight, rightY + 6);
+
+  y = Math.max(y, rightY + 10) + 8;
+
+  // Linha separadora
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+  y += 10;
+
+  // =====================================================
+  // DADOS DO PACIENTE
+  // =====================================================
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("PACIENTE", MARGIN, y);
+  y += 6;
+  
+  doc.setFontSize(9.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.pacienteNome, MARGIN, y);
+  y += 6;
+  
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text(`CPF: ${formatCPF(data.pacienteCpf)}`, MARGIN, y);
+
+  const sexoText = data.pacienteSexo || "N/I";
+  const idadeText = data.pacienteIdade ? `${data.pacienteIdade} anos` : "N/I";
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text(`Sexo: ${sexoText}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
+  doc.text(`Idade: ${idadeText}`, PAGE_WIDTH - MARGIN, y + 5, { align: "right" });
+
+  y += 6;
+
+  if (data.pacienteEndereco) {
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.slate600);
+    const pAddr = doc.splitTextToSize(data.pacienteEndereco, CONTENT_WIDTH);
+    doc.text(pAddr, MARGIN, y);
+    y += pAddr.length * 4 + 2;
+  }
+
+  y += 8;
+
+  // Linha separadora
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
+  y += 10;
+
+  // =====================================================
   // MEDICAMENTOS
   // =====================================================
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.slate400);
+  doc.text("PRESCRIÇÃO", MARGIN, y);
+  y += 6;
+  
   if (data.medicamentos.length === 0) {
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(...COLORS.slate400);
-    doc.text("Nenhum medicamento prescrito", MARGIN + 5, y);
+    doc.text("Nenhum medicamento prescrito", MARGIN, y);
     y += 10;
   } else {
     data.medicamentos.forEach((med, index) => {
-      const num = String(index + 1) + ".";
+      const num = String(index + 1);
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COLORS.slate800);
-      doc.text(num, MARGIN + 2, y);
-
+      // Número do medicamento
+      doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      const nomeWidth = doc.getTextWidth(med.nome + " ");
-      doc.text(med.nome, MARGIN + 10, y);
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COLORS.slate400);
-      const dashStart = MARGIN + 10 + nomeWidth;
-      const dashEnd = PAGE_WIDTH - MARGIN - 10;
-      const dashWidth = dashEnd - dashStart;
-      if (dashWidth > 5) {
-        const dashes = "-".repeat(Math.floor(dashWidth / 1.5));
-        doc.setFontSize(8);
-        doc.text(dashes, dashStart, y);
-      }
-
-      doc.setFontSize(10);
       doc.setTextColor(...COLORS.slate800);
-      doc.text(String(med.quantidade), PAGE_WIDTH - MARGIN, y, { align: "right" });
+      doc.text(`${num}.`, MARGIN, y);
 
-      y += 7;
+      // Nome do medicamento
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...COLORS.slate800);
+      doc.text(med.nome, MARGIN + 8, y);
 
+      // Quantidade à direita
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...COLORS.slate600);
-      doc.text(med.posologia, MARGIN + 10, y);
+      doc.text(`Qtd: ${med.quantidade}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
 
-      y += 10;
+      y += 6;
+
+      // Posologia
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...COLORS.slate600);
+      const posLines = doc.splitTextToSize(med.posologia, CONTENT_WIDTH - 8);
+      doc.text(posLines, MARGIN + 8, y);
+      y += posLines.length * 4.5 + 6;
     });
   }
 

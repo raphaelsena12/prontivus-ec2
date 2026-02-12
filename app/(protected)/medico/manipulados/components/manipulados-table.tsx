@@ -25,9 +25,7 @@ import {
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -43,7 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, Plus } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Manipulado {
@@ -56,6 +54,8 @@ interface Manipulado {
 
 interface ManipuladosTableProps {
   data: Manipulado[];
+  globalFilter?: string;
+  onGlobalFilterChange?: (value: string) => void;
   onEdit: (manipulado: Manipulado) => void;
   onDelete: (manipulado: Manipulado) => void;
   newButtonUrl?: string;
@@ -72,6 +72,8 @@ const formatDate = (date: Date) => {
 
 export function ManipuladosTable({
   data: initialData,
+  globalFilter: externalGlobalFilter = "",
+  onGlobalFilterChange,
   onEdit,
   onDelete,
   newButtonUrl,
@@ -81,7 +83,12 @@ export function ManipuladosTable({
   const [data] = React.useState(() => initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
-  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [globalFilter, setGlobalFilter] = React.useState(externalGlobalFilter);
+  
+  // Sincronizar com filtro externo
+  React.useEffect(() => {
+    setGlobalFilter(externalGlobalFilter);
+  }, [externalGlobalFilter]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -102,26 +109,58 @@ export function ManipuladosTable({
     });
   }, [data, globalFilter]);
 
+  const getStatusBadge = (ativo: boolean) => {
+    if (ativo) {
+      return (
+        <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
+          <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
+          Ativo
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
+          <IconLoader className="mr-1 h-3 w-3" />
+          Inativo
+        </Badge>
+      );
+    }
+  };
+
   const columns: ColumnDef<Manipulado>[] = React.useMemo(
     () => [
       {
         accessorKey: "createdAt",
-        header: "Data",
-        cell: ({ row }) => formatDate(row.original.createdAt),
+        header: () => (
+          <span className="text-xs font-semibold">
+            Data
+          </span>
+        ),
+        cell: ({ row }) => (
+          <span className="text-xs py-3">{formatDate(row.original.createdAt)}</span>
+        ),
       },
       {
         accessorKey: "descricao",
-        header: "Descrição",
+        header: () => (
+          <span className="text-xs font-semibold">
+            Descrição
+          </span>
+        ),
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.descricao}</div>
+          <div className="font-medium text-xs py-3">{row.original.descricao}</div>
         ),
         enableHiding: false,
       },
       {
         accessorKey: "informacoes",
-        header: "Informações",
+        header: () => (
+          <span className="text-xs font-semibold">
+            Informações
+          </span>
+        ),
         cell: ({ row }) => (
-          <div className="max-w-md truncate">
+          <div className="max-w-md truncate text-xs py-3">
             {row.original.informacoes || (
               <span className="text-muted-foreground">-</span>
             )}
@@ -130,47 +169,41 @@ export function ManipuladosTable({
       },
       {
         accessorKey: "ativo",
-        header: "Status",
+        header: () => (
+          <span className="text-xs font-semibold">
+            Status
+          </span>
+        ),
         cell: ({ row }) => (
-          <Badge 
-            variant="outline" 
-            className={`bg-transparent ${
-              row.original.ativo 
-                ? "border-green-500 text-green-700 dark:text-green-400" 
-                : "border-gray-500 text-gray-700 dark:text-gray-400"
-            }`}
-          >
-            {row.original.ativo ? (
-              <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 text-green-500" />
-            ) : (
-              <IconLoader className="mr-1 h-3 w-3 text-gray-500" />
-            )}
-            {row.original.ativo ? "Ativo" : "Inativo"}
-          </Badge>
+          <div className="py-3">
+            {getStatusBadge(row.original.ativo)}
+          </div>
         ),
       },
       {
         id: "actions",
-        header: () => <div className="w-full text-right">Ações</div>,
+        header: () => (
+          <div className="w-full text-right text-xs font-semibold">Ações</div>
+        ),
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 py-3">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onEdit(row.original)}
               title="Editar manipulado"
-              className="shadow-sm shadow-gray-300/50 hover:shadow-md hover:shadow-gray-400/50 transition-shadow"
+              className="h-7 text-xs w-7 p-0"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-3 w-3" />
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onDelete(row.original)}
               title="Excluir manipulado"
-              className="shadow-sm shadow-gray-300/50 hover:shadow-md hover:shadow-gray-400/50 transition-shadow text-destructive hover:text-destructive"
+              className="h-7 text-xs w-7 p-0 text-destructive hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3" />
             </Button>
           </div>
         ),
@@ -203,35 +236,21 @@ export function ManipuladosTable({
   });
 
   return (
-    <div className="flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-            <Input 
-              type="search"
-              placeholder="Buscar por descrição ou informações..." 
-              value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
-              className="pl-9 w-[512px] h-10 bg-background" 
-            />
-          </div>
-          {(newButtonUrl || onCreate) && (
-            <Button onClick={() => onCreate ? onCreate() : router.push(newButtonUrl!)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Manipulado
-            </Button>
-          )}
-        </div>
-      </div>
-      <div className="overflow-hidden rounded-lg border">
+    <div className="flex flex-col gap-4 overflow-auto">
+      {/* Table */}
+      <div className="overflow-hidden">
+        <div className="px-6 pt-6">
         <Table>
-          <TableHeader className="bg-muted sticky top-0 z-10">
+          <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="border-b-0 hover:bg-transparent">
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
+                    <TableHead
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      className="text-xs font-semibold py-3 bg-slate-100 px-4"
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -249,9 +268,10 @@ export function ManipuladosTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
+                  className="border-b border-border/30 hover:bg-neutral-50/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="px-4 py-3 text-xs">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -264,7 +284,7 @@ export function ManipuladosTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-24 text-center text-xs text-muted-foreground"
                 >
                   Nenhum manipulado encontrado.
                 </TableCell>
@@ -272,79 +292,79 @@ export function ManipuladosTable({
             )}
           </TableBody>
         </Table>
-      </div>
-      <div className="flex items-center justify-between px-4">
-        <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-          {table.getFilteredRowModel().rows.length} manipulado(s) encontrado(s).
         </div>
-        <div className="flex w-full items-center gap-8 lg:w-fit">
-          <div className="hidden items-center gap-2 lg:flex">
-            <Label htmlFor="rows-per-page" className="text-sm font-medium">
-              Linhas por página
-            </Label>
-            <Select
-              value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value));
-              }}
-            >
-              <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                <SelectValue
-                  placeholder={table.getState().pagination.pageSize}
-                />
-              </SelectTrigger>
-              <SelectContent side="top">
-                {[10, 20, 30, 40, 50].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
-                    {pageSize}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex w-fit items-center justify-center text-sm font-medium">
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between px-6 pb-6">
+        <div className="hidden items-center gap-2 lg:flex">
+          <Label htmlFor="rows-per-page" className="text-xs text-muted-foreground font-normal">
+            Linhas por página
+          </Label>
+          <Select
+            value={`${table.getState().pagination.pageSize}`}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value));
+            }}
+          >
+            <SelectTrigger size="sm" className="w-16 h-8 text-xs border-border/50" id="rows-per-page">
+              <SelectValue
+                placeholder={table.getState().pagination.pageSize}
+              />
+            </SelectTrigger>
+            <SelectContent side="top">
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <SelectItem key={pageSize} value={`${pageSize}`}>
+                  {pageSize}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-6">
+          <span className="text-xs text-muted-foreground">
             Página {table.getState().pagination.pageIndex + 1} de{" "}
             {table.getPageCount()}
-          </div>
-          <div className="ml-auto flex items-center gap-2 lg:ml-0">
+          </span>
+          <div className="flex items-center gap-1">
             <Button
-              variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
+              variant="ghost"
+              className="hidden h-7 w-7 p-0 lg:flex text-muted-foreground hover:text-foreground"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
             >
               <span className="sr-only">Primeira página</span>
-              <IconChevronsLeft />
+              <IconChevronsLeft className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant="outline"
-              className="size-8"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
               size="icon"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
             >
               <span className="sr-only">Página anterior</span>
-              <IconChevronLeft />
+              <IconChevronLeft className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant="outline"
-              className="size-8"
+              variant="ghost"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
               size="icon"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
               <span className="sr-only">Próxima página</span>
-              <IconChevronRight />
+              <IconChevronRight className="h-3.5 w-3.5" />
             </Button>
             <Button
-              variant="outline"
-              className="hidden size-8 lg:flex"
+              variant="ghost"
+              className="hidden h-7 w-7 p-0 lg:flex text-muted-foreground hover:text-foreground"
               size="icon"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
             >
               <span className="sr-only">Última página</span>
-              <IconChevronsRight />
+              <IconChevronsRight className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
