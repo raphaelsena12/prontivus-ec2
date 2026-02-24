@@ -202,7 +202,12 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col">{children}</div>
+          <div
+            className="flex h-full w-full flex-col text-sidebar-foreground"
+            style={{
+              background: 'linear-gradient(180deg, #ffffff 0%, #f0f7ff 30%, #dbeafe 70%, #bfdbfe 100%)',
+            }}
+          >{children}</div>
         </SheetContent>
       </Sheet>
     )
@@ -251,7 +256,10 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm border-r border-sidebar-border"
+          className="group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm border-r border-sidebar-border text-sidebar-foreground"
+          style={{
+            background: 'linear-gradient(180deg, #ffffff 0%, #f0f7ff 30%, #dbeafe 70%, #bfdbfe 100%)',
+          }}
         >
           {children}
         </div>

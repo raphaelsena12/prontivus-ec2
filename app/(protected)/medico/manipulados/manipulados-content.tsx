@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ManipuladosTable } from "./components/manipulados-table";
 import { ManipuladoDialog } from "./components/manipulado-dialog";
 import { ManipuladoDeleteDialog } from "./components/manipulado-delete-dialog";
+import { PageHeader } from "@/components/page-header";
 
 interface Manipulado {
   id: string;
@@ -83,16 +84,11 @@ export function ManipuladosContent({ clinicaId }: ManipuladosContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <FlaskConical className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Manipulados</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie os medicamentos manipulados
-        </p>
-      </div>
+      <PageHeader
+        icon={FlaskConical}
+        title="Manipulados"
+        subtitle="Gerencie os medicamentos manipulados"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

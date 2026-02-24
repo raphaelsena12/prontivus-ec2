@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatTime } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Agendamento {
   id: string;
@@ -128,7 +129,7 @@ export function AgendamentosTable({
   data: initialData,
 }: AgendamentosTableProps) {
   const router = useRouter();
-  const [data] = React.useState(() => initialData);
+  const [data, setData] = React.useState<Agendamento[]>(initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");
@@ -153,8 +154,44 @@ export function AgendamentosTable({
     });
   }, [data, globalFilter]);
 
-  const handleIniciarAtendimento = (agendamentoId: string) => {
-    router.push(`/medico/atendimento?consultaId=${agendamentoId}`);
+  const handleIniciarAtendimento = async (agendamentoId: string) => {
+    try {
+      // Se o status já for EM_ATENDIMENTO, apenas redireciona
+      const agendamento = data.find(a => a.id === agendamentoId);
+      if (agendamento?.status === "EM_ATENDIMENTO") {
+        router.push(`/medico/atendimento?consultaId=${agendamentoId}`);
+        return;
+      }
+
+      // Chamar API para iniciar atendimento e atualizar status
+      const response = await fetch("/api/medico/fila-atendimento", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ consultaId: agendamentoId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao iniciar atendimento");
+      }
+
+      // Atualizar estado local
+      setData((prevData) =>
+        prevData.map((agendamento) =>
+          agendamento.id === agendamentoId
+            ? { ...agendamento, status: "EM_ATENDIMENTO" }
+            : agendamento
+        )
+      );
+
+      toast.success("Atendimento iniciado com sucesso");
+      router.push(`/medico/atendimento?consultaId=${agendamentoId}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao iniciar atendimento");
+      console.error(error);
+    }
   };
 
   const columns: ColumnDef<Agendamento>[] = React.useMemo(
@@ -295,14 +332,14 @@ export function AgendamentosTable({
         ),
         cell: ({ row }) => (
           <div className="flex justify-end">
-            {(row.original.status === "AGENDADO" || row.original.status === "CONFIRMADO") ? (
+            {(row.original.status === "AGENDADO" || row.original.status === "CONFIRMADO" || row.original.status === "EM_ATENDIMENTO") ? (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleIniciarAtendimento(row.original.id)}
                 className="text-xs h-7"
               >
-                Iniciar Atendimento
+                {row.original.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar Atendimento"}
                 <ArrowRight className="h-3 w-3 mr-1.5" />
               </Button>
             ) : (

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminClinicaAuth } from "@/lib/api-helpers";
+import { checkAdminClinicaAuth, checkClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -14,14 +14,17 @@ const estoqueSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await checkAdminClinicaAuth();
+    // Permitir acesso para Admin Clínica, Médico e Secretária
+    const auth = await checkClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
-    const where = {
+    
+    // Buscar estoques de medicamentos
+    const whereMedicamentos = {
       clinicaId: auth.clinicaId!,
       ...(search && {
         OR: [
@@ -30,17 +33,78 @@ export async function GET(request: NextRequest) {
         ],
       }),
     };
-    const [estoques, total] = await Promise.all([
+    
+    // Buscar estoques de insumos
+    const whereInsumos = {
+      clinicaId: auth.clinicaId!,
+      ...(search && {
+        insumo: {
+          OR: [
+            { nome: { contains: search, mode: "insensitive" as const } },
+            { descricao: { contains: search, mode: "insensitive" as const } },
+          ],
+        },
+      }),
+    };
+    
+    const [estoquesMedicamentos, estoquesInsumos, totalMedicamentos, totalInsumos] = await Promise.all([
       prisma.estoqueMedicamento.findMany({
-        where,
+        where: whereMedicamentos,
         include: { medicamento: true },
-        skip,
-        take: limit,
         orderBy: { createdAt: "desc" },
       }),
-      prisma.estoqueMedicamento.count({ where }),
+      prisma.estoqueInsumo.findMany({
+        where: whereInsumos,
+        include: { insumo: true },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.estoqueMedicamento.count({ where: whereMedicamentos }),
+      prisma.estoqueInsumo.count({ where: whereInsumos }),
     ]);
-    return NextResponse.json({ estoques, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+    
+    // Combinar e formatar os estoques
+    const estoques = [
+      ...estoquesMedicamentos.map(e => ({
+        id: e.id,
+        tipo: "MEDICAMENTO" as const,
+        medicamento: {
+          id: e.medicamento.id,
+          nome: e.medicamento.nome,
+          principioAtivo: e.medicamento.principioAtivo,
+        },
+        insumo: null,
+        quantidadeAtual: e.quantidadeAtual,
+        quantidadeMinima: e.quantidadeMinima,
+        quantidadeMaxima: e.quantidadeMaxima,
+        unidade: e.unidade,
+        localizacao: e.localizacao,
+        createdAt: e.createdAt,
+      })),
+      ...estoquesInsumos.map(e => ({
+        id: e.id,
+        tipo: "INSUMO" as const,
+        medicamento: null,
+        insumo: {
+          id: e.insumo.id,
+          nome: e.insumo.nome,
+          descricao: e.insumo.descricao,
+        },
+        quantidadeAtual: e.quantidadeAtual,
+        quantidadeMinima: e.quantidadeMinima,
+        quantidadeMaxima: e.quantidadeMaxima,
+        unidade: e.unidade,
+        localizacao: e.localizacao,
+        createdAt: e.createdAt,
+      })),
+    ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    const total = totalMedicamentos + totalInsumos;
+    const paginatedEstoques = estoques.slice(skip, skip + limit);
+    
+    return NextResponse.json({ 
+      estoques: paginatedEstoques, 
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } 
+    });
   } catch (error) {
     console.error("Erro ao listar estoque:", error);
     return NextResponse.json({ error: "Erro ao listar estoque" }, { status: 500 });

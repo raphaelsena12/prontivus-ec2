@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, FileText, Filter, Search } from "lucide-react";
 import { ProntuariosTable } from "./prontuarios-table";
+import { PageHeader } from "@/components/page-header";
 
 interface Prontuario {
   id: string;
   paciente: {
     id: string;
+    numeroProntuario: number | null;
     nome: string;
     cpf: string;
     dataNascimento: Date | null;
@@ -78,16 +80,11 @@ export function ProntuariosContent() {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <FileText className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Prontuários</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Visualize e gerencie os prontuários dos pacientes
-        </p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="Prontuários"
+        subtitle="Visualize e gerencie os prontuários dos pacientes"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

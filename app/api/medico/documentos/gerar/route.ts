@@ -12,8 +12,9 @@ import { generateRiscoCirurgicoPDF } from "@/lib/pdf/risco-cirurgico";
 import { generateJustificativaExamesPDF } from "@/lib/pdf/justificativa-exames";
 import { generateControleDiabetesPDF } from "@/lib/pdf/controle-diabetes";
 import { generateControlePressaoPDF } from "@/lib/pdf/controle-pressao";
-import fs from "fs";
-import path from "path";
+import { generateFichaAtendimentoPDF } from "@/lib/pdf/ficha-atendimento";
+import sharp from "sharp";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,16 +55,95 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Consulta não encontrada" }, { status: 404 });
     }
 
-    // Tentar carregar logo da clínica
+    // Tentar carregar foto de perfil do usuário admin-clínica (converte para PNG para preservar transparência no PDF)
     let logoBase64: string | undefined;
     try {
-      const logoPath = path.join(process.cwd(), "public", "LogotipoemFundoTransparente.webp");
-      if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        logoBase64 = `data:image/webp;base64,${logoBuffer.toString("base64")}`;
+      // Buscar usuário admin-clínica da clínica
+      const adminClinica = await prisma.usuario.findFirst({
+        where: {
+          clinicaId,
+          tipo: TipoUsuario.ADMIN_CLINICA,
+          ativo: true,
+        },
+        select: {
+          avatar: true,
+        },
+        orderBy: {
+          createdAt: "asc", // Pegar o primeiro admin criado (mais antigo)
+        },
+      });
+
+      if (adminClinica?.avatar) {
+        let imageBuffer: Buffer;
+
+        // Se for uma key do S3 (formato: usuarios/xxx)
+        if (adminClinica.avatar.startsWith("usuarios/")) {
+          try {
+            const s3Client = new S3Client({
+              region: process.env.AWS_REGION || "sa-east-1",
+              credentials: {
+                accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+                secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+              },
+            });
+
+            const bucketName = process.env.AWS_S3_BUCKET_NAME || "prontivus-documentos";
+            const command = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: adminClinica.avatar,
+            });
+
+            const response = await s3Client.send(command);
+            const chunks: Uint8Array[] = [];
+
+            if (response.Body) {
+              // @ts-ignore - Body pode ser um stream
+              for await (const chunk of response.Body) {
+                chunks.push(chunk);
+              }
+            }
+
+            const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+            const combined = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+              combined.set(chunk, offset);
+              offset += chunk.length;
+            }
+            imageBuffer = Buffer.from(combined);
+          } catch (s3Error) {
+            console.error("Erro ao baixar avatar do S3:", s3Error);
+            // Se falhar ao baixar do S3, não é possível continuar
+            throw s3Error;
+          }
+        } else if (adminClinica.avatar.startsWith("data:image")) {
+          // Se for base64, extrair o buffer
+          const base64Data = adminClinica.avatar.split(",")[1];
+          imageBuffer = Buffer.from(base64Data, "base64");
+        } else if (adminClinica.avatar.startsWith("https://")) {
+          // Se for URL, baixar
+          const response = await fetch(adminClinica.avatar);
+          if (!response.ok) {
+            throw new Error(`Erro ao baixar imagem: ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          imageBuffer = Buffer.from(arrayBuffer);
+        } else {
+          // Formato não reconhecido
+          throw new Error("Formato de avatar não reconhecido");
+        }
+
+        // Converter para PNG usando sharp
+        const pngBuffer = await sharp(imageBuffer).png().toBuffer();
+        logoBase64 = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+        console.log("Logo do admin-clínica carregado com sucesso");
+      } else {
+        console.warn("Admin-clínica não possui avatar configurado");
       }
-    } catch {
-      // Logo não disponível, segue sem
+    } catch (error) {
+      console.error("Erro ao carregar foto de perfil do admin-clínica:", error);
+      // Logo não disponível, segue sem - não usar logo do Prontivus
+      logoBase64 = undefined;
     }
 
     // Formatar data de nascimento
@@ -90,6 +170,13 @@ export async function POST(request: NextRequest) {
       clinicaCnpj: consulta.clinica.cnpj,
       clinicaTelefone: consulta.clinica.telefone || undefined,
       clinicaEmail: consulta.clinica.email || undefined,
+      clinicaEndereco: consulta.clinica.endereco || undefined,
+      clinicaNumero: consulta.clinica.numero || undefined,
+      clinicaBairro: consulta.clinica.bairro || undefined,
+      clinicaCidade: consulta.clinica.cidade || undefined,
+      clinicaEstado: consulta.clinica.estado || undefined,
+      clinicaCep: consulta.clinica.cep || undefined,
+      clinicaSite: consulta.clinica.site || undefined,
       logoBase64,
       medicoNome: consulta.medico.usuario.nome,
       medicoCrm: consulta.medico.crm,
@@ -208,12 +295,22 @@ export async function POST(request: NextRequest) {
       // RECEITAS
       // =====================================================
       case "receita-medica": {
+        // O frontend envia "prescricoes" com {medicamento, dosagem, posologia, duracao}
+        // O PDF espera "medicamentos" com {nome, quantidade, posologia}
+        const medicamentosReceita = (dados?.prescricoes || dados?.medicamentos || []).map((p: any) => ({
+          nome: p.medicamento || p.nome || "",
+          dosagem: p.dosagem || undefined,
+          posologia: [p.posologia, p.duracao ? `por ${p.duracao}` : ""].filter(Boolean).join(" — "),
+        }));
         pdfBuffer = generateReceitaSimplesPDF({
           ...baseData,
-          pacienteEndereco: dados?.pacienteEndereco || undefined,
-          pacienteSexo: dados?.pacienteSexo || undefined,
+          pacienteEndereco: (consulta.paciente as any).endereco || dados?.pacienteEndereco || undefined,
+          pacienteNumero: (consulta.paciente as any).numero || undefined,
+          pacienteBairro: (consulta.paciente as any).bairro || undefined,
+          pacienteCidade: (consulta.paciente as any).cidade || undefined,
+          pacienteSexo: (consulta.paciente as any).sexo || dados?.pacienteSexo || undefined,
           pacienteIdade: idade,
-          medicamentos: dados?.medicamentos || [],
+          medicamentos: medicamentosReceita,
         });
         break;
       }
@@ -321,6 +418,45 @@ export async function POST(request: NextRequest) {
         pdfBuffer = generateControlePressaoPDF({
           ...baseData,
           analitico: true,
+        });
+        break;
+      }
+
+      // =====================================================
+      // FICHA DE ATENDIMENTO
+      // =====================================================
+      case "ficha-atendimento": {
+        // Buscar prontuário da consulta
+        const prontuario = await prisma.prontuario.findFirst({
+          where: {
+            consultaId,
+            clinicaId,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+        // Buscar CIDs selecionados
+        const cidCodes = dados?.cidCodes || [];
+
+        // Buscar exames selecionados
+        const exames = dados?.exames || [];
+
+        // Buscar prescrições
+        const prescricoes = dados?.prescricoes || [];
+
+        // Formatar data da consulta
+        const dataConsulta = new Date(consulta.dataHora);
+        const dataConsultaFormatada = `${String(dataConsulta.getDate()).padStart(2, "0")}/${String(dataConsulta.getMonth() + 1).padStart(2, "0")}/${dataConsulta.getFullYear()}`;
+
+        pdfBuffer = generateFichaAtendimentoPDF({
+          ...baseData,
+          dataConsulta: dataConsultaFormatada,
+          anamnese: prontuario?.anamnese || dados?.anamnese || "",
+          cidCodes,
+          exames,
+          prescricoes,
         });
         break;
       }

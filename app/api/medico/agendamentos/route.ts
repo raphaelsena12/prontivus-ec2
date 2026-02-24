@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
             cpf: true,
             telefone: true,
             celular: true,
+            numeroProntuario: true,
           },
         },
         codigoTuss: {

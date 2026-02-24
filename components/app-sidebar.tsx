@@ -12,6 +12,7 @@ import {
   IconCreditCard,
   IconFlask,
   IconPill,
+  IconPackage,
   IconBox,
   IconCash,
   IconReceipt,
@@ -85,6 +86,11 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Medicamentos",
           url: "/admin-clinica/medicamentos",
           icon: IconPill,
+        },
+        {
+          title: "Insumos",
+          url: "/admin-clinica/insumos",
+          icon: IconPackage,
         },
         {
           title: "Procedimentos",
@@ -245,6 +251,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       icon: IconCalendar,
     });
     items.push({
+      title: "Lista de Espera",
+      url: "/secretaria/lista-espera",
+      icon: IconList,
+    });
+    items.push({
       title: "Check-in",
       url: "/secretaria/check-in",
       icon: IconCheck,
@@ -253,6 +264,16 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       title: "Painel de Chamadas",
       url: "/secretaria/painel-chamadas",
       icon: IconPhoneCall,
+    });
+    items.push({
+      title: "Procedimentos",
+      url: "/secretaria/executar-procedimento",
+      icon: IconFileText,
+    });
+    items.push({
+      title: "Estoque",
+      url: "/secretaria/estoque",
+      icon: IconBox,
     });
   }
 
@@ -307,6 +328,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         icon: IconCalendar,
       },
       {
+        title: "Aprovações",
+        url: "/medico/aprovacoes",
+        icon: IconCheck,
+      },
+      {
         title: "Fila de Atendimento",
         url: "/medico/fila-atendimento",
         icon: IconList,
@@ -317,7 +343,12 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         icon: IconFileText,
       },
       {
-        title: "Manipulados",
+        title: "Prontuários Completos",
+        url: "/medico/pacientes",
+        icon: IconUsers,
+      },
+      {
+        title: "Fórmulas Manipuladas",
         url: "/medico/manipulados",
         icon: IconFlask,
       },
@@ -334,39 +365,39 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="border-b border-white/10 relative overflow-hidden px-4 py-3">
+      <SidebarHeader className="border-b border-blue-100 relative overflow-hidden px-4 py-3">
         <div className="flex flex-col gap-2 items-center">
           {/* Logo e texto */}
           <Link href="/dashboard" className="flex flex-col gap-0.5 items-center group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
-            <Image 
-              src="/LogotipoemFundoTransparente.webp" 
-              alt="Prontivus" 
-              width={100} 
+            <Image
+              src="/LogotipoemFundoTransparente.webp"
+              alt="Prontivus"
+              width={100}
               height={30}
               className="group-data-[collapsible=icon]:hidden"
               priority
             />
             {/* Ícone quando colapsado */}
-            <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/20">
-              <span className="text-lg font-bold text-white">P</span>
+            <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/15">
+              <span className="text-lg font-bold text-blue-600">P</span>
             </div>
           </Link>
-          
+
           {/* Badge do plano */}
           <div className="w-full flex justify-center group-data-[collapsible=icon]:hidden">
             {user.tipo === TipoUsuario.ADMIN_CLINICA && user.planoNome ? (
               <Link href="/admin-clinica/pagamentos">
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-400/50 bg-blue-500/10 hover:bg-blue-500/20 transition-colors cursor-pointer">
-                  <IconCheck className="h-2.5 w-2.5 text-blue-300 shrink-0" />
-                  <span className="text-[10px] font-medium text-white leading-tight">
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors cursor-pointer">
+                  <IconCheck className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                  <span className="text-[10px] font-medium text-blue-700 leading-tight">
                     Plano: {user.planoNome === "BASICO" ? "Básico" : user.planoNome === "INTERMEDIARIO" ? "Intermediário" : "Profissional"}
                   </span>
                 </div>
               </Link>
             ) : (
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-400/50 bg-blue-500/10">
-                <IconCheck className="h-2.5 w-2.5 text-blue-300 shrink-0" />
-                <span className="text-[10px] font-medium text-white uppercase leading-tight">
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50">
+                <IconCheck className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                <span className="text-[10px] font-medium text-blue-700 uppercase leading-tight">
                   {user.tipo === TipoUsuario.SUPER_ADMIN && "SUPER ADMIN"}
                   {user.tipo === TipoUsuario.ADMIN_CLINICA && "ADMIN CLÍNICA"}
                   {user.tipo === TipoUsuario.MEDICO && "MÉDICO"}

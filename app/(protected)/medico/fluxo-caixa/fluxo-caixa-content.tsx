@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Wallet, Filter, Search, Calendar, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { PageHeader } from "@/components/page-header";
 
 interface Movimentacao {
   id: string;
@@ -113,16 +114,11 @@ export function FluxoCaixaContent() {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Wallet className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Fluxo de Caixa</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie as movimentações financeiras
-        </p>
-      </div>
+      <PageHeader
+        icon={Wallet}
+        title="Fluxo de Caixa"
+        subtitle="Gerencie as movimentações financeiras"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

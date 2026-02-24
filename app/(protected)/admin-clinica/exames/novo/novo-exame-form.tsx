@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,9 +38,17 @@ const exameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"]).optional(),
+  codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
 });
 
 type ExameFormData = z.infer<typeof exameSchema>;
+
+interface CodigoTuss {
+  id: string;
+  codigoTuss: string;
+  descricao: string;
+  tipoProcedimento: string;
+}
 
 interface NovoExameFormProps {
   clinicaId: string;
@@ -49,6 +57,8 @@ interface NovoExameFormProps {
 export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingCodigosTuss, setLoadingCodigosTuss] = useState(true);
+  const [codigosTuss, setCodigosTuss] = useState<CodigoTuss[]>([]);
 
   const form = useForm<ExameFormData>({
     resolver: zodResolver(exameSchema),
@@ -56,8 +66,34 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
       nome: "",
       descricao: "",
       tipo: undefined,
+      codigoTussId: "",
     },
   });
+
+  // Carregar códigos TUSS do tipo EXAME
+  useEffect(() => {
+    const fetchCodigosTuss = async () => {
+      try {
+        setLoadingCodigosTuss(true);
+        const response = await fetch(
+          "/api/admin-clinica/codigos-tuss?tipoProcedimento=EXAME&ativo=true"
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setCodigosTuss(data.codigosTuss || []);
+        } else {
+          toast.error("Erro ao carregar códigos TUSS");
+        }
+      } catch (error) {
+        console.error("Erro ao buscar códigos TUSS:", error);
+        toast.error("Erro ao carregar códigos TUSS");
+      } finally {
+        setLoadingCodigosTuss(false);
+      }
+    };
+
+    fetchCodigosTuss();
+  }, []);
 
   const onSubmit = async (data: ExameFormData) => {
     try {
@@ -124,6 +160,45 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
                         <FormControl>
                           <Input {...field} placeholder="Nome do exame" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="codigoTussId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Código TUSS *</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={loadingCodigosTuss}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o código TUSS" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {loadingCodigosTuss ? (
+                              <SelectItem value="loading" disabled>
+                                Carregando...
+                              </SelectItem>
+                            ) : codigosTuss.length === 0 ? (
+                              <SelectItem value="empty" disabled>
+                                Nenhum código TUSS encontrado
+                              </SelectItem>
+                            ) : (
+                              codigosTuss.map((codigo) => (
+                                <SelectItem key={codigo.id} value={codigo.id}>
+                                  {codigo.codigoTuss} - {codigo.descricao}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

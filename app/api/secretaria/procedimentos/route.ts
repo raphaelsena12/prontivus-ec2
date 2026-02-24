@@ -70,6 +70,22 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
         orderBy: { nome: "asc" },
+        include: {
+          procedimentosMedicamentos: {
+            include: {
+              medicamento: {
+                include: {
+                  estoqueMedicamento: true,
+                },
+              },
+            },
+          },
+          procedimentosInsumos: {
+            include: {
+              insumo: true,
+            },
+          },
+        },
       }),
       prisma.procedimento.count({ where }),
     ]);

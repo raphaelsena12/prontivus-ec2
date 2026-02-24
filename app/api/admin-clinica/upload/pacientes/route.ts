@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { parseExcelFile, normalizeColumnName, parseDate, cleanCPF, cleanPhone } from "@/lib/excel-utils";
+import { gerarNumeroProntuario } from "@/lib/paciente-helpers";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -74,6 +75,9 @@ export async function POST(request: NextRequest) {
     let criados = 0;
     let ignorados = 0;
 
+    // Obter o próximo número de prontuário inicial (globalmente único)
+    let proximoNumeroProntuario = await gerarNumeroProntuario();
+
     // Normalizar nomes das colunas
     const normalizedRows = rows.map((row) => {
       const normalized: any = {};
@@ -131,7 +135,7 @@ export async function POST(request: NextRequest) {
           continue; // Ignorar duplicados silenciosamente
         }
 
-        // Criar paciente
+        // Criar paciente com número de prontuário
         await prisma.paciente.create({
           data: {
             clinicaId: auth.clinicaId!,
@@ -156,6 +160,7 @@ export async function POST(request: NextRequest) {
             estadoCivil: row.estado_civil || row.estado_civil_abrev ? (row.estado_civil || row.estado_civil_abrev).toString().trim().toUpperCase() : null,
             observacoes: row.observacoes || row.obs ? (row.observacoes || row.obs).toString().trim() : null,
             ativo: true,
+            numeroProntuario: proximoNumeroProntuario++,
           },
         });
 

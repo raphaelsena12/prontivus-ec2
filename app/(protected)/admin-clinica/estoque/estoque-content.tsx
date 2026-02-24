@@ -3,25 +3,34 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Package, Upload, Filter, Box } from "lucide-react";
+import { Loader2, Package, Upload, Filter, Box, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 import { EstoqueTable } from "./components/estoque-table";
 import { EstoqueDeleteDialog } from "./components/estoque-delete-dialog";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
+import { NovaMovimentacaoEstoqueDialog } from "./movimentacoes/nova-movimentacao-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Estoque {
   id: string;
+  tipo?: "MEDICAMENTO" | "INSUMO";
   medicamento: {
     id: string;
     nome: string;
     principioAtivo: string | null;
-  };
+  } | null;
+  insumo: {
+    id: string;
+    nome: string;
+    descricao: string | null;
+  } | null;
   quantidadeAtual: number;
   quantidadeMinima: number;
   quantidadeMaxima: number | null;
   unidade: string;
   localizacao: string | null;
+  createdAt?: Date;
 }
 
 interface EstoqueContentProps {
@@ -35,6 +44,9 @@ export function EstoqueContent({ clinicaId }: EstoqueContentProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [estoqueToDelete, setEstoqueToDelete] = useState<Estoque | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [movimentacaoDialogOpen, setMovimentacaoDialogOpen] = useState(false);
+  const [estoqueSelecionado, setEstoqueSelecionado] = useState<string | null>(null);
+  const [tipoEstoqueSelecionado, setTipoEstoqueSelecionado] = useState<"MEDICAMENTO" | "INSUMO" | null>(null);
 
   const fetchEstoques = useCallback(async () => {
     try {
@@ -68,18 +80,30 @@ export function EstoqueContent({ clinicaId }: EstoqueContentProps) {
     fetchEstoques();
   };
 
+  const handleMovimentacaoSuccess = () => {
+    fetchEstoques(); // Atualizar lista após criar movimentação
+    setEstoqueSelecionado(null); // Limpar seleção
+    setTipoEstoqueSelecionado(null);
+  };
+
+  const handleMovimentacaoClick = (estoque?: Estoque, tipoEstoque: "MEDICAMENTO" | "INSUMO" = "MEDICAMENTO") => {
+    if (estoque) {
+      setEstoqueSelecionado(estoque.id);
+      setTipoEstoqueSelecionado(tipoEstoque);
+    } else {
+      setEstoqueSelecionado(null);
+      setTipoEstoqueSelecionado(null);
+    }
+    setMovimentacaoDialogOpen(true);
+  };
+
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Box className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Estoque</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie o estoque de medicamentos da clínica
-        </p>
-      </div>
+      <PageHeader
+        icon={Box}
+        title="Estoque"
+        subtitle="Gerencie o estoque de medicamentos e insumos da clínica"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
@@ -89,6 +113,14 @@ export function EstoqueContent({ clinicaId }: EstoqueContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Estoque</CardTitle>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="default" 
+              onClick={() => handleMovimentacaoClick()} 
+              className="h-8 text-xs px-3"
+            >
+              <Plus className="mr-1.5 h-3 w-3" />
+              Nova Movimentação
+            </Button>
             <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
               <Upload className="mr-1.5 h-3 w-3" />
               Upload em Massa
@@ -105,13 +137,17 @@ export function EstoqueContent({ clinicaId }: EstoqueContentProps) {
             </div>
           ) : estoques.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6">
-              <p className="text-muted-foreground text-center">Nenhum medicamento em estoque encontrado</p>
+              <p className="text-muted-foreground text-center">Nenhum item em estoque encontrado</p>
             </div>
           ) : (
             <EstoqueTable
             data={estoques}
             onDelete={handleDeleteClick}
             onUpload={() => setUploadDialogOpen(true)}
+            onMovimentacoes={(estoque) => {
+              const tipo = estoque.tipo || (estoque.medicamento ? "MEDICAMENTO" : "INSUMO");
+              handleMovimentacaoClick(estoque, tipo);
+            }}
           />
           )}
         </CardContent>
@@ -122,6 +158,26 @@ export function EstoqueContent({ clinicaId }: EstoqueContentProps) {
         onOpenChange={setDeleteDialogOpen}
         estoque={estoqueToDelete}
         onSuccess={handleDeleteSuccess}
+      />
+
+      <NovaMovimentacaoEstoqueDialog
+        open={movimentacaoDialogOpen}
+        onOpenChange={(open) => {
+          setMovimentacaoDialogOpen(open);
+          if (!open) {
+            setEstoqueSelecionado(null);
+            setTipoEstoqueSelecionado(null);
+          }
+        }}
+        estoques={estoques
+          .filter(e => e.tipo === "MEDICAMENTO" && e.medicamento)
+          .map(e => ({ id: e.id, medicamento: { nome: e.medicamento!.nome } }))}
+        insumos={estoques
+          .filter(e => e.tipo === "INSUMO" && e.insumo)
+          .map(e => ({ id: e.insumo!.id, nome: e.insumo!.nome }))}
+        estoqueIdPreSelecionado={estoqueSelecionado || undefined}
+        tipoEstoquePreSelecionado={tipoEstoqueSelecionado || undefined}
+        onSuccess={handleMovimentacaoSuccess}
       />
 
       <UploadExcelDialog

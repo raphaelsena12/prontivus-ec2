@@ -1,3 +1,15 @@
+// IMPORTANTE: Configurar variáveis de ambiente ANTES de importar o Next.js
+// Isso garante que o Turbopack seja desabilitado antes de qualquer inicialização
+process.env.NEXT_DISABLE_TURBO = "1";
+process.env.TURBOPACK = "0";
+process.env.NEXT_WEBPACK = "1";
+// Forçar webpack no Windows
+if (process.platform === "win32") {
+  process.env.NEXT_WEBPACK = "1";
+  // Desabilitar Turbopack explicitamente no Windows
+  delete process.env.TURBOPACK;
+}
+
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
@@ -8,29 +20,19 @@ import { TranscriptionResult } from "./lib/transcribe-service";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
 
-// Configurar diretório de cache do Turbopack dentro do projeto para evitar problemas de permissão
-const turboCacheDir = path.join(process.cwd(), ".turbo");
-if (!existsSync(turboCacheDir)) {
-  try {
-    mkdirSync(turboCacheDir, { recursive: true });
-  } catch (error) {
-    console.warn("Não foi possível criar diretório de cache do Turbopack:", error);
-  }
-}
-process.env.TURBOPACK_CACHE_DIR = turboCacheDir;
-
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = parseInt(process.env.PORT || "3000", 10);
 
 // Desabilitar Turbopack no Windows para evitar erros de permissão
 // Use webpack tradicional que é mais estável no Windows
+// No Windows, forçar uso do webpack através de variáveis de ambiente
 const app = next({ 
   dev, 
   hostname, 
   port,
-  // Desabilitar Turbopack explicitamente
-  turbo: false,
+  // Forçar uso do webpack ao invés do Turbopack no Windows
+  // O Turbopack causa erros de permissão no Windows
 });
 const handle = app.getRequestHandler();
 
@@ -67,6 +69,7 @@ app.prepare().then(() => {
     userId: string;
     clinicaId: string;
     tipo: string;
+    status: string;
   }>();
 
   io.on("connection", (socket) => {
@@ -155,17 +158,35 @@ app.prepare().then(() => {
     // ============================================
 
     // Entrar no chat
-    socket.on("join-chat", async (data: { userId: string; clinicaId: string; tipo: string }) => {
+    socket.on("join-chat", async (data: { userId: string; clinicaId: string; tipo: string; status?: string }) => {
       try {
+        const status = data.status || "online";
         chatUsers.set(socket.id, {
           userId: data.userId,
           clinicaId: data.clinicaId,
           tipo: data.tipo,
+          status: status,
         });
 
         // Entrar na sala da clínica
         socket.join(`clinica:${data.clinicaId}`);
-        console.log(`Usuário ${data.userId} entrou no chat da clínica ${data.clinicaId}`);
+        console.log(`Usuário ${data.userId} entrou no chat da clínica ${data.clinicaId} com status ${status}`);
+
+        // Enviar lista de usuários com status para o novo usuário
+        const usersInClinica = Array.from(chatUsers.values())
+          .filter((user) => user.clinicaId === data.clinicaId && user.userId !== data.userId)
+          .map((user) => ({
+            userId: user.userId,
+            status: user.status,
+          }));
+
+        socket.emit("users-status", { users: usersInClinica });
+
+        // Notificar outros usuários sobre o novo status
+        socket.to(`clinica:${data.clinicaId}`).emit("user-status-update", {
+          userId: data.userId,
+          status: status,
+        });
       } catch (error) {
         console.error("Erro ao entrar no chat:", error);
       }
@@ -221,6 +242,32 @@ app.prepare().then(() => {
       }
     });
 
+    // Atualizar status do usuário
+    socket.on("update-status", async (data: { userId: string; clinicaId: string; status: string }) => {
+      try {
+        const userInfo = chatUsers.get(socket.id);
+        if (!userInfo || userInfo.userId !== data.userId) {
+          return;
+        }
+
+        // Atualizar status no mapa
+        chatUsers.set(socket.id, {
+          ...userInfo,
+          status: data.status,
+        });
+
+        // Notificar outros usuários na sala sobre a mudança de status
+        socket.to(`clinica:${data.clinicaId}`).emit("user-status-update", {
+          userId: data.userId,
+          status: data.status,
+        });
+
+        console.log(`Usuário ${data.userId} mudou status para ${data.status}`);
+      } catch (error) {
+        console.error("Erro ao atualizar status:", error);
+      }
+    });
+
     // Desconexão
     socket.on("disconnect", () => {
       console.log("Cliente desconectado:", socket.id);
@@ -229,6 +276,16 @@ app.prepare().then(() => {
         stream.stop();
         activeStreams.delete(socket.id);
       }
+      
+      const userInfo = chatUsers.get(socket.id);
+      if (userInfo) {
+        // Notificar outros usuários que este usuário ficou offline
+        socket.to(`clinica:${userInfo.clinicaId}`).emit("user-status-update", {
+          userId: userInfo.userId,
+          status: "offline",
+        });
+      }
+      
       chatUsers.delete(socket.id);
     });
   });

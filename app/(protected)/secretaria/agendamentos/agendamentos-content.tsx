@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban, AlertCircle } from "lucide-react";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { EditarAgendamentoModal } from "./components/editar-agendamento-modal";
 import { BloqueioAgendaModal } from "./components/bloqueio-agenda-modal";
 import { NovoAgendamentoModal } from "./components/novo-agendamento-modal";
+import { PageHeader } from "@/components/page-header";
 
 interface Agendamento {
   id: string;
@@ -224,21 +225,42 @@ export function AgendamentosContent() {
       });
 
       if (!response.ok) {
-        throw new Error("Erro ao cancelar agendamento");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || "Erro ao cancelar agendamento";
+        
+        // Se o agendamento já está cancelado, apenas atualizar a lista
+        if (response.status === 400 && errorMessage.includes("já está cancelado")) {
+          toast.info("Este agendamento já foi cancelado anteriormente");
+          setDeleteDialogOpen(false);
+          setAgendamentoToDelete(null);
+          // Remover da lista local e recarregar
+          setAgendamentos((prev) => prev.filter((ag) => ag.id !== id));
+          fetchAgendamentos();
+          return;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       toast.success("Agendamento cancelado com sucesso");
       setDeleteDialogOpen(false);
       setAgendamentoToDelete(null);
+      
+      // Remover imediatamente da lista local para feedback instantâneo
+      setAgendamentos((prev) => prev.filter((ag) => ag.id !== id));
+      
+      // Recarregar para garantir sincronização
       fetchAgendamentos();
     } catch (error) {
-      toast.error("Erro ao cancelar agendamento");
-      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : "Erro ao cancelar agendamento";
+      toast.error(errorMessage);
+      console.error("Erro ao cancelar agendamento:", error);
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "AGENDADA":
       case "AGENDADO":
         return (
           <Badge variant="outline" className="bg-transparent border-yellow-500 text-yellow-700 dark:text-yellow-400 text-[10px] py-0.5 px-1.5 leading-tight">
@@ -266,11 +288,19 @@ export function AgendamentosContent() {
             Concluído
           </Badge>
         );
+      case "CANCELADA":
       case "CANCELADO":
         return (
           <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
             <IconLoader className="mr-1 h-3 w-3" />
             Cancelado
+          </Badge>
+        );
+      case "AGUARDANDO_APROVACAO":
+        return (
+          <Badge variant="outline" className="bg-transparent border-orange-500 text-orange-700 dark:text-orange-400 text-[10px] py-0.5 px-1.5 leading-tight">
+            <AlertCircle className="mr-1 h-3 w-3" />
+            Aguardando Aprovação
           </Badge>
         );
       default:
@@ -292,10 +322,16 @@ export function AgendamentosContent() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col bg-background">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      <PageHeader
+        icon={CalendarDays}
+        title="Agendamentos"
+        subtitle="Visualize e gerencie os agendamentos de consultas dos médicos"
+      />
+
       <div className="flex flex-col space-y-4">
         {/* Seletor de Médicos - Grande com fotos */}
-        <div className="px-4 lg:px-6 pt-3">
+        <div>
           <div className="mb-4">
             <p className="text-xs font-medium text-muted-foreground mb-3">Selecione o médico</p>
             <ScrollArea className="w-full">
@@ -352,7 +388,7 @@ export function AgendamentosContent() {
         </div>
 
         {/* Barra de ações principais */}
-        <div className="px-4 lg:px-6">
+        <div>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               {/* Tabs no estilo do atendimento */}
@@ -414,7 +450,7 @@ export function AgendamentosContent() {
         </div>
 
         {/* Conteúdo principal */}
-        <div className="px-4 lg:px-6 pb-4">
+        <div className="pb-4">
           {/* Tab Content */}
           <div className="min-h-[400px]">
             {view === "calendar" && (

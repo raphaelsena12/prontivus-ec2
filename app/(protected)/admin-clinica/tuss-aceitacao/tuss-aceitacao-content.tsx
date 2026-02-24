@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Filter, FileText } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 import { TussAceitacaoTable } from "./components/tuss-aceitacao-table";
 import { TussAceitacaoDeleteDialog } from "./components/tuss-aceitacao-delete-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -69,16 +70,11 @@ export function TussAceitacaoContent({ clinicaId }: TussAceitacaoContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <CheckCircle className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Aceitação TUSS</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie a aceitação de códigos TUSS por operadora e plano de saúde
-        </p>
-      </div>
+      <PageHeader
+        icon={CheckCircle}
+        title="Aceitação TUSS"
+        subtitle="Gerencie a aceitação de códigos TUSS por operadora e plano de saúde"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

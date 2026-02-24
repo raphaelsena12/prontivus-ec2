@@ -47,12 +47,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Eye } from "lucide-react";
+import { Eye, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface Prontuario {
   id: string;
   paciente: {
     id: string;
+    numeroProntuario: number | null;
     nome: string;
     cpf: string;
     dataNascimento: Date | null;
@@ -106,6 +108,7 @@ export function ProntuariosTable({
   search = "",
   onSearchChange,
 }: ProntuariosTableProps) {
+  const router = useRouter();
   const [data] = React.useState(() => initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -122,6 +125,16 @@ export function ProntuariosTable({
 
   const columns: ColumnDef<Prontuario>[] = React.useMemo(
     () => [
+      {
+        accessorKey: "paciente.numeroProntuario",
+        header: () => <span className="text-xs font-semibold">Nº Prontuário</span>,
+        cell: ({ row }) => (
+          <div className="text-xs font-semibold text-primary">
+            {row.original.paciente.numeroProntuario || "-"}
+          </div>
+        ),
+        enableHiding: false,
+      },
       {
         accessorKey: "paciente.nome",
         header: () => <span className="text-xs font-semibold">Paciente</span>,
@@ -163,131 +176,142 @@ export function ProntuariosTable({
         id: "actions",
         header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
         cell: ({ row }) => (
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedProntuario(row.original)}
-                className="text-xs h-7"
-              >
-                <Eye className="h-3 w-3 mr-1.5" />
-                Ver
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-base">Detalhes do Prontuário</DialogTitle>
-                <DialogDescription className="text-xs">
-                  Informações completas do prontuário médico
-                </DialogDescription>
-              </DialogHeader>
-              {selectedProntuario && (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h3 className="font-semibold text-xs text-muted-foreground">
-                        Paciente
-                      </h3>
-                      <p className="text-xs mt-1">{selectedProntuario.paciente.nome}</p>
-                      <p className="text-xs text-muted-foreground">
-                        CPF: {formatCPF(selectedProntuario.paciente.cpf)}
-                      </p>
-                      {selectedProntuario.paciente.dataNascimento && (
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/prontuario-paciente/${row.original.paciente.id}`)}
+              className="text-xs h-7 gap-1.5"
+            >
+              <FileText className="h-3 w-3" />
+              Prontuário Completo
+            </Button>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedProntuario(row.original)}
+                  className="text-xs h-7"
+                >
+                  <Eye className="h-3 w-3 mr-1.5" />
+                  Ver
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-base">Detalhes do Prontuário</DialogTitle>
+                  <DialogDescription className="text-xs">
+                    Informações completas do prontuário médico
+                  </DialogDescription>
+                </DialogHeader>
+                {selectedProntuario && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h3 className="font-semibold text-xs text-muted-foreground">
+                          Paciente
+                        </h3>
+                        <p className="text-xs mt-1">{selectedProntuario.paciente.nome}</p>
                         <p className="text-xs text-muted-foreground">
-                          Nascimento:{" "}
-                          {formatDateOnly(selectedProntuario.paciente.dataNascimento)}
+                          CPF: {formatCPF(selectedProntuario.paciente.cpf)}
                         </p>
-                      )}
+                        {selectedProntuario.paciente.dataNascimento && (
+                          <p className="text-xs text-muted-foreground">
+                            Nascimento:{" "}
+                            {formatDateOnly(selectedProntuario.paciente.dataNascimento)}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-xs text-muted-foreground">
+                          Médico
+                        </h3>
+                        <p className="text-xs mt-1">
+                          {selectedProntuario.medico.usuario.nome}
+                        </p>
+                      </div>
                     </div>
+
+                    {selectedProntuario.consulta && (
+                      <div>
+                        <h3 className="font-semibold text-xs text-muted-foreground">
+                          Consulta
+                        </h3>
+                        <p className="text-xs mt-1">
+                          {formatDate(selectedProntuario.consulta.dataHora)}
+                        </p>
+                      </div>
+                    )}
+
                     <div>
-                      <h3 className="font-semibold text-xs text-muted-foreground">
-                        Médico
+                      <h3 className="font-semibold text-xs text-muted-foreground mb-1">
+                        Anamnese
                       </h3>
-                      <p className="text-xs mt-1">
-                        {selectedProntuario.medico.usuario.nome}
+                      <p className="text-xs whitespace-pre-wrap">
+                        {selectedProntuario.anamnese || "-"}
                       </p>
                     </div>
-                  </div>
 
-                  {selectedProntuario.consulta && (
                     <div>
-                      <h3 className="font-semibold text-xs text-muted-foreground">
-                        Consulta
+                      <h3 className="font-semibold text-xs text-muted-foreground mb-1">
+                        Exame Físico
                       </h3>
-                      <p className="text-xs mt-1">
-                        {formatDate(selectedProntuario.consulta.dataHora)}
+                      <p className="text-xs whitespace-pre-wrap">
+                        {selectedProntuario.exameFisico || "-"}
                       </p>
                     </div>
-                  )}
 
-                  <div>
-                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
-                      Anamnese
-                    </h3>
-                    <p className="text-xs whitespace-pre-wrap">
-                      {selectedProntuario.anamnese || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
-                      Exame Físico
-                    </h3>
-                    <p className="text-xs whitespace-pre-wrap">
-                      {selectedProntuario.exameFisico || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
-                      Diagnóstico
-                    </h3>
-                    <p className="text-xs whitespace-pre-wrap">
-                      {selectedProntuario.diagnostico || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
-                      Conduta
-                    </h3>
-                    <p className="text-xs whitespace-pre-wrap">
-                      {selectedProntuario.conduta || "-"}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold text-xs text-muted-foreground mb-1">
-                      Evolução
-                    </h3>
-                    <p className="text-xs whitespace-pre-wrap">
-                      {selectedProntuario.evolucao || "-"}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t">
                     <div>
-                      <h3 className="font-semibold text-xs text-muted-foreground">
-                        Criado em
+                      <h3 className="font-semibold text-xs text-muted-foreground mb-1">
+                        Diagnóstico
                       </h3>
-                      <p className="text-xs">
-                        {formatDate(selectedProntuario.createdAt)}
+                      <p className="text-xs whitespace-pre-wrap">
+                        {selectedProntuario.diagnostico || "-"}
                       </p>
                     </div>
+
                     <div>
-                      <h3 className="font-semibold text-xs text-muted-foreground">
-                        Atualizado em
+                      <h3 className="font-semibold text-xs text-muted-foreground mb-1">
+                        Conduta
                       </h3>
-                      <p className="text-xs">
-                        {formatDate(selectedProntuario.updatedAt)}
+                      <p className="text-xs whitespace-pre-wrap">
+                        {selectedProntuario.conduta || "-"}
                       </p>
                     </div>
+
+                    <div>
+                      <h3 className="font-semibold text-xs text-muted-foreground mb-1">
+                        Evolução
+                      </h3>
+                      <p className="text-xs whitespace-pre-wrap">
+                        {selectedProntuario.evolucao || "-"}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t">
+                      <div>
+                        <h3 className="font-semibold text-xs text-muted-foreground">
+                          Criado em
+                        </h3>
+                        <p className="text-xs">
+                          {formatDate(selectedProntuario.createdAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-xs text-muted-foreground">
+                          Atualizado em
+                        </h3>
+                        <p className="text-xs">
+                          {formatDate(selectedProntuario.updatedAt)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+                )}
+              </DialogContent>
+            </Dialog>
+          </div>
         ),
         enableSorting: false,
         enableHiding: false,

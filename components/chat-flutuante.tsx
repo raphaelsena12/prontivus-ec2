@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "next-auth/react";
 import { io, Socket } from "socket.io-client";
-import { IconMessage, IconX, IconSend, IconChevronDown } from "@tabler/icons-react";
+import { IconMessage, IconX, IconSend, IconChevronDown, IconCircle, IconClock, IconUserOff } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +36,8 @@ interface Mensagem {
   };
 }
 
+type StatusUsuario = "online" | "ausente" | "ocupado" | "offline";
+
 interface Usuario {
   id: string;
   nome: string;
@@ -44,6 +46,7 @@ interface Usuario {
   crm?: string;
   especialidade?: string;
   mensagensNaoLidas?: number;
+  status?: StatusUsuario;
 }
 
 interface ChatFlutuanteProps {
@@ -63,8 +66,11 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
   const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [meuStatus, setMeuStatus] = useState<StatusUsuario>("online");
+  const [statusMenuAberto, setStatusMenuAberto] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
 
   // Garantir que o componente só renderize no cliente
   useEffect(() => {
@@ -179,6 +185,7 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
         userId,
         clinicaId,
         tipo: userTipo,
+        status: meuStatus,
       });
     });
 
@@ -260,12 +267,31 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
       setMensagensNaoLidas((prev) => Math.max(0, prev - 1));
     });
 
+    // Atualizar status dos usuários
+    newSocket.on("user-status-update", (data: { userId: string; status: StatusUsuario }) => {
+      setUsuarios((prev) =>
+        prev.map((u) =>
+          u.id === data.userId ? { ...u, status: data.status } : u
+        )
+      );
+    });
+
+    // Receber lista de usuários com status ao conectar
+    newSocket.on("users-status", (data: { users: Array<{ userId: string; status: StatusUsuario }> }) => {
+      setUsuarios((prev) =>
+        prev.map((u) => {
+          const userStatus = data.users.find((us) => us.userId === u.id);
+          return userStatus ? { ...u, status: userStatus.status } : { ...u, status: "offline" as StatusUsuario };
+        })
+      );
+    });
+
     setSocket(newSocket);
 
     return () => {
       newSocket.disconnect();
     };
-  }, [userId, clinicaId, userTipo, session, isOpen, usuarioSelecionado, recarregarContador]);
+  }, [userId, clinicaId, userTipo, session, isOpen, usuarioSelecionado, recarregarContador, meuStatus]);
 
   // Carregar usuários disponíveis
   useEffect(() => {
@@ -415,6 +441,63 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
     }
   };
 
+  // Função para mudar status
+  const mudarStatus = (novoStatus: StatusUsuario) => {
+    setMeuStatus(novoStatus);
+    setStatusMenuAberto(false);
+    if (socket) {
+      socket.emit("update-status", {
+        userId,
+        clinicaId,
+        status: novoStatus,
+      });
+    }
+  };
+
+  // Função para obter cor do status
+  const getStatusColor = (status?: StatusUsuario): string => {
+    switch (status) {
+      case "online":
+        return "bg-green-500";
+      case "ausente":
+        return "bg-yellow-500";
+      case "ocupado":
+        return "bg-red-500";
+      case "offline":
+      default:
+        return "bg-gray-400";
+    }
+  };
+
+  // Função para obter ícone do status
+  const getStatusIcon = (status?: StatusUsuario) => {
+    switch (status) {
+      case "online":
+        return <IconCircle className="h-3 w-3 fill-current" />;
+      case "ausente":
+        return <IconClock className="h-3 w-3" />;
+      case "ocupado":
+        return <IconCircle className="h-3 w-3 fill-current" />;
+      case "offline":
+      default:
+        return <IconUserOff className="h-3 w-3" />;
+    }
+  };
+
+  // Fechar menu de status ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusMenuRef.current && !statusMenuRef.current.contains(event.target as Node)) {
+        setStatusMenuAberto(false);
+      }
+    };
+
+    if (statusMenuAberto) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [statusMenuAberto]);
+
   // Recarregar contador apenas quando fechar o chat (para sincronização final)
   useEffect(() => {
     if (isOpen) return;
@@ -475,14 +558,59 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
               <IconMessage className="h-5 w-5" />
               <h3 className="font-semibold">Chat</h3>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
-              onClick={() => setIsOpen(false)}
-            >
-              <IconX className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Seletor de Status */}
+              <div className="relative" ref={statusMenuRef}>
+                <button
+                  onClick={() => setStatusMenuAberto(!statusMenuAberto)}
+                  className="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-primary/80 transition-colors text-primary-foreground"
+                  title="Status"
+                >
+                  <span className={cn("h-2.5 w-2.5 rounded-full", getStatusColor(meuStatus))} />
+                  <span className="text-xs font-medium capitalize hidden sm:inline text-primary-foreground">{meuStatus}</span>
+                </button>
+                {statusMenuAberto && (
+                  <div className="absolute right-0 top-full mt-1 bg-background border rounded-lg shadow-lg p-1 z-50 min-w-[120px]">
+                    <button
+                      onClick={() => mudarStatus("online")}
+                      className="w-full text-left px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent rounded flex items-center gap-2 transition-colors"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-green-500" />
+                      Online
+                    </button>
+                    <button
+                      onClick={() => mudarStatus("ausente")}
+                      className="w-full text-left px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent rounded flex items-center gap-2 transition-colors"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-yellow-500" />
+                      Ausente
+                    </button>
+                    <button
+                      onClick={() => mudarStatus("ocupado")}
+                      className="w-full text-left px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent rounded flex items-center gap-2 transition-colors"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-red-500" />
+                      Ocupado
+                    </button>
+                    <button
+                      onClick={() => mudarStatus("offline")}
+                      className="w-full text-left px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent rounded flex items-center gap-2 transition-colors"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-gray-400" />
+                      Offline
+                    </button>
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-primary-foreground hover:bg-primary/80"
+                onClick={() => setIsOpen(false)}
+              >
+                <IconX className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Lista de usuários ou conversa */}
@@ -508,17 +636,27 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
                         onClick={() => setUsuarioSelecionado(usuario)}
                         className="flex w-full items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent relative"
                       >
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={usuario.avatar || undefined} />
-                          <AvatarFallback>
-                            {usuario.nome
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={usuario.avatar || undefined} />
+                            <AvatarFallback>
+                              {usuario.nome
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* Indicador de status */}
+                          <span
+                            className={cn(
+                              "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+                              getStatusColor(usuario.status)
+                            )}
+                            title={usuario.status ? usuario.status.charAt(0).toUpperCase() + usuario.status.slice(1) : "Offline"}
+                          />
+                        </div>
                         <div className="flex-1 text-left">
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{usuario.nome}</p>
@@ -556,19 +694,34 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
                 >
                   <IconChevronDown className="h-4 w-4 rotate-90" />
                 </Button>
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={usuarioSelecionado.avatar || undefined} />
-                  <AvatarFallback>
-                    {usuarioSelecionado.nome
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .toUpperCase()
-                      .slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={usuarioSelecionado.avatar || undefined} />
+                    <AvatarFallback>
+                      {usuarioSelecionado.nome
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Indicador de status */}
+                  <span
+                    className={cn(
+                      "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background",
+                      getStatusColor(usuarioSelecionado.status)
+                    )}
+                    title={usuarioSelecionado.status ? usuarioSelecionado.status.charAt(0).toUpperCase() + usuarioSelecionado.status.slice(1) : "Offline"}
+                  />
+                </div>
                 <div className="flex-1">
-                  <p className="font-medium">{usuarioSelecionado.nome}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{usuarioSelecionado.nome}</p>
+                    <span className={cn("text-xs capitalize text-muted-foreground")}>
+                      {usuarioSelecionado.status || "offline"}
+                    </span>
+                  </div>
                   {usuarioSelecionado.crm && (
                     <p className="text-xs text-muted-foreground">
                       {usuarioSelecionado.crm} - {usuarioSelecionado.especialidade}

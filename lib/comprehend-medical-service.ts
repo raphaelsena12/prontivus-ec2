@@ -146,11 +146,10 @@ export async function processTranscriptionWithAI(
     // 5. Sugerir exames baseado nas entidades e CID
     const exames = suggestExams(entities, cidCodes);
 
-    // Ordenar e limitar códigos CID, garantindo que não estejam vazios
+    // Ordenar códigos CID, garantindo que não estejam vazios e tenham score > 0.5
     let sortedCidCodes = cidCodes
-      .filter((cid) => cid.code && cid.description) // Garantir que não está vazio
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
+      .filter((cid) => cid.code && cid.description && cid.score > 0.5) // Garantir que não está vazio e tem assertividade > 50%
+      .sort((a, b) => b.score - a.score);
 
     // Se ainda não houver CIDs, tentar inferir diretamente do texto da transcrição
     if (sortedCidCodes.length === 0) {
@@ -345,15 +344,43 @@ function generateAnamnese(
     .map((e) => e.text)
     .join(", ");
 
-  // Construir anamnese estruturada
-  let anamnese = `ANAMNESE\n\n`;
-  anamnese += `QUEIXA PRINCIPAL:\n${sintomas || "Não especificado"}\n\n`;
-  anamnese += `HISTÓRICO DA DOENÇA ATUAL:\n${transcription}\n\n`;
-
-  if (medicamentos) {
-    anamnese += `MEDICAÇÕES EM USO:\n${medicamentos}\n\n`;
+  // Construir anamnese estruturada seguindo a ordem padrão
+  // Extrair queixa principal (2-3 palavras do primeiro sintoma)
+  let queixaPrincipal = "N/A";
+  if (sintomas) {
+    const primeiroSintoma = sintomas.split(',')[0].trim();
+    const palavras = primeiroSintoma.split(' ').slice(0, 3);
+    queixaPrincipal = palavras.join(' ');
   }
 
+  let anamnese = `ANAMNESE:\n${transcription}\n\n`;
+  
+  // QUEIXA PRINCIPAL
+  anamnese += `QUEIXA PRINCIPAL:\n${queixaPrincipal}\n\n`;
+  
+  // HISTÓRIA DA DOENÇA ATUAL
+  anamnese += `HISTÓRIA DA DOENÇA ATUAL:\n${transcription}\n\n`;
+  
+  // ANTECEDENTES PESSOAIS PATOLÓGICOS
+  anamnese += `ANTECEDENTES PESSOAIS PATOLÓGICOS:\nN/A\n\n`;
+  
+  // ANTECEDENTES FAMILIARES
+  anamnese += `ANTECEDENTES FAMILIARES:\nN/A\n\n`;
+  
+  // HÁBITOS DE VIDA / HISTÓRIA SOCIAL
+  anamnese += `HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\nN/A\n\n`;
+  
+  // HISTÓRIA GINECO-OBSTÉTRICA (pode ser omitida se não aplicável)
+  // anamnese += `HISTÓRIA GINECO-OBSTÉTRICA:\nN/A\n\n`;
+  
+  // MEDICAMENTOS EM USO ATUAL
+  if (medicamentos) {
+    anamnese += `MEDICAMENTOS EM USO ATUAL:\n${medicamentos}\n\n`;
+  } else {
+    anamnese += `MEDICAMENTOS EM USO ATUAL:\nN/A\n\n`;
+  }
+
+  // EXAMES REALIZADOS (se houver)
   if (exames) {
     anamnese += `EXAMES REALIZADOS:\n${exames}\n\n`;
   }
@@ -416,7 +443,7 @@ function suggestExams(
     );
   }
 
-  return exames.slice(0, 5); // Limitar a 5 exames
+  return exames; // Retornar todos os exames sugeridos
 }
 
 /**
@@ -499,17 +526,20 @@ function inferCIDFromText(
   
   console.log("Total de CIDs inferidos do texto:", cidCodes.length);
   
+  // Filtrar apenas códigos com score > 0.5 (assertividade acima de 50%)
+  const filteredCids = cidCodes.filter((cid) => cid.score > 0.5);
+  
   // Se não encontrou nenhum CID e o texto é muito curto/genérico, 
-  // retornar um CID genérico para consulta/exame
-  if (cidCodes.length === 0 && textLower.length < 100) {
+  // retornar um CID genérico para consulta/exame (com score mínimo de 0.51 para passar no filtro)
+  if (filteredCids.length === 0 && textLower.length < 100) {
     console.log("Texto muito genérico, retornando CID genérico para consulta");
     return [{
       code: "Z00.0",
       description: "Exame médico geral",
-      score: 0.5
+      score: 0.51
     }];
   }
   
-  return cidCodes.slice(0, 5); // Limitar a 5
+  return filteredCids;
 }
 

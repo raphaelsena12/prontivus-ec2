@@ -59,8 +59,8 @@
   --secondary-foreground: oklch(0.2 0.01 270);
   --muted: oklch(0.97 0.004 270);
   --muted-foreground: oklch(0.48 0.01 270);
-  --accent: oklch(0.96 0.006 270);
-  --accent-foreground: oklch(0.2 0.01 270);
+  --accent: oklch(0.95 0.02 260);
+  --accent-foreground: oklch(0.45 0.15 260);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.93 0.006 270);
   --input: oklch(0.96 0.005 270);
@@ -70,14 +70,14 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.25 0.08 250);
-  --sidebar-foreground: oklch(0.95 0.01 270);
-  --sidebar-primary: oklch(0.55 0.18 270);
+  --sidebar: oklch(0.97 0.005 250);
+  --sidebar-foreground: oklch(0.18 0.02 250);
+  --sidebar-primary: oklch(0.5 0.2 260);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.35 0.12 250);
-  --sidebar-accent-foreground: oklch(0.95 0.01 270);
-  --sidebar-border: oklch(0.4 0.12 250);
-  --sidebar-ring: oklch(0.55 0.18 270);
+  --sidebar-accent: oklch(0.93 0.04 250);
+  --sidebar-accent-foreground: oklch(0.18 0.03 250);
+  --sidebar-border: oklch(0.88 0.03 250);
+  --sidebar-ring: oklch(0.5 0.2 260);
 }
 
 .dark {
@@ -93,8 +93,8 @@
   --secondary-foreground: oklch(0.96 0.003 270);
   --muted: oklch(0.2 0.025 270);
   --muted-foreground: oklch(0.62 0.015 270);
-  --accent: oklch(0.22 0.03 270);
-  --accent-foreground: oklch(0.96 0.003 270);
+  --accent: oklch(0.25 0.03 260);
+  --accent-foreground: oklch(0.55 0.15 260);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(0.25 0.04 270);
   --input: oklch(0.22 0.03 270);
@@ -104,14 +104,29 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.25 0.08 250);
-  --sidebar-foreground: oklch(0.95 0.01 270);
-  --sidebar-primary: oklch(0.68 0.22 270);
-  --sidebar-primary-foreground: oklch(0.11 0.015 270);
-  --sidebar-accent: oklch(0.35 0.12 250);
-  --sidebar-accent-foreground: oklch(0.95 0.01 270);
-  --sidebar-border: oklch(0.4 0.12 250);
-  --sidebar-ring: oklch(0.68 0.22 270);
+  --sidebar: oklch(0.97 0.005 250);
+  --sidebar-foreground: oklch(0.18 0.02 250);
+  --sidebar-primary: oklch(0.5 0.2 260);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.04 250);
+  --sidebar-accent-foreground: oklch(0.18 0.03 250);
+  --sidebar-border: oklch(0.88 0.03 250);
+  --sidebar-ring: oklch(0.5 0.2 260);
+
+  /* ── Tokens clínicos (tela de atendimento) ── */
+  --clinical-cobalt: #1E40AF;
+  --clinical-cobalt-light: #EFF6FF;
+  --clinical-cobalt-border: #BFDBFE;
+  --clinical-allergy-bg: #FEF2F2;
+  --clinical-allergy-border: #DC2626;
+  --clinical-allergy-text: #991B1B;
+  --clinical-success-bg: #F0FDF4;
+  --clinical-success-text: #166534;
+  --clinical-warning-bg: #FFFBEB;
+  --clinical-warning-text: #92400E;
+  --clinical-surface: #F8F9FA;
+  --clinical-header-bg: #FFFFFF;
+  --clinical-vitals-bg: #F1F5F9;
 }
 
 @layer base {
@@ -144,20 +159,20 @@
 
   [data-sidebar="sidebar"]::-webkit-scrollbar-thumb,
   [data-sidebar="content"]::-webkit-scrollbar-thumb {
-    background: oklch(0.68 0.22 270 / 0.5);
+    background: oklch(0.55 0.2 260 / 0.3);
     border-radius: 4px;
   }
 
   [data-sidebar="sidebar"]::-webkit-scrollbar-thumb:hover,
   [data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.68 0.22 270 / 0.7);
+    background: oklch(0.55 0.2 260 / 0.5);
   }
 
   /* Firefox */
   [data-sidebar="sidebar"],
   [data-sidebar="content"] {
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.68 0.22 270 / 0.5) transparent;
+    scrollbar-color: oklch(0.55 0.2 260 / 0.3) transparent;
   }
 
   /* Animação de flutuação para partículas */
@@ -178,6 +193,24 @@
 
   .animate-float {
     animation: float 6s ease-in-out infinite;
+  }
+
+  /* Pulse lento para banner de alergias (2s, para de repetir após mount) */
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .animate-pulse-slow {
+    animation: pulse-slow 1s ease-in-out 2;
+  }
+
+  /* Borda animada para área de transcrição ativa */
+  @keyframes border-pulse {
+    0%, 100% { border-color: #BFDBFE; }
+    50% { border-color: #1E40AF; }
+  }
+  .animate-border-pulse {
+    animation: border-pulse 1.5s ease-in-out infinite;
   }
 
   /* Animação de entrada suave */

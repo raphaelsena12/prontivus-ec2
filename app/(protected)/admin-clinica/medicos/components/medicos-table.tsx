@@ -50,6 +50,7 @@ interface Medico {
   id: string;
   crm: string;
   especialidade: string;
+  rqe?: number | null;
   ativo?: boolean;
   createdAt: Date;
   usuario: {

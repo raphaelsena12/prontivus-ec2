@@ -41,16 +41,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, Package, Plus, Upload } from "lucide-react";
+import { Edit, Trash2, Package, Plus, Upload, ArrowUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Estoque {
   id: string;
+  tipo?: "MEDICAMENTO" | "INSUMO";
   medicamento: {
     id: string;
     nome: string;
     principioAtivo: string | null;
-  };
+  } | null;
+  insumo: {
+    id: string;
+    nome: string;
+    descricao: string | null;
+  } | null;
   quantidadeAtual: number;
   quantidadeMinima: number;
   quantidadeMaxima: number | null;
@@ -64,7 +70,7 @@ interface EstoqueTableProps {
   onEdit?: (estoque: Estoque) => void;
   onDelete?: (estoque: Estoque) => void;
   newButtonUrl?: string;
-  onMovimentacoes?: () => void;
+  onMovimentacoes?: (estoque: Estoque) => void;
   onUpload?: () => void;
 }
 
@@ -126,32 +132,63 @@ export function EstoqueTable({
     if (!globalFilter) return data;
     const search = globalFilter.toLowerCase();
     return data.filter((estoque) => {
-      const nome = estoque.medicamento.nome?.toLowerCase() || "";
-      const principioAtivo = estoque.medicamento.principioAtivo?.toLowerCase() || "";
-      return nome.includes(search) || principioAtivo.includes(search);
+      if (estoque.tipo === "INSUMO" && estoque.insumo) {
+        const nome = estoque.insumo.nome?.toLowerCase() || "";
+        const descricao = estoque.insumo.descricao?.toLowerCase() || "";
+        return nome.includes(search) || descricao.includes(search);
+      } else if (estoque.medicamento) {
+        const nome = estoque.medicamento.nome?.toLowerCase() || "";
+        const principioAtivo = estoque.medicamento.principioAtivo?.toLowerCase() || "";
+        return nome.includes(search) || principioAtivo.includes(search);
+      }
+      return false;
     });
   }, [data, globalFilter]);
 
   const columns: ColumnDef<Estoque>[] = React.useMemo(
     () => [
       {
-        accessorKey: "medicamento.nome",
-        header: "Medicamento",
+        accessorKey: "tipo",
+        header: "Tipo",
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.medicamento.nome}</div>
+          <Badge variant={row.original.tipo === "INSUMO" ? "secondary" : "default"}>
+            {row.original.tipo === "INSUMO" ? "Insumo" : "Medicamento"}
+          </Badge>
         ),
         enableHiding: false,
       },
       {
-        accessorKey: "medicamento.principioAtivo",
-        header: "Princípio Ativo",
-        cell: ({ row }) => (
-          <div className="max-w-md truncate">
-            {row.original.medicamento.principioAtivo || (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </div>
-        ),
+        accessorKey: "nome",
+        header: "Nome",
+        cell: ({ row }) => {
+          const nome = row.original.tipo === "INSUMO" 
+            ? row.original.insumo?.nome 
+            : row.original.medicamento?.nome;
+          return <div className="font-medium">{nome || "-"}</div>;
+        },
+        enableHiding: false,
+      },
+      {
+        accessorKey: "principioAtivo",
+        header: "Princípio Ativo / Descrição",
+        cell: ({ row }) => {
+          if (row.original.tipo === "INSUMO") {
+            return (
+              <div className="max-w-md truncate">
+                {row.original.insumo?.descricao || (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </div>
+            );
+          }
+          return (
+            <div className="max-w-md truncate">
+              {row.original.medicamento?.principioAtivo || (
+                <span className="text-muted-foreground">-</span>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: "quantidadeAtual",
@@ -200,6 +237,20 @@ export function EstoqueTable({
         header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
         cell: ({ row }) => (
           <div className="flex justify-end gap-2">
+            {onMovimentacoes && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const tipo = row.original.tipo || (row.original.medicamento ? "MEDICAMENTO" : "INSUMO");
+                  onMovimentacoes(row.original);
+                }}
+                title="Lançar movimentação"
+                className="h-7 w-7 p-0"
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+            )}
             {onEdit ? (
               <Button
                 variant="outline"
@@ -239,7 +290,7 @@ export function EstoqueTable({
         enableHiding: false,
       },
     ],
-    [router, onEdit, onDelete]
+    [router, onEdit, onDelete, onMovimentacoes]
   );
 
   const table = useReactTable({
@@ -308,7 +359,7 @@ export function EstoqueTable({
                     colSpan={columns.length}
                     className="h-24 text-center text-xs"
                   >
-                    Nenhum medicamento em estoque encontrado.
+                    Nenhum item em estoque encontrado.
                   </TableCell>
                 </TableRow>
               )}

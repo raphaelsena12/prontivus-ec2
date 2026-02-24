@@ -77,6 +77,9 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       clinicaId: auth.clinicaId,
+      status: {
+        notIn: ["CANCELADA"], // Excluir agendamentos cancelados
+      },
       ...(medicoId && { medicoId }),
       ...(search && {
         OR: [
@@ -127,7 +130,7 @@ export async function GET(request: NextRequest) {
           operadora: true,
           planoSaude: true,
         },
-        orderBy: { dataHora: "asc" },
+        orderBy: { dataHora: "desc" },
       });
     } catch (includeError: any) {
       // Se falhar ao incluir procedimento (campo pode não existir no banco), tentar sem ele
@@ -164,7 +167,7 @@ export async function GET(request: NextRequest) {
             operadora: true,
             planoSaude: true,
           },
-          orderBy: { dataHora: "asc" },
+          orderBy: { dataHora: "desc" },
         });
       } else {
         throw includeError;
@@ -375,6 +378,83 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validar regra de retorno: criar alçada de aprovação se houver retorno nos últimos 30 dias
+    // ou se já houver um retorno agendado no futuro
+    let precisaAprovacao = false;
+    let motivoAprovacao: string | null = null;
+
+    if (data.tipoConsultaId) {
+      const tipoConsulta = await prisma.tipoConsulta.findFirst({
+        where: {
+          id: data.tipoConsultaId,
+          codigo: "RETORNO",
+          ativo: true,
+        },
+      });
+
+      if (tipoConsulta) {
+        // Buscar TODOS os retornos do paciente com o mesmo médico (passados e futuros)
+        const retornosExistentes = await prisma.consulta.findMany({
+          where: {
+            pacienteId: data.pacienteId,
+            medicoId: data.medicoId,
+            clinicaId: auth.clinicaId,
+            tipoConsultaId: tipoConsulta.id,
+            status: {
+              not: "CANCELADA",
+            },
+          },
+          orderBy: {
+            dataHora: "desc",
+          },
+          include: {
+            medico: {
+              include: {
+                usuario: {
+                  select: {
+                    nome: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (retornosExistentes.length > 0) {
+          const hoje = new Date();
+          const trintaDiasAtras = new Date(hoje);
+          trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+
+          // Encontrar o retorno mais recente (pode ser passado ou futuro)
+          const retornoMaisRecente = retornosExistentes[0];
+          const dataRetornoMaisRecente = new Date(retornoMaisRecente.dataHora);
+
+          // Verificar se há retorno nos últimos 30 dias (passado)
+          if (dataRetornoMaisRecente >= trintaDiasAtras && dataRetornoMaisRecente <= hoje) {
+            // Calcular data mínima permitida (30 dias após a última consulta)
+            const dataMinimaPermitida = new Date(dataRetornoMaisRecente);
+            dataMinimaPermitida.setDate(dataMinimaPermitida.getDate() + 30);
+
+            // Se a data do novo agendamento for antes da data mínima permitida, requer aprovação
+            if (dataHoraInicio < dataMinimaPermitida) {
+              precisaAprovacao = true;
+              motivoAprovacao = `Este paciente já teve uma consulta de retorno nos últimos 30 dias (${dataRetornoMaisRecente.toLocaleDateString('pt-BR')}). A data mínima recomendada seria ${dataMinimaPermitida.toLocaleDateString('pt-BR')}.`;
+            }
+          }
+
+          // Verificar se já existe um retorno agendado no futuro
+          const retornosFuturos = retornosExistentes.filter(
+            (r) => new Date(r.dataHora) > hoje
+          );
+
+          if (retornosFuturos.length > 0) {
+            precisaAprovacao = true;
+            motivoAprovacao = `Este paciente já possui ${retornosFuturos.length} retorno(s) agendado(s) no futuro.`;
+          }
+        }
+      }
+    }
+
     if (!auth.clinicaId) {
       return NextResponse.json(
         { error: "Clínica não encontrada" },
@@ -395,8 +475,10 @@ export async function POST(request: NextRequest) {
         planoSaudeId: data.planoSaudeId,
         numeroCarteirinha: data.numeroCarteirinha,
         valorCobrado: data.valorCobrado,
-        observacoes: data.observacoes,
-        status: "AGENDADA",
+        observacoes: motivoAprovacao 
+          ? `${data.observacoes || ''}\n\n[Motivo para aprovação: ${motivoAprovacao}]`.trim()
+          : data.observacoes,
+        status: precisaAprovacao ? "AGUARDANDO_APROVACAO" : "AGENDADA",
       },
       include: {
         paciente: true,
@@ -418,8 +500,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Enviar email de confirmação para o paciente (não bloqueia a resposta)
-    if (consulta.paciente.email) {
+    // Enviar email de confirmação para o paciente apenas se o agendamento foi aprovado automaticamente
+    // (não enviar quando está aguardando aprovação)
+    if (consulta.status === "AGENDADA" && consulta.paciente.email) {
       try {
         const emailHtml = gerarEmailConfirmacaoAgendamento({
           pacienteNome: consulta.paciente.nome,

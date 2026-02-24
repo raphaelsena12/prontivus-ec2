@@ -51,6 +51,7 @@ interface FormaPagamento {
   nome: string;
   descricao: string | null;
   tipo: "DINHEIRO" | "CARTAO_CREDITO" | "CARTAO_DEBITO" | "PIX" | "BOLETO" | "TRANSFERENCIA";
+  bandeiraCartao: string | null;
   ativo: boolean;
   createdAt: Date;
   updatedAt: Date;

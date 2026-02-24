@@ -148,11 +148,11 @@ function PacienteSearchInput({
     if (!paciente.id) return;
     
     setSelectedPaciente(paciente);
-    const cpfFormatado = maskCPF(paciente.cpf);
-    setSearchTerm(cpfFormatado);
+    // Mostrar o nome do paciente no campo, mas ainda permitir editar
+    setSearchTerm(paciente.nome);
     setShowResults(false);
     setPacientes([]);
-    onChange(cpfFormatado);
+    onChange(paciente.nome);
     onSelect(paciente);
   }, [onChange, onSelect]);
 
@@ -162,13 +162,15 @@ function PacienteSearchInput({
       const term = searchTerm.trim();
       
       // Se já tem um paciente selecionado e o termo não mudou, não buscar
-      if (selectedPaciente && term === maskCPF(selectedPaciente.cpf)) {
+      if (selectedPaciente && term === selectedPaciente.nome) {
         return;
       }
 
-      // Buscar por CPF (11 dígitos) ou por nome (3+ caracteres)
+      // Buscar por CPF (3+ dígitos) ou por nome (3+ caracteres)
       const cpfLimpo = removeMask(term);
-      const isCPF = cpfLimpo.length === 11 && /^\d+$/.test(cpfLimpo);
+      // Se contém apenas números e tem 3+ caracteres, pode ser busca por CPF
+      const isCPF = cpfLimpo.length >= 3 && /^\d+$/.test(cpfLimpo);
+      // Se contém letras ou não é apenas números, é busca por nome
       const isNome = term.length >= 3 && !/^\d+$/.test(term);
 
       if (!isCPF && !isNome) {
@@ -187,8 +189,8 @@ function PacienteSearchInput({
           setPacientes(data.pacientes || []);
           setShowResults(true);
           
-          // Se buscar por CPF e encontrar exatamente um resultado, selecionar automaticamente
-          if (isCPF && data.pacientes?.length === 1) {
+          // Se buscar por CPF completo (11 dígitos) e encontrar exatamente um resultado, selecionar automaticamente
+          if (isCPF && cpfLimpo.length === 11 && data.pacientes?.length === 1) {
             handleSelectPaciente(data.pacientes[0]);
           }
         }
@@ -226,19 +228,36 @@ function PacienteSearchInput({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Se o valor parece ser um CPF (contém números), aplicar máscara
+    
+    // Se o campo foi limpo, limpar seleção
+    if (!value) {
+      handleClear();
+      return;
+    }
+    
+    // Se há um paciente selecionado e o usuário começou a digitar, limpar seleção imediatamente
+    if (selectedPaciente) {
+      const nomeSelecionado = selectedPaciente.nome;
+      if (value !== nomeSelecionado) {
+        setSelectedPaciente(null);
+        setPacientes([]);
+        setShowResults(false);
+        onSelect({ id: "", nome: "", cpf: "" } as Paciente);
+      }
+    }
+    
+    // Verificar se contém apenas números (sem letras ou caracteres especiais além da máscara)
     const cpfLimpo = removeMask(value);
-    const maskedValue = cpfLimpo.length > 0 && /^\d+$/.test(cpfLimpo) 
+    const contemApenasNumeros = /^\d+$/.test(cpfLimpo);
+    
+    // Se contém apenas números, aplicar máscara de CPF
+    // Se contém letras ou outros caracteres, permitir digitação livre (busca por nome)
+    const maskedValue = contemApenasNumeros && cpfLimpo.length > 0
       ? maskCPF(value) 
       : value;
     
     setSearchTerm(maskedValue);
     onChange(maskedValue);
-    
-    // Se limpar o campo, limpar seleção
-    if (!value) {
-      handleClear();
-    }
   };
 
   return (
@@ -319,6 +338,11 @@ export function EditarAgendamentoModal({
     retornosNoDia: number;
     limiteAtingido: boolean;
     mensagem: string | null;
+  } | null>(null);
+  const [sugestaoDataRetorno, setSugestaoDataRetorno] = useState<{
+    temRetorno30Dias: boolean;
+    dataSugerida: string | null;
+    ultimaConsulta: { id: string; dataHora: string; medico: string } | null;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<File[]>([]);
@@ -571,6 +595,43 @@ export function EditarAgendamentoModal({
     verificarLimiteRetornos();
   }, [medicoId, tipoConsultaId, data, tiposConsulta, open]);
 
+  // Verificar sugestão de data de retorno (30 dias após última consulta)
+  useEffect(() => {
+    const verificarSugestaoDataRetorno = async () => {
+      const tipoRetorno = tiposConsulta.find((tipo) => tipo.codigo === "RETORNO");
+      const isTipoRetorno = tipoRetorno && tipoConsultaId === tipoRetorno.id;
+
+      if (!pacienteId || !medicoId || !isTipoRetorno || !open) {
+        setSugestaoDataRetorno(null);
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `/api/secretaria/pacientes/${pacienteId}/sugestao-data-retorno?medicoId=${medicoId}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setSugestaoDataRetorno(data);
+        } else {
+          setSugestaoDataRetorno(null);
+        }
+      } catch (error) {
+        console.error("Erro ao verificar sugestão de data de retorno:", error);
+        setSugestaoDataRetorno(null);
+      }
+    };
+
+    verificarSugestaoDataRetorno();
+  }, [pacienteId, medicoId, tipoConsultaId, tiposConsulta, open]);
+
+  const handleAplicarDataSugerida = () => {
+    if (sugestaoDataRetorno?.dataSugerida) {
+      form.setValue("data", sugestaoDataRetorno.dataSugerida);
+      setSugestaoDataRetorno(null); // Ocultar alerta após aplicar
+    }
+  };
+
   const handlePacienteSelect = (paciente: Paciente) => {
     if (paciente.id) {
       setPacienteSelecionado(paciente);
@@ -682,17 +743,48 @@ export function EditarAgendamentoModal({
                     </Alert>
                   )}
 
+                  {sugestaoDataRetorno?.temRetorno30Dias && sugestaoDataRetorno.dataSugerida && (
+                    <Alert variant="default" className="text-xs py-3 border-orange-500 bg-orange-50 dark:bg-orange-950">
+                      <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <AlertTitle className="text-xs font-semibold text-orange-800 dark:text-orange-200">
+                        ⚠️ Atenção: Regra de Retorno (30 dias)
+                      </AlertTitle>
+                      <AlertDescription className="text-xs text-orange-700 dark:text-orange-300 mt-2">
+                        <div className="space-y-2">
+                          <p>
+                            Este paciente teve uma consulta de retorno nos últimos 30 dias com este médico.
+                            <br />
+                            <strong>Última consulta:</strong> {new Date(sugestaoDataRetorno.ultimaConsulta?.dataHora || '').toLocaleDateString('pt-BR')}
+                            <br />
+                            <strong>Data mínima recomendada:</strong> {new Date(sugestaoDataRetorno.dataSugerida).toLocaleDateString('pt-BR')} (30 dias após a última consulta)
+                          </p>
+                          <p className="font-semibold text-orange-800 dark:text-orange-200">
+                            ⚠️ O sistema solicitará autorização para o médico
+                          </p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleAplicarDataSugerida}
+                            className="h-7 text-xs px-3 mt-1 bg-orange-600 hover:bg-orange-700 text-white"
+                          >
+                            Aplicar Data Sugerida
+                          </Button>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* Row 1: Médico e Código TUSS */}
                   <div className="flex flex-wrap items-start gap-2.5">
                     <FormField
                       control={form.control}
                       name="medicoId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[200px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Médico *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-full">
                                 <SelectValue placeholder="Selecione o médico" />
                               </SelectTrigger>
                             </FormControl>
@@ -713,11 +805,11 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="codigoTussId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[250px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Código TUSS *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-full">
                                 <SelectValue placeholder="Selecione o código TUSS" />
                               </SelectTrigger>
                             </FormControl>
@@ -741,8 +833,8 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="pacienteId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[140px]">
-                          <FormLabel className="text-xs font-medium">CPF</FormLabel>
+                        <FormItem className="min-w-[400px] flex-1">
+                          <FormLabel className="text-xs font-medium">Paciente (CPF ou Nome) *</FormLabel>
                           <FormControl>
                             <PacienteSearchInput
                               value={pacienteSearchValue}
@@ -762,16 +854,6 @@ export function EditarAgendamentoModal({
                         </FormItem>
                       )}
                     />
-
-                    <FormItem className="min-w-[320px]">
-                      <FormLabel className="text-xs font-medium">Paciente</FormLabel>
-                      <Input
-                        value={pacienteSelecionado?.nome || ""}
-                        disabled
-                        className="h-8 text-xs bg-muted"
-                        placeholder="Selecione pelo CPF"
-                      />
-                    </FormItem>
 
                     <FormField
                       control={form.control}
@@ -818,11 +900,11 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="tipoConsultaId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[180px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Tipo de Consulta</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-full">
                                 <SelectValue placeholder="Selecione o tipo" />
                               </SelectTrigger>
                             </FormControl>
@@ -843,7 +925,7 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="procedimentoId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[220px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Procedimento</FormLabel>
                           <Select
                             onValueChange={(value) => {
@@ -852,7 +934,7 @@ export function EditarAgendamentoModal({
                             value={field.value === null ? "null" : field.value || ""}
                           >
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-full">
                                 <SelectValue placeholder="Selecione o procedimento" />
                               </SelectTrigger>
                             </FormControl>
@@ -874,7 +956,7 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="operadoraId"
                       render={({ field }) => (
-                        <FormItem className="min-w-[180px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Convênio</FormLabel>
                           <Select
                             onValueChange={(value) => {
@@ -884,7 +966,7 @@ export function EditarAgendamentoModal({
                             value={field.value === null ? "null" : field.value || ""}
                           >
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-full">
                                 <SelectValue placeholder="Selecione o convênio" />
                               </SelectTrigger>
                             </FormControl>
@@ -906,14 +988,14 @@ export function EditarAgendamentoModal({
                       control={form.control}
                       name="numeroCarteirinha"
                       render={({ field }) => (
-                        <FormItem className="min-w-[180px]">
+                        <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Número da Carteirinha</FormLabel>
                           <FormControl>
                             <Input 
                               {...field} 
                               value={field.value || ""}
                               placeholder="Número da carteirinha"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs w-full"
                             />
                           </FormControl>
                           <FormMessage className="text-xs" />
@@ -974,12 +1056,12 @@ export function EditarAgendamentoModal({
                   </div>
 
                   {/* Row 6: Valor */}
-                  <div className="flex flex-wrap items-start gap-2.5">
+                  <div className="flex flex-wrap items-start gap-2.5 justify-end">
                     <FormField
                       control={form.control}
                       name="valorCobrado"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Valor Cobrado</FormLabel>
                           <FormControl>
                             <Input
@@ -989,7 +1071,7 @@ export function EditarAgendamentoModal({
                               {...field}
                               onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                               value={field.value || ""}
-                              className="h-8 text-xs"
+                              className="h-10 text-base font-semibold text-right"
                             />
                           </FormControl>
                           <FormMessage className="text-xs" />

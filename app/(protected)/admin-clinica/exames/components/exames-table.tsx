@@ -51,8 +51,15 @@ interface Exame {
   nome: string;
   descricao: string | null;
   tipo: string | null;
+  codigoTussId: string | null;
   ativo: boolean;
   createdAt: Date;
+  codigoTuss?: {
+    id: string;
+    codigoTuss: string;
+    descricao: string;
+    tipoProcedimento: string;
+  } | null;
 }
 
 interface ExamesTableProps {
@@ -125,12 +132,35 @@ export function ExamesTable({
     return data.filter((exame) => {
       const nome = exame.nome?.toLowerCase() || "";
       const descricao = exame.descricao?.toLowerCase() || "";
-      return nome.includes(search) || descricao.includes(search);
+      const codigoTuss = exame.codigoTuss?.codigoTuss?.toLowerCase() || "";
+      const codigoTussDesc = exame.codigoTuss?.descricao?.toLowerCase() || "";
+      return nome.includes(search) || descricao.includes(search) || codigoTuss.includes(search) || codigoTussDesc.includes(search);
     });
   }, [data, globalFilter]);
 
   const columns: ColumnDef<Exame>[] = React.useMemo(
     () => [
+      {
+        accessorKey: "codigoTuss",
+        header: "Código TUSS",
+        cell: ({ row }) => {
+          const codigoTuss = row.original.codigoTuss;
+          if (!codigoTuss) {
+            return (
+              <span className="text-muted-foreground text-xs">-</span>
+            );
+          }
+          return (
+            <div className="flex flex-col">
+              <span className="font-medium text-xs">{codigoTuss.codigoTuss}</span>
+              <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">
+                {codigoTuss.descricao}
+              </span>
+            </div>
+          );
+        },
+        enableHiding: false,
+      },
       {
         accessorKey: "createdAt",
         header: "Data",

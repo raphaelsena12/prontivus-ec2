@@ -13,7 +13,13 @@
       "Bash(npx prisma migrate:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npx prisma db pull:*)",
-      "Bash(npx prisma validate:*)"
+      "Bash(npx prisma validate:*)",
+      "Bash(npx prisma db execute:*)",
+      "Bash(node -e:*)",
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)"
     ]
   }
 }

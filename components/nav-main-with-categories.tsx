@@ -114,8 +114,8 @@ export function NavMainWithCategories({
                     <SidebarMenuButton
                       className={cn(
                         "h-10 text-sm transition-colors",
-                        "text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-transparent",
-                        hasActiveItem && "text-sidebar-foreground"
+                        "text-gray-600 hover:text-gray-900 hover:bg-transparent",
+                        hasActiveItem && "text-gray-900 font-medium"
                       )}
                       tooltip={category.title}
                     >
@@ -123,7 +123,7 @@ export function NavMainWithCategories({
                       <span className="flex-1 text-left">{category.title}</span>
                       <ChevronRight
                         className={cn(
-                          "h-4 w-4 transition-transform duration-200 text-sidebar-foreground",
+                          "h-4 w-4 transition-transform duration-200 text-gray-500",
                           isOpen && "rotate-90"
                         )}
                       />
@@ -131,7 +131,7 @@ export function NavMainWithCategories({
                   </CollapsibleTrigger>
 
                   <CollapsibleContent className="overflow-hidden transition-all data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                    <SidebarMenuSub className="border-l-0 ml-0 px-0 py-1 gap-0.5 bg-sidebar">
+                    <SidebarMenuSub className="border-l-0 ml-0 px-0 py-1 gap-0.5" style={{ backgroundColor: 'rgba(30, 78, 216, 0.05)' }}>
                       {category.items.map((item) => {
                         const ItemIcon = item.icon;
                         const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
@@ -143,21 +143,34 @@ export function NavMainWithCategories({
                               isActive={isActive}
                               className={cn(
                                 "h-10 text-sm transition-all duration-150",
-                                "hover:bg-sidebar-accent",
                                 isActive
-                                  ? "bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary ml-0 pl-[calc(1rem-2px)]"
-                                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground pl-4"
+                                  ? "font-medium border-l-2 ml-0 pl-[calc(1rem-2px)]"
+                                  : "text-gray-600 hover:text-gray-900 pl-4"
                               )}
+                              style={isActive ? {
+                                backgroundColor: 'rgba(30, 78, 216, 0.15)',
+                                color: '#1E4ED8',
+                                borderLeftColor: '#1E4ED8'
+                              } : {}}
+                              onMouseEnter={(e) => {
+                                if (!isActive) {
+                                  e.currentTarget.style.backgroundColor = 'rgba(30, 78, 216, 0.08)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isActive) {
+                                  e.currentTarget.style.backgroundColor = '';
+                                }
+                              }}
                             >
                               <Link href={item.url} className="flex items-center gap-3 w-full">
                                 {ItemIcon && (
                                   <ItemIcon
                                     className={cn(
                                       "h-[18px] w-[18px] shrink-0 transition-colors",
-                                      isActive
-                                        ? "text-sidebar-primary"
-                                        : "text-sidebar-foreground/50"
+                                      isActive ? "" : "text-gray-500"
                                     )}
+                                    style={isActive ? { color: '#1E4ED8' } : {}}
                                   />
                                 )}
                                 <span className="truncate">{item.title}</span>

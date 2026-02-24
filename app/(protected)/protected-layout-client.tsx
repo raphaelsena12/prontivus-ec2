@@ -95,16 +95,6 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    label: "Prontuários",
-    href: "/prontuarios",
-    icon: FileText,
-    roles: [
-      TipoUsuario.SUPER_ADMIN,
-      TipoUsuario.ADMIN_CLINICA,
-      TipoUsuario.MEDICO,
-    ],
-  },
-  {
     label: "Médicos",
     href: "/medicos",
     icon: Stethoscope,
@@ -146,13 +136,7 @@ function SidebarContent({
 }) {
   const pathname = usePathname();
 
-  // Ajustar o href de Prontuários para médicos
-  const adjustedMenuItems = menuItems.map((item) => {
-    if (item.label === "Prontuários" && user.tipo === TipoUsuario.MEDICO) {
-      return { ...item, href: "/medico/prontuarios" };
-    }
-    return item;
-  });
+  const adjustedMenuItems = menuItems;
 
   const filteredMenuItems = adjustedMenuItems.filter((item) =>
     item.roles.includes(user.tipo)
@@ -284,7 +268,7 @@ export function ProtectedLayoutClient({
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 border-r bg-background lg:block">
+      <aside className="hidden w-64 border-r bg-background lg:block relative z-20">
         <SidebarContent user={user} />
       </aside>
 
@@ -311,7 +295,7 @@ export function ProtectedLayoutClient({
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="flex h-16 items-center justify-between border-b bg-background px-4 lg:px-6">
+        <header className="flex h-16 items-center justify-between border-b bg-background px-4 lg:px-6 overflow-x-hidden">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
               <Image 

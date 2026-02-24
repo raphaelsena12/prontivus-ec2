@@ -8,6 +8,16 @@ const procedimentoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero"),
+  medicamentos: z.array(z.object({
+    medicamentoId: z.string(),
+    quantidade: z.number().optional(),
+    observacoes: z.string().optional(),
+  })).optional(),
+  insumos: z.array(z.object({
+    insumoId: z.string(),
+    quantidade: z.number().optional(),
+    observacoes: z.string().optional(),
+  })).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -39,6 +49,18 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
+        include: {
+          procedimentosMedicamentos: {
+            include: {
+              medicamento: true,
+            },
+          },
+          procedimentosInsumos: {
+            include: {
+              insumo: true,
+            },
+          },
+        },
       }),
       prisma.procedimento.count({ where }),
     ]);
@@ -97,9 +119,37 @@ export async function POST(request: NextRequest) {
 
     const procedimento = await prisma.procedimento.create({
       data: {
-        ...data,
+        codigo: data.codigo,
+        nome: data.nome,
+        descricao: data.descricao || null,
         valor: data.valor,
         clinicaId: auth.clinicaId!,
+        procedimentosMedicamentos: data.medicamentos ? {
+          create: data.medicamentos.map((m: any) => ({
+            medicamentoId: m.medicamentoId,
+            quantidade: m.quantidade ? m.quantidade : null,
+            observacoes: m.observacoes || null,
+          })),
+        } : undefined,
+        procedimentosInsumos: data.insumos ? {
+          create: data.insumos.map((i: any) => ({
+            insumoId: i.insumoId,
+            quantidade: i.quantidade ? i.quantidade : null,
+            observacoes: i.observacoes || null,
+          })),
+        } : undefined,
+      },
+      include: {
+        procedimentosMedicamentos: {
+          include: {
+            medicamento: true,
+          },
+        },
+        procedimentosInsumos: {
+          include: {
+            insumo: true,
+          },
+        },
       },
     });
 

@@ -17,9 +17,10 @@ import { toast } from "sonner";
 interface Paciente {
   id: string;
   nome: string;
+  ativo: boolean;
 }
 
-interface PacienteDeleteDialogProps {
+interface PacienteToggleStatusDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   paciente: Paciente | null;
@@ -31,47 +32,53 @@ export function PacienteDeleteDialog({
   onOpenChange,
   paciente,
   onSuccess,
-}: PacienteDeleteDialogProps) {
+}: PacienteToggleStatusDialogProps) {
   const [loading, setLoading] = useState(false);
 
-  const handleDelete = async () => {
+  const isDeactivating = paciente?.ativo !== false;
+
+  const handleToggleStatus = async () => {
     if (!paciente) return;
 
     try {
       setLoading(true);
 
       const response = await fetch(`/api/admin-clinica/pacientes/${paciente.id}`, {
-        method: "DELETE",
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativo: !paciente.ativo }),
       });
 
       if (!response.ok) {
-        let errorMessage = "Erro ao excluir paciente";
+        let errorMessage = isDeactivating
+          ? "Erro ao desativar paciente"
+          : "Erro ao reativar paciente";
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
-          // Se não conseguir parsear JSON, usar mensagem padrão baseada no status
           if (response.status === 401) {
             errorMessage = "Não autenticado. Por favor, faça login novamente.";
           } else if (response.status === 403) {
-            errorMessage = "Acesso negado. Você não tem permissão para excluir pacientes.";
+            errorMessage = "Acesso negado. Você não tem permissão.";
           } else if (response.status === 404) {
             errorMessage = "Paciente não encontrado.";
-          } else {
-            errorMessage = `Erro ao excluir paciente (${response.status})`;
           }
         }
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      toast.success(data.message || "Paciente excluído com sucesso!");
+      toast.success(
+        isDeactivating
+          ? "Paciente desativado com sucesso!"
+          : "Paciente reativado com sucesso!"
+      );
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error("Erro ao excluir paciente:", error);
+      console.error("Erro ao alterar status do paciente:", error);
       toast.error(
-        error instanceof Error ? error.message : "Erro ao excluir paciente"
+        error instanceof Error ? error.message : "Erro ao alterar status do paciente"
       );
     } finally {
       setLoading(false);
@@ -82,13 +89,28 @@ export function PacienteDeleteDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Excluir Paciente?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {isDeactivating ? "Desativar Paciente?" : "Reativar Paciente?"}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir o paciente{" "}
-            <strong className="text-foreground">{paciente?.nome}</strong>?
-            <br />
-            <br />
-            Esta ação irá desativar o paciente no sistema.
+            {isDeactivating ? (
+              <>
+                Tem certeza que deseja desativar o paciente{" "}
+                <strong className="text-foreground">{paciente?.nome}</strong>?
+                <br />
+                <br />
+                O paciente será marcado como inativo e não aparecerá nas listagens padrão,
+                mas seus dados serão mantidos no sistema.
+              </>
+            ) : (
+              <>
+                Deseja reativar o paciente{" "}
+                <strong className="text-foreground">{paciente?.nome}</strong>?
+                <br />
+                <br />
+                O paciente voltará a aparecer nas listagens e poderá ser utilizado normalmente.
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -96,26 +118,20 @@ export function PacienteDeleteDialog({
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              handleDelete();
+              handleToggleStatus();
             }}
             disabled={loading}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className={
+              isDeactivating
+                ? "bg-amber-500 text-white hover:bg-amber-600"
+                : "bg-emerald-500 text-white hover:bg-emerald-600"
+            }
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Excluir
+            {isDeactivating ? "Desativar" : "Reativar"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
 }
-
-
-
-
-
-
-
-
-
-

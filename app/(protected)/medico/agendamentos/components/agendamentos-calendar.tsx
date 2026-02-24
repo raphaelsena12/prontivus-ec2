@@ -59,7 +59,7 @@ const getTipoConsultaColor = (tipoNome: string | null | undefined): { bg: string
   if (tipoLower.includes("primeira")) {
     return { bg: "#3b82f6", border: "#2563eb" }; // Azul
   } else if (tipoLower.includes("retorno")) {
-    return { bg: "#10b981", border: "#059669" }; // Verde
+    return { bg: "#ef4444", border: "#dc2626" }; // Vermelho
   } else if (tipoLower.includes("urgência") || tipoLower.includes("urgencia")) {
     return { bg: "#ef4444", border: "#dc2626" }; // Vermelho
   } else if (tipoLower.includes("eletiva")) {
@@ -91,12 +91,20 @@ export function AgendamentosCalendar({
   const router = useRouter();
 
   const events = useMemo(() => {
+    const agora = new Date();
+    
     return agendamentos.map((agendamento) => {
       const dataHora = new Date(agendamento.dataHora);
       const endTime = new Date(dataHora);
       endTime.setMinutes(endTime.getMinutes() + 30); // Duração padrão de 30 minutos
 
-      const title = `${agendamento.paciente.nome}${agendamento.tipoConsulta ? ` - ${agendamento.tipoConsulta.nome}` : ""}`;
+      // Verificar se está atrasado
+      // Um agendamento está atrasado se a data/hora já passou e não foi concluído/realizado
+      const statusConcluido = agendamento.status === "CONCLUIDO" || agendamento.status === "REALIZADA";
+      const estaAtrasado = dataHora < agora && !statusConcluido;
+      const emoji = estaAtrasado ? "😢" : "😊";
+
+      const title = `${emoji} ${agendamento.paciente.nome}${agendamento.tipoConsulta ? ` - ${agendamento.tipoConsulta.nome}` : ""}`;
 
       return {
         id: agendamento.id,
@@ -123,7 +131,7 @@ export function AgendamentosCalendar({
         borderRadius: "3px",
         color: "white",
         padding: "1px 3px",
-        fontSize: "10px",
+          fontSize: "14px",
         lineHeight: "1.2",
         fontWeight: "500",
       },
@@ -176,7 +184,7 @@ export function AgendamentosCalendar({
                     borderColor: cor.border,
                   }}
                 />
-                <span className="text-[10px] text-foreground font-medium">{tipo}</span>
+                <span className="text-[14px] text-foreground font-medium">{tipo}</span>
               </div>
             );
           })}
@@ -187,15 +195,15 @@ export function AgendamentosCalendar({
       <div className="h-[500px] w-full calendar-compact">
         <style dangerouslySetInnerHTML={{__html: `
           .calendar-compact .rbc-calendar {
-            font-size: 11px !important;
+            font-size: 15px !important;
           }
           .calendar-compact .rbc-toolbar {
-            font-size: 10px !important;
+            font-size: 14px !important;
             position: relative !important;
             z-index: 10 !important;
           }
           .calendar-compact .rbc-toolbar button {
-            font-size: 10px !important;
+            font-size: 14px !important;
             padding: 4px 8px !important;
             cursor: pointer !important;
             pointer-events: auto !important;
@@ -226,33 +234,33 @@ export function AgendamentosCalendar({
             font-weight: 600 !important;
           }
           .calendar-compact .rbc-toolbar-label {
-            font-size: 10px !important;
+            font-size: 14px !important;
             font-weight: 600 !important;
           }
           .calendar-compact .rbc-header {
-            font-size: 10px !important;
+            font-size: 14px !important;
             padding: 4px 2px !important;
             font-weight: 600 !important;
           }
           .calendar-compact .rbc-time-header-content {
-            font-size: 10px !important;
+            font-size: 14px !important;
           }
           .calendar-compact .rbc-time-slot {
-            font-size: 10px !important;
+            font-size: 14px !important;
           }
           .calendar-compact .rbc-event {
-            font-size: 10px !important;
+            font-size: 14px !important;
             padding: 1px 3px !important;
             min-height: 16px !important;
             line-height: 1.2 !important;
             font-weight: 500 !important;
           }
           .calendar-compact .rbc-event-content {
-            font-size: 10px !important;
+            font-size: 14px !important;
             line-height: 1.2 !important;
           }
           .calendar-compact .rbc-event-label {
-            font-size: 9px !important;
+            font-size: 13px !important;
           }
           .calendar-compact .rbc-day-slot .rbc-time-slot {
             border-top: 1px solid #e5e7eb !important;
@@ -261,11 +269,11 @@ export function AgendamentosCalendar({
             border-top: 1px solid #d1d5db !important;
           }
           .calendar-compact .rbc-time-header-gutter {
-            font-size: 10px !important;
+            font-size: 14px !important;
             padding: 2px !important;
           }
           .calendar-compact .rbc-time-gutter {
-            font-size: 10px !important;
+            font-size: 14px !important;
           }
           .calendar-compact .rbc-day-slot {
             min-height: 50px !important;
@@ -286,7 +294,7 @@ export function AgendamentosCalendar({
           onSelectEvent={handleEventClick}
           selectable={false}
           eventPropGetter={eventStyleGetter}
-          defaultView="week"
+          defaultView="day"
           views={["month", "week", "day", "agenda"]}
           messages={messages}
           culture="pt-BR"

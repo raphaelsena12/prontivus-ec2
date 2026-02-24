@@ -5,8 +5,9 @@ import { z } from "zod";
 
 const updateExameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
-  descricao: z.string().optional(),
+  descricao: z.string().min(1, "Descrição é obrigatória").optional(),
   tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"]).optional(),
+  codigoTussId: z.string().uuid("Código TUSS inválido").optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -26,6 +27,16 @@ export async function GET(
       where: {
         id,
         clinicaId: auth.clinicaId!,
+      },
+      include: {
+        codigoTuss: {
+          select: {
+            id: true,
+            codigoTuss: true,
+            descricao: true,
+            tipoProcedimento: true,
+          },
+        },
       },
     });
 

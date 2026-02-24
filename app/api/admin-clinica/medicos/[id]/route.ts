@@ -7,6 +7,7 @@ import { z } from "zod";
 const updateMedicoSchema = z.object({
   crm: z.string().min(1, "CRM é obrigatório").optional(),
   especialidade: z.string().min(1, "Especialidade é obrigatória").optional(),
+  rqe: z.number().int().min(0).nullable().optional(),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
   ativo: z.boolean().optional(),
 });

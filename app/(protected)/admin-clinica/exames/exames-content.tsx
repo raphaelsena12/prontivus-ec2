@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, FileText, Upload, Filter, Plus, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 import { ExamesTable } from "./components/exames-table";
 import { ExameDialog } from "./components/exame-dialog";
 import { ExameDeleteDialog } from "./components/exame-delete-dialog";
@@ -17,8 +18,15 @@ interface Exame {
   nome: string;
   descricao: string | null;
   tipo: string | null;
+  codigoTussId: string | null;
   ativo: boolean;
   createdAt: Date;
+  codigoTuss?: {
+    id: string;
+    codigoTuss: string;
+    descricao: string;
+    tipoProcedimento: string;
+  } | null;
 }
 
 interface ExamesContentProps {
@@ -85,16 +93,11 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <ClipboardList className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Exames</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie os exames cadastrados na clínica
-        </p>
-      </div>
+      <PageHeader
+        icon={ClipboardList}
+        title="Exames"
+        subtitle="Gerencie os exames cadastrados na clínica"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

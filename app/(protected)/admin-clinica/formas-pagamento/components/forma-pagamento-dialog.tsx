@@ -39,6 +39,7 @@ interface FormaPagamento {
   nome: string;
   descricao: string | null;
   tipo: "DINHEIRO" | "CARTAO_CREDITO" | "CARTAO_DEBITO" | "PIX" | "BOLETO" | "TRANSFERENCIA";
+  bandeiraCartao: string | null;
   ativo: boolean;
 }
 
@@ -53,6 +54,7 @@ const formaPagamentoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
+  bandeiraCartao: z.string().optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -73,9 +75,13 @@ export function FormaPagamentoDialog({
       nome: "",
       descricao: "",
       tipo: "DINHEIRO",
+      bandeiraCartao: "",
       ativo: true,
     },
   });
+
+  const tipoSelecionado = form.watch("tipo");
+  const isCartao = tipoSelecionado === "CARTAO_CREDITO" || tipoSelecionado === "CARTAO_DEBITO";
 
   useEffect(() => {
     if (formaPagamento) {
@@ -83,6 +89,7 @@ export function FormaPagamentoDialog({
         nome: formaPagamento.nome,
         descricao: formaPagamento.descricao || "",
         tipo: formaPagamento.tipo,
+        bandeiraCartao: formaPagamento.bandeiraCartao || "",
         ativo: formaPagamento.ativo,
       });
     } else {
@@ -90,6 +97,7 @@ export function FormaPagamentoDialog({
         nome: "",
         descricao: "",
         tipo: "DINHEIRO",
+        bandeiraCartao: "",
         ativo: true,
       });
     }
@@ -103,6 +111,7 @@ export function FormaPagamentoDialog({
         nome: data.nome,
         descricao: data.descricao || null,
         tipo: data.tipo,
+        bandeiraCartao: data.bandeiraCartao || null,
       };
 
       if (isEditing) {
@@ -185,7 +194,12 @@ export function FormaPagamentoDialog({
                     Tipo <span className="text-destructive">*</span>
                   </FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value !== "CARTAO_CREDITO" && value !== "CARTAO_DEBITO") {
+                        form.setValue("bandeiraCartao", "");
+                      }
+                    }}
                     value={field.value}
                     disabled={loading}
                   >
@@ -207,6 +221,39 @@ export function FormaPagamentoDialog({
                 </FormItem>
               )}
             />
+
+            {isCartao && (
+              <FormField
+                control={form.control}
+                name="bandeiraCartao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bandeira do Cartão</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={loading}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a bandeira" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="VISA">Visa</SelectItem>
+                        <SelectItem value="MASTERCARD">Mastercard</SelectItem>
+                        <SelectItem value="ELO">Elo</SelectItem>
+                        <SelectItem value="AMEX">American Express</SelectItem>
+                        <SelectItem value="HIPERCARD">Hipercard</SelectItem>
+                        <SelectItem value="DINERS">Diners Club</SelectItem>
+                        <SelectItem value="OUTROS">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

@@ -97,6 +97,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!auth.clinicaId) {
+      return NextResponse.json(
+        { error: "Clínica não encontrada" },
+        { status: 400 }
+      );
+    }
+
     // Verificar se o paciente pertence às consultas do médico (se fornecido)
     if (validation.data.pacienteId) {
       const consulta = await prisma.consulta.findFirst({
@@ -117,8 +124,12 @@ export async function POST(request: NextRequest) {
 
     const conta = await prisma.contaReceber.create({
       data: {
-        ...validation.data,
+        descricao: validation.data.descricao,
+        pacienteId: validation.data.pacienteId,
+        valor: validation.data.valor,
         dataVencimento: new Date(validation.data.dataVencimento),
+        formaPagamentoId: validation.data.formaPagamentoId,
+        observacoes: validation.data.observacoes,
         clinicaId: auth.clinicaId,
         status: "PENDENTE",
       },

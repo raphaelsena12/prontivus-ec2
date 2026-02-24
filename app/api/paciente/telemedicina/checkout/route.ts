@@ -171,6 +171,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar registro de pagamento pendente
+    if (!auth.clinicaId || !auth.pacienteId) {
+      return NextResponse.json(
+        { error: "Clínica ou paciente não encontrado" },
+        { status: 400 }
+      );
+    }
+
     let pagamento;
     try {
       pagamento = await prisma.pagamentoConsulta.create({

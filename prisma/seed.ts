@@ -966,7 +966,8 @@ async function main() {
     prisma.movimentacaoEstoque.create({
       data: {
         clinicaId: clinicaExemplo.id,
-        estoqueId: estoques[0].id,
+        tipoEstoque: "MEDICAMENTO",
+        estoqueMedicamentoId: estoques[0].id,
         tipo: "ENTRADA",
         quantidade: 100,
         motivo: "Compra de fornecedor",
@@ -977,7 +978,8 @@ async function main() {
     prisma.movimentacaoEstoque.create({
       data: {
         clinicaId: clinicaExemplo.id,
-        estoqueId: estoques[1].id,
+        tipoEstoque: "MEDICAMENTO",
+        estoqueMedicamentoId: estoques[1].id,
         tipo: "ENTRADA",
         quantidade: 150,
         motivo: "Compra de fornecedor",
@@ -988,7 +990,8 @@ async function main() {
     prisma.movimentacaoEstoque.create({
       data: {
         clinicaId: clinicaExemplo.id,
-        estoqueId: estoques[0].id,
+        tipoEstoque: "MEDICAMENTO",
+        estoqueMedicamentoId: estoques[0].id,
         tipo: "SAIDA",
         quantidade: 20,
         motivo: "Uso em consulta",
@@ -999,7 +1002,8 @@ async function main() {
     prisma.movimentacaoEstoque.create({
       data: {
         clinicaId: clinicaExemplo.id,
-        estoqueId: estoques[2].id,
+        tipoEstoque: "MEDICAMENTO",
+        estoqueMedicamentoId: estoques[2].id,
         tipo: "ENTRADA",
         quantidade: 50,
         motivo: "Compra de fornecedor",
@@ -1010,7 +1014,8 @@ async function main() {
     prisma.movimentacaoEstoque.create({
       data: {
         clinicaId: clinicaExemplo.id,
-        estoqueId: estoques[3].id,
+        tipoEstoque: "MEDICAMENTO",
+        estoqueMedicamentoId: estoques[3].id,
         tipo: "AJUSTE",
         quantidade: 10,
         motivo: "Ajuste de inventário",

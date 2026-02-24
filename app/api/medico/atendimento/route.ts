@@ -3,6 +3,8 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { uploadPDFToS3 } from "@/lib/s3-service";
+import sharp from "sharp";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -95,6 +97,7 @@ export async function GET(request: NextRequest) {
             celular: true,
             email: true,
             observacoes: true,
+            numeroProntuario: true,
           },
         },
         codigoTuss: {
@@ -226,13 +229,15 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Atualizar status da consulta para REALIZADA
+    // Atualizar status da consulta para REALIZADA e salvar momento do fim
+    const agora = new Date();
     await prisma.consulta.update({
       where: {
         id: consultaId,
       },
       data: {
         status: "REALIZADA",
+        fimAtendimento: agora,
       },
     });
 
@@ -254,11 +259,95 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Tentar carregar foto de perfil do usuário admin-clínica
+      let logoBase64: string | undefined;
+      try {
+        const adminClinica = await prisma.usuario.findFirst({
+          where: {
+            clinicaId: auth.clinicaId,
+            tipo: TipoUsuario.ADMIN_CLINICA,
+            ativo: true,
+          },
+          select: {
+            avatar: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        });
+
+        if (adminClinica?.avatar) {
+          let imageBuffer: Buffer;
+
+          if (adminClinica.avatar.startsWith("usuarios/")) {
+            try {
+              const s3Client = new S3Client({
+                region: process.env.AWS_REGION || "sa-east-1",
+                credentials: {
+                  accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+                },
+              });
+
+              const bucketName = process.env.AWS_S3_BUCKET_NAME || "prontivus-documentos";
+              const command = new GetObjectCommand({
+                Bucket: bucketName,
+                Key: adminClinica.avatar,
+              });
+
+              const response = await s3Client.send(command);
+              const chunks: Uint8Array[] = [];
+
+              if (response.Body) {
+                // @ts-ignore - Body pode ser um stream
+                for await (const chunk of response.Body) {
+                  chunks.push(chunk);
+                }
+              }
+
+              const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+              const combined = new Uint8Array(totalLength);
+              let offset = 0;
+              for (const chunk of chunks) {
+                combined.set(chunk, offset);
+                offset += chunk.length;
+              }
+              imageBuffer = Buffer.from(combined);
+            } catch (s3Error) {
+              console.error("Erro ao baixar avatar do S3:", s3Error);
+              throw s3Error;
+            }
+          } else if (adminClinica.avatar.startsWith("data:image")) {
+            const base64Data = adminClinica.avatar.split(",")[1];
+            imageBuffer = Buffer.from(base64Data, "base64");
+          } else if (adminClinica.avatar.startsWith("https://")) {
+            const response = await fetch(adminClinica.avatar);
+            if (!response.ok) {
+              throw new Error(`Erro ao baixar imagem: ${response.statusText}`);
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            imageBuffer = Buffer.from(arrayBuffer);
+          } else {
+            throw new Error("Formato de avatar não reconhecido");
+          }
+
+          const pngBuffer = await sharp(imageBuffer).png().toBuffer();
+          logoBase64 = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+          console.log("Logo do admin-clínica carregado com sucesso para o prontuário");
+        } else {
+          console.warn("Admin-clínica não possui avatar configurado");
+        }
+      } catch (error) {
+        console.error("Erro ao carregar foto de perfil do admin-clínica:", error);
+        logoBase64 = undefined;
+      }
+
       if (consultaCompleta && prontuario) {
         const pdfBuffer = generateProntuarioPDF({
           clinicaNome: consultaCompleta.clinica.nome,
           clinicaCnpj: consultaCompleta.clinica.cnpj || "",
           clinicaEndereco: consultaCompleta.clinica.endereco || undefined,
+          logoBase64,
           medicoNome: consultaCompleta.medico.usuario.nome,
           medicoCrm: consultaCompleta.medico.crm,
           medicoEspecialidade: consultaCompleta.medico.especialidade || "",

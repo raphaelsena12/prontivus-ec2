@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkAdminClinicaAuth } from "@/lib/api-helpers";
+import { checkAdminClinicaAuth, checkClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -7,11 +7,13 @@ const formaPagamentoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
+  bandeiraCartao: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await checkAdminClinicaAuth();
+    // Permitir acesso para Admin Clínica, Médico e Secretária
+    const auth = await checkClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
@@ -20,10 +22,11 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
     const where = {
       clinicaId: auth.clinicaId!,
+      ativo: true, // Apenas formas de pagamento ativas
       ...(search && { OR: [{ nome: { contains: search, mode: "insensitive" as const } }] }),
     };
     const [formasPagamento, total] = await Promise.all([
-      prisma.formaPagamento.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+      prisma.formaPagamento.findMany({ where, skip, take: limit, orderBy: { nome: "asc" } }),
       prisma.formaPagamento.count({ where }),
     ]);
     return NextResponse.json({ formasPagamento, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });

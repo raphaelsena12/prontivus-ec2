@@ -214,15 +214,30 @@ function LoginFormContent({
             {/* Formulário de Login */}
             <>
               {/* Card principal com tudo dentro */}
-              <Card className="bg-white/10 backdrop-blur-md border-white/20 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-white/20 hover:border-white/40">
-                <CardContent className="pt-6 pb-6">
+              <Card 
+                className="bg-white border-gray-100 shadow-2xl transition-all duration-300 rounded-2xl" 
+                style={{ 
+                  boxShadow: '0 25px 50px -12px rgba(30, 78, 216, 0.1)',
+                  borderWidth: '1px',
+                  borderColor: 'rgba(229, 231, 235, 1)'
+                }} 
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 35px 70px -12px rgba(30, 78, 216, 0.3), 0 0 0 1px rgba(30, 78, 216, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(30, 78, 216, 0.3)';
+                }} 
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(30, 78, 216, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(229, 231, 235, 1)';
+                }}
+              >
+                <CardContent className="pt-8 pb-8 px-8">
                   {/* Logo e título no topo do card */}
-                  <div className="mb-6 text-center">
+                  <div className="mb-8 text-center">
                     <div className="mb-4 flex items-center justify-center">
-                      <Image 
-                        src="/LogotipoemFundoTransparente.webp" 
-                        alt="Prontivus" 
-                        width={180} 
+                      <Image
+                        src="/LogotipoemFundoTransparente.webp"
+                        alt="Prontivus"
+                        width={180}
                         height={54}
                         className="h-auto"
                         priority
@@ -231,35 +246,41 @@ function LoginFormContent({
                   </div>
 
                   {error && (
-                    <Alert variant="destructive" className="mb-6 bg-red-500/20 border-red-400/30">
-                      <AlertCircle className="h-4 w-4 text-red-300" />
-                      <AlertTitle className="text-red-200">Erro</AlertTitle>
-                      <AlertDescription className="text-red-200/90">{error}</AlertDescription>
+                    <Alert variant="destructive" className="mb-6">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Erro</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
 
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                       <FormField
                         control={form.control}
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FieldLabel htmlFor="email" className="text-white/90">Email</FieldLabel>
+                            <FieldLabel htmlFor="email" className="text-gray-700">Email</FieldLabel>
                             <FormControl>
                               <div className="relative">
-                                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                 <Input
+                                  {...field}
                                   id="email"
                                   type="email"
                                   placeholder="nome@exemplo.com"
-                                  className={cn(
-                                    "pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/50",
-                                    "focus:bg-white/20 focus:border-white/40",
-                                    field.value && "bg-white/20 text-white border-white/30"
-                                  )}
+                                  className="pl-9 bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:bg-white"
+                                  style={{ '--tw-ring-color': 'rgba(30, 78, 216, 0.2)' } as React.CSSProperties}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#1E4ED8';
+                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(30, 78, 216, 0.2)';
+                                  }}
+                                  onBlur={(e) => {
+                                    field.onBlur();
+                                    e.currentTarget.style.borderColor = '';
+                                    e.currentTarget.style.boxShadow = '';
+                                  }}
                                   disabled={isLoading}
-                                  {...field}
                                 />
                               </div>
                             </FormControl>
@@ -273,29 +294,38 @@ function LoginFormContent({
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center justify-between">
-                              <FieldLabel htmlFor="password" className="text-white/90">Senha</FieldLabel>
+                              <FieldLabel htmlFor="password" className="text-gray-700">Senha</FieldLabel>
                               <button
                                 type="button"
                                 onClick={handleEsqueceuSenha}
-                                className="text-sm text-white/70 hover:text-white underline-offset-4 hover:underline"
+                                className="text-sm underline-offset-4 hover:underline transition-colors"
+                                style={{ color: '#1E4ED8' }}
+                                onMouseEnter={(e) => e.currentTarget.style.color = '#1a3fb8'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = '#1E4ED8'}
                               >
                                 Esqueceu a senha?
                               </button>
                             </div>
                             <FormControl>
                               <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                                 <Input
+                                  {...field}
                                   id="password"
                                   type="password"
                                   placeholder="••••••••"
-                                  className={cn(
-                                    "pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/50",
-                                    "focus:bg-white/20 focus:border-white/40",
-                                    field.value && "bg-white/20 text-white border-white/30"
-                                  )}
+                                  className="pl-9 bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:bg-white"
+                                  style={{ '--tw-ring-color': 'rgba(30, 78, 216, 0.2)' } as React.CSSProperties}
+                                  onFocus={(e) => {
+                                    e.currentTarget.style.borderColor = '#1E4ED8';
+                                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(30, 78, 216, 0.2)';
+                                  }}
+                                  onBlur={(e) => {
+                                    field.onBlur();
+                                    e.currentTarget.style.borderColor = '';
+                                    e.currentTarget.style.boxShadow = '';
+                                  }}
                                   disabled={isLoading}
-                                  {...field}
                                 />
                               </div>
                             </FormControl>
@@ -303,9 +333,21 @@ function LoginFormContent({
                           </FormItem>
                         )}
                       />
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-white text-slate-900 hover:bg-white/90 font-semibold" 
+                      <Button
+                        type="submit"
+                        className="w-full text-white font-semibold transition-all duration-200"
+                        style={{ 
+                          backgroundColor: '#1E4ED8',
+                          boxShadow: '0 10px 15px -3px rgba(30, 78, 216, 0.3)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#1a3fb8';
+                          e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(30, 78, 216, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#1E4ED8';
+                          e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(30, 78, 216, 0.3)';
+                        }}
                         disabled={isLoading}
                       >
                         {isLoading ? (
@@ -321,19 +363,22 @@ function LoginFormContent({
                   </Form>
 
                   {/* Footer dentro do card */}
-                  <div className="mt-4 text-center text-sm text-white/70">
+                  <div className="mt-5 text-center text-sm text-gray-500">
                     Não tem uma conta?{" "}
                     <a
                       href="#"
-                      className="text-white hover:text-white/90 hover:underline underline-offset-4 font-medium"
+                      className="hover:underline underline-offset-4 font-medium transition-colors"
+                      style={{ color: '#1E4ED8' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#1a3fb8'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#1E4ED8'}
                     >
                       Entre em contato
                     </a>
                   </div>
 
                   {/* Rodapé elegante */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-xs text-white/50 text-center">
+                  <div className="mt-5 pt-5 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 text-center">
                       © 2026 Prontivus. Todos os direitos reservados.
                     </p>
                   </div>
@@ -354,15 +399,30 @@ function LoginFormContent({
             {/* Formulário de Recuperação de Senha */}
             <>
               {/* Card principal com tudo dentro */}
-              <Card className="bg-white/10 backdrop-blur-md border-white/20 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-white/20 hover:border-white/40">
-                <CardContent className="pt-6 pb-6">
+              <Card 
+                className="bg-white border-gray-100 shadow-2xl transition-all duration-300 rounded-2xl" 
+                style={{ 
+                  boxShadow: '0 25px 50px -12px rgba(30, 78, 216, 0.1)',
+                  borderWidth: '1px',
+                  borderColor: 'rgba(229, 231, 235, 1)'
+                }} 
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 35px 70px -12px rgba(30, 78, 216, 0.3), 0 0 0 1px rgba(30, 78, 216, 0.2)';
+                  e.currentTarget.style.borderColor = 'rgba(30, 78, 216, 0.3)';
+                }} 
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(30, 78, 216, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(229, 231, 235, 1)';
+                }}
+              >
+                <CardContent className="pt-8 pb-8 px-8">
                   {/* Logo e título no topo do card */}
-                  <div className="mb-6 text-center">
+                  <div className="mb-8 text-center">
                     <div className="mb-4 flex items-center justify-center">
-                      <Image 
-                        src="/LogotipoemFundoTransparente.webp" 
-                        alt="Prontivus" 
-                        width={180} 
+                      <Image
+                        src="/LogotipoemFundoTransparente.webp"
+                        alt="Prontivus"
+                        width={180}
                         height={54}
                         className="h-auto"
                         priority
@@ -376,14 +436,14 @@ function LoginFormContent({
                       <button
                         type="button"
                         onClick={handleVoltarLogin}
-                        className="p-1 hover:bg-white/10 rounded-md transition-colors text-white"
+                        className="p-1 hover:bg-gray-100 rounded-md transition-colors text-gray-600"
                         aria-label="Voltar para login"
                       >
                         <ArrowLeft className="h-4 w-4" />
                       </button>
-                      <h2 className="text-2xl font-bold tracking-tight text-white">Recuperar Senha</h2>
+                      <h2 className="text-2xl font-bold tracking-tight text-gray-800">Recuperar Senha</h2>
                     </div>
-                    <p className="text-white/70 text-sm">
+                    <p className="text-gray-500 text-sm">
                       {recuperarSenhaSuccess
                         ? "Verifique sua caixa de entrada"
                         : "Digite seu email para receber um link de recuperação"}
@@ -391,12 +451,12 @@ function LoginFormContent({
                   </div>
 
                   {recuperarSenhaSuccess ? (
-                    <Alert className="mb-4 border-emerald-400/30 bg-emerald-500/20">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                      <AlertTitle className="text-emerald-200">
+                    <Alert className="mb-4 border-emerald-200 bg-emerald-50">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <AlertTitle className="text-emerald-700">
                         Email enviado!
                       </AlertTitle>
-                      <AlertDescription className="text-emerald-200/90">
+                      <AlertDescription className="text-emerald-600">
                         Se o email estiver cadastrado, você receberá um link de recuperação em breve.
                       </AlertDescription>
                     </Alert>
@@ -404,7 +464,7 @@ function LoginFormContent({
                     <Form {...recuperarSenhaForm}>
                       <form
                         onSubmit={recuperarSenhaForm.handleSubmit(onRecuperarSenha)}
-                        className="space-y-4"
+                        className="space-y-5"
                         noValidate
                       >
                         <FormField
@@ -412,22 +472,28 @@ function LoginFormContent({
                           name="email"
                           render={({ field }) => (
                             <FormItem>
-                              <FieldLabel htmlFor="recuperar-email" className="text-white/90">Email</FieldLabel>
+                              <FieldLabel htmlFor="recuperar-email" className="text-gray-700">Email</FieldLabel>
                               <FormControl>
                                 <div className="relative">
-                                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50 pointer-events-none z-10" />
+                                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
                                   <Input
+                                    {...field}
                                     id="recuperar-email"
                                     type="email"
                                     placeholder="nome@exemplo.com"
-                                    className={cn(
-                                      "pl-9 relative z-0 bg-white/10 border-white/20 text-white placeholder:text-white/50",
-                                      "focus:bg-white/20 focus:border-white/40",
-                                      field.value && "bg-white/20 text-white border-white/30"
-                                    )}
+                                    className="pl-9 relative z-0 bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:bg-white"
+                                    style={{ '--tw-ring-color': 'rgba(30, 78, 216, 0.2)' } as React.CSSProperties}
+                                    onFocus={(e) => {
+                                      e.currentTarget.style.borderColor = '#1E4ED8';
+                                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(30, 78, 216, 0.2)';
+                                    }}
+                                    onBlur={(e) => {
+                                      field.onBlur();
+                                      e.currentTarget.style.borderColor = '';
+                                      e.currentTarget.style.boxShadow = '';
+                                    }}
                                     disabled={isLoading}
                                     autoComplete="email"
-                                    {...field}
                                   />
                                 </div>
                               </FormControl>
@@ -435,9 +501,21 @@ function LoginFormContent({
                             </FormItem>
                           )}
                         />
-                        <Button 
-                          type="submit" 
-                          className="w-full bg-white text-slate-900 hover:bg-white/90 font-semibold" 
+                        <Button
+                          type="submit"
+                          className="w-full text-white font-semibold transition-all duration-200"
+                          style={{ 
+                            backgroundColor: '#1E4ED8',
+                            boxShadow: '0 10px 15px -3px rgba(30, 78, 216, 0.3)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#1a3fb8';
+                            e.currentTarget.style.boxShadow = '0 20px 25px -5px rgba(30, 78, 216, 0.4)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '#1E4ED8';
+                            e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(30, 78, 216, 0.3)';
+                          }}
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -455,12 +533,15 @@ function LoginFormContent({
 
                   {/* Footer dentro do card */}
                   {!recuperarSenhaSuccess && (
-                    <div className="mt-4 text-center text-sm text-white/70">
+                    <div className="mt-5 text-center text-sm text-gray-500">
                       Lembrou sua senha?{" "}
                       <button
                         type="button"
                         onClick={handleVoltarLogin}
-                        className="text-white hover:text-white/90 hover:underline underline-offset-4 font-medium"
+                        className="hover:underline underline-offset-4 font-medium transition-colors"
+                      style={{ color: '#1E4ED8' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#1a3fb8'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#1E4ED8'}
                       >
                         Voltar para login
                       </button>
@@ -468,9 +549,9 @@ function LoginFormContent({
                   )}
 
                   {/* Rodapé elegante */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <p className="text-xs text-white/50 text-center">
-                      © 2024 Prontivus. Todos os direitos reservados.
+                  <div className="mt-5 pt-5 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 text-center">
+                      © 2026 Prontivus. Todos os direitos reservados.
                     </p>
                   </div>
                 </CardContent>

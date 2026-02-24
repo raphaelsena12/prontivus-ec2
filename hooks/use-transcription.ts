@@ -300,18 +300,12 @@ export function useTranscription() {
 
       // Configurar handlers
       socket.on("connect", () => {
-        console.log("✅ Conectado ao servidor WebSocket");
+        console.log("Conectado ao servidor WebSocket");
         socket.emit("start-transcription");
       });
 
-      socket.on("connect_error", (error) => {
-        console.error("❌ Erro ao conectar ao WebSocket:", error);
-        toast.error("Erro ao conectar ao servidor de transcrição");
-        setIsTranscribing(false);
-      });
-
       socket.on("transcription-started", () => {
-        console.log("✅ Transcrição iniciada via AWS");
+        console.log("Transcrição iniciada via AWS");
         setIsTranscribing(true);
         setUseAWSTranscribe(true);
         toast.success("Transcrição AWS iniciada com speaker diarization");
@@ -323,12 +317,6 @@ export function useTranscription() {
         speaker: string;
         speakerLabel?: string;
       }) => {
-        console.log("📝 Transcrição recebida:", { 
-          transcript: data.transcript.substring(0, 50), 
-          isPartial: data.isPartial,
-          speaker: data.speaker 
-        });
-        
         if (data.isPartial) {
           setCurrentPartial(data.transcript);
         } else {
@@ -349,7 +337,7 @@ export function useTranscription() {
       });
 
       socket.on("transcription-error", (error: { message: string }) => {
-        console.error("❌ Erro na transcrição:", error);
+        console.error("Erro na transcrição:", error);
         toast.error(`Erro na transcrição: ${error.message}`);
         setIsTranscribing(false);
       });
@@ -364,7 +352,6 @@ export function useTranscription() {
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
-      let audioChunkCount = 0;
       processor.onaudioprocess = (e) => {
         if (!isPaused && socket.connected) {
           const inputData = e.inputBuffer.getChannelData(0);
@@ -378,13 +365,6 @@ export function useTranscription() {
           const uint8Array = new Uint8Array(pcmData.buffer);
           const base64 = btoa(String.fromCharCode(...uint8Array));
           socket.emit("audio-chunk", { chunk: base64 });
-          
-          audioChunkCount++;
-          if (audioChunkCount % 100 === 0) {
-            console.log(`🎤 Enviados ${audioChunkCount} chunks de áudio para AWS`);
-          }
-        } else if (!socket.connected) {
-          console.warn("⚠️ Socket não conectado, não enviando áudio");
         }
       };
 
@@ -431,29 +411,15 @@ export function useTranscription() {
 
       // Tentar usar AWS Transcribe via WebSocket primeiro (se disponível)
       const awsAvailable = process.env.NEXT_PUBLIC_USE_AWS_TRANSCRIBE === "true";
-      console.log("🔍 Verificando disponibilidade AWS:", {
-        awsAvailable,
-        envVar: process.env.NEXT_PUBLIC_USE_AWS_TRANSCRIBE,
-      });
+      console.log("AWS disponível?", awsAvailable);
       
       if (awsAvailable) {
-        console.log("🚀 Tentando iniciar transcrição AWS...");
-        try {
-          const awsStarted = await startAWSTranscription(stream);
-          console.log("✅ AWS iniciado?", awsStarted);
-          if (awsStarted) {
-            isStartingRef.current = false;
-            return; // AWS está funcionando
-          } else {
-            console.warn("⚠️ AWS não iniciou, usando fallback");
-          }
-        } catch (error: any) {
-          console.error("❌ Erro ao iniciar AWS:", error);
-          toast.error(`Erro ao iniciar AWS: ${error.message}`);
-          // Continuar para fallback
+        const awsStarted = await startAWSTranscription(stream);
+        console.log("AWS iniciado?", awsStarted);
+        if (awsStarted) {
+          isStartingRef.current = false;
+          return; // AWS está funcionando
         }
-      } else {
-        console.log("ℹ️ AWS não habilitado, usando Web Speech API");
       }
 
       // Fallback: usar Web Speech API
@@ -696,19 +662,13 @@ export function useTranscription() {
   }, [currentPartial]);
 
   // Processar transcrição com IA
-  const processTranscription = useCallback(async (
-    aiModel: 'openai' = 'openai',
-    examesIds?: string[]
-  ): Promise<{
+  const processTranscription = useCallback(async (): Promise<{
     anamnese: string;
     cidCodes: Array<{ code: string; description: string; score: number }>;
     exames: Array<{ nome: string; tipo: string; justificativa: string }>;
-    prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string; justificativa?: string }>;
   } | null> => {
     try {
       console.log("Processando transcrição. Total de entradas:", transcription.length);
-      console.log("Modelo de IA selecionado:", aiModel);
-      console.log("Exames selecionados:", examesIds);
       console.log("Entradas:", transcription);
       
       // Primeiro, tentar usar apenas entradas não parciais
@@ -728,9 +688,9 @@ export function useTranscription() {
       console.log("Texto da transcrição para processar:", transcriptionText);
       console.log("Tamanho do texto:", transcriptionText.length);
 
-      if (!transcriptionText.trim() && (!examesIds || examesIds.length === 0)) {
-        console.error("Transcrição vazia e nenhum exame selecionado");
-        throw new Error("Nenhuma transcrição disponível para processar e nenhum exame selecionado");
+      if (!transcriptionText.trim()) {
+        console.error("Transcrição vazia após processamento");
+        throw new Error("Nenhuma transcrição disponível para processar");
       }
 
       const response = await fetch("/api/medico/process-transcription", {
@@ -740,8 +700,6 @@ export function useTranscription() {
         },
         body: JSON.stringify({
           transcription: transcriptionText,
-          aiModel, // Passar o modelo selecionado
-          examesIds: examesIds || [], // Passar IDs dos exames selecionados
         }),
       });
 

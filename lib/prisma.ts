@@ -17,22 +17,19 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);
 
-// Verificar se o client em cache tem os modelos necessários
-// Se não tiver, limpar o cache para forçar recriação
-if (process.env.NODE_ENV !== "production" && globalForPrisma.prisma) {
-  const hasRequiredModels = 
-    'bloqueioAgenda' in globalForPrisma.prisma &&
-    'pagamentoConsulta' in globalForPrisma.prisma &&
-    'paciente' in globalForPrisma.prisma;
-    
-  if (!hasRequiredModels) {
-    // Limpar cache antigo
-    try {
-      (globalForPrisma.prisma as any).$disconnect?.();
-    } catch (e) {
-      // Ignorar erros
+// Em desenvolvimento, forçar limpeza do cache se PRISMA_FORCE_RELOAD estiver definido
+// Isso é útil após mudanças no schema do Prisma
+// Também limpar cache após mudanças no schema (útil para desenvolvimento)
+if (process.env.NODE_ENV !== "production") {
+  if (process.env.PRISMA_FORCE_RELOAD === "true" || process.env.NEXT_PHASE === "phase-development-server") {
+    if (globalForPrisma.prisma) {
+      try {
+        (globalForPrisma.prisma as any).$disconnect?.();
+      } catch (e) {
+        // Ignorar erros
+      }
+      globalForPrisma.prisma = undefined;
     }
-    globalForPrisma.prisma = undefined;
   }
 }
 

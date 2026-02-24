@@ -67,37 +67,43 @@ model Tenant {
   cidade                   String?
   estado                   String?
   pais                     String?       @default("Brasil")
+  site                     String?
   logoUrl                  String?       @map("logourl")
 
   // Relations
-  plano                     Plano                      @relation(fields: [planoId], references: [id])
-  usuarios                  Usuario[]
-  usuariosTenants           UsuarioTenant[]
-  pagamentos                Pagamento[]
-  pacientes                 Paciente[]
-  medicos                   Medico[]
-  exames                    Exame[]
-  medicamentos              Medicamento[]
-  procedimentos             Procedimento[]
-  formasPagamento           FormaPagamento[]
-  contasPagar               ContaPagar[]
-  contasReceber             ContaReceber[]
-  fluxoCaixa                FluxoCaixa[]
-  estoqueMedicamentos       EstoqueMedicamento[]
-  movimentacoesEstoque      MovimentacaoEstoque[]
-  consultas                 Consulta[]
-  prontuarios               Prontuario[]
-  solicitacoesExames        SolicitacaoExame[]
-  prescricoesMedicamentos   PrescricaoMedicamento[]
-  operadoras                Operadora[]
-  tussValores               TussValor[]
-  guiasTiss                 GuiaTiss[]
-  mensagens                 Mensagem[]
-  mensagensMedicoSecretaria MensagemMedicoSecretaria[] @relation("MensagensMedicoSecretaria")
-  bloqueiosAgenda           BloqueioAgenda[]
-  manipulados               Manipulado[]
-  documentosGerados         DocumentoGerado[]
-  pagamentosConsultas       PagamentoConsulta[]
+  plano                       Plano                        @relation(fields: [planoId], references: [id])
+  usuarios                    Usuario[]
+  usuariosTenants             UsuarioTenant[]
+  pagamentos                  Pagamento[]
+  pacientes                   Paciente[]
+  medicos                     Medico[]
+  exames                      Exame[]
+  medicamentos                Medicamento[]
+  insumos                     Insumo[]
+  procedimentos               Procedimento[]
+  formasPagamento             FormaPagamento[]
+  contasPagar                 ContaPagar[]
+  contasReceber               ContaReceber[]
+  fluxoCaixa                  FluxoCaixa[]
+  estoqueMedicamentos         EstoqueMedicamento[]
+  estoqueInsumos              EstoqueInsumo[]
+  movimentacoesEstoque        MovimentacaoEstoque[]
+  consultas                   Consulta[]
+  prontuarios                 Prontuario[]
+  solicitacoesExames          SolicitacaoExame[]
+  prescricoesMedicamentos     PrescricaoMedicamento[]
+  operadoras                  Operadora[]
+  tussValores                 TussValor[]
+  guiasTiss                   GuiaTiss[]
+  mensagens                   Mensagem[]
+  mensagensMedicoSecretaria   MensagemMedicoSecretaria[]   @relation("MensagensMedicoSecretaria")
+  bloqueiosAgenda             BloqueioAgenda[]
+  manipulados                 Manipulado[]
+  documentosGerados           DocumentoGerado[]
+  medicoDocumentos            MedicoDocumento[]
+  pagamentosConsultas         PagamentoConsulta[]
+  listasEspera                ListaEspera[]
+  autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -123,29 +129,29 @@ model Plano {
 }
 
 model Usuario {
-  id                          String                     @id @default(uuid())
-  email                       String                     @unique
-  senha                       String
-  nome                        String
-  cpf                         String                     @unique
-  telefone                    String?
-  avatar                      String?
-  tipo                        TipoUsuario
-  clinicaId                   String?
-  ativo                       Boolean                    @default(true)
-  primeiroAcesso              Boolean                    @default(true)
-  ultimoAcesso                DateTime?
-  createdAt                   DateTime                   @default(now())
-  updatedAt                   DateTime                   @updatedAt
-  resetToken                  String?
-  resetTokenExpires           DateTime?
+  id                String      @id @default(uuid())
+  email             String      @unique
+  senha             String
+  nome              String
+  cpf               String      @unique
+  telefone          String?
+  avatar            String?
+  tipo              TipoUsuario
+  clinicaId         String?
+  ativo             Boolean     @default(true)
+  primeiroAcesso    Boolean     @default(true)
+  ultimoAcesso      DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  resetToken        String?
+  resetTokenExpires DateTime?
 
-  clinica                     Tenant?                    @relation(fields: [clinicaId], references: [id])
-  medicos                     Medico[]
-  pacientes                   Paciente[]
-  sessoes                     Sessao[]
-  usuariosTenants             UsuarioTenant[]
-  mensagensMedicoSecretaria   MensagemMedicoSecretaria[]
+  clinica                   Tenant?                    @relation(fields: [clinicaId], references: [id])
+  medicos                   Medico[]
+  pacientes                 Paciente[]
+  sessoes                   Sessao[]
+  usuariosTenants           UsuarioTenant[]
+  mensagensMedicoSecretaria MensagemMedicoSecretaria[]
 
   @@index([email])
   @@index([clinicaId])
@@ -210,47 +216,50 @@ model Pagamento {
 }
 
 model Paciente {
-  id             String   @id @default(uuid())
-  clinicaId      String
-  usuarioId      String?
-  nome           String
-  cpf            String
-  rg             String?
-  dataNascimento DateTime
-  sexo           String
-  email          String?
-  telefone       String?
-  celular        String?
-  cep            String?
-  endereco       String?
-  numero         String?
-  complemento    String?
-  bairro         String?
-  cidade         String?
-  estado         String?
-  nomeMae        String?
-  nomePai        String?
-  profissao      String?
-  estadoCivil    String?
-  observacoes    String?
-  ativo          Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String   @id @default(uuid())
+  clinicaId        String
+  usuarioId        String?
+  numeroProntuario Int?     @unique
+  nome             String
+  cpf              String
+  rg               String?
+  dataNascimento   DateTime
+  sexo             String
+  email            String?
+  telefone         String?
+  celular          String?
+  cep              String?
+  endereco         String?
+  numero           String?
+  complemento      String?
+  bairro           String?
+  cidade           String?
+  estado           String?
+  nomeMae          String?
+  nomePai          String?
+  profissao        String?
+  estadoCivil      String?
+  observacoes      String?
+  ativo            Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  clinica          Tenant           @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  usuario          Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  consultas        Consulta[]
-  contasReceber    ContaReceber[]
-  mensagens        Mensagem[]
-  pacientesPlanos  PacientePlano[]
-  prontuarios      Prontuario[]
+  clinica             Tenant              @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  usuario             Usuario?            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  consultas           Consulta[]
+  contasReceber       ContaReceber[]
+  mensagens           Mensagem[]
+  pacientesPlanos     PacientePlano[]
+  prontuarios         Prontuario[]
   pagamentosConsultas PagamentoConsulta[]
+  listasEspera        ListaEspera[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
   @@index([cpf])
   @@index([nome])
   @@index([usuarioId])
+  @@index([numeroProntuario])
   @@map("pacientes")
 }
 
@@ -260,13 +269,14 @@ model Medico {
   usuarioId                  String
   crm                        String
   especialidade              String
+  rqe                        Int?
   ativo                      Boolean  @default(true)
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
   limiteMaximoRetornosPorDia Int?
 
-  clinica                     Tenant                     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  usuario                     Usuario                    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  clinica                     Tenant                       @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  usuario                     Usuario                      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   consultas                   Consulta[]
   prontuarios                 Prontuario[]
   mensagens                   Mensagem[]
@@ -275,6 +285,9 @@ model Medico {
   bloqueiosAgenda             BloqueioAgenda[]
   manipulados                 Manipulado[]
   documentos                  DocumentoGerado[]
+  medicoDocumentos            MedicoDocumento[]
+  listasEspera                ListaEspera[]
+  autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -284,20 +297,23 @@ model Medico {
 }
 
 model Exame {
-  id        String   @id @default(uuid())
-  clinicaId String
-  nome      String
-  descricao String?
-  tipo      String?
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  clinicaId    String
+  nome         String
+  descricao    String?
+  tipo         String?
+  codigoTussId String? // Nullable no banco para manter dados existentes, mas obrigatório na aplicação
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  clinica             Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  solicitacoesExames  SolicitacaoExame[]
+  clinica            Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  codigoTuss         CodigoTuss?        @relation(fields: [codigoTussId], references: [id], onDelete: SetNull)
+  solicitacoesExames SolicitacaoExame[]
 
   @@index([clinicaId])
   @@index([nome])
+  @@index([codigoTussId])
   @@map("exames")
 }
 
@@ -314,13 +330,33 @@ model Medicamento {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  clinica                  Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  estoqueMedicamento       EstoqueMedicamento?
-  prescricoesMedicamentos  PrescricaoMedicamento[]
+  clinica                   Tenant                    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  estoqueMedicamento        EstoqueMedicamento?
+  prescricoesMedicamentos   PrescricaoMedicamento[]
+  procedimentosMedicamentos ProcedimentoMedicamento[]
 
   @@index([clinicaId])
   @@index([nome])
   @@map("medicamentos")
+}
+
+model Insumo {
+  id        String   @id @default(uuid())
+  clinicaId String
+  nome      String
+  descricao String?
+  unidade   String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clinica              Tenant               @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  procedimentosInsumos ProcedimentoInsumo[]
+  estoqueInsumo        EstoqueInsumo?
+
+  @@index([clinicaId])
+  @@index([nome])
+  @@map("insumos")
 }
 
 model Procedimento {
@@ -334,27 +370,66 @@ model Procedimento {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  clinica   Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  consultas Consulta[]
+  clinica                   Tenant                    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consultas                 Consulta[]
+  procedimentosMedicamentos ProcedimentoMedicamento[]
+  procedimentosInsumos      ProcedimentoInsumo[]
 
   @@index([clinicaId])
   @@index([codigo])
   @@map("procedimentos")
 }
 
-model FormaPagamento {
-  id        String   @id @default(uuid())
-  clinicaId String
-  nome      String
-  descricao String?
-  tipo      String
-  ativo     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model ProcedimentoMedicamento {
+  id             String   @id @default(uuid())
+  procedimentoId String
+  medicamentoId  String
+  quantidade     Decimal? @db.Decimal(10, 2)
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  clinica        Tenant         @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  contasReceber  ContaReceber[]
-  fluxoCaixa     FluxoCaixa[]
+  procedimento Procedimento @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  medicamento  Medicamento  @relation(fields: [medicamentoId], references: [id], onDelete: Cascade)
+
+  @@unique([procedimentoId, medicamentoId])
+  @@index([procedimentoId])
+  @@index([medicamentoId])
+  @@map("procedimentos_medicamentos")
+}
+
+model ProcedimentoInsumo {
+  id             String   @id @default(uuid())
+  procedimentoId String
+  insumoId       String
+  quantidade     Decimal? @db.Decimal(10, 2)
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  procedimento Procedimento @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  insumo       Insumo       @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+
+  @@unique([procedimentoId, insumoId])
+  @@index([procedimentoId])
+  @@index([insumoId])
+  @@map("procedimentos_insumos")
+}
+
+model FormaPagamento {
+  id             String   @id @default(uuid())
+  clinicaId      String
+  nome           String
+  descricao      String?
+  tipo           String
+  bandeiraCartao String?
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinica       Tenant         @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  contasReceber ContaReceber[]
+  fluxoCaixa    FluxoCaixa[]
 
   @@index([clinicaId])
   @@index([nome])
@@ -408,16 +483,16 @@ model ContaReceber {
 }
 
 model FluxoCaixa {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   clinicaId        String
   tipo             String
   descricao        String
-  valor            Decimal   @db.Decimal(10, 2)
+  valor            Decimal  @db.Decimal(10, 2)
   data             DateTime
   formaPagamentoId String?
   observacoes      String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   clinica        Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   formaPagamento FormaPagamento? @relation(fields: [formaPagamentoId], references: [id])
@@ -449,24 +524,50 @@ model EstoqueMedicamento {
   @@map("estoque_medicamentos")
 }
 
-model MovimentacaoEstoque {
-  id          String   @id @default(uuid())
-  clinicaId   String
-  estoqueId   String
-  tipo        String
-  quantidade  Int
-  motivo      String?
-  observacoes String?
-  data        DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model EstoqueInsumo {
+  id               String   @id @default(uuid())
+  clinicaId        String
+  insumoId         String   @unique
+  quantidadeAtual  Int      @default(0)
+  quantidadeMinima Int      @default(0)
+  quantidadeMaxima Int?
+  unidade          String   @default("UN")
+  localizacao      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  clinica  Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  estoque  EstoqueMedicamento @relation(fields: [estoqueId], references: [id], onDelete: Cascade)
+  clinica              Tenant                @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  insumo               Insumo                @relation(fields: [insumoId], references: [id], onDelete: Cascade)
+  movimentacoesEstoque MovimentacaoEstoque[]
 
   @@index([clinicaId])
-  @@index([estoqueId])
+  @@index([insumoId])
+  @@map("estoque_insumos")
+}
+
+model MovimentacaoEstoque {
+  id                   String   @id @default(uuid())
+  clinicaId            String
+  tipoEstoque          String // "MEDICAMENTO" ou "INSUMO"
+  estoqueMedicamentoId String?
+  estoqueInsumoId      String?
+  tipo                 String
+  quantidade           Int
+  motivo               String?
+  observacoes          String?
+  data                 DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  clinica            Tenant              @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  estoqueMedicamento EstoqueMedicamento? @relation(fields: [estoqueMedicamentoId], references: [id], onDelete: Cascade)
+  estoqueInsumo      EstoqueInsumo?      @relation(fields: [estoqueInsumoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([estoqueMedicamentoId])
+  @@index([estoqueInsumoId])
   @@index([tipo])
+  @@index([tipoEstoque])
   @@index([data])
   @@map("movimentacoes_estoque")
 }
@@ -478,6 +579,8 @@ model Consulta {
   medicoId          String
   dataHora          DateTime
   status            String    @default("AGENDADA")
+  inicioAtendimento DateTime?
+  fimAtendimento    DateTime?
   observacoes       String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -493,20 +596,20 @@ model Consulta {
   valorRepassado    Decimal?  @db.Decimal(10, 2)
   procedimentoId    String?
 
-  clinica                  Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  paciente                 Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  medico                   Medico                  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-  codigoTuss               CodigoTuss              @relation(fields: [codigoTussId], references: [id])
-  operadora                Operadora?              @relation(fields: [operadoraId], references: [id])
-  planoSaude               PlanoSaude?             @relation(fields: [planoSaudeId], references: [id])
-  tipoConsulta             TipoConsulta?           @relation(fields: [tipoConsultaId], references: [id])
-  procedimento             Procedimento?           @relation(fields: [procedimentoId], references: [id])
-  prontuarios              Prontuario[]
-  solicitacoesExames       SolicitacaoExame[]
-  prescricoesMedicamentos  PrescricaoMedicamento[]
-  guiasTiss                GuiaTiss[]
-  documentos               DocumentoGerado[]
-  pagamentos               PagamentoConsulta[]
+  clinica                 Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente                Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  medico                  Medico                  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  codigoTuss              CodigoTuss              @relation(fields: [codigoTussId], references: [id])
+  operadora               Operadora?              @relation(fields: [operadoraId], references: [id])
+  planoSaude              PlanoSaude?             @relation(fields: [planoSaudeId], references: [id])
+  tipoConsulta            TipoConsulta?           @relation(fields: [tipoConsultaId], references: [id])
+  procedimento            Procedimento?           @relation(fields: [procedimentoId], references: [id])
+  prontuarios             Prontuario[]
+  solicitacoesExames      SolicitacaoExame[]
+  prescricoesMedicamentos PrescricaoMedicamento[]
+  guiasTiss               GuiaTiss[]
+  documentos              DocumentoGerado[]
+  pagamentos              PagamentoConsulta[]
 
   @@index([clinicaId])
   @@index([pacienteId])
@@ -520,7 +623,7 @@ model Consulta {
 }
 
 model Prontuario {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   clinicaId   String
   pacienteId  String
   medicoId    String
@@ -530,8 +633,8 @@ model Prontuario {
   diagnostico String?
   conduta     String?
   evolucao    String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   clinica  Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   paciente Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -631,9 +734,9 @@ model TussGrupo {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  grupoPai     TussGrupo?   @relation("TussGrupoHierarquia", fields: [grupoPaiId], references: [id])
-  subGrupos    TussGrupo[]  @relation("TussGrupoHierarquia")
-  codigosTuss  CodigoTuss[]
+  grupoPai    TussGrupo?   @relation("TussGrupoHierarquia", fields: [grupoPaiId], references: [id])
+  subGrupos   TussGrupo[]  @relation("TussGrupoHierarquia")
+  codigosTuss CodigoTuss[]
 
   @@index([codigo])
   @@index([grupoPaiId])
@@ -657,6 +760,7 @@ model CodigoTuss {
 
   grupo              TussGrupo?          @relation(fields: [grupoId], references: [id])
   consultas          Consulta[]
+  exames             Exame[]
   tussEspecialidades TussEspecialidade[]
   tussOperadoras     TussOperadora[]
   tussValores        TussValor[]
@@ -693,8 +797,8 @@ model TipoConsulta {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  consultas    Consulta[]
-  tussValores  TussValor[]
+  consultas   Consulta[]
+  tussValores TussValor[]
 
   @@index([codigo])
   @@index([ativo])
@@ -714,11 +818,11 @@ model Operadora {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  clinica         Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  consultas       Consulta[]
-  planosSaude     PlanoSaude[]
-  tussOperadoras  TussOperadora[]
-  tussValores     TussValor[]
+  clinica        Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consultas      Consulta[]
+  planosSaude    PlanoSaude[]
+  tussOperadoras TussOperadora[]
+  tussValores    TussValor[]
 
   @@index([clinicaId])
   @@index([codigoAns])
@@ -738,7 +842,7 @@ model PlanoSaude {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  operadora       Operadora        @relation(fields: [operadoraId], references: [id], onDelete: Cascade)
+  operadora       Operadora       @relation(fields: [operadoraId], references: [id], onDelete: Cascade)
   consultas       Consulta[]
   pacientesPlanos PacientePlano[]
   tussOperadoras  TussOperadora[]
@@ -765,11 +869,11 @@ model TussValor {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  clinica        Tenant        @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  codigoTuss     CodigoTuss    @relation(fields: [codigoTussId], references: [id])
-  operadora      Operadora?    @relation(fields: [operadoraId], references: [id])
-  planoSaude     PlanoSaude?   @relation(fields: [planoSaudeId], references: [id])
-  tipoConsulta   TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
+  clinica      Tenant        @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  codigoTuss   CodigoTuss    @relation(fields: [codigoTussId], references: [id])
+  operadora    Operadora?    @relation(fields: [operadoraId], references: [id])
+  planoSaude   PlanoSaude?   @relation(fields: [planoSaudeId], references: [id])
+  tipoConsulta TipoConsulta? @relation(fields: [tipoConsultaId], references: [id])
 
   @@index([clinicaId])
   @@index([codigoTussId])
@@ -941,10 +1045,10 @@ model DocumentoGerado {
   clinicaId     String
   consultaId    String
   medicoId      String
-  tipoDocumento String   // "receita-medica", "atestado-afastamento", etc
-  nomeDocumento String   // Nome amigável do documento
-  dados         Json?    // Dados usados para gerar o documento (prescrições, CID, etc)
-  s3Key         String?  // Chave do arquivo no S3 (ex: "documentos/1234567890-receita.pdf")
+  tipoDocumento String // "receita-medica", "atestado-afastamento", etc
+  nomeDocumento String // Nome amigável do documento
+  dados         Json? // Dados usados para gerar o documento (prescrições, CID, etc)
+  s3Key         String? // Chave do arquivo no S3 (ex: "documentos/1234567890-receita.pdf")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -960,26 +1064,48 @@ model DocumentoGerado {
   @@map("documentos_gerados")
 }
 
-model PagamentoConsulta {
-  id                String          @id @default(uuid())
-  clinicaId         String
-  pacienteId        String
-  consultaId        String?
-  valor             Decimal         @db.Decimal(10, 2)
-  status            StatusPagamento @default(PENDENTE)
-  metodoPagamento   String?         // "STRIPE", "PIX", etc
-  stripeSessionId   String?         @unique
-  stripePaymentId   String?
-  transacaoId       String?
-  dataPagamento     DateTime?
-  dataVencimento    DateTime?
-  observacoes       String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+model MedicoDocumento {
+  id            String   @id @default(uuid())
+  clinicaId     String
+  medicoId      String
+  tipoDocumento String // "certificado", "diploma", "registro-profissional", etc
+  nomeDocumento String // Nome amigável do documento
+  s3Key         String // Chave do arquivo no S3
+  mimeType      String // Tipo MIME do arquivo (image/jpeg, application/pdf, etc)
+  tamanho       Int // Tamanho do arquivo em bytes
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  clinica   Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  paciente  Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  consulta  Consulta? @relation(fields: [consultaId], references: [id], onDelete: SetNull)
+  // Relações
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([tipoDocumento])
+  @@map("medicos_documentos")
+}
+
+model PagamentoConsulta {
+  id              String          @id @default(uuid())
+  clinicaId       String
+  pacienteId      String
+  consultaId      String?
+  valor           Decimal         @db.Decimal(10, 2)
+  status          StatusPagamento @default(PENDENTE)
+  metodoPagamento String? // "STRIPE", "PIX", etc
+  stripeSessionId String?         @unique
+  stripePaymentId String?
+  transacaoId     String?
+  dataPagamento   DateTime?
+  dataVencimento  DateTime?
+  observacoes     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  clinica  Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente Paciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  consulta Consulta? @relation(fields: [consultaId], references: [id], onDelete: SetNull)
 
   @@index([clinicaId])
   @@index([pacienteId])
@@ -988,4 +1114,51 @@ model PagamentoConsulta {
   @@index([stripeSessionId])
   @@index([dataPagamento])
   @@map("pagamentos_consultas")
+}
+
+model ListaEspera {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  medicoId    String
+  pacienteId  String
+  observacoes String?
+  prioridade  Int      @default(0) // 0 = normal, maior número = maior prioridade
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico   Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([pacienteId])
+  @@index([prioridade])
+  @@index([createdAt])
+  @@map("listas_espera")
+}
+
+model AutorizacaoFechamentoCaixa {
+  id                   String    @id @default(uuid())
+  clinicaId            String
+  medicoId             String
+  data                 DateTime // Data do fechamento
+  autorizadoEm         DateTime  @default(now())
+  fechadoEm            DateTime?
+  status               String    @default("AUTORIZADO") // "AUTORIZADO", "FECHADO", "CANCELADO"
+  observacoes          String?
+  assinaturaMedico     String? // Base64 da assinatura do médico
+  assinaturaSecretaria String? // Base64 da assinatura da secretária
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicaId, medicoId, data])
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([data])
+  @@index([status])
+  @@map("autorizacoes_fechamento_caixa")
 }

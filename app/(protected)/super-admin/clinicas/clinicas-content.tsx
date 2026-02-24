@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Building2, Filter } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 import { useRouter } from "next/navigation";
 import { StatusClinica, TipoPlano } from "@/lib/generated/prisma/enums";
 import { ClinicaDialog } from "./clinica-dialog";
@@ -124,16 +125,11 @@ export function ClinicasContent({
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Clínicas</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie as clínicas cadastradas no sistema
-        </p>
-      </div>
+      <PageHeader
+        icon={Building2}
+        title="Clínicas"
+        subtitle="Gerencie as clínicas cadastradas no sistema"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

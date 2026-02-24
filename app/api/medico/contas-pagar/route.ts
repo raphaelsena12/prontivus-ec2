@@ -63,9 +63,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
-    if (!auth.authorized) return auth.response;
-
-    const body = await request.json();
+    if (!auth.authorized) return auth.response;    const body = await request.json();
     const validation = contaPagarSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
@@ -74,10 +72,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!auth.clinicaId) {
+      return NextResponse.json(
+        { error: "Clínica não encontrada" },
+        { status: 400 }
+      );
+    }
+
     const conta = await prisma.contaPagar.create({
       data: {
-        ...validation.data,
+        descricao: validation.data.descricao,
+        fornecedor: validation.data.fornecedor,
+        valor: validation.data.valor,
         dataVencimento: new Date(validation.data.dataVencimento),
+        formaPagamentoId: validation.data.formaPagamentoId,
+        observacoes: validation.data.observacoes,
         clinicaId: auth.clinicaId,
         status: "PENDENTE",
       },

@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import {
   User,
@@ -56,19 +55,30 @@ import {
   Stethoscope,
   Plus,
   Trash2,
-  Printer
+  Printer,
+  Ruler,
+  TrendingUp,
+  FileText as FileTextIcon,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate, formatTime, formatCPF } from '@/lib/utils';
 import { useTranscription } from '@/hooks/use-transcription';
 import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
-import { DocumentModelsSheet } from '@/components/document-models-sheet';
 import { MicrophoneSelectorModal } from '@/components/microphone-selector-modal';
 import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search } from 'lucide-react';
+
+// ─── Novos componentes do redesign ───────────────────────────────────────────
+import { PatientHistory } from '@/components/atendimento/patient/PatientHistory';
+import { TranscriptionBar } from '@/components/atendimento/consultation/TranscriptionBar';
+import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
+import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
+import { TelemedicineView } from '@/components/atendimento/consultation/TelemedicineView';
 
 interface Consulta {
   id: string;
@@ -82,6 +92,7 @@ interface Consulta {
     email: string | null;
     dataNascimento: string;
     observacoes?: string | null;
+    numeroProntuario: number | null;
   };
   codigoTuss: {
     codigoTuss: string;
@@ -136,17 +147,22 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [editedAnamnese, setEditedAnamnese] = useState<string>('');
   const [isAnamneseEdited, setIsAnamneseEdited] = useState(false);
   const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
-  const [isDocumentModelsOpen, setIsDocumentModelsOpen] = useState(false);
+  const [documentoSearch, setDocumentoSearch] = useState("");
+  const [documentoSuggestions, setDocumentoSuggestions] = useState<Array<{ id: string; nome: string }>>([]);
   const [isMicrophoneSelectorOpen, setIsMicrophoneSelectorOpen] = useState(false);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState<string | undefined>();
   const [prescricoes, setPrescricoes] = useState<Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string }>>([]);
   const [selectedCids, setSelectedCids] = useState<Set<number>>(new Set());
+  const [selectedProtocolosAI, setSelectedProtocolosAI] = useState<Set<number>>(new Set());
   const [selectedExamesAI, setSelectedExamesAI] = useState<Set<number>>(new Set());
   const [selectedPrescricoesAI, setSelectedPrescricoesAI] = useState<Set<number>>(new Set());
   const [medicamentoDialogOpen, setMedicamentoDialogOpen] = useState(false);
   const [medicamentoSearch, setMedicamentoSearch] = useState("");
   const [medicamentos, setMedicamentos] = useState<Array<{ id: string; nome: string; principioAtivo: string | null; laboratorio: string | null; apresentacao: string | null; concentracao: string | null; unidade: string | null }>>([]);
   const [loadingMedicamentos, setLoadingMedicamentos] = useState(false);
+  const [manipulados, setManipulados] = useState<Array<{ id: string; descricao: string; informacoes: string | null }>>([]);
+  const [loadingManipulados, setLoadingManipulados] = useState(false);
+  const [activeMedicamentoTab, setActiveMedicamentoTab] = useState<"medicamentos" | "manipulados">("medicamentos");
   const [selectedPrescricaoIndex, setSelectedPrescricaoIndex] = useState<number | null>(null);
   const [documentosGerados, setDocumentosGerados] = useState<Array<{ id: string; tipoDocumento: string; nomeDocumento: string; createdAt: string; pdfBlob?: Blob }>>([]);
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
@@ -168,10 +184,39 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   }>>([]);
   const [loadingExames, setLoadingExames] = useState(false);
   const [uploadingExame, setUploadingExame] = useState(false);
-  const [examesSelecionadosParaIA, setExamesSelecionadosParaIA] = useState<Set<string>>(new Set());
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [nomeExameInput, setNomeExameInput] = useState("");
   const [arquivoExame, setArquivoExame] = useState<File | null>(null);
+  const [cidsManuais, setCidsManuais] = useState<Array<{ code: string; description: string }>>([]);
+  const [protocolosManuais, setProtocolosManuais] = useState<Array<{ nome: string; descricao: string }>>([]);
+  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string }>>([]);
+  const [cidDialogOpen, setCidDialogOpen] = useState(false);
+  const [protocoloDialogOpen, setProtocoloDialogOpen] = useState(false);
+  const [exameDialogOpen, setExameDialogOpen] = useState(false);
+  const [novoCidCode, setNovoCidCode] = useState("");
+  const [novoCidDescription, setNovoCidDescription] = useState("");
+  const [novoExameNome, setNovoExameNome] = useState("");
+  const [novoExameTipo, setNovoExameTipo] = useState("");
+  const [exameSearchDialogOpen, setExameSearchDialogOpen] = useState(false);
+  const [exameSearch, setExameSearch] = useState("");
+  const [examesParaIA, setExamesParaIA] = useState<Set<string>>(new Set());
+  const [transcricaoFinalizada, setTranscricaoFinalizada] = useState(false);
+  const [anamneseModoManual, setAnamneseModoManual] = useState(false);
+  const [examesDrawerOpen, setExamesDrawerOpen] = useState(false);
+  const [resumoClinicoDialogOpen, setResumoClinicoDialogOpen] = useState(false);
+  const [gerandoResumoClinico, setGerandoResumoClinico] = useState(false);
+  const [resumoClinico, setResumoClinico] = useState<string | null>(null);
+  const [medicamentosEmUso, setMedicamentosEmUso] = useState<Array<{ nome: string; posologia: string; dataPrescricao: string }>>([]);
+  const [loadingMedicamentosEmUso, setLoadingMedicamentosEmUso] = useState(false);
+  const [examesCadastrados, setExamesCadastrados] = useState<Array<{ id: string; nome: string; descricao: string; tipo: string }>>([]);
+  const [loadingExamesCadastrados, setLoadingExamesCadastrados] = useState(false);
+
+  // ─── UI states do redesign (não afetam lógica de negócio) ─────────────────
+  const [currentStep, setCurrentStep] = useState<1|2|3|4|5>(1);
+  const [consultationMode, setConsultationMode] = useState<'manual'|'ai'>('ai');
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+  const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
 
   // Hook de transcrição
   const {
@@ -186,11 +231,23 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   } = useTranscription();
 
   // Dados mockados para funcionalidades que ainda não estão implementadas
+  // Função para calcular IMC
+  const calcularIMC = (peso: number, altura: number): number => {
+    if (altura <= 0) return 0;
+    return peso / (altura * altura);
+  };
+
+  const peso = 68.5; // kg
+  const altura = 1.70; // metros
+  const imc = calcularIMC(peso, altura);
+
   const vitals = [
-    { icon: Heart, label: "Pressão", value: "120/80", unit: "mmHg", status: "normal" },
-    { icon: Activity, label: "Frequência", value: "72", unit: "bpm", status: "normal" },
-    { icon: Droplet, label: "Saturação", value: "98", unit: "%", status: "normal" },
-    { icon: Weight, label: "Peso", value: "68.5", unit: "kg", status: "normal" },
+    { icon: Heart, label: "Pressão", value: "120/80", unit: "mmHg", status: "normal", iconColor: "text-red-500" },
+    { icon: Activity, label: "Frequência", value: "72", unit: "bpm", status: "normal", iconColor: "text-blue-500" },
+    { icon: Droplet, label: "Saturação", value: "98", unit: "%", status: "normal", iconColor: "text-cyan-500" },
+    { icon: Weight, label: "Peso", value: "68.5", unit: "kg", status: "normal", iconColor: "text-orange-500" },
+    { icon: Ruler, label: "Altura", value: `${altura.toFixed(2)}`, unit: "m", status: "normal", iconColor: "text-green-500" },
+    { icon: TrendingUp, label: "IMC", value: imc.toFixed(1), unit: "kg/m²", status: "normal", iconColor: "text-purple-500" },
   ];
 
   const exams: any[] = [];
@@ -246,6 +303,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   useEffect(() => {
     if (consulta?.paciente?.id) {
       fetchHistoricoConsultas(consulta.paciente.id);
+      fetchMedicamentosEmUso(consulta.paciente.id);
     }
   }, [consulta?.paciente?.id]);
 
@@ -343,29 +401,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
       toast.success("Exame removido com sucesso!");
       await fetchExamesAnexados();
-      // Remover da seleção se estava selecionado
-      setExamesSelecionadosParaIA((prev) => {
-        const next = new Set(prev);
-        next.delete(exameId);
-        return next;
-      });
     } catch (error: any) {
       console.error("Erro ao deletar exame:", error);
       toast.error(error.message || "Erro ao remover exame");
     }
   };
 
-  const handleToggleExameSelecionado = (exameId: string) => {
-    setExamesSelecionadosParaIA((prev) => {
-      const next = new Set(prev);
-      if (next.has(exameId)) {
-        next.delete(exameId);
-      } else {
-        next.add(exameId);
-      }
-      return next;
-    });
-  };
 
   const handleDownloadExame = async (exameId: string, s3Key: string) => {
     try {
@@ -379,12 +420,37 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  // Buscar medicamentos quando o dialog abrir
+  // Buscar medicamentos ou manipulados quando o dialog abrir ou quando a tab mudar
   useEffect(() => {
     if (medicamentoDialogOpen) {
-      fetchMedicamentos();
+      if (activeMedicamentoTab === "medicamentos") {
+        fetchMedicamentos();
+      } else {
+        fetchManipulados();
+      }
     }
-  }, [medicamentoDialogOpen, medicamentoSearch]);
+  }, [medicamentoDialogOpen, activeMedicamentoTab]);
+
+  // Buscar quando o termo de busca mudar (com debounce)
+  useEffect(() => {
+    if (medicamentoDialogOpen) {
+      const timeoutId = setTimeout(() => {
+        if (activeMedicamentoTab === "medicamentos") {
+          fetchMedicamentos();
+        } else {
+          fetchManipulados();
+        }
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [medicamentoSearch, medicamentoDialogOpen, activeMedicamentoTab]);
+
+  // Buscar exames quando o dialog abrir
+  useEffect(() => {
+    if (exameSearchDialogOpen) {
+      fetchExamesCadastrados();
+    }
+  }, [exameSearchDialogOpen, exameSearch]);
 
   const fetchMedicamentos = async () => {
     try {
@@ -405,6 +471,199 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
+  const fetchManipulados = async () => {
+    try {
+      setLoadingManipulados(true);
+      const params = new URLSearchParams();
+      if (medicamentoSearch) {
+        params.append("search", medicamentoSearch);
+      }
+      params.append("limit", "50"); // Buscar mais resultados
+      const response = await fetch(`/api/medico/manipulados?${params.toString()}`);
+      if (!response.ok) throw new Error("Erro ao buscar manipulados");
+      const data = await response.json();
+      setManipulados(data.manipulados || []);
+    } catch (error) {
+      console.error("Erro ao buscar manipulados:", error);
+      toast.error("Erro ao buscar manipulados");
+    } finally {
+      setLoadingManipulados(false);
+    }
+  };
+
+  const fetchExamesCadastrados = async () => {
+    try {
+      setLoadingExamesCadastrados(true);
+      const params = new URLSearchParams();
+      if (exameSearch) {
+        params.append("search", exameSearch);
+      }
+      const response = await fetch(`/api/medico/exames?${params.toString()}`);
+      if (!response.ok) throw new Error("Erro ao buscar exames");
+      const data = await response.json();
+      setExamesCadastrados(data.exames || []);
+    } catch (error) {
+      console.error("Erro ao buscar exames:", error);
+      toast.error("Erro ao buscar exames");
+    } finally {
+      setLoadingExamesCadastrados(false);
+    }
+  };
+
+  const handleSelectExame = (exame: typeof examesCadastrados[0]) => {
+    setExamesManuais([...examesManuais, { nome: exame.nome, tipo: exame.tipo }]);
+    setExameSearchDialogOpen(false);
+    setExameSearch("");
+  };
+
+  const toggleExameParaIA = (id: string) => {
+    setExamesParaIA(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAnalisarComIA = async () => {
+    setTranscricaoFinalizada(false);
+    await handleProcessTranscription();
+  };
+
+  // ─── Helpers de navegação do stepper ─────────────────────────────────────
+  const advanceToStep = (step: 1|2|3|4|5) => {
+    setCompletedSteps(prev => {
+      const next = new Set(prev);
+      next.add(step - 1 as number);
+      return next;
+    });
+    setCurrentStep(step);
+    // Scroll para o topo da área de consulta
+    setTimeout(() => {
+      document.getElementById('consultation-zone')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  };
+
+  // ── Fase 1: gerar apenas anamnese a partir da transcrição ─────────────────
+  const handleGenerateAnamnese = async () => {
+    const transcriptionText = transcription
+      .filter((e) => !e.isPartial)
+      .map((e) => e.text)
+      .join(" ") || transcription.map((e) => e.text).join(" ");
+
+    if (!transcriptionText.trim()) {
+      toast.error("Nenhuma transcrição disponível para processar");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStage('processing');
+    setAnalysisResults(null);
+
+    try {
+      setTimeout(() => setProcessingStage('analyzing'), 800);
+
+      const response = await fetch("/api/medico/gerar-anamnese", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcription: transcriptionText }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Erro ao gerar anamnese");
+      }
+
+      const data = await response.json();
+      // Garantir que as quebras de linha sejam preservadas
+      const anamneseFormatted = data.anamnese
+        ? data.anamnese.replace(/\\n/g, '\n').replace(/\\r/g, '')
+        : '';
+      setAnalysisResults({ anamnese: anamneseFormatted, cidCodes: [], exames: [], prescricoes: [] });
+      setProntuario((prev) => ({ ...prev, anamnese: anamneseFormatted } as Prontuario));
+      setEditedAnamnese(anamneseFormatted);
+      setIsEditingAnamnese(true); // Sempre deixar em modo de edição
+      toast.success("Anamnese gerada com sucesso!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao gerar anamnese");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+      setProcessingStage('processing');
+    }
+  };
+
+  // ── Auto-gerar anamnese ao encerrar transcrição ────────────────────────────
+  useEffect(() => {
+    if (transcricaoFinalizada && transcription.length > 0) {
+      handleGenerateAnamnese();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcricaoFinalizada]);
+
+  // Mantido para compatibilidade com fluxo legado (telemedicina etc.)
+  const handleStep1Complete = async () => {
+    await handleGenerateAnamnese();
+  };
+
+  const handleConfirmAnamnese = () => {
+    setAnamneseConfirmed(true);
+    toast.success('Anamnese confirmada');
+  };
+
+  // ── Fase 2: gerar CID, exames e prescrições com contexto confirmado ────────
+  const handleGenerateSuggestions = async (context?: AIContext) => {
+    const anamneseText = analysisResults?.anamnese || prontuario?.anamnese || "";
+    if (!anamneseText.trim()) {
+      toast.error("Confirme a anamnese antes de gerar sugestões");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStage('analyzing');
+
+    try {
+      setTimeout(() => setProcessingStage('generating'), 800);
+
+      // Montar contexto a partir das seleções do médico
+      const alergias = context?.alergias ? patient.allergies : [];
+      const medicamentos = context?.medicamentos
+        ? medicamentosEmUso.map((m) => `${m.nome} ${m.posologia || ""}`.trim())
+        : [];
+      const examesIds = context?.examesIds ?? [];
+
+      const response = await fetch("/api/medico/gerar-sugestoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anamnese: anamneseText, alergias, medicamentosEmUso: medicamentos, examesIds }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Erro ao gerar sugestões");
+      }
+
+      const data = await response.json();
+      setAnalysisResults((prev) => ({
+        anamnese: prev?.anamnese || anamneseText,
+        cidCodes: data.cidCodes || [],
+        exames: data.exames || [],
+        prescricoes: data.prescricoes || [],
+      }));
+      toast.success("Sugestões geradas com sucesso!");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao gerar sugestões");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+      setProcessingStage('processing');
+    }
+  };
+
+  const handleDeleteDocument = (id: string) => {
+    setDocumentosGerados((prev) => prev.filter((d) => d.id !== id));
+  };
+
   const handleSelectMedicamento = (medicamento: typeof medicamentos[0]) => {
     if (selectedPrescricaoIndex === null) {
       // Adicionar nova prescrição
@@ -414,11 +673,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       setPrescricoes([...prescricoes, {
         medicamento: medicamento.nome,
         dosagem,
-        posologia: "",
+        posologia: "", // Posologia sempre vazia ao adicionar novo medicamento
         duracao: medicamento.apresentacao || "",
       }]);
     } else {
-      // Atualizar prescrição existente
+      // Atualizar prescrição existente - manter posologia existente
       const next = [...prescricoes];
       const dosagem = medicamento.concentracao && medicamento.unidade
         ? `${medicamento.concentracao}${medicamento.unidade}`
@@ -427,7 +686,35 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         ...next[selectedPrescricaoIndex],
         medicamento: medicamento.nome,
         dosagem,
+        // Manter a posologia existente, não alterar
+        posologia: next[selectedPrescricaoIndex].posologia,
         duracao: medicamento.apresentacao || next[selectedPrescricaoIndex].duracao,
+      };
+      setPrescricoes(next);
+    }
+    setMedicamentoDialogOpen(false);
+    setMedicamentoSearch("");
+    setSelectedPrescricaoIndex(null);
+  };
+
+  const handleSelectManipulado = (manipulado: typeof manipulados[0]) => {
+    if (selectedPrescricaoIndex === null) {
+      // Adicionar nova prescrição
+      setPrescricoes([...prescricoes, {
+        medicamento: manipulado.descricao,
+        dosagem: "",
+        posologia: manipulado.informacoes || "",
+        duracao: "",
+      }]);
+    } else {
+      // Atualizar prescrição existente - manter posologia existente se já tiver
+      const next = [...prescricoes];
+      next[selectedPrescricaoIndex] = {
+        ...next[selectedPrescricaoIndex],
+        medicamento: manipulado.descricao,
+        dosagem: next[selectedPrescricaoIndex].dosagem,
+        posologia: manipulado.informacoes || next[selectedPrescricaoIndex].posologia,
+        duracao: next[selectedPrescricaoIndex].duracao,
       };
       setPrescricoes(next);
     }
@@ -498,6 +785,33 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
+  const fetchMedicamentosEmUso = async (pacienteId: string) => {
+    try {
+      setLoadingMedicamentosEmUso(true);
+      const response = await fetch(`/api/medico/paciente/${pacienteId}/prescricoes`);
+      if (!response.ok) throw new Error("Erro ao buscar medicamentos em uso");
+      const data = await response.json();
+      
+      // Pegar as 10 prescrições mais recentes e formatar
+      const medicamentos = data.prescricoes
+        ?.slice(0, 10)
+        .flatMap((presc: any) => 
+          presc.medicamentos?.map((med: any) => ({
+            nome: med.medicamento?.nome || med.medicamento || "Medicamento não especificado",
+            posologia: med.posologia || "Não especificado",
+            dataPrescricao: formatDate(new Date(presc.dataPrescricao || presc.consulta?.dataHora || Date.now())),
+          })) || []
+        ) || [];
+      
+      setMedicamentosEmUso(medicamentos);
+    } catch (error) {
+      console.error("Erro ao buscar medicamentos em uso:", error);
+      setMedicamentosEmUso([]);
+    } finally {
+      setLoadingMedicamentosEmUso(false);
+    }
+  };
+
   const fetchHistoricoConsultas = async (pacienteId: string) => {
     try {
       setLoadingHistorico(true);
@@ -516,8 +830,82 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  const handleViewProntuario = (consultaId: string) => {
-    router.push(`/prontuarios?consultaId=${consultaId}`);
+  const handleViewFichaAtendimento = async (consultaId: string) => {
+    try {
+      // Buscar documentos da consulta
+      const response = await fetch(`/api/medico/consultas/${consultaId}/documentos`);
+      if (!response.ok) {
+        throw new Error("Erro ao buscar documentos");
+      }
+      const data = await response.json();
+      
+      // Procurar a ficha de atendimento
+      const fichaAtendimento = data.documentos?.find((doc: any) => doc.tipoDocumento === "ficha-atendimento");
+      
+      if (!fichaAtendimento) {
+        toast.error("Ficha de atendimento não encontrada para esta consulta");
+        return;
+      }
+
+      if (!fichaAtendimento.s3Key) {
+        toast.error("Ficha de atendimento não disponível");
+        return;
+      }
+
+      // Buscar URL do documento
+      const docResponse = await fetch(`/api/medico/documentos/${fichaAtendimento.id}`);
+      if (!docResponse.ok) {
+        const errorData = await docResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao buscar ficha de atendimento");
+      }
+
+      const docData = await docResponse.json();
+      if (docData.url) {
+        window.open(docData.url, "_blank");
+      } else {
+        throw new Error("URL da ficha de atendimento não encontrada");
+      }
+    } catch (error: any) {
+      console.error("Erro ao visualizar ficha de atendimento:", error);
+      toast.error(error.message || "Erro ao visualizar ficha de atendimento");
+    }
+  };
+
+  const handleGerarResumoClinico = async () => {
+    if (!consulta?.paciente?.id) {
+      toast.error("Paciente não encontrado");
+      return;
+    }
+
+    setGerandoResumoClinico(true);
+    setResumoClinico(null);
+
+    try {
+      const response = await fetch("/api/medico/resumo-clinico", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pacienteId: consulta.paciente.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao gerar resumo clínico");
+      }
+
+      const data = await response.json();
+      setResumoClinico(data.resumo);
+      toast.success("Resumo clínico gerado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao gerar resumo clínico:", error);
+      toast.error(error.message || "Erro ao gerar resumo clínico");
+      setResumoClinico(null);
+    } finally {
+      setGerandoResumoClinico(false);
+    }
   };
 
   const handleProcessTranscription = async () => {
@@ -544,28 +932,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
 
     try {
-      // Converter Set para Array de IDs dos exames selecionados
-      const examesIdsArray = Array.from(examesSelecionadosParaIA);
-      
-      // Contar quantos são imagens e quantos são PDFs
-      const examesSelecionados = examesAnexados.filter(e => examesSelecionadosParaIA.has(e.id));
-      const imagensCount = examesSelecionados.filter(e => e.isImage).length;
-      const pdfsCount = examesSelecionados.filter(e => e.isPdf).length;
-
-      // Mostrar informação sobre exames selecionados
-      if (examesIdsArray.length > 0) {
-        toast.info(
-          `Processando transcrição com ${imagensCount} imagem(ns) e ${pdfsCount} PDF(s) selecionado(s)`,
-          { duration: 3000 }
-        );
-      }
-
       // Simular estágios de processamento
       setTimeout(() => setProcessingStage('analyzing'), 1000);
       setTimeout(() => setProcessingStage('generating'), 2000);
 
       // Passar o modelo selecionado e os exames selecionados para o processamento
-      const results = await processTranscription(selectedAIModel, examesIdsArray);
+      const results = await processTranscription();
       
       console.log("=== Resultados do processamento ===");
       console.log("Results:", results);
@@ -579,6 +951,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         setAnalysisResults({
           anamnese: results.anamnese,
           cidCodes: results.cidCodes || [],
+          protocolos: (results as any).protocolos || [],
           exames: results.exames || [],
           prescricoes: (results as any).prescricoes || [],
         });
@@ -661,6 +1034,67 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         throw new Error(error.error || "Erro ao finalizar atendimento");
       }
 
+      // Gerar e salvar Ficha de Atendimento automaticamente
+      try {
+        console.log("📋 Gerando Ficha de Atendimento...");
+        
+        // Preparar dados para a ficha de atendimento
+        const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
+        const selectedExamesList = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || [];
+        const examesManuaisList = examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }));
+        const allExames = [...selectedExamesList, ...examesManuaisList];
+        
+        const fichaRequestData = {
+          tipoDocumento: "ficha-atendimento",
+          consultaId,
+          dados: {
+            anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+            cidCodes: selectedCidsList,
+            exames: allExames,
+            prescricoes: prescricoes,
+          },
+        };
+
+        // Gerar o PDF da ficha de atendimento
+        const fichaResponse = await fetch("/api/medico/documentos/gerar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fichaRequestData),
+        });
+
+        if (!fichaResponse.ok) {
+          const error = await fichaResponse.json();
+          console.error("Erro ao gerar Ficha de Atendimento:", error);
+          toast.warning("Ficha de Atendimento não pôde ser gerada automaticamente");
+        } else {
+          // Obter o blob do PDF
+          const fichaPdfBlob = await fichaResponse.blob();
+
+          // Salvar a ficha de atendimento
+          const fichaFormData = new FormData();
+          fichaFormData.append("consultaId", consultaId);
+          fichaFormData.append("tipoDocumento", "ficha-atendimento");
+          fichaFormData.append("nomeDocumento", "Ficha de Atendimento");
+          fichaFormData.append("pdfFile", fichaPdfBlob, "ficha-atendimento.pdf");
+
+          const fichaSaveResponse = await fetch("/api/medico/documentos/salvar", {
+            method: "POST",
+            body: fichaFormData,
+          });
+
+          if (!fichaSaveResponse.ok) {
+            const error = await fichaSaveResponse.json();
+            console.error("Erro ao salvar Ficha de Atendimento:", error);
+            toast.warning("Ficha de Atendimento gerada mas não pôde ser salva");
+          } else {
+            console.log("✅ Ficha de Atendimento gerada e salva com sucesso!");
+          }
+        }
+      } catch (fichaError: any) {
+        console.error("Erro ao gerar/salvar Ficha de Atendimento:", fichaError);
+        toast.warning("Ficha de Atendimento não pôde ser gerada automaticamente");
+      }
+
       // Salvar documentos gerados
       if (documentosGerados.length > 0) {
         for (const doc of documentosGerados) {
@@ -735,12 +1169,27 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         }
       }
 
-      toast.success("Atendimento finalizado com sucesso!");
+      toast.success("Atendimento finalizado com sucesso!", {
+        description: `Prontuário do paciente ${consulta?.paciente?.nome || 'o paciente'} foi atualizado.`,
+        duration: 5000,
+      });
+      
+      // Mostrar toast adicional com link para prontuário completo
+      setTimeout(() => {
+        if (consulta?.paciente?.nome && consulta?.paciente?.id) {
+          toast.info(
+            `Deseja visualizar o prontuário completo de ${consulta.paciente.nome}? Acesse pelo menu de prontuários.`,
+            {
+              duration: 6000,
+            }
+          );
+        }
+      }, 800);
       
       // Redirecionar para a fila de atendimento após um breve delay
       setTimeout(() => {
         router.push("/medico/fila-atendimento");
-      }, 1000);
+      }, 2000);
     } catch (error: any) {
       toast.error(error.message || "Erro ao finalizar atendimento");
       console.error(error);
@@ -765,37 +1214,112 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     return `${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
   };
 
-  const handleGenerateDocument = async (modelId: string, pdfBlob?: Blob) => {
-    console.log("Documento gerado:", modelId);
-    
-    // Buscar o nome do documento da lista de modelos
-    const documentModels = [
-      { id: "prontuario-medico", nome: "Prontuário Médico" },
-      { id: "receita-medica", nome: "Receita Médica" },
-      { id: "atestado-afastamento", nome: "Atestado de Afastamento" },
-      { id: "atestado-afastamento-cid", nome: "Atestado de Afastamento c/ CID" },
-      { id: "atestado-afastamento-sem-cid", nome: "Atestado de Afastamento s/ CID" },
-      { id: "atestado-afastamento-historico-cid", nome: "Atestado de Afastamento com Histórico de CID" },
-      { id: "atestado-afastamento-indeterminado", nome: "Atestado de Afastamento Tempo Indeterminado" },
-      { id: "pedido-exames", nome: "Pedido de Exames" },
-      { id: "justificativa-exames-plano", nome: "Justificativa de Exames para Planos de Saúde" },
-      { id: "laudo-medico", nome: "Laudo Médico" },
-      { id: "guia-encaminhamento", nome: "Guia de Encaminhamento" },
-    ];
-    
+  // Lista completa de documentos disponíveis
+  const documentModels = useMemo(() => [
+    { id: "prontuario-medico", nome: "Prontuário Médico" },
+    { id: "receita-medica", nome: "Receita Médica" },
+    { id: "receita-controle-especial", nome: "Receita de Controle Especial" },
+    { id: "receita-tipo-ba", nome: "Receita Tipo B" },
+    { id: "atestado-afastamento", nome: "Atestado de Afastamento" },
+    { id: "atestado-afastamento-cid", nome: "Atestado de Afastamento c/ CID" },
+    { id: "atestado-afastamento-sem-cid", nome: "Atestado de Afastamento s/ CID" },
+    { id: "atestado-afastamento-historico-cid", nome: "Atestado de Afastamento com Histórico de CID" },
+    { id: "atestado-afastamento-indeterminado", nome: "Atestado de Afastamento Tempo Indeterminado" },
+    { id: "atestado-aptidao-fisica-mental", nome: "Atestado de Aptidão Física e Mental" },
+    { id: "atestado-aptidao-piscinas", nome: "Atestado de Aptidão para Frequentar Piscinas" },
+    { id: "atestado-aptidao-fisica", nome: "Atestado de Aptidão Física" },
+    { id: "declaracao-comparecimento-acompanhante", nome: "Declaração de Comparecimento (Acompanhante)" },
+    { id: "declaracao-comparecimento-horario-cid", nome: "Declaração de Comparecimento de Horário c/ CID" },
+    { id: "declaracao-comparecimento", nome: "Declaração de Comparecimento" },
+    { id: "pedido-exames", nome: "Pedido de Exames" },
+    { id: "justificativa-exames-plano", nome: "Justificativa de Exames para Planos de Saúde" },
+    { id: "laudo-medico", nome: "Laudo Médico" },
+    { id: "risco-cirurgico-cardiaco", nome: "Risco Cirúrgico Cardíaco" },
+    { id: "guia-encaminhamento", nome: "Guia de Encaminhamento" },
+    { id: "controle-diabetes-analitico", nome: "Controle de Diabetes Analítico" },
+    { id: "controle-diabetes", nome: "Controle de Diabetes" },
+    { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico" },
+    { id: "controle-pressao-arterial", nome: "Controle de Pressão Arterial" },
+    { id: "termo-consentimento", nome: "Termo de Consentimento" },
+  ], []);
+
+  // Filtrar sugestões baseado no input
+  useEffect(() => {
+    if (documentoSearch.trim().length > 0) {
+      const filtered = documentModels.filter(doc =>
+        doc.nome.toLowerCase().includes(documentoSearch.toLowerCase())
+      );
+      setDocumentoSuggestions(filtered.slice(0, 5)); // Limitar a 5 sugestões
+    } else {
+      setDocumentoSuggestions([]);
+    }
+  }, [documentoSearch, documentModels]);
+
+  const handleGenerateDocument = async (modelId: string) => {
     const documentModel = documentModels.find((m) => m.id === modelId);
     const nomeDocumento = documentModel?.nome || modelId;
 
-    // Adicionar à lista de documentos gerados
-    const novoDocumento = {
-      id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      tipoDocumento: modelId,
-      nomeDocumento,
-      createdAt: new Date().toISOString(),
-      pdfBlob, // Armazenar o blob temporariamente
-    };
+    try {
+      // Preparar dados para a API
+      const requestData: any = {
+        tipoDocumento: modelId,
+        consultaId,
+        dados: {},
+      };
 
-    setDocumentosGerados([...documentosGerados, novoDocumento]);
+      // Adicionar prescrições se for receita médica
+      if (modelId === "receita-medica" && prescricoes.length > 0) {
+        const prescricoesValidas = prescricoes.filter(
+          (p) => p.medicamento && p.medicamento.trim() !== ""
+        );
+        if (prescricoesValidas.length > 0) {
+          requestData.dados.prescricoes = prescricoesValidas;
+        }
+      }
+
+      // Adicionar CID se necessário
+      const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
+      if (selectedCidsList.length > 0) {
+        requestData.dados.cidCodigo = selectedCidsList[0].code;
+        requestData.dados.cidDescricao = selectedCidsList[0].description;
+      }
+
+      // Chamar API para gerar o PDF
+      const response = await fetch("/api/medico/documentos/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao gerar documento");
+      }
+
+      // Obter o blob do PDF (mas não abrir)
+      const pdfBlob = await response.blob();
+
+      // Adicionar à lista de documentos gerados
+      const novoDocumento = {
+        id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        tipoDocumento: modelId,
+        nomeDocumento,
+        createdAt: new Date().toISOString(),
+        pdfBlob, // Armazenar o blob para visualização posterior
+      };
+
+      setDocumentosGerados([...documentosGerados, novoDocumento]);
+      setDocumentoSearch(""); // Limpar o input após adicionar
+      setDocumentoSuggestions([]);
+      toast.success("Documento adicionado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao gerar documento:", error);
+      toast.error(error.message || "Erro ao gerar documento");
+    }
+  };
+
+  const handleSelectDocument = (modelId: string) => {
+    handleGenerateDocument(modelId);
   };
 
   const getPatientAllergies = () => {
@@ -824,7 +1348,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const patient = {
     name: consulta.paciente.nome,
     age: calcularIdade(consulta.paciente.dataNascimento),
-    id: consulta.paciente.id.substring(0, 12).toUpperCase(),
+    id: consulta.paciente.numeroProntuario ? consulta.paciente.numeroProntuario.toString() : consulta.paciente.id.substring(0, 12).toUpperCase(),
     phone: consulta.paciente.celular || consulta.paciente.telefone || "-",
     email: consulta.paciente.email || "-",
     bloodType: "Não informado", // Campo não disponível no schema atual
@@ -832,1953 +1356,431 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     lastVisit: formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
   };
 
+  // Função para gerar cor do avatar
+  const getAvatarColor = (name: string) => {
+    const hue = (name.charCodeAt(0) * 47 + name.charCodeAt(name.length - 1) * 13) % 360;
+    return {
+      bg: `hsl(${hue}, 50%, 90%)`,
+      text: `hsl(${hue}, 55%, 28%)`,
+    };
+  };
+
+  const avatarColor = getAvatarColor(consulta.paciente.nome);
+  const inicial = consulta.paciente.nome.trim().charAt(0).toUpperCase();
+  const idade = calcularIdade(consulta.paciente.dataNascimento);
+  const prontuarioLabel = consulta.paciente.numeroProntuario
+    ? `Pront. ${String(consulta.paciente.numeroProntuario).padStart(5, "0")}`
+    : `ID ${consulta.paciente.id.substring(0, 8).toUpperCase()}`;
+  const hasAllergies = patient.allergies.length > 0;
+
+  const vitalStatusDot: Record<string, string> = {
+    normal: "bg-emerald-500",
+    warning: "bg-amber-500",
+    critical: "bg-red-500",
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header Superior */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-[1600px] mx-auto px-8">
-          {/* Top Bar - Paciente + Contato + Sinais Vitais */}
-          <div className="py-4">
-            <div className="flex items-center justify-between">
-              {/* Paciente Info */}
-              <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                  <User className="w-5 h-5 text-slate-500" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-base font-semibold text-slate-800">{patient.name}</h1>
-                    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-                      Em andamento
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-500 mt-0.5">
-                    <span>{patient.age} anos</span>
-                    <span>•</span>
-                    <span>{patient.bloodType}</span>
-                    <span>•</span>
-                    <span className="font-mono text-xs text-slate-400">ID: {patient.id}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contato */}
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{patient.phone}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Mail className="w-4 h-4 text-slate-400" />
-                  <span className="max-w-[200px] truncate">{patient.email}</span>
-                </div>
-              </div>
-
-              {/* Sinais Vitais - Alinhados à direita */}
-              <div className="flex items-center gap-2">
-                {vitals.map((vital, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100"
-                  >
-                    <vital.icon className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <p className="text-slate-800 font-semibold text-sm leading-none">{vital.value}</p>
-                      <p className="text-slate-400 text-xs">{vital.unit}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Alergias inline se houver */}
-            {patient.allergies.length > 0 && (
-              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-                <AlertCircle className="w-4 h-4 text-red-500" />
-                <span className="text-xs font-semibold text-red-600 uppercase">Alergias:</span>
-                <div className="flex gap-1.5">
-                  {patient.allergies.map((allergy, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                      {allergy}
-                    </Badge>
+    <div className="min-h-screen -mx-4 md:-mx-6 -mt-4 md:-mt-6 overflow-x-hidden" style={{ backgroundColor: 'var(--clinical-surface)' }}>
+      {/* Novo box do cabeçalho */}
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-5">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          {/* Faixa de alergias — só aparece se houver */}
+          {hasAllergies && (
+            <div className="px-6 py-1.5 border-b border-red-100 overflow-x-hidden" style={{ backgroundColor: "#FEF2F2" }}>
+              <div className="flex items-center gap-2 overflow-x-hidden">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
+                <span className="text-xs font-semibold text-red-700 uppercase tracking-wide whitespace-nowrap">Alergias:</span>
+                <div className="flex gap-1.5 min-w-0 overflow-x-hidden">
+                  {patient.allergies.map((a, i) => (
+                    <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap flex-shrink-0">
+                      {a}
+                    </span>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Tabs Navigation */}
-          <div className="flex items-center gap-1 -mb-px">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
-                    activeTab === tab.id
-                      ? 'text-slate-800'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab.id === 'telemedicina' && <Video className="w-4 h-4 inline mr-1.5" />}
-                  {tab.label}
-                  {activeTab === tab.id && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-[1800px] mx-auto">
-
-        {/* Tab Content */}
-        <div className="min-h-[400px]">
-
-          {/* Informações Tab */}
-          {activeTab === 'informacoes' && (
-            <div className="animate-in fade-in duration-500 grid grid-cols-12 gap-6 px-8 pt-6 max-w-[1600px] mx-auto">
-
-              {/* Coluna Esquerda - Exames */}
-              <div className="col-span-8">
-                <Card className="border border-slate-200 shadow-sm overflow-hidden bg-white">
-                  <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-4">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                        <FileImage className="w-4 h-4 text-slate-500" />
-                        Exames do Paciente
-                      </CardTitle>
-                      <Badge variant="outline" className="text-xs bg-slate-50 text-slate-600">
-                        {examesAnexados.length} {examesAnexados.length === 1 ? 'exame' : 'exames'}
-                      </Badge>
-                      {examesSelecionadosParaIA.size > 0 && (
-                        <Badge className="text-xs bg-purple-600 text-white">
-                          <Sparkles className="w-3 h-3 mr-1" />
-                          {examesSelecionadosParaIA.size} selecionado(s) para IA
-                        </Badge>
-                      )}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="text-slate-600 hover:bg-slate-50 border-slate-300 h-8 text-xs"
-                      onClick={() => setUploadDialogOpen(true)}
-                    >
-                      <FilePlus className="w-3.5 h-3.5 mr-1.5" />
-                      Adicionar
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    {loadingExames ? (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                      </div>
-                    ) : examesAnexados.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <FileImage className="w-10 h-10 text-slate-200 mb-2" />
-                        <p className="text-sm text-slate-400">Nenhum exame anexado</p>
-                        <p className="text-xs text-slate-300 mt-1">Clique em "Adicionar" para anexar imagens ou PDFs</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {examesAnexados.map((exame) => (
-                          <div
-                            key={exame.id}
-                            className="group p-3 rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox
-                                checked={examesSelecionadosParaIA.has(exame.id)}
-                                onCheckedChange={() => handleToggleExameSelecionado(exame.id)}
-                                className="flex-shrink-0"
-                              />
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                exame.isImage ? 'bg-blue-100' : 'bg-red-100'
-                              }`}>
-                                {exame.isImage ? (
-                                  <FileImage className="w-4 h-4 text-blue-600" />
-                                ) : (
-                                  <FileText className="w-4 h-4 text-red-600" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-slate-700 text-sm truncate">{exame.nome}</h4>
-                                  {exame.isFromCurrentConsulta && (
-                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                      Esta consulta
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-slate-400">
-                                  {formatDate(new Date(exame.data))} • {exame.isImage ? 'Imagem' : 'PDF'}
-                                  {exame.consultaData && !exame.isFromCurrentConsulta && (
-                                    <> • Consulta: {formatDate(new Date(exame.consultaData))}</>
-                                  )}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
-                                  onClick={() => handleDownloadExame(exame.id, exame.s3Key)}
-                                  title="Visualizar/Baixar"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="ghost" 
-                                  className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
-                                  onClick={() => handleDeleteExame(exame.id)}
-                                  title="Remover"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                            {examesSelecionadosParaIA.has(exame.id) && (
-                              <div className="mt-2 pt-2 border-t border-slate-100">
-                                <Badge className="text-xs bg-purple-600 text-white">
-                                  <Sparkles className="w-3 h-3 mr-1" />
-                                  {exame.isImage ? 'Imagem será analisada pela IA' : 'PDF será incluído no contexto'}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Coluna Direita - Histórico de Consultas */}
-              <div className="col-span-4">
-                <Card className="border border-slate-200 shadow-sm overflow-hidden bg-white h-full">
-                  <CardHeader className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white flex flex-row items-center justify-between py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
-                        <Calendar className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-base font-semibold text-slate-800">
-                          Histórico de Consultas
-                        </CardTitle>
-                        <p className="text-xs text-slate-500 mt-0.5">Consultas anteriores do paciente</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="text-xs bg-white text-slate-700 border-slate-300 font-semibold">
-                      {historicoConsultas.length}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ScrollArea className="h-[400px]">
-                      {loadingHistorico ? (
-                        <div className="flex items-center justify-center py-12">
-                          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                        </div>
-                      ) : historicoConsultas.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-                          <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                            <FileText className="w-8 h-8 text-slate-300" />
-                          </div>
-                          <p className="text-sm text-slate-600 font-semibold mb-1">Primeira consulta</p>
-                          <p className="text-xs text-slate-400">Nenhum histórico anterior disponível</p>
-                        </div>
-                      ) : (
-                        <div className="p-3 space-y-3">
-                          {historicoConsultas.map((consultaHist) => {
-                            const dataHora = new Date(consultaHist.dataHora);
-                            const prontuario = consultaHist.prontuarios?.[0];
-                            const isCurrent = consultaHist.id === consultaId;
-
-                            return (
-                              <div
-                                key={consultaHist.id}
-                                className={`group relative rounded-xl border transition-all duration-200 ${
-                                  isCurrent
-                                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-sm'
-                                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-md'
-                                }`}
-                              >
-                                {isCurrent && (
-                                  <div className="absolute top-0 right-0 -mt-2 -mr-2">
-                                    <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 shadow-md">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 animate-pulse" />
-                                      Atual
-                                    </Badge>
-                                  </div>
-                                )}
-                                
-                                <div className="p-4">
-                                  {/* Header com data e hora */}
-                                  <div className="flex items-start justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                                        isCurrent 
-                                          ? 'bg-blue-500 text-white' 
-                                          : 'bg-slate-100 text-slate-600'
-                                      }`}>
-                                        <Calendar className="w-4 h-4" />
-                                      </div>
-                                      <div>
-                                        <p className={`text-sm font-semibold ${
-                                          isCurrent ? 'text-blue-900' : 'text-slate-800'
-                                        }`}>
-                                          {formatDate(dataHora)}
-                                        </p>
-                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                          <Clock className="w-3 h-3 text-slate-400" />
-                                          <span className="text-xs text-slate-500">
-                                            {formatTime(dataHora)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Médico */}
-                                  {consultaHist.medico?.usuario?.nome && (
-                                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-100">
-                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                                        <User className="w-3.5 h-3.5 text-slate-500" />
-                                      </div>
-                                      <p className="text-xs font-medium text-slate-700">
-                                        {consultaHist.medico.usuario.nome}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Tipo de consulta */}
-                                  {consultaHist.tipoConsulta?.nome && (
-                                    <div className="mb-3">
-                                      <Badge 
-                                        variant="outline" 
-                                        className={`text-xs ${
-                                          isCurrent 
-                                            ? 'bg-blue-100 text-blue-700 border-blue-300' 
-                                            : 'bg-slate-50 text-slate-600 border-slate-200'
-                                        }`}
-                                      >
-                                        {consultaHist.tipoConsulta.nome}
-                                      </Badge>
-                                    </div>
-                                  )}
-
-                                  {/* Diagnóstico */}
-                                  {prontuario?.diagnostico && (
-                                    <div className="mb-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                                      <p className="text-xs font-medium text-slate-600 mb-1">Diagnóstico:</p>
-                                      <p className="text-xs text-slate-700 line-clamp-2 leading-relaxed">
-                                        {prontuario.diagnostico}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Ações */}
-                                  <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                                    {prontuario && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className={`h-8 text-xs gap-1.5 flex-1 ${
-                                          isCurrent
-                                            ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-100'
-                                            : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
-                                        }`}
-                                        onClick={() => handleViewProntuario(consultaHist.id)}
-                                      >
-                                        <Eye className="w-3.5 h-3.5" />
-                                        Ver prontuário
-                                      </Button>
-                                    )}
-                                    {consultaHist.documentos && consultaHist.documentos.length > 0 && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className={`h-8 text-xs gap-1.5 ${
-                                          isCurrent
-                                            ? 'text-blue-700 hover:text-blue-800 hover:bg-blue-100'
-                                            : 'text-slate-600 hover:text-slate-800 hover:bg-slate-100'
-                                        }`}
-                                        onClick={() => {
-                                          setSelectedConsultaForDocumentos(consultaHist.id);
-                                          setSelectedConsultaDataForDocumentos(consultaHist.dataHora);
-                                          setDocumentosDialogOpen(true);
-                                        }}
-                                      >
-                                        <FileCheck className="w-3.5 h-3.5" />
-                                        <span className="font-semibold">{consultaHist.documentos.length}</span>
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
               </div>
             </div>
           )}
 
-          {/* Contexto da Consulta Tab */}
-          {activeTab === 'contexto-consulta' && (
-            <div className="animate-in fade-in duration-500 px-8 pt-6 pb-28 max-w-[1600px] mx-auto">
+          {/* Corpo principal */}
+          <div className="p-6 flex items-center justify-between gap-6 overflow-hidden">
+            {/* Coluna esquerda — identidade */}
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <div
+                className="w-13 h-13 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold select-none"
+                style={{ backgroundColor: avatarColor.bg, color: avatarColor.text, width: 52, height: 52 }}
+              >
+                {inicial}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-base font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                    Em Atendimento
+                  </Badge>
+                  {isTelemedicina && (
+                    <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
+                      <Video className="w-3 h-3" />
+                      Telemedicina
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 flex-wrap">
+                  <span className="font-medium text-slate-700 whitespace-nowrap">{idade} anos</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="whitespace-nowrap">Nasc. {formatDate(consulta.paciente.dataNascimento)}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="font-medium text-slate-600 whitespace-nowrap">{prontuarioLabel}</span>
+                  {consulta.tipoConsulta && (
+                    <>
+                      <span className="text-slate-300">·</span>
+                      <span className="truncate">{consulta.tipoConsulta.nome}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
 
-              {/* ====== WORKFLOW PROGRESS ====== */}
-              <div className="flex items-center gap-3 mb-8">
-                {[
-                  { num: 1, label: 'Transcrição', icon: Mic, done: transcription.length > 0 && !isTranscribing },
-                  { num: 2, label: 'Anamnese', icon: Sparkles, done: !!analysisResults?.anamnese },
-                  { num: 3, label: 'Diagnóstico & Exames', icon: Stethoscope, done: !!(analysisResults?.cidCodes?.length && analysisResults?.exames?.length) },
-                  { num: 4, label: 'Prescrições', icon: Pill, done: prescricoes.length > 0 },
-                  { num: 5, label: 'Documentos', icon: FileCheck, done: false },
-                ].map((step, idx, arr) => {
-                  const isActive = (step.num === 1 && (isTranscribing || (!analysisResults && transcription.length === 0))) ||
-                    (step.num === 2 && !isTranscribing && transcription.length > 0 && !analysisResults) ||
-                    (step.num === 3 && !!analysisResults && prescricoes.length === 0) ||
-                    (step.num === 4 && prescricoes.length > 0) ||
-                    (step.num === 5 && false);
-                  const Icon = step.icon;
+            {/* Coluna direita — vitais (topo) + ações (baixo) */}
+            <div className="flex flex-col items-end gap-3 flex-shrink-0 min-w-0">
+              {/* Vitais — chips compactos */}
+              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
+                {vitals.map((v, i) => {
+                  const Icon = v.icon;
                   return (
-                    <React.Fragment key={step.num}>
-                      <div className={`flex items-center gap-2.5 px-4 py-2 rounded-lg transition-all ${
-                        isActive
-                          ? 'bg-slate-800 text-white shadow-md'
-                          : step.done
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          isActive
-                            ? 'bg-white text-slate-800'
-                            : step.done
-                              ? 'bg-emerald-500 text-white'
-                              : 'bg-slate-200 text-slate-400'
-                        }`}>
-                          {step.done ? <CheckCircle2 className="w-3.5 h-3.5" /> : step.num}
-                        </div>
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="text-xs font-semibold whitespace-nowrap">{step.label}</span>
-                      </div>
-                      {idx < arr.length - 1 && (
-                        <div className={`flex-1 h-px ${step.done ? 'bg-emerald-300' : 'bg-slate-200'}`} />
-                      )}
-                    </React.Fragment>
+                    <div
+                      key={i}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0"
+                    >
+                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${v.iconColor}`} />
+                      <span className="text-xs font-bold text-slate-800 tabular-nums leading-none whitespace-nowrap">{v.value}</span>
+                      <span className="text-[10px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${vitalStatusDot[v.status]}`} />
+                    </div>
                   );
                 })}
               </div>
 
-              <div className="space-y-6">
-
-                {/* ====== SEÇÃO 1: TRANSCRIÇÃO ====== */}
-                <Card className="border border-slate-200 shadow-sm overflow-hidden bg-white">
-                  <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                        <Mic className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">Transcrição da Consulta</CardTitle>
-                        <p className="text-xs text-slate-500 mt-0.5">Gravação em tempo real (AWS Transcribe) - Selecione o modelo de análise abaixo</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {/* Modelo de Análise IA - Apenas OpenAI GPT */}
-                      {!isTranscribing && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-slate-300 bg-white">
-                          <Sparkles className="w-3 h-3 text-purple-600" />
-                          <span className="text-xs font-medium text-slate-700">Análise: OpenAI GPT</span>
-                        </div>
-                      )}
-                      {/* Status */}
-                      {isTranscribing && (
-                        <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-                          isPaused
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'}`} />
-                          {isPaused ? 'Pausado' : 'Gravando'}
-                        </div>
-                      )}
-                      {isTranscribing && (
-                        <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">
-                          {sessionDuration}
-                        </span>
-                      )}
-                      {/* Controles */}
-                      <div className="flex items-center gap-1.5 ml-2">
-                        {!isTranscribing ? (
-                          <Button
-                            onClick={startTranscription}
-                            size="sm"
-                            className="h-8 px-4 bg-slate-800 hover:bg-slate-900 text-white text-xs gap-2 rounded-lg"
-                          >
-                            <Play className="w-3.5 h-3.5" fill="currentColor" />
-                            Iniciar Gravação
-                          </Button>
-                        ) : isPaused ? (
-                          <>
-                            <Button
-                              onClick={resumeTranscription}
-                              size="sm"
-                              className="h-8 px-3 bg-slate-800 hover:bg-slate-900 text-white text-xs gap-1.5 rounded-lg"
-                            >
-                              <Play className="w-3.5 h-3.5" fill="currentColor" />
-                              Retomar
-                            </Button>
-                            <Button
-                              onClick={async () => {
-                                await stopTranscription();
-                                setTimeout(() => { handleProcessTranscription(); }, 1000);
-                              }}
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3 border-red-200 text-red-600 hover:bg-red-50 text-xs gap-1.5 rounded-lg"
-                            >
-                              <Square className="w-3 h-3" fill="currentColor" />
-                              Finalizar
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              onClick={pauseTranscription}
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3 border-slate-300 text-slate-600 hover:bg-slate-50 text-xs gap-1.5 rounded-lg"
-                            >
-                              <Pause className="w-3 h-3" fill="currentColor" />
-                              Pausar
-                            </Button>
-                            <Button
-                              onClick={async () => {
-                                await stopTranscription();
-                                setTimeout(() => { handleProcessTranscription(); }, 1000);
-                              }}
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3 border-red-200 text-red-600 hover:bg-red-50 text-xs gap-1.5 rounded-lg"
-                            >
-                              <Square className="w-3 h-3" fill="currentColor" />
-                              Finalizar
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <Button
-                        onClick={() => setIsMicrophoneSelectorOpen(true)}
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 rounded-lg"
-                        title="Configurar microfone"
-                      >
-                        <Settings className="w-3.5 h-3.5 text-slate-400" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <ScrollArea className={`${isTranscribing || transcription.length > 0 ? 'h-[280px]' : 'h-[180px]'} transition-all`}>
-                      <div className="p-5 space-y-3">
-                        {transcription.length === 0 && !isTranscribing && (
-                          <div className="flex flex-col items-center justify-center py-8 text-center">
-                            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                              <Mic className="w-8 h-8 text-slate-300" />
-                            </div>
-                            <p className="text-sm font-medium text-slate-500">Pronto para iniciar a consulta</p>
-                            <p className="text-xs text-slate-400 mt-1">Clique em "Iniciar Gravação" para transcrever a conversa</p>
-                          </div>
-                        )}
-                        {transcription.map((entry, idx) => {
-                          const timeParts = entry.time.split(':');
-                          const totalSeconds = parseInt(timeParts[0]) * 60 + parseInt(timeParts[1] || '0');
-                          return (
-                            <div key={idx} className="flex gap-3 group">
-                              <span className="text-slate-400 font-mono text-xs mt-0.5 flex-shrink-0 w-14 text-right">
-                                {formatTranscriptionTime(totalSeconds)}
-                              </span>
-                              <div className="flex-1 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 group-hover:bg-slate-100 transition-colors">
-                                {entry.text}
-                              </div>
-                            </div>
-                          );
-                        })}
-                        {isTranscribing && transcription.length === 0 && (
-                          <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-8">
-                            <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-slate-800 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <div className="w-2 h-2 bg-slate-800 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <div className="w-2 h-2 bg-slate-800 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                            </div>
-                            <span className="ml-2">Ouvindo...</span>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-
-                {/* ====== SEÇÃO 2: ANAMNESE GERADA PELA IA ====== */}
-                <Card className={`border shadow-sm overflow-hidden bg-white transition-all ${
-                  analysisResults?.anamnese ? 'border-slate-200' : 'border-dashed border-slate-200'
-                }`}>
-                  <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        analysisResults?.anamnese ? 'bg-emerald-600' : 'bg-slate-200'
-                      }`}>
-                        <Sparkles className={`w-4 h-4 ${analysisResults?.anamnese ? 'text-white' : 'text-slate-400'}`} />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">Anamnese</CardTitle>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Gerada automaticamente pela IA (OpenAI GPT) a partir da transcrição
-                          {examesSelecionadosParaIA.size > 0 && (
-                            <span className="ml-1 text-purple-600 font-medium">
-                              + {examesSelecionadosParaIA.size} exame(s) analisado(s)
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isAnamneseEdited && (
-                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                          <Pencil className="w-3 h-3 mr-1" />
-                          Editado
-                        </Badge>
-                      )}
-                      {editedAnamnese && !isAnamneseEdited && (
-                        <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                          <CheckCircle2 className="w-3 h-3 mr-1" />
-                          Gerada
-                        </Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-5">
-                    {examesSelecionadosParaIA.size > 0 && editedAnamnese && (
-                      <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <Sparkles className="w-4 h-4 text-purple-600 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-xs font-semibold text-purple-700 mb-1.5">
-                              Exames analisados pela IA nesta anamnese:
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {Array.from(examesSelecionadosParaIA).map((exameId) => {
-                                const exame = examesAnexados.find(e => e.id === exameId);
-                                if (!exame) return null;
-                                return (
-                                  <Badge key={exameId} variant="outline" className="text-xs bg-white border-purple-300 text-purple-700">
-                                    {exame.isImage ? '🖼️' : '📄'} {exame.nome}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {editedAnamnese ? (
-                      <>
-                        {!isEditingAnamnese ? (
-                          <div className="relative">
-                            <div 
-                              className="min-h-[200px] max-h-[500px] overflow-y-auto bg-white border border-slate-200 rounded-lg p-5 text-sm text-slate-700 leading-relaxed font-sans"
-                              style={{ wordBreak: 'break-word' }}
-                            >
-                              {editedAnamnese.split('\n').map((line, idx, lines) => {
-                                const trimmedLine = line.trim();
-                                
-                                // Identificar títulos (linhas em maiúsculas seguidas de dois pontos, ou linhas curtas em maiúsculas)
-                                const isTitle = (
-                                  (trimmedLine.toUpperCase() === trimmedLine && trimmedLine.length > 0 && trimmedLine.length < 60 && trimmedLine.includes(':')) ||
-                                  /^[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ\s]+:\s*$/.test(trimmedLine) ||
-                                  /^[A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ][A-ZÁÉÍÓÚÀÈÌÒÙÂÊÎÔÛÃÕÇ\s]+:\s*$/.test(trimmedLine)
-                                ) && trimmedLine.length > 0;
-                                
-                                // Verificar se a próxima linha tem conteúdo (para não tratar como título se for apenas texto em maiúsculas)
-                                const nextLine = idx < lines.length - 1 ? lines[idx + 1].trim() : '';
-                                const hasContentAfter = nextLine.length > 0 && !nextLine.toUpperCase().includes(':');
-                                
-                                if (isTitle && (hasContentAfter || trimmedLine.endsWith(':'))) {
-                                  const titleText = trimmedLine.replace(/:$/, '').trim();
-                                  return (
-                                    <div key={idx} className="mb-4 mt-6 first:mt-0">
-                                      <h3 className="font-bold text-base text-slate-900 uppercase tracking-wide border-b border-slate-300 pb-2">
-                                        {titleText}
-                                      </h3>
-                                    </div>
-                                  );
-                                }
-                                
-                                // Linhas vazias
-                                if (trimmedLine === '') {
-                                  return <div key={idx} className="h-3" />;
-                                }
-                                
-                                // Texto normal
-                                return (
-                                  <p key={idx} className="mb-2.5 text-slate-700 leading-6">
-                                    {line || '\u00A0'}
-                                  </p>
-                                );
-                              })}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="absolute top-2 right-2 h-7 text-xs"
-                              onClick={() => setIsEditingAnamnese(true)}
-                            >
-                              <Pencil className="w-3 h-3 mr-1" />
-                              Editar
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <Textarea
-                              value={editedAnamnese}
-                              onChange={(e) => {
-                                setEditedAnamnese(e.target.value);
-                                setIsAnamneseEdited(e.target.value !== analysisResults?.anamnese);
-                              }}
-                              className="min-h-[200px] resize-y bg-slate-50 border-slate-200 text-sm text-slate-700 leading-relaxed font-sans focus:ring-1 focus:ring-slate-400 focus:border-slate-400 rounded-lg"
-                              placeholder="A anamnese será exibida aqui após o processamento..."
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="absolute top-2 right-2 h-7 text-xs"
-                              onClick={() => setIsEditingAnamnese(false)}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              Visualizar
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-10 text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                          <Sparkles className="w-7 h-7 text-slate-300" />
-                        </div>
-                        <p className="text-sm font-medium text-slate-500">Anamnese será gerada pela IA</p>
-                        <p className="text-xs text-slate-400 mt-1">Finalize a transcrição para a IA processar e gerar automaticamente</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* ====== SEÇÃO 3: CID + EXAMES + PRESCRIÇÕES (3 colunas) ====== */}
-                <div className="grid grid-cols-3 gap-6">
-
-                  {/* CID-10 Sugeridos */}
-                  <Card className={`border shadow-sm overflow-hidden bg-white ${
-                    analysisResults?.cidCodes?.length ? 'border-slate-200' : 'border-dashed border-slate-200'
-                  }`}>
-                    <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
-                          analysisResults?.cidCodes?.length ? 'bg-blue-600' : 'bg-slate-200'
-                        }`}>
-                          <Activity className={`w-3.5 h-3.5 ${analysisResults?.cidCodes?.length ? 'text-white' : 'text-slate-400'}`} />
-                        </div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">CID-10 Sugeridos</CardTitle>
-                      </div>
-                      {analysisResults?.cidCodes?.length ? (
-                        <Badge className="bg-blue-100 text-blue-700 text-xs border-0">
-                          {selectedCids.size} aceito(s)
-                        </Badge>
-                      ) : null}
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[260px]">
-                        {analysisResults?.cidCodes && analysisResults.cidCodes.length > 0 ? (
-                          <div className="p-3 space-y-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1 rounded bg-amber-50 border border-amber-200">
-                              <Sparkles className="w-3 h-3 text-amber-600 flex-shrink-0" />
-                              <p className="text-xs text-amber-700">
-                                Sugestões da IA (OpenAI GPT). Selecione os CIDs aplicáveis.
-                              </p>
-                            </div>
-                            {analysisResults.cidCodes.map((cid, idx) => (
-                              <div
-                                key={idx}
-                                onClick={() => {
-                                  const next = new Set(selectedCids);
-                                  next.has(idx) ? next.delete(idx) : next.add(idx);
-                                  setSelectedCids(next);
-                                }}
-                                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                                  selectedCids.has(idx)
-                                    ? 'border-blue-300 bg-blue-50 ring-1 ring-blue-200'
-                                    : 'border-slate-200 bg-white hover:border-slate-300'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <Badge className={`font-mono text-xs ${
-                                    selectedCids.has(idx) ? 'bg-blue-600 text-white' : 'bg-slate-800 text-white'
-                                  }`}>
-                                    {cid.code}
-                                  </Badge>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-slate-400">{Math.round(cid.score * 100)}%</span>
-                                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                                      selectedCids.has(idx) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
-                                    }`}>
-                                      {selectedCids.has(idx) && <CheckCircle2 className="w-3 h-3 text-white" />}
-                                    </div>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-600 leading-relaxed">{cid.description}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                            <Activity className="w-8 h-8 text-slate-200 mb-2" />
-                            <p className="text-xs text-slate-400">Sugestões após análise</p>
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-
-                  {/* Exames Sugeridos */}
-                  <Card className={`border shadow-sm overflow-hidden bg-white ${
-                    analysisResults?.exames?.length ? 'border-slate-200' : 'border-dashed border-slate-200'
-                  }`}>
-                    <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
-                          analysisResults?.exames?.length ? 'bg-blue-600' : 'bg-slate-200'
-                        }`}>
-                          <ClipboardList className={`w-3.5 h-3.5 ${analysisResults?.exames?.length ? 'text-white' : 'text-slate-400'}`} />
-                        </div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">Exames Sugeridos</CardTitle>
-                      </div>
-                      {analysisResults?.exames?.length ? (
-                        <Badge className="bg-blue-100 text-blue-700 text-xs border-0">
-                          {selectedExamesAI.size} aceito(s)
-                        </Badge>
-                      ) : null}
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[260px]">
-                        {analysisResults?.exames && analysisResults.exames.length > 0 ? (
-                          <div className="p-3 space-y-2">
-                            <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1 rounded bg-amber-50 border border-amber-200">
-                              <Sparkles className="w-3 h-3 text-amber-600 flex-shrink-0" />
-                              <p className="text-xs text-amber-700">
-                                Sugestões da IA (OpenAI GPT). Selecione os exames que deseja solicitar.
-                              </p>
-                            </div>
-                            {analysisResults.exames.map((exame, idx) => (
-                              <div
-                                key={idx}
-                                onClick={() => {
-                                  const next = new Set(selectedExamesAI);
-                                  next.has(idx) ? next.delete(idx) : next.add(idx);
-                                  setSelectedExamesAI(next);
-                                }}
-                                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                                  selectedExamesAI.has(idx)
-                                    ? 'border-blue-300 bg-blue-50 ring-1 ring-blue-200'
-                                    : 'border-slate-200 bg-white hover:border-slate-300'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between mb-1.5">
-                                  <h4 className="font-medium text-xs text-slate-800">{exame.nome}</h4>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">{exame.tipo}</Badge>
-                                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                                      selectedExamesAI.has(idx) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
-                                    }`}>
-                                      {selectedExamesAI.has(idx) && <CheckCircle2 className="w-3 h-3 text-white" />}
-                                    </div>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-500 leading-relaxed">{exame.justificativa}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                            <ClipboardList className="w-8 h-8 text-slate-200 mb-2" />
-                            <p className="text-xs text-slate-400">Sugestões após análise</p>
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-
-                  {/* Prescrições */}
-                  <Card className={`border shadow-sm overflow-hidden bg-white ${
-                    prescricoes.length > 0 ? 'border-slate-200' : 'border-dashed border-slate-200'
-                  }`}>
-                    <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                      <div className="flex items-center gap-2.5">
-                        <div className={`w-7 h-7 rounded-md flex items-center justify-center ${
-                          prescricoes.length > 0 ? 'bg-amber-600' : 'bg-slate-200'
-                        }`}>
-                          <Pill className={`w-3.5 h-3.5 ${prescricoes.length > 0 ? 'text-white' : 'text-slate-400'}`} />
-                        </div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">Prescrições</CardTitle>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1 rounded-lg"
-                          onClick={() => {
-                            setSelectedPrescricaoIndex(null);
-                            setMedicamentoDialogOpen(true);
-                          }}
-                        >
-                          <Search className="w-3 h-3" />
-                          Buscar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs gap-1 rounded-lg"
-                          onClick={() => setPrescricoes([...prescricoes, { medicamento: '', dosagem: '', posologia: '', duracao: '' }])}
-                        >
-                          <Plus className="w-3 h-3" />
-                          Adicionar
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <ScrollArea className="h-[260px]">
-                        <div className="p-3 space-y-2">
-                          {/* Prescrições Sugeridas pela IA */}
-                          {analysisResults?.prescricoes && analysisResults.prescricoes.length > 0 && (
-                            <>
-                              <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1 rounded bg-amber-50 border border-amber-200">
-                                <Sparkles className="w-3 h-3 text-amber-600 flex-shrink-0" />
-                                <p className="text-xs text-amber-700">
-                                  Sugestões da IA (OpenAI GPT). Selecione as prescrições que deseja adicionar.
-                                </p>
-                              </div>
-                              {analysisResults.prescricoes.map((presc, idx) => (
-                                <div
-                                  key={`ai-${idx}`}
-                                  onClick={() => {
-                                    const next = new Set(selectedPrescricoesAI);
-                                    next.has(idx) ? next.delete(idx) : next.add(idx);
-                                    setSelectedPrescricoesAI(next);
-                                  }}
-                                  className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                                    selectedPrescricoesAI.has(idx)
-                                      ? 'border-purple-300 bg-purple-50 ring-1 ring-purple-200'
-                                      : 'border-slate-200 bg-white hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between mb-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                                        <Sparkles className="w-2.5 h-2.5 mr-1" />
-                                        IA
-                                      </Badge>
-                                      <h4 className="font-medium text-xs text-slate-800">{presc.medicamento}</h4>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                                        selectedPrescricoesAI.has(idx) ? 'bg-purple-600 border-purple-600' : 'border-slate-300'
-                                      }`}>
-                                        {selectedPrescricoesAI.has(idx) && <CheckCircle2 className="w-3 h-3 text-white" />}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                                      <span><strong>Dosagem:</strong> {presc.dosagem}</span>
-                                      <span><strong>Posologia:</strong> {presc.posologia}</span>
-                                      <span><strong>Duração:</strong> {presc.duracao}</span>
-                                    </div>
-                                    {presc.justificativa && (
-                                      <p className="text-xs text-slate-500 leading-relaxed">{presc.justificativa}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                              {selectedPrescricoesAI.size > 0 && (
-                                <Button
-                                  size="sm"
-                                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs"
-                                  onClick={() => {
-                                    // Adicionar prescrições selecionadas
-                                    const novasPrescricoes = Array.from(selectedPrescricoesAI).map(idx => {
-                                      const presc = analysisResults!.prescricoes[idx];
-                                      return {
-                                        medicamento: presc.medicamento,
-                                        dosagem: presc.dosagem,
-                                        posologia: presc.posologia,
-                                        duracao: presc.duracao,
-                                      };
-                                    });
-                                    setPrescricoes([...prescricoes, ...novasPrescricoes]);
-                                    setSelectedPrescricoesAI(new Set());
-                                    toast.success(`${novasPrescricoes.length} prescrição(ões) adicionada(s)`);
-                                  }}
-                                >
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  Adicionar {selectedPrescricoesAI.size} prescrição(ões) selecionada(s)
-                                </Button>
-                              )}
-                              {prescricoes.length > 0 && (
-                                <div className="my-2 border-t border-slate-200"></div>
-                              )}
-                            </>
-                          )}
-                          
-                          {/* Prescrições Adicionadas */}
-                          {prescricoes.length > 0 && (
-                            <>
-                              {prescricoes.map((presc, idx) => (
-                                <div key={idx} className="p-3 rounded-lg border border-slate-200 bg-white space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-semibold text-slate-500">#{idx + 1}</span>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-6 w-6 p-0 text-slate-400 hover:text-red-500"
-                                      onClick={() => setPrescricoes(prescricoes.filter((_, i) => i !== idx))}
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                  <div className="flex gap-1.5">
-                                    <input
-                                      type="text"
-                                      placeholder="Medicamento"
-                                      value={presc.medicamento}
-                                      onChange={(e) => {
-                                        const next = [...prescricoes];
-                                        next[idx] = { ...next[idx], medicamento: e.target.value };
-                                        setPrescricoes(next);
-                                      }}
-                                      className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
-                                    />
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 px-2 text-xs"
-                                      onClick={() => {
-                                        setSelectedPrescricaoIndex(idx);
-                                        setMedicamentoDialogOpen(true);
-                                      }}
-                                      title="Buscar medicamento cadastrado"
-                                    >
-                                      <Search className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-1.5">
-                                    <input
-                                      type="text"
-                                      placeholder="Dosagem"
-                                      value={presc.dosagem}
-                                      onChange={(e) => {
-                                        const next = [...prescricoes];
-                                        next[idx] = { ...next[idx], dosagem: e.target.value };
-                                        setPrescricoes(next);
-                                      }}
-                                      className="px-2 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
-                                    />
-                                    <input
-                                      type="text"
-                                      placeholder="Duração"
-                                      value={presc.duracao}
-                                      onChange={(e) => {
-                                        const next = [...prescricoes];
-                                        next[idx] = { ...next[idx], duracao: e.target.value };
-                                        setPrescricoes(next);
-                                      }}
-                                      className="px-2 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
-                                    />
-                                  </div>
-                                  <input
-                                    type="text"
-                                    placeholder="Posologia (ex: 1 cp de 8/8h)"
-                                    value={presc.posologia}
-                                    onChange={(e) => {
-                                      const next = [...prescricoes];
-                                      next[idx] = { ...next[idx], posologia: e.target.value };
-                                      setPrescricoes(next);
-                                    }}
-                                    className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-md bg-slate-50 focus:ring-1 focus:ring-slate-400 focus:border-slate-400 outline-none"
-                                  />
-                                </div>
-                              ))}
-                            </>
-                          )}
-                          
-                          {/* Mensagem quando não há prescrições nem sugestões */}
-                          {prescricoes.length === 0 && (!analysisResults?.prescricoes || analysisResults.prescricoes.length === 0) && (
-                            <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                              <Pill className="w-8 h-8 text-slate-200 mb-2" />
-                              <p className="text-xs text-slate-400">Adicione prescrições médicas</p>
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
+              {/* Botões de ação */}
+              <div className="flex items-center gap-2.5 flex-shrink-0 flex-wrap justify-end">
+                <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 flex-shrink-0">
+                  <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  <span className="text-sm font-mono font-semibold text-slate-700 tabular-nums whitespace-nowrap">{sessionDuration}</span>
                 </div>
 
-                {/* ====== SEÇÃO 4: GERAÇÃO DE DOCUMENTOS ====== */}
-                <Card className="border border-slate-200 shadow-sm overflow-hidden bg-white">
-                  <CardHeader className="border-b border-slate-200 flex flex-row items-center justify-between py-3 px-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
-                        <FileCheck className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-sm font-semibold text-slate-800">Geração de Documentos</CardTitle>
-                        <p className="text-xs text-slate-500 mt-0.5">Gere prontuário e receitas a partir dos dados da consulta</p>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-5">
-                    <div className="flex flex-col gap-4">
-                      {/* Lista de Documentos Gerados */}
-                      {documentosGerados.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                              Documentos Gerados ({documentosGerados.length})
-                            </p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              onClick={() => setIsDocumentModelsOpen(true)}
-                            >
-                              <FilePlus className="w-3 h-3 mr-1.5" />
-                              Adicionar
-                            </Button>
-                          </div>
-                          <ScrollArea className="h-[200px] border rounded-lg">
-                            <div className="p-2 space-y-1.5">
-                              {documentosGerados.map((doc) => (
-                                <div
-                                  key={doc.id}
-                                  className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
-                                >
-                                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                      <FileCheck className="w-4 h-4 text-slate-600" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium text-slate-800 truncate">{doc.nomeDocumento}</p>
-                                      <p className="text-xs text-slate-500">
-                                        {new Date(doc.createdAt).toLocaleString('pt-BR', {
-                                          day: '2-digit',
-                                          month: '2-digit',
-                                          year: 'numeric',
-                                          hour: '2-digit',
-                                          minute: '2-digit',
-                                        })}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    {doc.pdfBlob && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-7 w-7 p-0"
-                                        onClick={() => {
-                                          const url = URL.createObjectURL(doc.pdfBlob!);
-                                          window.open(url, "_blank");
-                                        }}
-                                        title="Visualizar PDF"
-                                      >
-                                        <Eye className="w-3.5 h-3.5 text-slate-500" />
-                                      </Button>
-                                    )}
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
-                                      onClick={() => {
-                                        setDocumentosGerados(documentosGerados.filter((d) => d.id !== doc.id));
-                                      }}
-                                      title="Remover"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setIsDocumentModelsOpen(true)}
-                          className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-slate-200 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer"
-                        >
-                          <FileCheck className="w-12 h-12 text-slate-300 mb-3" />
-                          <p className="text-sm text-slate-500 font-medium">Nenhum documento gerado</p>
-                          <p className="text-xs text-slate-400 mt-1">Clique aqui para adicionar documentos</p>
-                        </button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setResumoClinicoDialogOpen(true)}
+                  className="h-9 px-4 text-xs gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 flex-shrink-0"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="whitespace-nowrap">Resumo Clínico</span>
+                </Button>
 
-              </div>
-
-              {/* ====== BARRA DE AÇÕES FIXA ====== */}
-              <div className="fixed bottom-0 right-0 z-40 bg-white border-t border-slate-200 shadow-lg" style={{ left: 'var(--sidebar-width, 16rem)' }}>
-                <div className="max-w-[1600px] mx-auto px-8 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Clock className="w-4 h-4" />
-                      <span className="font-mono">{sessionDuration}</span>
-                    </div>
-                    {transcription.length > 0 && (
-                      <Badge variant="outline" className="text-xs text-slate-500">
-                        {transcription.length} trecho(s) transcritos
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mr-[60px]">
-                    <Button
-                      variant="outline"
-                      className="h-9 px-4 text-sm gap-2"
-                      onClick={handleSave}
-                      disabled={saving || !analysisResults}
-                    >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Salvar Rascunho
-                    </Button>
-                    <Button
-                      className="h-9 px-6 text-sm gap-2 bg-slate-800 hover:bg-slate-900 text-white"
-                      onClick={handleFinalizarAtendimento}
-                      disabled={saving}
-                    >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      Finalizar Atendimento
-                    </Button>
-                  </div>
-                </div>
+                {isTelemedicina && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {}}
+                    className="h-9 px-4 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span className="whitespace-nowrap">Videochamada</span>
+                  </Button>
+                )}
               </div>
             </div>
-          )}
-
-          {/* Telemedicina Tab */}
-          {activeTab === 'telemedicina' && (
-            <div className="grid grid-cols-12 gap-4 animate-in fade-in duration-500">
-              
-              {/* Main Video Area */}
-              <div className="col-span-8 space-y-3">
-                
-                {/* Patient Video - Large */}
-                <Card className="border-slate-200 shadow-2xl shadow-emerald-500/20 overflow-hidden relative group">
-                  
-                  {/* Video Container */}
-                  <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 aspect-video flex items-center justify-center overflow-hidden">
-                    {/* Simulated Video Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/10 to-blue-500/10" />
-                    
-                    {/* Patient Video Placeholder */}
-                    <div className="relative z-10 text-center">
-                      <div className="w-24 h-24 mx-auto mb-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-pulse">
-                        <User className="w-12 h-12 text-white" />
-                      </div>
-                      <h3 className="text-lg font-bold text-white mb-1.5">{patient.name}</h3>
-                      <Badge className="bg-emerald-500 text-white font-semibold text-xs">
-                        Conectado
-                      </Badge>
-                    </div>
-
-                    {/* Connection Quality Indicator */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1.5 rounded-lg">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        connectionQuality === 'excellent' ? 'bg-emerald-500' :
-                        connectionQuality === 'good' ? 'bg-yellow-500' : 'bg-red-500'
-                      } animate-pulse`} />
-                      <span className="text-xs text-white font-semibold">
-                        {connectionQuality === 'excellent' ? 'Excelente' :
-                         connectionQuality === 'good' ? 'Bom' : 'Instável'}
-                      </span>
-                    </div>
-
-                    {/* Doctor Video - Picture in Picture */}
-                    <div className="absolute bottom-3 right-3 w-36 h-28 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg border-2 border-white/20 shadow-2xl overflow-hidden group-hover:scale-105 transition-transform">
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                          <User className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                        <Badge className="bg-blue-600 text-white text-xs font-semibold w-full justify-center">
-                          Você
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Timer */}
-                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-white font-mono font-bold text-sm">{sessionDuration}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Video Controls */}
-                  <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setIsMicOn(!isMicOn);
-                            // O controle de transcrição é feito pelo botão flutuante
-                            // Este botão apenas controla o estado visual do microfone
-                          }}
-                          className={`rounded-full w-10 h-10 ${
-                            isMicOn 
-                              ? 'bg-slate-700 hover:bg-slate-600' 
-                              : 'bg-red-600 hover:bg-red-700'
-                          }`}
-                        >
-                          {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setIsCameraOn(!isCameraOn)}
-                          className={`rounded-full w-10 h-10 ${
-                            isCameraOn 
-                              ? 'bg-slate-700 hover:bg-slate-600' 
-                              : 'bg-red-600 hover:bg-red-700'
-                          }`}
-                        >
-                          {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setIsScreenSharing(!isScreenSharing)}
-                          className={`rounded-full w-10 h-10 ${
-                            isScreenSharing 
-                              ? 'bg-emerald-600 hover:bg-emerald-700' 
-                              : 'bg-slate-700 hover:bg-slate-600'
-                          }`}
-                        >
-                          <Monitor className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-white hover:bg-slate-700 rounded-full"
-                          onClick={() => setIsFullscreen(!isFullscreen)}
-                        >
-                          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-white hover:bg-slate-700 rounded-full"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-red-600 hover:bg-red-700 rounded-full px-6 font-bold text-xs"
-                          onClick={() => router.push("/medico/fila-atendimento")}
-                        >
-                          Encerrar Chamada
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-3 gap-3">
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all">
-                    <Share2 className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Compartilhar Exame</span>
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all">
-                    <FileText className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Gerar Receita</span>
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all">
-                    <Camera className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Capturar Imagem</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Right Sidebar - Chat & Transcription */}
-              <div className="col-span-4 space-y-3">
-                
-                {/* Patient Info Card - Compact */}
-                <Card className="border-slate-200 shadow-lg shadow-blue-100/50 overflow-hidden">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">{patient.name}</h3>
-                        <p className="text-xs text-slate-500">{patient.age} anos • {patient.bloodType}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {vitals.slice(0, 2).map((vital, idx) => (
-                        <div key={idx} className="bg-emerald-50 rounded-lg p-1.5 border border-emerald-200">
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <vital.icon className="w-3 h-3 text-emerald-600" />
-                            <span className="text-xs text-emerald-700 font-bold">{vital.label}</span>
-                          </div>
-                          <div className="text-sm font-bold text-slate-800">{vital.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Tabs: Chat / Transcrição */}
-                <Card className="border-slate-200 shadow-lg overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 300px)' }}>
-                  <div className="flex border-b border-slate-200">
-                    <button
-                      onClick={() => setIsChatOpen(true)}
-                      className={`flex-1 px-3 py-2 font-semibold text-xs transition-all ${
-                        isChatOpen
-                          ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <MessageSquare className="w-3 h-3 inline mr-1.5" />
-                      Chat
-                    </button>
-                    <button
-                      onClick={() => setIsChatOpen(false)}
-                      className={`flex-1 px-3 py-2 font-semibold text-xs transition-all relative ${
-                        !isChatOpen
-                          ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Mic className="w-3 h-3 inline mr-1.5" />
-                      Transcrição
-                      {!isChatOpen && isTranscribing && (
-                        <div className="absolute top-1.5 right-1.5">
-                          <div className={`w-2 h-2 rounded-full ${
-                            isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'
-                          }`} />
-                        </div>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Chat Content */}
-                  {isChatOpen ? (
-                    <>
-                      <ScrollArea className="flex-1 p-3">
-                        <div className="space-y-2">
-                          {chatMessages.map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`flex ${msg.sender === 'doctor' ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div className={`max-w-[80%] rounded-lg p-2 ${
-                                msg.sender === 'doctor'
-                                  ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-                                  : 'bg-slate-100 text-slate-800'
-                              }`}>
-                                <p className="text-xs leading-relaxed">{msg.text}</p>
-                                <span className={`text-xs mt-0.5 block ${
-                                  msg.sender === 'doctor' ? 'text-blue-100' : 'text-slate-500'
-                                }`}>
-                                  {msg.time}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                      
-                      <div className="p-2 border-t border-slate-200 bg-slate-50">
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={chatMessage}
-                            onChange={(e) => setChatMessage(e.target.value)}
-                            placeholder="Digite sua mensagem..."
-                            className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && chatMessage.trim()) {
-                                // Enviar mensagem
-                                setChatMessage('');
-                              }
-                            }}
-                          />
-                          <Button size="sm" className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3">
-                            <Send className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    /* Transcrição Content */
-                    <>
-                    {/* Controles de Transcrição - Telemedicina */}
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/50">
-                      <div className="flex items-center gap-1.5">
-                        {!isTranscribing && (
-                          <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-purple-50 border border-purple-200">
-                            <Sparkles className="w-3 h-3 text-purple-600" />
-                            <span className="text-xs text-purple-700 font-medium">Análise: OpenAI GPT</span>
-                          </div>
-                        )}
-                        {isTranscribing && (
-                          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${
-                            isPaused
-                              ? 'bg-amber-50 text-amber-700 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${
-                              isPaused ? 'bg-amber-500' : 'bg-emerald-500 animate-pulse'
-                            }`} />
-                            <span className="font-medium">{isPaused ? 'Pausado' : 'Ao vivo'}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {!isTranscribing ? (
-                          <Button
-                            onClick={startTranscription}
-                            size="sm"
-                            className="h-6 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
-                          >
-                            <Play className="w-2.5 h-2.5" fill="currentColor" />
-                            Iniciar
-                          </Button>
-                        ) : isPaused ? (
-                          <>
-                            <Button
-                              onClick={resumeTranscription}
-                              size="sm"
-                              className="h-6 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
-                            >
-                              <Play className="w-2.5 h-2.5" fill="currentColor" />
-                              Retomar
-                            </Button>
-                            <Button
-                              onClick={async () => {
-                                await stopTranscription();
-                                setTimeout(() => { handleProcessTranscription(); }, 1000);
-                              }}
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0 border-red-300 text-red-600 hover:bg-red-50"
-                            >
-                              <Square className="w-2.5 h-2.5" fill="currentColor" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button
-                              onClick={pauseTranscription}
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0 border-amber-300 text-amber-600 hover:bg-amber-50"
-                            >
-                              <Pause className="w-2.5 h-2.5" fill="currentColor" />
-                            </Button>
-                            <Button
-                              onClick={async () => {
-                                await stopTranscription();
-                                setTimeout(() => { handleProcessTranscription(); }, 1000);
-                              }}
-                              size="sm"
-                              variant="outline"
-                              className="h-6 w-6 p-0 border-red-300 text-red-600 hover:bg-red-50"
-                            >
-                              <Square className="w-2.5 h-2.5" fill="currentColor" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <ScrollArea className="flex-1 p-3">
-                      <div className="space-y-2">
-                        {transcription.length === 0 && !isTranscribing && (
-                          <div className="text-center py-4">
-                            <Mic className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                            <p className="text-xs text-slate-500">Nenhuma transcrição ainda</p>
-                          </div>
-                        )}
-                        {transcription.map((entry, idx) => (
-                          <div key={idx} className="space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Badge className={`text-xs ${
-                                entry.speaker === 'Médico'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-600 text-white'
-                              }`}>
-                                {entry.speaker}
-                              </Badge>
-                              <span className="text-xs text-slate-400 font-mono">{entry.time}</span>
-                              {entry.isPartial && (
-                                <span className="text-xs text-blue-500 font-medium">(digitando...)</span>
-                              )}
-                            </div>
-                            <p className={`text-xs text-slate-700 leading-relaxed pl-1.5 border-l-2 ${
-                              entry.isPartial ? 'border-blue-200 border-dashed opacity-75' : 'border-blue-200'
-                            }`}>
-                              {entry.text}
-                            </p>
-                          </div>
-                        ))}
-
-                        {isTranscribing && transcription.length === 0 && (
-                          <div className="flex items-center gap-1.5 text-blue-600 animate-pulse">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                            <span className="text-xs font-medium">Transcrevendo...</span>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                    </>
-                  )}
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* Aba removida - telemedicina-video não é mais usada */}
-          {false && activeTab === 'telemedicina-video' && (
-            <div className="grid grid-cols-12 gap-4 animate-in fade-in duration-500">
-              
-              {/* Main Video Area */}
-              <div className="col-span-8 space-y-3">
-                
-                {/* Patient Video - Large */}
-                <Card className="border-slate-200 shadow-2xl shadow-emerald-500/20 overflow-hidden relative group">
-                  
-                  {/* Video Container */}
-                  <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 aspect-video flex items-center justify-center overflow-hidden">
-                    {/* Simulated Video Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/10 to-blue-500/10" />
-                    
-                    {/* Patient Video Placeholder */}
-                    <div className="relative z-10 text-center">
-                      <div className="w-24 h-24 mx-auto mb-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-pulse">
-                        <User className="w-12 h-12 text-white" />
-                      </div>
-                      <h3 className="text-lg font-bold text-white mb-1.5">{patient.name}</h3>
-                      <Badge className="bg-emerald-500 text-white font-semibold text-xs">
-                        Conectado
-                      </Badge>
-                    </div>
-
-                    {/* Connection Quality Indicator */}
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1.5 rounded-lg">
-                      <div className={`w-1.5 h-1.5 rounded-full ${
-                        connectionQuality === 'excellent' ? 'bg-emerald-500' :
-                        connectionQuality === 'good' ? 'bg-yellow-500' : 'bg-red-500'
-                      } animate-pulse`} />
-                      <span className="text-xs text-white font-semibold">
-                        {connectionQuality === 'excellent' ? 'Excelente' :
-                         connectionQuality === 'good' ? 'Bom' : 'Instável'}
-                      </span>
-                    </div>
-
-                    {/* Doctor Video - Picture in Picture */}
-                    <div className="absolute bottom-3 right-3 w-36 h-28 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg border-2 border-white/20 shadow-2xl overflow-hidden group-hover:scale-105 transition-transform">
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                          <User className="w-6 h-6 text-white" />
-                        </div>
-                      </div>
-                      <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                        <Badge className="bg-blue-600 text-white text-xs font-semibold w-full justify-center">
-                          Você
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Timer */}
-                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-white font-mono font-bold text-sm">{sessionDuration}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Video Controls */}
-                  <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => setIsMicOn(!isMicOn)}
-                          className={`rounded-full w-10 h-10 ${
-                            isMicOn 
-                              ? 'bg-slate-700 hover:bg-slate-600' 
-                              : 'bg-red-600 hover:bg-red-700'
-                          }`}
-                        >
-                          {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setIsCameraOn(!isCameraOn)}
-                          className={`rounded-full w-10 h-10 ${
-                            isCameraOn 
-                              ? 'bg-slate-700 hover:bg-slate-600' 
-                              : 'bg-red-600 hover:bg-red-700'
-                          }`}
-                        >
-                          {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setIsScreenSharing(!isScreenSharing)}
-                          className={`rounded-full w-10 h-10 ${
-                            isScreenSharing 
-                              ? 'bg-emerald-600 hover:bg-emerald-700' 
-                              : 'bg-slate-700 hover:bg-slate-600'
-                          }`}
-                        >
-                          <Monitor className="w-4 h-4" />
-                        </Button>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-white hover:bg-slate-700 rounded-full"
-                          onClick={() => setIsFullscreen(!isFullscreen)}
-                        >
-                          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-white hover:bg-slate-700 rounded-full"
-                        >
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-red-600 hover:bg-red-700 rounded-full px-6 font-bold text-xs"
-                          onClick={() => router.push("/medico/fila-atendimento")}
-                        >
-                          Encerrar Chamada
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-3 gap-3">
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all">
-                    <Share2 className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Compartilhar Exame</span>
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all">
-                    <FileText className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Gerar Receita</span>
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all">
-                    <Camera className="w-5 h-5" />
-                    <span className="text-xs font-semibold">Capturar Imagem</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Right Sidebar - Chat & Transcription */}
-              <div className="col-span-4 space-y-3">
-                
-                {/* Patient Info Card - Compact */}
-                <Card className="border-slate-200 shadow-lg shadow-blue-100/50 overflow-hidden">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-800 text-sm">{patient.name}</h3>
-                        <p className="text-xs text-slate-500">{patient.age} anos • {patient.bloodType}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {vitals.slice(0, 2).map((vital, idx) => (
-                        <div key={idx} className="bg-emerald-50 rounded-lg p-1.5 border border-emerald-200">
-                          <div className="flex items-center gap-1 mb-0.5">
-                            <vital.icon className="w-3 h-3 text-emerald-600" />
-                            <span className="text-xs text-emerald-700 font-bold">{vital.label}</span>
-                          </div>
-                          <div className="text-sm font-bold text-slate-800">{vital.value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Tabs: Chat / Transcrição */}
-                <Card className="border-slate-200 shadow-lg overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 300px)' }}>
-                  <div className="flex border-b border-slate-200">
-                    <button
-                      onClick={() => setIsChatOpen(true)}
-                      className={`flex-1 px-3 py-2 font-semibold text-xs transition-all ${
-                        isChatOpen
-                          ? 'bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600'
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <MessageSquare className="w-3 h-3 inline mr-1.5" />
-                      Chat
-                    </button>
-                    <button
-                      onClick={() => setIsChatOpen(false)}
-                      className={`flex-1 px-3 py-2 font-semibold text-xs transition-all relative ${
-                        !isChatOpen
-                          ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                          : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Mic className="w-3 h-3 inline mr-1.5" />
-                      Transcrição
-                    </button>
-                  </div>
-
-                  {/* Chat Content */}
-                  {isChatOpen ? (
-                    <>
-                      <ScrollArea className="flex-1 p-3">
-                        <div className="space-y-2">
-                          {chatMessages.map((msg) => (
-                            <div
-                              key={msg.id}
-                              className={`flex ${msg.sender === 'doctor' ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div className={`max-w-[80%] rounded-lg p-2 ${
-                                msg.sender === 'doctor'
-                                  ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
-                                  : 'bg-slate-100 text-slate-800'
-                              }`}>
-                                <p className="text-xs leading-relaxed">{msg.text}</p>
-                                <span className={`text-xs mt-0.5 block ${
-                                  msg.sender === 'doctor' ? 'text-blue-100' : 'text-slate-500'
-                                }`}>
-                                  {msg.time}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                      
-                      <div className="p-2 border-t border-slate-200 bg-slate-50">
-                        <div className="flex gap-1.5">
-                          <input
-                            type="text"
-                            value={chatMessage}
-                            onChange={(e) => setChatMessage(e.target.value)}
-                            placeholder="Digite sua mensagem..."
-                            className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && chatMessage.trim()) {
-                                setChatMessage('');
-                              }
-                            }}
-                          />
-                          <Button size="sm" className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3">
-                            <Send className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <ScrollArea className="flex-1 p-3">
-                      <div className="space-y-2">
-                        {transcription.length === 0 && !isTranscribing && (
-                          <div className="text-center py-4">
-                            <Mic className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                            <p className="text-xs text-slate-500">Nenhuma transcrição ainda</p>
-                          </div>
-                        )}
-                        {transcription.map((entry, idx) => (
-                          <div key={idx} className="space-y-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <Badge className={`text-xs ${
-                                entry.speaker === 'Médico'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-600 text-white'
-                              }`}>
-                                {entry.speaker}
-                              </Badge>
-                              <span className="text-xs text-slate-400 font-mono">{entry.time}</span>
-                            </div>
-                            <p className="text-xs text-slate-700 leading-relaxed pl-1.5 border-l-2 border-blue-200">
-                              {entry.text}
-                            </p>
-                          </div>
-                        ))}
-                        {isTranscribing && transcription.length === 0 && (
-                          <div className="flex items-center gap-1.5 text-blue-600 animate-pulse">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                            <span className="text-xs font-medium">Transcrevendo...</span>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </Card>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
+      <div className="max-w-[1400px] mx-auto space-y-4 px-4 lg:px-8 pt-5 pb-10 overflow-x-hidden">
+        {/* Zona 2 — Histórico do Paciente (colapsável) */}
+        <PatientHistory
+          isExpanded={isHistoryExpanded}
+          onToggle={() => setIsHistoryExpanded((v) => !v)}
+          historicoConsultas={historicoConsultas}
+          loadingHistorico={loadingHistorico}
+          examesAnexados={examesAnexados}
+          expandedConsultas={expandedConsultas}
+          onToggleConsulta={(id) =>
+            setExpandedConsultas((prev) => {
+              const next = new Set(prev);
+              next.has(id) ? next.delete(id) : next.add(id);
+              return next;
+            })
+          }
+          onViewDocumentos={(consultaId) => {
+            setSelectedConsultaForDocumentos(consultaId);
+            setDocumentosDialogOpen(true);
+          }}
+          onDownloadExame={handleDownloadExame}
+          formatDate={formatDate}
+        />
 
+        {/* Zona 3 — Consulta Atual */}
+        {isTelemedicina ? (
+          <TelemedicineView
+            patient={patient}
+            vitals={vitals}
+            sessionDuration={sessionDuration}
+            connectionQuality={connectionQuality}
+            isMicOn={isMicOn}
+            setIsMicOn={setIsMicOn}
+            isCameraOn={isCameraOn}
+            setIsCameraOn={setIsCameraOn}
+            isScreenSharing={isScreenSharing}
+            setIsScreenSharing={setIsScreenSharing}
+            isFullscreen={isFullscreen}
+            setIsFullscreen={setIsFullscreen}
+            isChatOpen={isChatOpen}
+            setIsChatOpen={setIsChatOpen}
+            chatMessage={chatMessage}
+            setChatMessage={setChatMessage}
+            chatMessages={chatMessages}
+            isTranscribing={isTranscribing}
+            isPaused={isPaused}
+            transcription={transcription}
+            startTranscription={startTranscription}
+            pauseTranscription={pauseTranscription}
+            resumeTranscription={resumeTranscription}
+            stopTranscription={stopTranscription}
+            handleProcessTranscription={handleProcessTranscription}
+            onOpenResumoClinico={() => setResumoClinicoDialogOpen(true)}
+            onEncerrar={handleFinalizarAtendimento}
+          />
+        ) : (
+          <>
+          <div className="grid grid-cols-12 gap-4 items-start">
+            {/* Coluna Anamnese */}
+            <div className="col-span-8">
+              <Step2Anamnesis
+                isProcessing={isProcessing}
+                analysisResults={analysisResults}
+                prontuario={prontuario}
+                setProntuario={setProntuario}
+                editedAnamnese={editedAnamnese}
+                setEditedAnamnese={setEditedAnamnese}
+                isAnamneseEdited={isAnamneseEdited}
+                setIsAnamneseEdited={setIsAnamneseEdited}
+                isEditingAnamnese={isEditingAnamnese}
+                setIsEditingAnamnese={setIsEditingAnamnese}
+                anamneseConfirmed={anamneseConfirmed}
+                onConfirmAnamnese={handleConfirmAnamnese}
+                onAdvance={() => {}}
+                consultationMode={consultationMode}
+                onToggleMode={setConsultationMode}
+                isTranscribing={isTranscribing}
+                startTranscription={startTranscription}
+                transcriptionText={transcription
+                  .filter((e) => !e.isPartial)
+                  .map((e) => e.text)
+                  .join(" ") || transcription.map((e) => e.text).join(" ")}
+              />
+            </div>
+
+            {/* Sidebar IA */}
+            <div className="col-span-4">
+              <AISidebar
+                  isProcessing={isProcessing}
+                  analysisResults={analysisResults}
+                  prontuario={prontuario}
+                  examesAnexados={examesAnexados}
+                  selectedExams={examesParaIA}
+                  setSelectedExams={setExamesParaIA}
+                  historicoConsultas={historicoConsultas}
+                  medicamentosEmUso={medicamentosEmUso}
+                  selectedCids={selectedCids}
+                  setSelectedCids={setSelectedCids}
+                  cidsManuais={cidsManuais}
+                  setCidDialogOpen={setCidDialogOpen}
+                  selectedProtocolosAI={selectedProtocolosAI}
+                  setSelectedProtocolosAI={setSelectedProtocolosAI}
+                  protocolosManuais={protocolosManuais}
+                  setProtocoloDialogOpen={setProtocoloDialogOpen}
+                  selectedExamesAI={selectedExamesAI}
+                  setSelectedExamesAI={setSelectedExamesAI}
+                  examesManuais={examesManuais}
+                  setExameDialogOpen={setExameDialogOpen}
+                  setExameSearchDialogOpen={setExameSearchDialogOpen}
+                  prescricoes={prescricoes}
+                  setPrescricoes={setPrescricoes}
+                  selectedPrescricoesAI={selectedPrescricoesAI}
+                  setSelectedPrescricoesAI={setSelectedPrescricoesAI}
+                  setMedicamentoDialogOpen={setMedicamentoDialogOpen}
+                  selectedPrescricaoIndex={selectedPrescricaoIndex}
+                  setSelectedPrescricaoIndex={setSelectedPrescricaoIndex}
+                  allergies={patient.allergies}
+                  documentModels={documentModels}
+                  documentosGerados={documentosGerados}
+                  handleGenerateDocument={handleGenerateDocument}
+                  onDeleteDocument={handleDeleteDocument}
+                  onGenerateSuggestions={handleGenerateSuggestions}
+                  consultationMode={consultationMode}
+                />
+            </div>
+          </div>
+          </>
+        )}
+      </div>
+
+      {/* Pill flutuante de transcrição */}
+      {consultationMode === 'ai' && (
+        <TranscriptionBar
+          isTranscribing={isTranscribing}
+          isPaused={isPaused}
+          transcricaoFinalizada={transcricaoFinalizada}
+          hasAnamnese={!!(analysisResults?.anamnese || prontuario?.anamnese)}
+          isProcessing={isProcessing}
+          sessionDuration={sessionDuration}
+          pauseTranscription={pauseTranscription}
+          resumeTranscription={resumeTranscription}
+          stopTranscription={stopTranscription}
+          setTranscricaoFinalizada={setTranscricaoFinalizada}
+          setIsMicrophoneSelectorOpen={setIsMicrophoneSelectorOpen}
+          onProcessAndAdvance={handleStep1Complete}
+        />
+      )}
+
+
+      {/* ====== DIALOG: GERENCIAR EXAMES ====== */}
+      <Dialog open={examesDrawerOpen} onOpenChange={setExamesDrawerOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2.5 text-base">
+              <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                <FileImage className="w-3.5 h-3.5 text-white" />
+              </div>
+              Exames do Paciente
+              <Badge variant="outline" className="ml-auto text-xs font-normal">
+                {examesAnexados.length} {examesAnexados.length === 1 ? 'exame' : 'exames'}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden flex flex-col gap-4 min-h-0">
+            {/* Upload novo exame */}
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="flex-1 grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="Nome do exame (ex: Hemograma, RX Tórax...)"
+                  value={nomeExameInput}
+                  onChange={(e) => setNomeExameInput(e.target.value)}
+                  className="h-9 text-sm"
+                />
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    id="exame-upload-drawer"
+                    className="hidden"
+                    onChange={(e) => setArquivoExame(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-9 w-full text-sm gap-2 justify-start"
+                    onClick={() => document.getElementById('exame-upload-drawer')?.click()}
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="truncate text-slate-500">
+                      {arquivoExame ? arquivoExame.name : 'Selecionar arquivo'}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+              <Button
+                onClick={handleUploadExame}
+                disabled={uploadingExame || !nomeExameInput.trim() || !arquivoExame}
+                className="h-9 px-4 bg-slate-800 hover:bg-slate-700 text-white text-sm gap-2 flex-shrink-0"
+              >
+                {uploadingExame ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />}
+                Anexar
+              </Button>
+            </div>
+
+            {/* Lista de exames */}
+            <ScrollArea className="flex-1 min-h-0">
+              {loadingExames ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                </div>
+              ) : examesAnexados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                    <FileImage className="w-7 h-7 text-slate-300" />
+                  </div>
+                  <p className="text-sm font-medium text-slate-500">Nenhum exame anexado</p>
+                  <p className="text-xs text-slate-400 mt-1">Adicione imagens ou PDFs de exames acima</p>
+                </div>
+              ) : (
+                <div className="space-y-2 pr-1">
+                  {examesAnexados.map((exame) => (
+                    <div
+                      key={exame.id}
+                      className="group flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        exame.isImage ? 'bg-blue-100' : 'bg-red-50'
+                      }`}>
+                        {exame.isImage
+                          ? <FileImage className="w-4 h-4 text-blue-600" />
+                          : <FileText className="w-4 h-4 text-red-600" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-800 truncate">{exame.nome}</p>
+                          {exame.isFromCurrentConsulta && (
+                            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 flex-shrink-0">
+                              Atual
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {formatDate(new Date(exame.data))} · {exame.isImage ? 'Imagem' : 'PDF'}
+                          {exame.consultaData && !exame.isFromCurrentConsulta && (
+                            <> · Consulta {formatDate(new Date(exame.consultaData))}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700"
+                          onClick={() => handleDownloadExame(exame.id, exame.s3Key)}
+                          title="Visualizar"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
+                          onClick={() => handleDeleteExame(exame.id)}
+                          title="Remover"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Processamento */}
-      <ProcessingModal 
+      <ProcessingModal
         isOpen={isProcessing} 
         stage={processingStage}
-        examesCount={examesSelecionadosParaIA.size}
-        imagensCount={examesAnexados.filter(e => examesSelecionadosParaIA.has(e.id) && e.isImage).length}
+        examesCount={0}
+        imagensCount={0}
       />
 
-      {/* Document Models Sheet */}
-      <DocumentModelsSheet
-        isOpen={isDocumentModelsOpen}
-        onClose={() => setIsDocumentModelsOpen(false)}
-        onGenerate={handleGenerateDocument}
-        consultaId={consultaId}
-        cidCodes={analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description }))}
-        prescricoes={prescricoes}
-      />
 
       {/* Microphone Selector Modal */}
       <DocumentosConsultaDialog
@@ -2802,68 +1804,206 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         currentDeviceId={selectedMicrophoneId}
       />
 
+      {/* Modal de Resumo Clínico */}
+      <Dialog open={resumoClinicoDialogOpen} onOpenChange={setResumoClinicoDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileTextIcon className="w-5 h-5 text-blue-600" />
+              Resumo Clínico - {patient.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {!resumoClinico && !gerandoResumoClinico && (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileTextIcon className="w-16 h-16 text-slate-300 mb-4" />
+                <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                  Gerar Resumo Clínico
+                </h3>
+                <p className="text-sm text-slate-500 mb-6 max-w-md">
+                  A IA irá analisar todo o histórico do paciente, incluindo consultas, exames, prescrições, alergias e prontuários para gerar um resumo clínico completo.
+                </p>
+                <Button
+                  onClick={handleGerarResumoClinico}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Gerar Resumo com IA
+                </Button>
+              </div>
+            )}
+
+            {gerandoResumoClinico && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 animate-spin text-blue-600 mb-4" />
+                <p className="text-sm text-slate-600">
+                  Analisando histórico do paciente e gerando resumo clínico...
+                </p>
+                <p className="text-xs text-slate-400 mt-2">
+                  Isso pode levar alguns segundos
+                </p>
+              </div>
+            )}
+
+            {resumoClinico && !gerandoResumoClinico && (
+              <>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-slate-600">
+                    Resumo gerado pela IA com base em todo o histórico do paciente
+                  </p>
+                  <Button
+                    onClick={handleGerarResumoClinico}
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                    Regenerar
+                  </Button>
+                </div>
+                <ScrollArea className="flex-1 border border-slate-200 rounded-lg p-4 bg-slate-50">
+                  <div className="prose prose-sm max-w-none">
+                    <pre className="whitespace-pre-wrap font-sans text-sm text-slate-700 leading-relaxed">
+                      {resumoClinico}
+                    </pre>
+                  </div>
+                </ScrollArea>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog de Seleção de Medicamentos */}
-      <Dialog open={medicamentoDialogOpen} onOpenChange={setMedicamentoDialogOpen}>
+      <Dialog open={medicamentoDialogOpen} onOpenChange={(open) => {
+        setMedicamentoDialogOpen(open);
+        if (!open) {
+          // Resetar estados quando fechar
+          setActiveMedicamentoTab("medicamentos");
+          setMedicamentoSearch("");
+        }
+      }}>
         <DialogContent className="max-w-2xl h-[600px] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Selecionar Medicamento</DialogTitle>
+            <DialogTitle>Selecionar Medicamento ou Manipulado</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
-            <div className="relative flex-shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Buscar medicamento por nome, princípio ativo ou laboratório..."
-                value={medicamentoSearch}
-                onChange={(e) => setMedicamentoSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <ScrollArea className="flex-1 border rounded-lg min-h-0">
-              {loadingMedicamentos ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                </div>
-              ) : medicamentos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                  <Pill className="w-10 h-10 text-slate-200 mb-3" />
-                  <p className="text-sm text-slate-500 font-medium">Nenhum medicamento encontrado</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {medicamentoSearch ? "Tente uma busca diferente" : "Digite para buscar medicamentos cadastrados"}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-2 space-y-1">
-                  {medicamentos.map((med) => (
-                    <button
-                      key={med.id}
-                      onClick={() => handleSelectMedicamento(med)}
-                      className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{med.nome}</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            {med.principioAtivo && (
-                              <span className="text-xs text-slate-500">Princípio: {med.principioAtivo}</span>
-                            )}
-                            {med.laboratorio && (
-                              <span className="text-xs text-slate-500">Lab: {med.laboratorio}</span>
-                            )}
-                            {med.concentracao && med.unidade && (
-                              <span className="text-xs text-slate-500">{med.concentracao}{med.unidade}</span>
-                            )}
-                            {med.apresentacao && (
-                              <span className="text-xs text-slate-500">{med.apresentacao}</span>
-                            )}
+            <Tabs value={activeMedicamentoTab} onValueChange={(value) => {
+              const newTab = value as "medicamentos" | "manipulados";
+              setActiveMedicamentoTab(newTab);
+              setMedicamentoSearch("");
+              // Buscar imediatamente ao mudar de aba
+              if (newTab === "medicamentos") {
+                fetchMedicamentos();
+              } else {
+                fetchManipulados();
+              }
+            }}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="medicamentos">Medicamentos</TabsTrigger>
+                <TabsTrigger value="manipulados">Manipulados</TabsTrigger>
+              </TabsList>
+              
+              <div className="relative flex-shrink-0 mt-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder={activeMedicamentoTab === "medicamentos" 
+                    ? "Buscar medicamento por nome, princípio ativo ou laboratório..."
+                    : "Buscar manipulado por descrição..."}
+                  value={medicamentoSearch}
+                  onChange={(e) => setMedicamentoSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <TabsContent value="medicamentos" className="mt-0">
+                <div className="h-[400px] overflow-y-auto border rounded-lg">
+                  {loadingMedicamentos ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    </div>
+                  ) : medicamentos.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                      <Pill className="w-10 h-10 text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-500 font-medium">Nenhum medicamento encontrado</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {medicamentoSearch ? "Tente uma busca diferente" : "Digite para buscar medicamentos cadastrados"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {medicamentos.map((med) => (
+                        <button
+                          key={med.id}
+                          onClick={() => handleSelectMedicamento(med)}
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{med.nome}</p>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {med.principioAtivo && (
+                                  <span className="text-xs text-slate-500">Princípio: {med.principioAtivo}</span>
+                                )}
+                                {med.laboratorio && (
+                                  <span className="text-xs text-slate-500">Lab: {med.laboratorio}</span>
+                                )}
+                                {med.concentracao && med.unidade && (
+                                  <span className="text-xs text-slate-500">{med.concentracao}{med.unidade}</span>
+                                )}
+                                {med.apresentacao && (
+                                  <span className="text-xs text-slate-500">{med.apresentacao}</span>
+                                )}
+                              </div>
+                            </div>
+                            <Pill className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                           </div>
-                        </div>
-                        <Pill className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                      </div>
-                    </button>
-                  ))}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="manipulados" className="mt-0">
+                <div className="h-[400px] overflow-y-auto border rounded-lg">
+                  {loadingManipulados ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    </div>
+                  ) : manipulados.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                      <Pill className="w-10 h-10 text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-500 font-medium">Nenhum manipulado encontrado</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {medicamentoSearch ? "Tente uma busca diferente" : "Digite para buscar manipulados cadastrados"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {manipulados.map((manipulado) => (
+                        <button
+                          key={manipulado.id}
+                          onClick={() => handleSelectManipulado(manipulado)}
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{manipulado.descricao}</p>
+                              {manipulado.informacoes && (
+                                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{manipulado.informacoes}</p>
+                              )}
+                            </div>
+                            <Pill className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </DialogContent>
       </Dialog>
@@ -2954,6 +2094,210 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog para Adicionar CID-10 */}
+      <Dialog open={cidDialogOpen} onOpenChange={setCidDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar CID-10</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Código CID-10
+              </label>
+              <Input
+                value={novoCidCode}
+                onChange={(e) => setNovoCidCode(e.target.value.toUpperCase())}
+                placeholder="Ex: J11.1"
+                className="font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Descrição
+              </label>
+              <Textarea
+                value={novoCidDescription}
+                onChange={(e) => setNovoCidDescription(e.target.value)}
+                placeholder="Descrição do diagnóstico"
+                className="min-h-[100px] resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCidDialogOpen(false);
+                setNovoCidCode("");
+                setNovoCidDescription("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (novoCidCode.trim() && novoCidDescription.trim()) {
+                  setCidsManuais([...cidsManuais, { code: novoCidCode.trim(), description: novoCidDescription.trim() }]);
+                  setCidDialogOpen(false);
+                  setNovoCidCode("");
+                  setNovoCidDescription("");
+                }
+              }}
+              disabled={!novoCidCode.trim() || !novoCidDescription.trim()}
+            >
+              Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Adicionar Exame */}
+      <Dialog open={exameDialogOpen} onOpenChange={setExameDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Adicionar Exame</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Nome do Exame
+              </label>
+              <Input
+                value={novoExameNome}
+                onChange={(e) => setNovoExameNome(e.target.value)}
+                placeholder="Ex: Hemograma completo"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 mb-2 block">
+                Tipo
+              </label>
+              <Input
+                value={novoExameTipo}
+                onChange={(e) => setNovoExameTipo(e.target.value)}
+                placeholder="Ex: Laboratorial"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setExameDialogOpen(false);
+                setNovoExameNome("");
+                setNovoExameTipo("");
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (novoExameNome.trim()) {
+                  setExamesManuais([...examesManuais, { nome: novoExameNome.trim(), tipo: novoExameTipo.trim() || "Não especificado" }]);
+                  setExameDialogOpen(false);
+                  setNovoExameNome("");
+                  setNovoExameTipo("");
+                }
+              }}
+              disabled={!novoExameNome.trim()}
+            >
+              Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Dialog de Busca de Exames */}
+      <Dialog open={exameSearchDialogOpen} onOpenChange={setExameSearchDialogOpen}>
+        <DialogContent className="max-w-2xl h-[600px] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Selecionar Exame</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
+            <div className="relative flex-shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar exame por nome ou descrição..."
+                value={exameSearch}
+                onChange={(e) => setExameSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <ScrollArea className="flex-1 border rounded-lg min-h-0">
+              {loadingExamesCadastrados ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : examesCadastrados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                  <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
+                  <p className="text-sm text-slate-500 font-medium">Nenhum exame encontrado</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {exameSearch ? "Tente uma busca diferente" : "Digite para buscar exames cadastrados"}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {examesCadastrados.map((exame) => (
+                    <button
+                      key={exame.id}
+                      onClick={() => handleSelectExame(exame)}
+                      className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{exame.nome}</p>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
+                              {exame.tipo}
+                            </Badge>
+                            {exame.descricao && (
+                              <span className="text-xs text-slate-500">{exame.descricao}</span>
+                            )}
+                          </div>
+                        </div>
+                        <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Box de ações finais */}
+      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-5 pb-10">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => {
+                // TODO: Implementar função de assinar documento
+                toast.info("Funcionalidade de assinar documento em desenvolvimento");
+              }}
+              className="h-11 px-6 text-sm gap-2 border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              <FileCheck className="w-4 h-4" />
+              Assinar Documento
+            </Button>
+            <Button
+              size="lg"
+              onClick={handleFinalizarAtendimento}
+              disabled={saving}
+              className="h-11 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-sm"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Finalizar Atendimento
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

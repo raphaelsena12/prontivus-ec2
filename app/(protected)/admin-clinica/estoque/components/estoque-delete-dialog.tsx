@@ -16,9 +16,17 @@ import { toast } from "sonner";
 
 interface Estoque {
   id: string;
+  tipo?: "MEDICAMENTO" | "INSUMO";
   medicamento: {
+    id: string;
     nome: string;
-  };
+    principioAtivo: string | null;
+  } | null;
+  insumo: {
+    id: string;
+    nome: string;
+    descricao: string | null;
+  } | null;
 }
 
 interface EstoqueDeleteDialogProps {
@@ -69,8 +77,13 @@ export function EstoqueDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir Estoque?</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir o estoque do medicamento{" "}
-            <strong className="text-foreground">{estoque?.medicamento.nome}</strong>?
+            Tem certeza que deseja excluir o estoque{" "}
+            {estoque?.tipo === "INSUMO" || (!estoque?.tipo && estoque?.insumo)
+              ? "do insumo"
+              : "do medicamento"}{" "}
+            <strong className="text-foreground">
+              {estoque?.medicamento?.nome || estoque?.insumo?.nome}
+            </strong>?
             <br />
             <br />
             Esta ação irá remover permanentemente o estoque do sistema.

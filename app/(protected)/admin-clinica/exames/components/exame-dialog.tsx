@@ -39,7 +39,21 @@ interface Exame {
   nome: string;
   descricao: string | null;
   tipo: string | null;
+  codigoTussId: string | null;
   ativo: boolean;
+  codigoTuss?: {
+    id: string;
+    codigoTuss: string;
+    descricao: string;
+    tipoProcedimento: string;
+  } | null;
+}
+
+interface CodigoTuss {
+  id: string;
+  codigoTuss: string;
+  descricao: string;
+  tipoProcedimento: string;
 }
 
 interface ExameDialogProps {
@@ -51,8 +65,9 @@ interface ExameDialogProps {
 
 const exameSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  tipo: z.string().optional(),
-  descricao: z.string().optional(),
+  tipo: z.string().min(1, "Tipo é obrigatório"),
+  descricao: z.string().min(1, "Descrição é obrigatória"),
+  codigoTussId: z.string().uuid("Código TUSS inválido").optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -65,6 +80,8 @@ export function ExameDialog({
   onSuccess,
 }: ExameDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [loadingCodigosTuss, setLoadingCodigosTuss] = useState(false);
+  const [codigosTuss, setCodigosTuss] = useState<CodigoTuss[]>([]);
   const isEditing = !!exame;
 
   const form = useForm<ExameFormValues>({
@@ -73,9 +90,34 @@ export function ExameDialog({
       nome: "",
       tipo: undefined,
       descricao: "",
+      codigoTussId: undefined,
       ativo: true,
     },
   });
+
+  // Carregar códigos TUSS quando o dialog abrir
+  useEffect(() => {
+    if (open) {
+      const fetchCodigosTuss = async () => {
+        try {
+          setLoadingCodigosTuss(true);
+          const response = await fetch(
+            "/api/admin-clinica/codigos-tuss?tipoProcedimento=EXAME&ativo=true"
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setCodigosTuss(data.codigosTuss || []);
+          }
+        } catch (error) {
+          console.error("Erro ao buscar códigos TUSS:", error);
+        } finally {
+          setLoadingCodigosTuss(false);
+        }
+      };
+
+      fetchCodigosTuss();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (exame) {
@@ -83,6 +125,7 @@ export function ExameDialog({
         nome: exame.nome,
         tipo: exame.tipo || undefined,
         descricao: exame.descricao || "",
+        codigoTussId: exame.codigoTussId || undefined,
         ativo: exame.ativo,
       });
     } else {
@@ -90,6 +133,7 @@ export function ExameDialog({
         nome: "",
         tipo: undefined,
         descricao: "",
+        codigoTussId: undefined,
         ativo: true,
       });
     }
@@ -99,11 +143,44 @@ export function ExameDialog({
     try {
       setLoading(true);
 
+      // Validar codigoTussId obrigatório apenas na criação
+      if (!isEditing) {
+        // Verificar se codigoTussId está presente e é válido
+        if (!data.codigoTussId || data.codigoTussId.trim() === "") {
+          form.setError("codigoTussId", {
+            type: "manual",
+            message: "Código TUSS é obrigatório",
+          });
+          setLoading(false);
+          return;
+        }
+        // Validar formato UUID
+        const uuidValidation = z.string().uuid().safeParse(data.codigoTussId);
+        if (!uuidValidation.success) {
+          form.setError("codigoTussId", {
+            type: "manual",
+            message: "Código TUSS inválido. Selecione um código válido.",
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Na criação, codigoTussId é obrigatório e deve ser incluído
+      // Na edição, incluir apenas se tiver valor
       const payload: any = {
         nome: data.nome,
-        descricao: data.descricao || null,
-        tipo: data.tipo || null,
+        descricao: data.descricao || "",
+        tipo: data.tipo || "",
       };
+
+      if (!isEditing) {
+        // Na criação, codigoTussId é obrigatório
+        payload.codigoTussId = data.codigoTussId;
+      } else if (data.codigoTussId && data.codigoTussId.trim() !== "") {
+        // Na edição, incluir apenas se tiver valor válido
+        payload.codigoTussId = data.codigoTussId;
+      }
 
       // Incluir ativo apenas no modo de edição
       if (isEditing) {
@@ -113,6 +190,10 @@ export function ExameDialog({
       const url = isEditing
         ? `/api/admin-clinica/exames/${exame.id}`
         : `/api/admin-clinica/exames`;
+
+      console.log("[ExameDialog] Payload sendo enviado:", JSON.stringify(payload, null, 2));
+      console.log("[ExameDialog] isEditing:", isEditing);
+      console.log("[ExameDialog] codigoTussId:", data.codigoTussId);
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
@@ -179,10 +260,56 @@ export function ExameDialog({
 
             <FormField
               control={form.control}
+              name="codigoTussId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Código TUSS <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      // Garantir que sempre seja uma string válida
+                      field.onChange(value);
+                    }}
+                    value={field.value || ""}
+                    disabled={loading || loadingCodigosTuss}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o código TUSS" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {loadingCodigosTuss ? (
+                        <SelectItem value="loading" disabled>
+                          Carregando...
+                        </SelectItem>
+                      ) : codigosTuss.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          Nenhum código TUSS encontrado
+                        </SelectItem>
+                      ) : (
+                        codigosTuss.map((codigo) => (
+                          <SelectItem key={codigo.id} value={codigo.id}>
+                            {codigo.codigoTuss} - {codigo.descricao}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="tipo"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo</FormLabel>
+                  <FormLabel>
+                    Tipo <span className="text-destructive">*</span>
+                  </FormLabel>
                   <Select
                     onValueChange={(value) => field.onChange(value || undefined)}
                     value={field.value || undefined}
@@ -190,7 +317,7 @@ export function ExameDialog({
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo (opcional)" />
+                        <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -209,10 +336,12 @@ export function ExameDialog({
               name="descricao"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descrição</FormLabel>
+                  <FormLabel>
+                    Descrição <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Digite uma descrição (opcional)"
+                      placeholder="Digite uma descrição"
                       rows={4}
                       {...field}
                       disabled={loading}

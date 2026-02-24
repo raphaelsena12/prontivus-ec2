@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, Stethoscope, Upload, Filter, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 import { MedicosTable } from "./components/medicos-table";
 import { MedicoDeleteDialog } from "./components/medico-delete-dialog";
 import { MedicoDialog } from "./components/medico-dialog";
@@ -15,6 +16,7 @@ interface Medico {
   id: string;
   crm: string;
   especialidade: string;
+  rqe?: number | null;
   limiteMaximoRetornosPorDia?: number | null;
   ativo?: boolean;
   createdAt: Date;
@@ -116,16 +118,11 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Stethoscope className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Médicos</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie os médicos cadastrados na clínica
-        </p>
-      </div>
+      <PageHeader
+        icon={Stethoscope}
+        title="Médicos"
+        subtitle="Gerencie os médicos cadastrados na clínica"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">

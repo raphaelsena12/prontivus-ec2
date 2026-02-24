@@ -7,6 +7,7 @@ const updateFormaPagamentoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
   descricao: z.string().optional(),
   tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]).optional(),
+  bandeiraCartao: z.string().optional(),
   ativo: z.boolean().optional(),
 });
 

@@ -8,6 +8,7 @@ const medicoSchema = z.object({
   usuarioId: z.string().uuid("ID de usuário inválido"),
   crm: z.string().min(1, "CRM é obrigatório"),
   especialidade: z.string().min(1, "Especialidade é obrigatória"),
+  rqe: z.number().int().min(0).nullable().optional(),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
 });
 
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
           id: true,
           crm: true,
           especialidade: true,
+          rqe: true,
           usuario: {
             select: {
               id: true,
@@ -170,6 +172,7 @@ export async function POST(request: NextRequest) {
         usuarioId: data.usuarioId,
         crm: data.crm,
         especialidade: data.especialidade,
+        rqe: data.rqe ?? null,
         limiteMaximoRetornosPorDia: data.limiteMaximoRetornosPorDia ?? null,
         clinicaId: auth.clinicaId!,
       },

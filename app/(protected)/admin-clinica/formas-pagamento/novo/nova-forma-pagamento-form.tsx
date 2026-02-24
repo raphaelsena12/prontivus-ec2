@@ -19,6 +19,7 @@ const formaPagamentoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
+  bandeiraCartao: z.string().optional(),
 });
 
 type FormaPagamentoFormData = z.infer<typeof formaPagamentoSchema>;
@@ -32,8 +33,11 @@ export function NovaFormaPagamentoForm({ clinicaId }: NovaFormaPagamentoFormProp
   const [loading, setLoading] = useState(false);
   const form = useForm<FormaPagamentoFormData>({
     resolver: zodResolver(formaPagamentoSchema),
-    defaultValues: { nome: "", descricao: "", tipo: undefined },
+    defaultValues: { nome: "", descricao: "", tipo: undefined, bandeiraCartao: "" },
   });
+
+  const tipoSelecionado = form.watch("tipo");
+  const isCartao = tipoSelecionado === "CARTAO_CREDITO" || tipoSelecionado === "CARTAO_DEBITO";
 
   const onSubmit = async (data: FormaPagamentoFormData) => {
     try {
@@ -89,7 +93,12 @@ export function NovaFormaPagamentoForm({ clinicaId }: NovaFormaPagamentoFormProp
                   <FormField control={form.control} name="tipo" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Tipo *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        if (value !== "CARTAO_CREDITO" && value !== "CARTAO_DEBITO") {
+                          form.setValue("bandeiraCartao", "");
+                        }
+                      }} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione o tipo" />
@@ -107,6 +116,30 @@ export function NovaFormaPagamentoForm({ clinicaId }: NovaFormaPagamentoFormProp
                       <FormMessage />
                     </FormItem>
                   )} />
+                  {isCartao && (
+                    <FormField control={form.control} name="bandeiraCartao" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Bandeira do Cartão</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a bandeira" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="VISA">Visa</SelectItem>
+                            <SelectItem value="MASTERCARD">Mastercard</SelectItem>
+                            <SelectItem value="ELO">Elo</SelectItem>
+                            <SelectItem value="AMEX">American Express</SelectItem>
+                            <SelectItem value="HIPERCARD">Hipercard</SelectItem>
+                            <SelectItem value="DINERS">Diners Club</SelectItem>
+                            <SelectItem value="OUTROS">Outros</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
                   <FormField control={form.control} name="descricao" render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Descrição</FormLabel>

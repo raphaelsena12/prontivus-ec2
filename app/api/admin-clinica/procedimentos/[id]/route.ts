@@ -9,6 +9,16 @@ const updateProcedimentoSchema = z.object({
   descricao: z.string().optional(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero").optional(),
   ativo: z.boolean().optional(),
+  medicamentos: z.array(z.object({
+    medicamentoId: z.string(),
+    quantidade: z.number().optional(),
+    observacoes: z.string().optional(),
+  })).optional(),
+  insumos: z.array(z.object({
+    insumoId: z.string(),
+    quantidade: z.number().optional(),
+    observacoes: z.string().optional(),
+  })).optional(),
 });
 
 export async function GET(
@@ -27,6 +37,18 @@ export async function GET(
       where: {
         id,
         clinicaId: auth.clinicaId!,
+      },
+      include: {
+        procedimentosMedicamentos: {
+          include: {
+            medicamento: true,
+          },
+        },
+        procedimentosInsumos: {
+          include: {
+            insumo: true,
+          },
+        },
       },
     });
 
@@ -108,12 +130,71 @@ export async function PATCH(
       updateData.valor = data.valor;
     }
 
+    // Remover medicamentos e insumos do updateData para processar separadamente
+    const { medicamentos, insumos, ...procedimentoData } = updateData;
+
+    // Atualizar procedimento
     const procedimento = await prisma.procedimento.update({
       where: { id },
-      data: updateData,
+      data: procedimentoData,
     });
 
-    return NextResponse.json({ procedimento });
+    // Atualizar medicamentos se fornecidos
+    if (medicamentos !== undefined) {
+      // Deletar relações antigas
+      await prisma.procedimentoMedicamento.deleteMany({
+        where: { procedimentoId: id },
+      });
+      // Criar novas relações
+      if (medicamentos.length > 0) {
+        await prisma.procedimentoMedicamento.createMany({
+          data: medicamentos.map((m: any) => ({
+            procedimentoId: id,
+            medicamentoId: m.medicamentoId,
+            quantidade: m.quantidade ? m.quantidade : null,
+            observacoes: m.observacoes || null,
+          })),
+        });
+      }
+    }
+
+    // Atualizar insumos se fornecidos
+    if (insumos !== undefined) {
+      // Deletar relações antigas
+      await prisma.procedimentoInsumo.deleteMany({
+        where: { procedimentoId: id },
+      });
+      // Criar novas relações
+      if (insumos.length > 0) {
+        await prisma.procedimentoInsumo.createMany({
+          data: insumos.map((i: any) => ({
+            procedimentoId: id,
+            insumoId: i.insumoId,
+            quantidade: i.quantidade ? i.quantidade : null,
+            observacoes: i.observacoes || null,
+          })),
+        });
+      }
+    }
+
+    // Buscar procedimento atualizado com relações
+    const procedimentoAtualizado = await prisma.procedimento.findFirst({
+      where: { id },
+      include: {
+        procedimentosMedicamentos: {
+          include: {
+            medicamento: true,
+          },
+        },
+        procedimentosInsumos: {
+          include: {
+            insumo: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ procedimento: procedimentoAtualizado });
   } catch (error) {
     console.error("Erro ao atualizar procedimento:", error);
     return NextResponse.json(

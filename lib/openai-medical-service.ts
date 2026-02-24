@@ -13,6 +13,11 @@ export interface MedicalAnalysis {
     description: string;
     score: number;
   }>;
+  protocolos: Array<{
+    nome: string;
+    descricao: string;
+    justificativa?: string;
+  }>;
   exames: Array<{
     nome: string;
     tipo: string;
@@ -52,25 +57,40 @@ export async function processTranscriptionWithOpenAI(
     const systemPrompt = `Você é um assistente médico especializado em análise de consultas médicas. 
 Sua função é analisar transcrições de consultas e gerar:
 1. Uma anamnese completa, estruturada e profissional em português brasileiro
-2. Códigos CID-10 sugeridos (máximo 5) com scores de confiança entre 0 e 1
-3. Exames sugeridos com justificativas clínicas
-4. Prescrições médicas sugeridas com medicamentos, dosagens, posologias e durações
+2. Códigos CID-10 sugeridos com scores de confiança entre 0 e 1 (apenas inclua códigos com score acima de 0.5)
+3. Protocolos clínicos sugeridos baseados no diagnóstico e nas melhores práticas médicas, com descrição e justificativa
+4. Exames sugeridos com justificativas clínicas
+5. Prescrições médicas sugeridas com medicamentos, dosagens, posologias e durações
 
 IMPORTANTE:
-- A anamnese deve seguir o formato médico padrão brasileiro
+- A anamnese deve seguir o formato médico padrão brasileiro e a ordem EXATA abaixo:
+- O formato da anamnese deve ser EXATAMENTE nesta ordem:
+  1. "ANAMNESE:" (primeiro tópico com dois pontos) seguido imediatamente do texto completo da transcrição
+  2. "QUEIXA PRINCIPAL:" - Motivo da consulta, preferencialmente nas palavras do paciente, curta e objetiva (2-3 palavras)
+  3. "HISTÓRIA DA DOENÇA ATUAL:" - Deve incluir: início, evolução, localização, intensidade, características, fatores de melhora/piora, sintomas associados, tratamentos prévios, impacto funcional
+  4. "ANTECEDENTES PESSOAIS PATOLÓGICOS:" - Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos
+  5. "ANTECEDENTES FAMILIARES:" - Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes
+  6. "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:" - Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional
+  7. "HISTÓRIA GINECO-OBSTÉTRICA:" - Apenas quando aplicável (menarca, ciclo menstrual, gestações/partos/abortos, menopausa, métodos contraceptivos)
+  8. "MEDICAMENTOS EM USO ATUAL:" - Nome, dose, frequência, tempo de uso
 - Use títulos em MAIÚSCULAS seguidos de dois pontos (:) para seções principais
-- Exemplos de títulos: "ANAMNESE", "QUEIXA PRINCIPAL", "HISTÓRICO DA DOENÇA ATUAL", "ANTECEDENTES PESSOAIS", "MEDICAÇÕES EM USO", "EXAMES REALIZADOS", "EXAME FÍSICO"
+- Se alguma seção não for mencionada na transcrição, exiba o título seguido de "N/A"
+- A seção "EXAMES REALIZADOS" deve conter APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros nesta seção.
+- Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
 - Os códigos CID-10 devem ser válidos e específicos
-- Os exames devem ser clinicamente relevantes
+- Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS" da anamnese
 - As prescrições devem incluir medicamentos apropriados para o diagnóstico, com dosagens e posologias corretas
 - Para prescrições: use nomes comerciais ou genéricos comuns no Brasil, dosagem em formato padrão (ex: "500mg", "10ml"), posologia clara (ex: "1 comprimido de 8/8h", "1 gota 2x ao dia"), e duração do tratamento (ex: "7 dias", "15 dias", "30 dias")
 - Retorne APENAS um JSON válido, sem texto adicional
 
 Formato JSON esperado:
 {
-  "anamnese": "ANAMNESE\\n\\nQUEIXA PRINCIPAL:\\n...\\n\\nHISTÓRICO DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS:\\n...\\n\\nMEDICAÇÕES EM USO:\\n...\\n\\nEXAMES REALIZADOS:\\n...",
+  "anamnese": "ANAMNESE:\\n[texto completo da transcrição]\\n\\nQUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nHISTÓRIA GINECO-OBSTÉTRICA:\\n... (ou N/A se não aplicável)\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...",
   "cidCodes": [
     {"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}
+  ],
+  "protocolos": [
+    {"nome": "Protocolo de Hipertensão Arterial", "descricao": "Seguimento mensal, controle de PA, orientações dietéticas", "justificativa": "Baseado no diagnóstico de hipertensão"}
   ],
   "exames": [
     {"nome": "Hemograma completo", "tipo": "Laboratorial", "justificativa": "Avaliação geral e rastreamento de infecções"}
@@ -139,7 +159,10 @@ Transcrição da consulta:
 ${transcriptionText}
 ${examesContext}
 
-IMPORTANTE: Analise as imagens dos exames anexados e incorpore os achados relevantes na anamnese, nos códigos CID sugeridos e nas prescrições médicas.
+IMPORTANTE: 
+- Analise as imagens dos exames anexados e incorpore os achados relevantes na anamnese, nos códigos CID sugeridos e nas prescrições médicas.
+- Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou. NÃO inclua sugestões de exames futuros.
+- Se o paciente mencionou exames anexados ou que já fez, liste-os na seção "EXAMES REALIZADOS".
 
 Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicional.`
               }
@@ -190,25 +213,31 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
                 code: cid.code || "",
                 description: cid.description || "",
                 score: typeof cid.score === 'number' ? Math.max(0, Math.min(1, cid.score)) : 0.7,
-              })).filter((cid: any) => cid.code && cid.description).slice(0, 5),
+              })).filter((cid: any) => cid.code && cid.description && cid.score > 0.5),
+              protocolos: (analysis.protocolos || []).map((p: any) => ({
+                nome: p.nome || "",
+                descricao: p.descricao || "",
+                justificativa: p.justificativa || "",
+              })).filter((p: any) => p.nome),
               exames: (analysis.exames || []).map((exame: any) => ({
                 nome: exame.nome || "",
                 tipo: exame.tipo || "Laboratorial",
                 justificativa: exame.justificativa || "",
-              })).filter((exame: any) => exame.nome).slice(0, 10),
+              })).filter((exame: any) => exame.nome),
               prescricoes: (analysis.prescricoes || []).map((presc: any) => ({
                 medicamento: presc.medicamento || "",
                 dosagem: presc.dosagem || "",
                 posologia: presc.posologia || "",
                 duracao: presc.duracao || "",
                 justificativa: presc.justificativa || "",
-              })).filter((presc: any) => presc.medicamento).slice(0, 10),
+              })).filter((presc: any) => presc.medicamento),
               entities: analysis.entities || [],
             };
 
             console.log("=== RESULTADO OPENAI (COM IMAGENS) ===");
             console.log("Anamnese gerada:", validatedAnalysis.anamnese?.substring(0, 100));
             console.log("Total de CIDs:", validatedAnalysis.cidCodes.length);
+            console.log("Total de protocolos:", validatedAnalysis.protocolos.length);
             console.log("Total de exames:", validatedAnalysis.exames.length);
             console.log("Total de prescrições:", validatedAnalysis.prescricoes.length);
             console.log("=========================");
@@ -228,6 +257,12 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
 Transcrição da consulta:
 ${transcriptionText}
 ${examesContext}
+
+IMPORTANTE:
+- O formato da anamnese deve seguir EXATAMENTE a ordem: "ANAMNESE:" (com dois pontos) seguido do texto completo da transcrição, depois "QUEIXA PRINCIPAL:", "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "HISTÓRIA GINECO-OBSTÉTRICA:" (quando aplicável), e "MEDICAMENTOS EM USO ATUAL:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros.
+- Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
+- Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS".
 
 Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicional.`;
 
@@ -264,25 +299,31 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
         code: cid.code || "",
         description: cid.description || "",
         score: typeof cid.score === 'number' ? Math.max(0, Math.min(1, cid.score)) : 0.7,
-      })).filter((cid: any) => cid.code && cid.description).slice(0, 5),
+      })).filter((cid: any) => cid.code && cid.description && cid.score > 0.5),
+      protocolos: (analysis.protocolos || []).map((p: any) => ({
+        nome: p.nome || "",
+        descricao: p.descricao || "",
+        justificativa: p.justificativa || "",
+      })).filter((p: any) => p.nome),
       exames: (analysis.exames || []).map((exame: any) => ({
         nome: exame.nome || "",
         tipo: exame.tipo || "Laboratorial",
         justificativa: exame.justificativa || "",
-      })).filter((exame: any) => exame.nome).slice(0, 10),
+      })).filter((exame: any) => exame.nome),
       prescricoes: (analysis.prescricoes || []).map((presc: any) => ({
         medicamento: presc.medicamento || "",
         dosagem: presc.dosagem || "",
         posologia: presc.posologia || "",
         duracao: presc.duracao || "",
         justificativa: presc.justificativa || "",
-      })).filter((presc: any) => presc.medicamento).slice(0, 10),
+      })).filter((presc: any) => presc.medicamento),
       entities: analysis.entities || [],
     };
 
     console.log("=== RESULTADO OPENAI ===");
     console.log("Anamnese gerada:", validatedAnalysis.anamnese?.substring(0, 100));
     console.log("Total de CIDs:", validatedAnalysis.cidCodes.length);
+    console.log("Total de protocolos:", validatedAnalysis.protocolos.length);
     console.log("Total de exames:", validatedAnalysis.exames.length);
     console.log("Total de prescrições:", validatedAnalysis.prescricoes.length);
     console.log("=========================");
@@ -290,7 +331,7 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     return validatedAnalysis;
   } catch (error: any) {
     console.error("Erro ao processar com OpenAI:", error);
-    
+
     // Tratamento específico para erros de API
     if (error.status === 401) {
       throw new Error("Credenciais OpenAI inválidas. Verifique OPENAI_API_KEY");
@@ -301,9 +342,179 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     if (error.status === 500) {
       throw new Error("Erro interno da OpenAI. Tente novamente");
     }
-    
+
     throw new Error(
       error.message || "Erro ao processar transcrição com OpenAI"
     );
   }
+}
+
+/**
+ * Fase 1 — Gera APENAS a anamnese estruturada a partir da transcrição.
+ * Não gera CID, exames nem prescrições.
+ */
+export async function generateAnamneseOnly(transcriptionText: string): Promise<{ anamnese: string }> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
+  }
+
+  const systemPrompt = `Você é um assistente médico especializado em registros clínicos.
+Sua função é estruturar a transcrição de uma consulta em uma anamnese médica completa e profissional em português brasileiro.
+
+A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos):
+1. ANAMNESE: — texto completo da transcrição
+2. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
+3. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
+4. ANTECEDENTES PESSOAIS PATOLÓGICOS: — doenças prévias, internações, cirurgias, alergias, medicamentos crônicos
+5. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
+6. HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — tabagismo, etilismo, atividade física, ocupação
+7. HISTÓRIA GINECO-OBSTÉTRICA: — apenas quando aplicável, caso contrário "N/A"
+8. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+
+Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
+Retorne APENAS um JSON com o campo "anamnese".`;
+
+  const completion = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica:\n\n${transcriptionText}\n\nRetorne APENAS o JSON: {"anamnese": "..."}` },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
+
+  const responseContent = completion.choices[0]?.message?.content;
+  if (!responseContent) throw new Error("Resposta vazia da OpenAI");
+
+  try {
+    const data = JSON.parse(responseContent);
+    return { anamnese: data.anamnese || "Anamnese não gerada pela IA" };
+  } catch {
+    throw new Error("Resposta da OpenAI em formato inválido");
+  }
+}
+
+export interface SuggestionsContext {
+  anamnese: string;
+  alergias?: string[];
+  medicamentosEmUso?: string[];
+  examesIds?: string[];
+}
+
+export interface MedicalSuggestions {
+  cidCodes: MedicalAnalysis["cidCodes"];
+  protocolos: MedicalAnalysis["protocolos"];
+  exames: MedicalAnalysis["exames"];
+  prescricoes: MedicalAnalysis["prescricoes"];
+}
+
+/**
+ * Fase 2 — Gera sugestões clínicas (CID, exames e prescrições) a partir
+ * da anamnese já confirmada e do contexto selecionado pelo médico.
+ */
+export async function generateMedicalSuggestions(context: SuggestionsContext): Promise<MedicalSuggestions> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
+  }
+
+  let contextText = `ANAMNESE DA CONSULTA:\n${context.anamnese}`;
+
+  if (context.alergias && context.alergias.length > 0) {
+    contextText += `\n\nALERGIAS DO PACIENTE:\n${context.alergias.join(", ")}`;
+  }
+
+  if (context.medicamentosEmUso && context.medicamentosEmUso.length > 0) {
+    contextText += `\n\nMEDICAMENTOS EM USO:\n${context.medicamentosEmUso.join(", ")}`;
+  }
+
+  // Buscar dados dos exames se fornecidos
+  if (context.examesIds && context.examesIds.length > 0) {
+    try {
+      const exames = await prisma.documentoGerado.findMany({
+        where: { id: { in: context.examesIds } },
+        select: { id: true, nomeDocumento: true, tipoDocumento: true },
+      });
+      if (exames.length > 0) {
+        contextText += `\n\nEXAMES ANEXADOS:\n${exames.map((e) => `- ${e.nomeDocumento}`).join("\n")}`;
+      }
+    } catch (error) {
+      console.error("Erro ao buscar exames para sugestões:", error);
+    }
+  }
+
+  const systemPrompt = `Você é um assistente médico especializado em diagnóstico clínico.
+Com base no contexto da consulta fornecido, gere:
+1. Códigos CID-10 sugeridos com scores de confiança (0 a 1). Inclua apenas códigos com score acima de 0.5.
+2. Protocolos clínicos sugeridos baseados no diagnóstico e nas melhores práticas médicas, com descrição e justificativa.
+3. Exames complementares sugeridos para solicitar, com justificativa clínica.
+4. Prescrições médicas sugeridas, considerando alergias e medicamentos em uso do paciente.
+
+IMPORTANTE sobre prescrições:
+- Verifique conflitos com alergias listadas e não prescreva medicamentos incompatíveis.
+- Verifique interações com medicamentos em uso e sinalize quando necessário.
+- Use nomes genéricos ou comerciais comuns no Brasil.
+
+IMPORTANTE sobre protocolos:
+- Sugira protocolos clínicos relevantes baseados no diagnóstico e nas diretrizes médicas.
+- Inclua protocolos de tratamento, seguimento ou conduta clínica quando apropriado.
+
+Retorne APENAS um JSON válido no seguinte formato:
+{
+  "cidCodes": [{"code": "I10", "description": "Hipertensão essencial", "score": 0.9}],
+  "protocolos": [{"nome": "Protocolo de Hipertensão Arterial", "descricao": "Seguimento mensal, controle de PA, orientações dietéticas", "justificativa": "Baseado no diagnóstico de hipertensão"}],
+  "exames": [{"nome": "Hemograma", "tipo": "Laboratorial", "justificativa": "..."}],
+  "prescricoes": [{"medicamento": "Amoxicilina", "dosagem": "500mg", "posologia": "1 cp 8/8h", "duracao": "7 dias", "justificativa": "..."}]
+}`;
+
+  const completion = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: contextText },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
+    max_tokens: 1500,
+  });
+
+  const responseContent = completion.choices[0]?.message?.content;
+  if (!responseContent) throw new Error("Resposta vazia da OpenAI");
+
+  let data: any;
+  try {
+    data = JSON.parse(responseContent);
+  } catch {
+    throw new Error("Resposta da OpenAI em formato inválido");
+  }
+
+  return {
+    cidCodes: (data.cidCodes || [])
+      .map((cid: any) => ({
+        code: cid.code || "",
+        description: cid.description || "",
+        score: typeof cid.score === "number" ? Math.max(0, Math.min(1, cid.score)) : 0.7,
+      }))
+      .filter((cid: any) => cid.code && cid.description && cid.score > 0.5),
+    protocolos: (data.protocolos || [])
+      .map((p: any) => ({
+        nome: p.nome || "",
+        descricao: p.descricao || "",
+        justificativa: p.justificativa || "",
+      }))
+      .filter((p: any) => p.nome),
+    exames: (data.exames || [])
+      .map((e: any) => ({ nome: e.nome || "", tipo: e.tipo || "Laboratorial", justificativa: e.justificativa || "" }))
+      .filter((e: any) => e.nome),
+    prescricoes: (data.prescricoes || [])
+      .map((p: any) => ({
+        medicamento: p.medicamento || "",
+        dosagem: p.dosagem || "",
+        posologia: p.posologia || "",
+        duracao: p.duracao || "",
+        justificativa: p.justificativa || "",
+      }))
+      .filter((p: any) => p.medicamento),
+  };
 }

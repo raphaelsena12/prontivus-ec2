@@ -5,9 +5,11 @@ const nextConfig: NextConfig = {
   // Configuração básica do Next.js
   output: "standalone", // Necessário para Docker
   
-  // Turbopack está desabilitado no server.ts (turbo: false)
-  // Usando webpack tradicional que é mais estável no Windows
-  // O aviso sobre múltiplos lockfiles pode ser ignorado, pois não afeta o funcionamento
+  // Turbopack desabilitado completamente - usando webpack tradicional que é mais estável no Windows
+  // O Turbopack causa erros de permissão no Windows (os error 5)
+  
+  // Forçar uso do webpack ao invés do Turbopack
+  webpack: (config, { isServer }) => {
+    return config;
+  },
 };
-
-export default nextConfig;

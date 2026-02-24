@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { formatDate, formatTime } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
 import {
   CheckCircle2,
   Clock,
@@ -32,6 +33,7 @@ import {
   Phone,
   Stethoscope,
   Volume2,
+  LogIn,
 } from "lucide-react";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 
@@ -39,6 +41,7 @@ interface Consulta {
   id: string;
   dataHora: string;
   status: string;
+  updatedAt: string;
   paciente: {
     id: string;
     nome: string;
@@ -346,10 +349,16 @@ export function CheckInContent() {
   };
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      <PageHeader
+        icon={LogIn}
+        title="Check-in"
+        subtitle="Registre a chegada dos pacientes e gerencie os atendimentos do dia"
+      />
+
       <div className="flex flex-col">
         {/* Campo de busca */}
-        <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4">
+        <div className="flex items-center justify-end pb-4">
           <div className="relative max-w-md w-full">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -361,8 +370,8 @@ export function CheckInContent() {
           </div>
         </div>
 
-        {/* Conteúdo com margens laterais */}
-        <div className="px-4 lg:px-6">
+        {/* Conteúdo */}
+        <div>
           <div className="overflow-hidden rounded-lg border">
             <Table>
               <TableHeader className="bg-muted">
@@ -373,13 +382,14 @@ export function CheckInContent() {
                   <TableHead className="text-xs font-semibold py-3">Médico</TableHead>
                   <TableHead className="text-xs font-semibold py-3">Tipo</TableHead>
                   <TableHead className="text-xs font-semibold py-3">Convênio</TableHead>
+                  <TableHead className="text-xs font-semibold py-3">Horário Check-in</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                         <span className="text-xs text-muted-foreground">Carregando consultas...</span>
@@ -388,7 +398,7 @@ export function CheckInContent() {
                   </TableRow>
                 ) : filteredConsultas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
                         <span className="text-xs text-muted-foreground">
@@ -459,6 +469,23 @@ export function CheckInContent() {
                           <Badge variant="outline" className="bg-transparent border-gray-500 text-gray-700 dark:text-gray-400 text-[10px] py-0.5 px-1.5 leading-tight">
                             Particular
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs py-3">
+                        {consulta.status === "CONFIRMADA" ? (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {formatTime(new Date(consulta.updatedAt))}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                {formatDate(new Date(consulta.updatedAt))}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs py-3 text-right">

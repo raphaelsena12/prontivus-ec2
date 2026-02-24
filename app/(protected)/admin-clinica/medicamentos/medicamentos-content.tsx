@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pill, Upload, Filter, Plus } from "lucide-react";
+import { Loader2, Pill, Upload, Filter, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/page-header";
 import { MedicamentosTable } from "./components/medicamentos-table";
 import { MedicamentoDeleteDialog } from "./components/medicamento-delete-dialog";
 import { MedicamentoDialog } from "./components/medicamento-dialog";
@@ -33,6 +34,7 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
   const router = useRouter();
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [globalFilter, setGlobalFilter] = useState<string>("");
   const [medicamentoDialogOpen, setMedicamentoDialogOpen] = useState(false);
   const [editingMedicamento, setEditingMedicamento] = useState<Medicamento | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -87,16 +89,11 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Pill className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Medicamentos</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Gerencie os medicamentos cadastrados na clínica
-        </p>
-      </div>
+      <PageHeader
+        icon={Pill}
+        title="Medicamentos"
+        subtitle="Gerencie os medicamentos cadastrados na clínica"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
@@ -106,6 +103,16 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Medicamentos</CardTitle>
           </div>
           <div className="flex items-center gap-2">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input 
+                type="search"
+                placeholder="Buscar por nome, princípio ativo, laboratório..." 
+                value={globalFilter}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="pl-9 h-8 text-xs bg-background w-64" 
+              />
+            </div>
             <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
               <Upload className="mr-1.5 h-3 w-3" />
               Upload em Massa
@@ -131,6 +138,8 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
           ) : (
             <MedicamentosTable 
             data={medicamentos} 
+            globalFilter={globalFilter}
+            onGlobalFilterChange={setGlobalFilter}
             onEdit={handleEdit}
             onDelete={handleDeleteClick}
             onCreate={handleCreate}

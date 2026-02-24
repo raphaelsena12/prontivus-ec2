@@ -71,17 +71,33 @@ export async function GET(request: NextRequest) {
     const amanha = new Date(hoje);
     amanha.setDate(amanha.getDate() + 1);
 
-    const consultas = await prisma.consulta.findMany({
-      where: {
-        clinicaId: auth.clinicaId,
-        medicoId: auth.medicoId,
-        dataHora: {
-          gte: hoje,
-          lt: amanha,
-        },
-        status: "CONFIRMADA", // Apenas pacientes que já fizeram check-in
+    const { searchParams } = new URL(request.url);
+    const statusFilter = searchParams.get("status"); // Recebe filtro opcional via query param
+
+    const where: any = {
+      clinicaId: auth.clinicaId,
+      medicoId: auth.medicoId,
+      dataHora: {
+        gte: hoje,
+        lt: amanha,
       },
-      include: {
+    };
+
+    // Se houver filtro de status, aplicar; caso contrário, mostrar CONFIRMADA por padrão
+    if (statusFilter) {
+      const statusArray = statusFilter.split(",");
+      where.status = { in: statusArray };
+    } else {
+      // Por padrão, mostrar apenas CONFIRMADA (Aguardando)
+      where.status = "CONFIRMADA";
+    }
+
+    const consultas = await prisma.consulta.findMany({
+      where,
+      select: {
+        id: true,
+        dataHora: true,
+        status: true,
         paciente: {
           select: {
             id: true,
@@ -148,13 +164,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se a consulta pertence ao médico e está confirmada
+    // Verificar se a consulta pertence ao médico e está confirmada ou em atendimento
     const consulta = await prisma.consulta.findFirst({
       where: {
         id: consultaId,
         clinicaId: auth.clinicaId,
         medicoId: auth.medicoId,
-        status: "CONFIRMADA",
+        status: {
+          in: ["CONFIRMADA", "EM_ATENDIMENTO"],
+        },
       },
       include: {
         paciente: true,
@@ -199,13 +217,28 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Atualizar status da consulta para REALIZADA (opcional - pode deixar como CONFIRMADA até finalizar)
-    // Por enquanto, vamos deixar como CONFIRMADA e só mudar para REALIZADA quando finalizar o prontuário
+    // Atualizar status da consulta para EM_ATENDIMENTO e salvar momento do início
+    const agora = new Date();
+    const updateData: any = {
+      status: "EM_ATENDIMENTO",
+    };
+    
+    // Só salva o início do atendimento se ainda não estiver em atendimento
+    if (consulta.status !== "EM_ATENDIMENTO") {
+      updateData.inicioAtendimento = agora;
+    }
+    
+    const consultaAtualizada = await prisma.consulta.update({
+      where: {
+        id: consultaId,
+      },
+      data: updateData,
+    });
 
     return NextResponse.json(
       { 
         prontuario,
-        consulta,
+        consulta: consultaAtualizada,
         message: "Atendimento iniciado com sucesso" 
       },
       { status: 200 }

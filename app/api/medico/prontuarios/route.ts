@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
           paciente: {
             select: {
               id: true,
+              numeroProntuario: true,
               nome: true,
               cpf: true,
               dataNascimento: true,

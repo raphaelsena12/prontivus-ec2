@@ -12,13 +12,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Calendar, Clock, User, Stethoscope, Loader2, ArrowRight, RefreshCw, Filter, List } from "lucide-react";
+import { Calendar, Clock, User, Stethoscope, Loader2, ArrowRight, RefreshCw, Filter, List, CheckCircle2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatDate, formatTime, formatCPF } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
 
 interface Consulta {
   id: string;
   dataHora: Date | string;
+  status: string;
   paciente: {
     id: string;
     nome: string;
@@ -48,13 +57,21 @@ export function FilaAtendimentoContent() {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("CONFIRMADA"); // Padrão: Aguardando
+  const [mounted, setMounted] = useState(false);
 
   const fetchConsultas = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
-      const response = await fetch("/api/medico/fila-atendimento");
+      let url = "/api/medico/fila-atendimento";
+      if (statusFilter && statusFilter !== "TODOS") {
+        url += `?status=${statusFilter}`;
+      } else if (statusFilter === "TODOS") {
+        url += "?status=CONFIRMADA,EM_ATENDIMENTO,REALIZADA";
+      }
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error("Erro ao carregar fila de atendimento");
@@ -73,13 +90,19 @@ export function FilaAtendimentoContent() {
       setLoading(false);
       setRefreshing(false);
     }
+  }, [statusFilter]);
+
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   useEffect(() => {
-    fetchConsultas();
-    const interval = setInterval(() => fetchConsultas(true), 30000);
-    return () => clearInterval(interval);
-  }, [fetchConsultas]);
+    if (mounted) {
+      fetchConsultas();
+      const interval = setInterval(() => fetchConsultas(true), 30000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchConsultas, mounted]);
 
   const handleIniciarAtendimento = async (consultaId: string) => {
     try {
@@ -97,6 +120,8 @@ export function FilaAtendimentoContent() {
       }
 
       toast.success("Atendimento iniciado com sucesso");
+      // Atualizar a lista para mostrar a consulta com status atualizado
+      await fetchConsultas(true);
       router.push(`/medico/atendimento?consultaId=${consultaId}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao iniciar atendimento");
@@ -106,39 +131,51 @@ export function FilaAtendimentoContent() {
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
-      {/* Título e Subtítulo */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <List className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold text-foreground">Fila de Atendimento</h1>
-        </div>
-        <p className="text-sm text-muted-foreground ml-9">
-          Visualize e gerencie os pacientes aguardando atendimento
-        </p>
-      </div>
+      <PageHeader
+        icon={List}
+        title="Fila de Atendimento"
+        subtitle="Visualize e gerencie os pacientes aguardando atendimento"
+      />
 
       {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
           <div className="flex items-center gap-1.5">
             <Filter className="h-3 w-3 text-muted-foreground" />
-            <CardTitle className="text-sm font-semibold">Lista de Pacientes Aguardando</CardTitle>
+            <CardTitle className="text-sm font-semibold">Lista de Pacientes</CardTitle>
             {!loading && (
               <span className="text-xs text-muted-foreground ml-2">
                 ({consultas.length} {consultas.length === 1 ? "paciente" : "pacientes"})
               </span>
             )}
           </div>
-          <Button
-            variant="outline"
-            onClick={() => fetchConsultas(true)}
-            disabled={refreshing}
-            className="h-8 text-xs"
-            title="Atualizar fila"
-          >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            {mounted ? (
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-8 w-[200px] text-xs">
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CONFIRMADA">Aguardando</SelectItem>
+                  <SelectItem value="EM_ATENDIMENTO">Em Atendimento</SelectItem>
+                  <SelectItem value="REALIZADA">Realizadas</SelectItem>
+                  <SelectItem value="TODOS">Todos</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="h-8 w-[200px] border rounded-md bg-muted animate-pulse" />
+            )}
+            <Button
+              variant="outline"
+              onClick={() => fetchConsultas(true)}
+              disabled={refreshing}
+              className="h-8 text-xs"
+              title="Atualizar fila"
+            >
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-hidden px-6 pt-6">
@@ -257,21 +294,41 @@ export function FilaAtendimentoContent() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-amber-50 text-amber-700 border border-amber-200">
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          Aguardando
-                        </span>
+                        {consulta.status === "CONFIRMADA" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            Aguardando
+                          </span>
+                        ) : consulta.status === "EM_ATENDIMENTO" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-blue-50 text-blue-700 border border-blue-200">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            Em Atendimento
+                          </span>
+                        ) : consulta.status === "REALIZADA" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-green-50 text-green-700 border border-green-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Realizada
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium leading-tight bg-neutral-50 text-neutral-700 border border-neutral-200">
+                            {consulta.status}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4 text-right">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleIniciarAtendimento(consulta.id)}
-                          className="text-xs h-7"
-                        >
-                          Iniciar
-                          <ArrowRight className="h-3 w-3 mr-1.5" />
-                        </Button>
+                        {consulta.status === "CONFIRMADA" || consulta.status === "EM_ATENDIMENTO" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleIniciarAtendimento(consulta.id)}
+                            className="text-xs h-7"
+                          >
+                            {consulta.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar"}
+                            <ArrowRight className="h-3 w-3 mr-1.5" />
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">-</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

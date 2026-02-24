@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const status = searchParams.get("status") || "ativo"; // Padrão: apenas ativos
 
-    const where = {
+    const where: any = {
       clinicaId: auth.clinicaId,
       ...(search && {
         OR: [
@@ -63,10 +64,19 @@ export async function GET(request: NextRequest) {
       }),
     };
 
+    // Filtrar por status - por padrão mostra apenas ativos
+    if (status === "ativo" || !status) {
+      where.ativo = true;
+    } else if (status === "inativo") {
+      where.ativo = false;
+    }
+    // Se status === "todos", não adiciona filtro de ativo
+
     const pacientes = await prisma.paciente.findMany({
       where,
       select: {
         id: true,
+        numeroProntuario: true,
         nome: true,
         cpf: true,
         email: true,

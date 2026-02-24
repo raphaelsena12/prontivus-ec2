@@ -5,8 +5,11 @@ import { z } from "zod";
 
 const exameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  descricao: z.string().optional(),
-  tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"]).optional(),
+  descricao: z.string().min(1, "Descrição é obrigatória"),
+  tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"], {
+    message: "Tipo é obrigatório",
+  }),
+  codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
 });
 
 export async function GET(request: NextRequest) {
@@ -38,6 +41,16 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
+        include: {
+          codigoTuss: {
+            select: {
+              id: true,
+              codigoTuss: true,
+              descricao: true,
+              tipoProcedimento: true,
+            },
+          },
+        },
       }),
       prisma.exame.count({ where }),
     ]);
@@ -68,9 +81,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    console.log("[POST /api/admin-clinica/exames] Body recebido:", JSON.stringify(body, null, 2));
+    
     const validation = exameSchema.safeParse(body);
 
     if (!validation.success) {
+      console.error("[POST /api/admin-clinica/exames] Erro de validação:", validation.error.issues);
       return NextResponse.json(
         { error: "Dados inválidos", details: validation.error.issues },
         { status: 400 }

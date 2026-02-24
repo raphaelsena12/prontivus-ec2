@@ -61,6 +61,8 @@ interface Medicamento {
 
 interface MedicamentosTableProps {
   data: Medicamento[];
+  globalFilter?: string;
+  onGlobalFilterChange?: (value: string) => void;
   onEdit?: (medicamento: Medicamento) => void;
   onDelete?: (medicamento: Medicamento) => void;
   onCreate?: () => void;
@@ -77,6 +79,8 @@ const formatDate = (date: Date) => {
 
 export function MedicamentosTable({
   data: initialData,
+  globalFilter = "",
+  onGlobalFilterChange,
   onEdit,
   onDelete,
   onCreate,
@@ -86,7 +90,6 @@ export function MedicamentosTable({
   const [data] = React.useState(() => initialData);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
-  const [globalFilter, setGlobalFilter] = React.useState("");
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -96,7 +99,7 @@ export function MedicamentosTable({
     pageSize: 10,
   });
 
-  // Filtrar dados localmente
+  // Filtrar dados localmente por todas as colunas
   const filteredData = React.useMemo(() => {
     if (!globalFilter) return data;
     const search = globalFilter.toLowerCase();
@@ -104,7 +107,19 @@ export function MedicamentosTable({
       const nome = med.nome?.toLowerCase() || "";
       const principioAtivo = med.principioAtivo?.toLowerCase() || "";
       const laboratorio = med.laboratorio?.toLowerCase() || "";
-      return nome.includes(search) || principioAtivo.includes(search) || laboratorio.includes(search);
+      const concentracao = med.concentracao?.toLowerCase() || "";
+      const apresentacao = med.apresentacao?.toLowerCase() || "";
+      const unidade = med.unidade?.toLowerCase() || "";
+      const status = med.ativo ? "ativo" : "inativo";
+      return (
+        nome.includes(search) || 
+        principioAtivo.includes(search) || 
+        laboratorio.includes(search) ||
+        concentracao.includes(search) ||
+        apresentacao.includes(search) ||
+        unidade.includes(search) ||
+        status.includes(search)
+      );
     });
   }, [data, globalFilter]);
 

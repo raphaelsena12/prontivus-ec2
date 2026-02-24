@@ -1,6 +1,6 @@
 import {
-  createDoc, drawTopBar, drawBottomBar, drawClinicHeader,
-  formatCPF, COLORS, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, CONTENT_WIDTH,
+  createDoc, drawClinicHeader,
+  formatCPF, COLORS, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, CONTENT_WIDTH, PDF_FONT,
 } from "./pdf-base";
 
 interface ReceitaSimplesData {
@@ -9,6 +9,12 @@ interface ReceitaSimplesData {
   clinicaTelefone?: string;
   clinicaEmail?: string;
   clinicaEndereco?: string;
+  clinicaNumero?: string;
+  clinicaBairro?: string;
+  clinicaCidade?: string;
+  clinicaEstado?: string;
+  clinicaCep?: string;
+  clinicaSite?: string;
   logoBase64?: string;
 
   medicoNome: string;
@@ -20,6 +26,9 @@ interface ReceitaSimplesData {
   pacienteCpf: string;
   pacienteDataNascimento: string;
   pacienteEndereco?: string;
+  pacienteNumero?: string;
+  pacienteBairro?: string;
+  pacienteCidade?: string;
   pacienteSexo?: string;
   pacienteIdade?: number;
 
@@ -28,7 +37,7 @@ interface ReceitaSimplesData {
 
   medicamentos: Array<{
     nome: string;
-    quantidade: number;
+    dosagem?: string;
     posologia: string;
   }>;
 }
@@ -36,102 +45,79 @@ interface ReceitaSimplesData {
 export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer {
   const doc = createDoc();
 
-  drawTopBar(doc);
-  drawClinicHeader(doc, data);
+  drawClinicHeader(doc, data, "RECEITA MÉDICA");
 
-  // =====================================================
-  // TÍTULO "Receita Simples" - SIMPLES E LIMPO
-  // =====================================================
-  let y = 40;
+  // Título centralizado logo abaixo do cabeçalho
+  let y = 70; // Ajustado de 62 para 70 para acomodar cabeçalho bem mais baixo
 
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text("RECEITA SIMPLES", PAGE_WIDTH / 2, y, { align: "center" });
+  doc.text("RECEITA MÉDICA", PAGE_WIDTH / 2, y, { align: "center" });
 
-  y += 12;
-
-  // Linha separadora sutil
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-
-  y += 10;
+  y += 14;
 
   // =====================================================
-  // DADOS DO MÉDICO - SEM BOX, APENAS TEXTO ORGANIZADO
-  // =====================================================
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, MARGIN, y);
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM: ${data.medicoCrm}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
-
-  y += 5;
-
-  doc.setFontSize(9);
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(data.medicoEspecialidade, MARGIN, y);
-
-  if (data.medicoCpf) {
-    doc.text(`CPF: ${formatCPF(data.medicoCpf)}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
-  }
-
-  y += 5;
-
-  doc.setFontSize(8);
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(`Data de Emissão: ${data.dataEmissao}`, MARGIN, y);
-
-  y += 10;
-
-  // Linha separadora sutil
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-
-  y += 10;
-
-  // =====================================================
-  // DADOS DO PACIENTE - SEM BOX, APENAS TEXTO ORGANIZADO
+  // DADOS DO PACIENTE
   // =====================================================
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome, MARGIN, y);
 
-  y += 5;
+  // Linha: Paciente: Nome
+  doc.setFont(PDF_FONT, "bold");
+  doc.text("Paciente: ", MARGIN, y);
+  const labelW = doc.getTextWidth("Paciente: ");
+  doc.setFont(PDF_FONT, "normal");
+  doc.text(data.pacienteNome, MARGIN + labelW, y);
+  y += 6;
 
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(`CPF: ${formatCPF(data.pacienteCpf)}`, MARGIN, y);
+  // Linha: CPF   Nascimento   Idade   Sexo  (rótulo negrito, valor normal)
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.slate800);
+  let xPos = MARGIN;
+  const drawInfo = (label: string, value: string) => {
+    doc.setFont(PDF_FONT, "bold");
+    doc.text(label, xPos, y);
+    xPos += doc.getTextWidth(label);
+    doc.setFont(PDF_FONT, "normal");
+    doc.text(value, xPos, y);
+    xPos += doc.getTextWidth(value) + 8;
+  };
+  drawInfo("CPF: ", formatCPF(data.pacienteCpf));
+  if (data.pacienteDataNascimento) drawInfo("Nascimento: ", data.pacienteDataNascimento);
+  if (data.pacienteIdade) drawInfo("Idade: ", `${data.pacienteIdade} anos`);
+  if (data.pacienteSexo) drawInfo("Sexo: ", data.pacienteSexo);
+  y += 6;
 
-  const sexoText = data.pacienteSexo || "N/I";
-  const idadeText = data.pacienteIdade ? `${data.pacienteIdade} anos` : "N/I";
-  doc.text(`Sexo: ${sexoText} | Idade: ${idadeText}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
-
-  y += 5;
-
-  if (data.pacienteEndereco) {
-    doc.setFontSize(8);
-    doc.setTextColor(...COLORS.slate600);
-    const pAddrLines = doc.splitTextToSize(data.pacienteEndereco, CONTENT_WIDTH);
-    doc.text(pAddrLines, MARGIN, y);
-    y += pAddrLines.length * 4 + 2;
+  // Linha 3: Endereço completo (se disponível)
+  const endParts: string[] = [];
+  if (data.pacienteEndereco) endParts.push(data.pacienteEndereco);
+  if (data.pacienteNumero) endParts.push(`nº ${data.pacienteNumero}`);
+  if (data.pacienteBairro) endParts.push(data.pacienteBairro);
+  if (data.pacienteCidade) endParts.push(data.pacienteCidade);
+  if (endParts.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont(PDF_FONT, "bold");
+    doc.setTextColor(...COLORS.slate800);
+    doc.text("Endereço: ", MARGIN, y);
+    const endLabelW = doc.getTextWidth("Endereço: ");
+    doc.setFont(PDF_FONT, "normal");
+    const endText = doc.splitTextToSize(endParts.join(", "), CONTENT_WIDTH - endLabelW);
+    doc.text(endText, MARGIN + endLabelW, y);
+    y += endText.length * 5;
   }
 
-  y += 8;
+  y += 10;
 
-  // Linha separadora mais forte antes da prescrição
-  doc.setDrawColor(...COLORS.slate800);
-  doc.setLineWidth(0.5);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-
+  // =====================================================
+  // SUBTÍTULO PRESCRIÇÕES
+  // =====================================================
+  y += 4;
+  doc.setFontSize(14);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("Prescrições", PAGE_WIDTH / 2, y, { align: "center" });
   y += 10;
 
   // =====================================================
@@ -139,38 +125,32 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
   // =====================================================
   if (data.medicamentos.length === 0) {
     doc.setFontSize(9);
-    doc.setFont("helvetica", "italic");
+    doc.setFont(PDF_FONT, "italic");
     doc.setTextColor(...COLORS.slate400);
     doc.text("Nenhum medicamento prescrito", MARGIN, y);
     y += 10;
   } else {
     data.medicamentos.forEach((med, index) => {
       const num = String(index + 1);
-      const qtd = String(med.quantidade);
 
       // Número simples
       doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
+      doc.setFont(PDF_FONT, "bold");
       doc.setTextColor(...COLORS.slate800);
       doc.text(`${num}.`, MARGIN, y);
 
-      // Nome do medicamento em negrito
+      // Nome do medicamento + dosagem em negrito
+      const nomeCompleto = med.dosagem ? `${med.nome} ${med.dosagem}` : med.nome;
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
+      doc.setFont(PDF_FONT, "bold");
       doc.setTextColor(...COLORS.slate800);
-      doc.text(med.nome, MARGIN + 8, y);
-
-      // Quantidade à direita
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...COLORS.slate600);
-      doc.text(`Qtd: ${qtd}`, PAGE_WIDTH - MARGIN, y, { align: "right" });
+      doc.text(nomeCompleto, MARGIN + 8, y);
 
       y += 6;
 
       // Posologia
       doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
+      doc.setFont(PDF_FONT, "normal");
       doc.setTextColor(...COLORS.slate600);
       const posLines = doc.splitTextToSize(med.posologia, CONTENT_WIDTH - 8);
       doc.text(posLines, MARGIN + 8, y);
@@ -181,23 +161,38 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
   // =====================================================
   // ASSINATURA
   // =====================================================
-  const footerY = Math.max(y + 30, PAGE_HEIGHT - 50);
+  const sigY = Math.max(y + 20, PAGE_HEIGHT - 45);
 
+  // Limpar prefixos duplicados do nome e CRM
+  const medicoNomeLimpo = data.medicoNome.replace(/^Dr\.?a?\.?\s*/i, "");
+  const medicoCrmLimpo = data.medicoCrm.replace(/^CRM[-\s]*/i, "");
+
+  // Linha de assinatura (espaço para assinatura manual)
+  const lineY = sigY + 10;
   doc.setDrawColor(...COLORS.slate800);
   doc.setLineWidth(0.4);
-  doc.line(PAGE_WIDTH / 2 - 40, footerY, PAGE_WIDTH / 2 + 40, footerY);
+  doc.line(PAGE_WIDTH / 2 - 42, lineY, PAGE_WIDTH / 2 + 42, lineY);
 
+  // Nome do médico
   doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
+  doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, PAGE_WIDTH / 2, footerY + 5, { align: "center" });
+  doc.text(`Dr(a). ${medicoNomeLimpo}`, PAGE_WIDTH / 2, lineY + 5, { align: "center" });
 
+  // CRM e especialidade
   doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
+  doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${data.medicoCrm} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
+  doc.text(`${medicoCrmLimpo}  —  ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, lineY + 10, { align: "center" });
 
-  drawBottomBar(doc);
+  // Data abaixo do CRM
+  const localData = data.cidade
+    ? `${data.cidade}, ${data.dataEmissao}`
+    : data.dataEmissao;
+  doc.setFontSize(9);
+  doc.setFont(PDF_FONT, "normal");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text(localData, PAGE_WIDTH / 2, lineY + 16, { align: "center" });
 
   return doc.output("arraybuffer");
 }
