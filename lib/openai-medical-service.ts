@@ -64,15 +64,14 @@ Sua função é analisar transcrições de consultas e gerar:
 
 IMPORTANTE:
 - A anamnese deve seguir o formato médico padrão brasileiro e a ordem EXATA abaixo:
-- O formato da anamnese deve ser EXATAMENTE nesta ordem:
-  1. "ANAMNESE:" (primeiro tópico com dois pontos) seguido imediatamente do texto completo da transcrição
-  2. "QUEIXA PRINCIPAL:" - Motivo da consulta, preferencialmente nas palavras do paciente, curta e objetiva (2-3 palavras)
-  3. "HISTÓRIA DA DOENÇA ATUAL:" - Deve incluir: início, evolução, localização, intensidade, características, fatores de melhora/piora, sintomas associados, tratamentos prévios, impacto funcional
-  4. "ANTECEDENTES PESSOAIS PATOLÓGICOS:" - Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos
-  5. "ANTECEDENTES FAMILIARES:" - Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes
-  6. "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:" - Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional
-  7. "HISTÓRIA GINECO-OBSTÉTRICA:" - Apenas quando aplicável (menarca, ciclo menstrual, gestações/partos/abortos, menopausa, métodos contraceptivos)
-  8. "MEDICAMENTOS EM USO ATUAL:" - Nome, dose, frequência, tempo de uso
+- O formato da anamnese deve ser EXATAMENTE nesta ordem (começando direto na QUEIXA PRINCIPAL, SEM o tópico "ANAMNESE:"):
+  1. "QUEIXA PRINCIPAL:" - Motivo da consulta, preferencialmente nas palavras do paciente, curta e objetiva (2-3 palavras)
+  2. "HISTÓRIA DA DOENÇA ATUAL:" - Deve incluir: início, evolução, localização, intensidade, características, fatores de melhora/piora, sintomas associados, tratamentos prévios, impacto funcional
+  3. "ANTECEDENTES PESSOAIS PATOLÓGICOS:" - Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos
+  4. "ANTECEDENTES FAMILIARES:" - Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes
+  5. "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:" - Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional
+  6. "HISTÓRIA GINECO-OBSTÉTRICA:" - Apenas quando aplicável (menarca, ciclo menstrual, gestações/partos/abortos, menopausa, métodos contraceptivos)
+  7. "MEDICAMENTOS EM USO ATUAL:" - Nome, dose, frequência, tempo de uso
 - Use títulos em MAIÚSCULAS seguidos de dois pontos (:) para seções principais
 - Se alguma seção não for mencionada na transcrição, exiba o título seguido de "N/A"
 - A seção "EXAMES REALIZADOS" deve conter APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros nesta seção.
@@ -85,7 +84,7 @@ IMPORTANTE:
 
 Formato JSON esperado:
 {
-  "anamnese": "ANAMNESE:\\n[texto completo da transcrição]\\n\\nQUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nHISTÓRIA GINECO-OBSTÉTRICA:\\n... (ou N/A se não aplicável)\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...",
+  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nHISTÓRIA GINECO-OBSTÉTRICA:\\n... (ou N/A se não aplicável)\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...",
   "cidCodes": [
     {"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}
   ],
@@ -259,7 +258,7 @@ ${transcriptionText}
 ${examesContext}
 
 IMPORTANTE:
-- O formato da anamnese deve seguir EXATAMENTE a ordem: "ANAMNESE:" (com dois pontos) seguido do texto completo da transcrição, depois "QUEIXA PRINCIPAL:", "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "HISTÓRIA GINECO-OBSTÉTRICA:" (quando aplicável), e "MEDICAMENTOS EM USO ATUAL:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "HISTÓRIA GINECO-OBSTÉTRICA:" (quando aplicável), e "MEDICAMENTOS EM USO ATUAL:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
 - Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros.
 - Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
 - Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS".
@@ -361,15 +360,14 @@ export async function generateAnamneseOnly(transcriptionText: string): Promise<{
   const systemPrompt = `Você é um assistente médico especializado em registros clínicos.
 Sua função é estruturar a transcrição de uma consulta em uma anamnese médica completa e profissional em português brasileiro.
 
-A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos):
-1. ANAMNESE: — texto completo da transcrição
-2. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
-3. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
-4. ANTECEDENTES PESSOAIS PATOLÓGICOS: — doenças prévias, internações, cirurgias, alergias, medicamentos crônicos
-5. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
-6. HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — tabagismo, etilismo, atividade física, ocupação
-7. HISTÓRIA GINECO-OBSTÉTRICA: — apenas quando aplicável, caso contrário "N/A"
-8. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos), começando direto na QUEIXA PRINCIPAL (SEM o tópico "ANAMNESE:"):
+1. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
+2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
+3. ANTECEDENTES PESSOAIS PATOLÓGICOS: — doenças prévias, internações, cirurgias, alergias, medicamentos crônicos
+4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
+5. HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — tabagismo, etilismo, atividade física, ocupação
+6. HISTÓRIA GINECO-OBSTÉTRICA: — apenas quando aplicável, caso contrário "N/A"
+7. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
 
 Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
 Retorne APENAS um JSON com o campo "anamnese".`;

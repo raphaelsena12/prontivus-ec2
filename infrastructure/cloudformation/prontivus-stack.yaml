@@ -1,0 +1,394 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Stack CloudFormation para Prontivus - EC2 t3.small com Ubuntu, VPC e Security Groups'
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome da chave SSH para acesso à EC2
+    Default: prontivus-keypair
+  
+  AllowedSSHIP:
+    Type: String
+    Description: IP permitido para acesso SSH (use 0.0.0.0/0 para permitir de qualquer lugar)
+    Default: 0.0.0.0/0
+  
+  DatabaseURL:
+    Type: String
+    Description: URL de conexão do banco de dados PostgreSQL (RDS)
+    NoEcho: true
+  
+  NextAuthURL:
+    Type: String
+    Description: URL pública da aplicação (ex http://ec2-xxx.compute.amazonaws.com:3000)
+    Default: http://localhost:3000
+  
+  NextAuthSecret:
+    Type: String
+    Description: Secret para NextAuth
+    NoEcho: true
+  
+  AWSRegion:
+    Type: String
+    Description: Região AWS
+    Default: sa-east-1
+  
+  AWSAccessKeyId:
+    Type: String
+    Description: AWS Access Key ID (opcional)
+    Default: ''
+    NoEcho: true
+  
+  AWSSecretAccessKey:
+    Type: String
+    Description: AWS Secret Access Key (opcional)
+    Default: ''
+    NoEcho: true
+  
+  S3BucketName:
+    Type: String
+    Description: Nome do bucket S3 (opcional)
+    Default: ''
+
+Resources:
+  # VPC
+  ProntivusVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: ProntivusVPC
+
+  # Internet Gateway
+  ProntivusInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: ProntivusInternetGateway
+
+  # Attach Internet Gateway to VPC
+  ProntivusInternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref ProntivusInternetGateway
+      VpcId: !Ref ProntivusVPC
+
+  # Subnet Pública 1 (sa-east-1a)
+  ProntivusPublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ProntivusVPC
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ProntivusPublicSubnet1
+
+  # Subnet Pública 2 (sa-east-1b)
+  ProntivusPublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref ProntivusVPC
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: 10.0.2.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: ProntivusPublicSubnet2
+
+  # Route Table Pública
+  ProntivusPublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref ProntivusVPC
+      Tags:
+        - Key: Name
+          Value: ProntivusPublicRouteTable
+
+  # Rota padrão para Internet Gateway
+  ProntivusPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: ProntivusInternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref ProntivusPublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref ProntivusInternetGateway
+
+  # Associar Subnet 1 à Route Table
+  ProntivusPublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ProntivusPublicSubnet1
+      RouteTableId: !Ref ProntivusPublicRouteTable
+
+  # Associar Subnet 2 à Route Table
+  ProntivusPublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref ProntivusPublicSubnet2
+      RouteTableId: !Ref ProntivusPublicRouteTable
+
+  # Security Group
+  ProntivusSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: prontivus-sg
+      GroupDescription: Security Group para Prontivus - SSH e Next.js
+      VpcId: !Ref ProntivusVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedSSHIP
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: Next.js application port
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: ProntivusSecurityGroup
+
+  # IAM Role para EC2
+  ProntivusEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+        - PolicyName: SESAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'
+        - PolicyName: TranscribeAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - transcribe:StartStreamingTranscription
+                  - transcribe:StartTranscriptionJob
+                  - transcribe:GetTranscriptionJob
+                Resource: '*'
+        - PolicyName: ComprehendMedicalAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - comprehendmedical:DetectEntities
+                  - comprehendmedical:DetectPHI
+                Resource: '*'
+      Tags:
+        - Key: Name
+          Value: ProntivusEC2Role
+
+  # Instance Profile
+  ProntivusEC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ProntivusEC2Role
+
+  # Elastic IP
+  ProntivusElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: ProntivusElasticIP
+
+  # EC2 Instance
+  ProntivusEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-03a79217ca48f4d1e  # Ubuntu 22.04 LTS em sa-east-1
+      InstanceType: t3.small
+      KeyName: !Ref KeyPairName
+      SubnetId: !Ref ProntivusPublicSubnet1
+      SecurityGroupIds:
+        - !Ref ProntivusSecurityGroup
+      IamInstanceProfile: !Ref ProntivusEC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          
+          # Atualizar sistema
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -y
+          apt-get upgrade -y
+          
+          # Instalar dependências básicas
+          apt-get install -y \
+            curl \
+            wget \
+            git \
+            build-essential \
+            postgresql-client \
+            unzip \
+            ca-certificates \
+            gnupg \
+            lsb-release
+          
+          # Instalar Node.js 20.x
+          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+          apt-get install -y nodejs
+          
+          # Verificar instalação
+          node --version
+          npm --version
+          
+          # Instalar PM2 globalmente
+          npm install -g pm2
+          
+          # Instalar Nginx (opcional, para reverse proxy)
+          apt-get install -y nginx
+          
+          # Criar diretório da aplicação
+          mkdir -p /opt/prontivus
+          mkdir -p /opt/prontivus/logs
+          chown -R ubuntu:ubuntu /opt/prontivus
+          
+          # Configurar variáveis de ambiente
+          cat > /opt/prontivus/.env <<EOF
+          NODE_ENV=production
+          PORT=3000
+          HOSTNAME=0.0.0.0
+          DATABASE_URL=${DatabaseURL}
+          NEXTAUTH_URL=${NextAuthURL}
+          NEXTAUTH_SECRET=${NextAuthSecret}
+          AWS_REGION=${AWSRegion}
+          AWS_ACCESS_KEY_ID=${AWSAccessKeyId}
+          AWS_SECRET_ACCESS_KEY=${AWSSecretAccessKey}
+          AWS_S3_BUCKET_NAME=${S3BucketName}
+          NEXT_DISABLE_TURBO=1
+          TURBOPACK=0
+          NEXT_WEBPACK=1
+          EOF
+          
+          chown ubuntu:ubuntu /opt/prontivus/.env
+          chmod 600 /opt/prontivus/.env
+          
+          # Configurar Nginx como reverse proxy (opcional)
+          cat > /etc/nginx/sites-available/prontivus <<EOF
+          server {
+              listen 80;
+              server_name _;
+              
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto \$scheme;
+                  proxy_cache_bypass \$http_upgrade;
+              }
+          }
+          EOF
+          
+          # Criar link simbólico
+          ln -sf /etc/nginx/sites-available/prontivus /etc/nginx/sites-enabled/
+          rm -f /etc/nginx/sites-enabled/default
+          
+          # Testar configuração Nginx
+          nginx -t
+          
+          # Reiniciar Nginx
+          systemctl restart nginx
+          systemctl enable nginx
+          
+          # Instalar CloudWatch Agent (opcional)
+          wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+          dpkg -i -E ./amazon-cloudwatch-agent.deb || true
+          
+          # Log de conclusão
+          echo "Instalação concluída em $(date)" >> /var/log/prontivus-setup.log
+          
+      Tags:
+        - Key: Name
+          Value: ProntivusEC2Instance
+        - Key: Environment
+          Value: Production
+
+  # Associar Elastic IP à EC2
+  ProntivusEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref ProntivusEC2Instance
+      EIP: !Ref ProntivusElasticIP
+
+Outputs:
+  VPCId:
+    Description: ID da VPC criada
+    Value: !Ref ProntivusVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-VPCId'
+
+  SecurityGroupId:
+    Description: ID do Security Group
+    Value: !Ref ProntivusSecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
+
+  EC2InstanceId:
+    Description: ID da instância EC2
+    Value: !Ref ProntivusEC2Instance
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2InstanceId'
+
+  EC2PublicIP:
+    Description: IP público da instância EC2 (Elastic IP)
+    Value: !Ref ProntivusElasticIP
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2PublicIP'
+
+  EC2PublicDNS:
+    Description: DNS público da instância EC2
+    Value: !GetAtt ProntivusEC2Instance.PublicDnsName
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2PublicDNS'
+
+  ApplicationURL:
+    Description: URL da aplicação
+    Value: !Sub 'http://${ProntivusElasticIP}:3000'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApplicationURL'

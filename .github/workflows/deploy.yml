@@ -1,81 +1,94 @@
-name: Build and Deploy to ECS
+name: Deploy para EC2
 
 on:
   push:
     branches:
       - main
-      - production
-  workflow_dispatch:
-
-env:
-  AWS_REGION: us-east-1
-  ECR_REPOSITORY: production-prontivus
-  ECS_CLUSTER: production-prontivus-cluster
-  ECS_SERVICE: production-prontivus-service
-  ECS_TASK_DEFINITION: production-prontivus-task
+      - master
+  workflow_dispatch: # Permite execução manual
 
 jobs:
-  build-and-deploy:
-    name: Build Docker Image and Deploy to ECS
+  deploy:
+    name: Deploy na EC2
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code
+      - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Configurar SSH
         run: |
-          # Build Docker image
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
-          # Push both tags
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Download task definition
+      - name: Copiar script de deploy para EC2
         run: |
-          aws ecs describe-task-definition \
-            --task-definition ${{ env.ECS_TASK_DEFINITION }} \
-            --query taskDefinition > task-definition.json
+          scp -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            infrastructure/scripts/deploy.sh \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/deploy.sh
 
-      - name: Fill in the new image ID in the Amazon ECS task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: prontivus-app
-          image: ${{ steps.build-image.outputs.image }}
-
-      - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      - name: Verify deployment
+      - name: Copiar ecosystem.config.js para EC2
         run: |
-          echo "Deployment completed successfully!"
-          echo "Service: ${{ env.ECS_SERVICE }}"
-          echo "Cluster: ${{ env.ECS_CLUSTER }}"
-          echo "Image: ${{ steps.build-image.outputs.image }}"
+          scp -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            infrastructure/ecosystem.config.js \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/prontivus/ecosystem.config.js
 
+      - name: Executar deploy na EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            
+            # Criar diretório da aplicação se não existir
+            sudo mkdir -p /opt/prontivus
+            sudo mkdir -p /opt/prontivus/logs
+            
+            # Verificar se é um repositório Git
+            if [ ! -d /opt/prontivus/.git ]; then
+              echo "⚠️ Aviso: Diretório não é um repositório Git. Execute manualmente:"
+              echo "  cd /opt/prontivus && sudo git clone <repo-url> . && sudo chown -R ubuntu:ubuntu /opt/prontivus"
+            fi
+            
+            # Tornar script executável
+            chmod +x /tmp/deploy.sh
+            
+            # Executar script de deploy
+            /tmp/deploy.sh
+            
+            # Limpar script temporário
+            rm -f /tmp/deploy.sh
+          EOF
+
+      - name: Verificar status da aplicação
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            echo "Status do PM2:"
+            pm2 status
+            
+            echo ""
+            echo "Últimas linhas de log:"
+            pm2 logs prontivus --lines 20 --nostream || true
+          EOF
+
+      - name: Health Check
+        run: |
+          sleep 10
+          if curl -f http://${{ secrets.EC2_HOST }}:3000 > /dev/null 2>&1; then
+            echo "✅ Aplicação está respondendo"
+          else
+            echo "⚠️ Aplicação pode não estar respondendo ainda"
+            exit 0  # Não falhar o workflow, apenas avisar
+          fi
+
+      - name: Limpar chaves SSH
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f ~/.ssh/known_hosts

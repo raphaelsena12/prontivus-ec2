@@ -1,0 +1,38 @@
+[
+  {
+    "ParameterKey": "KeyPairName",
+    "ParameterValue": "prontivus-keypair"
+  },
+  {
+    "ParameterKey": "DatabaseURL",
+    "ParameterValue": "postgresql://postgres:AmGRLans3P2RLFv8pyky@db-prontivus-new.crka8siog2ay.sa-east-1.rds.amazonaws.com:5432/db-prontivus-new"
+  },
+  {
+    "ParameterKey": "NextAuthURL",
+    "ParameterValue": "http://56.125.239.99:3000"
+  },
+  {
+    "ParameterKey": "NextAuthSecret",
+    "ParameterValue": "d0sULqJedg07lq0gsU+cbmMsiLrZqz0P9Z4pb2fEsck="
+  },
+  {
+    "ParameterKey": "AllowedSSHIP",
+    "ParameterValue": "0.0.0.0/0"
+  },
+  {
+    "ParameterKey": "AWSRegion",
+    "ParameterValue": "sa-east-1"
+  },
+  {
+    "ParameterKey": "AWSAccessKeyId",
+    "ParameterValue": "YOUR_AWS_ACCESS_KEY_ID"
+  },
+  {
+    "ParameterKey": "AWSSecretAccessKey",
+    "ParameterValue": "YOUR_AWS_SECRET_ACCESS_KEY"
+  },
+  {
+    "ParameterKey": "S3BucketName",
+    "ParameterValue": "prontivus-documentos"
+  }
+]
