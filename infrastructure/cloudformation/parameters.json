@@ -9,7 +9,7 @@
   },
   {
     "ParameterKey": "NextAuthURL",
-    "ParameterValue": "http://56.125.239.99:3000"
+    "ParameterValue": "http://localhost:3000"
   },
   {
     "ParameterKey": "NextAuthSecret",

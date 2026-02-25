@@ -62,6 +62,7 @@ import {
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSidebar } from '@/components/ui/sidebar';
 import { formatDate, formatTime, formatCPF } from '@/lib/utils';
 import { useTranscription } from '@/hooks/use-transcription';
 import { ProcessingModal } from '@/components/processing-modal';
@@ -118,6 +119,7 @@ interface AtendimentoContentProps {
 
 export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const router = useRouter();
+  const { open: sidebarOpen, isMobile } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
@@ -138,9 +140,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [selectedExams, setSelectedExams] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState<'processing' | 'analyzing' | 'generating'>('processing');
+  const [processingContext, setProcessingContext] = useState<'anamnese' | 'suggestions'>('anamnese');
   const [analysisResults, setAnalysisResults] = useState<{
     anamnese: string;
     cidCodes: Array<{ code: string; description: string; score: number }>;
+    protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
     exames: Array<{ nome: string; tipo: string; justificativa: string }>;
     prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string; justificativa?: string }>;
   } | null>(null);
@@ -164,6 +168,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [loadingManipulados, setLoadingManipulados] = useState(false);
   const [activeMedicamentoTab, setActiveMedicamentoTab] = useState<"medicamentos" | "manipulados">("medicamentos");
   const [selectedPrescricaoIndex, setSelectedPrescricaoIndex] = useState<number | null>(null);
+  const [pendingMedicamento, setPendingMedicamento] = useState<{
+    nome: string;
+    dosagem: string;
+    posologia: string;
+    duracao: string;
+  } | null>(null);
   const [documentosGerados, setDocumentosGerados] = useState<Array<{ id: string; tipoDocumento: string; nomeDocumento: string; createdAt: string; pdfBlob?: Blob }>>([]);
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [selectedConsultaForDocumentos, setSelectedConsultaForDocumentos] = useState<string | null>(null);
@@ -557,6 +567,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
 
     setIsProcessing(true);
+    setProcessingContext('anamnese');
     setProcessingStage('processing');
     setAnalysisResults(null);
 
@@ -579,7 +590,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       const anamneseFormatted = data.anamnese
         ? data.anamnese.replace(/\\n/g, '\n').replace(/\\r/g, '')
         : '';
-      setAnalysisResults({ anamnese: anamneseFormatted, cidCodes: [], exames: [], prescricoes: [] });
+      setAnalysisResults({ anamnese: anamneseFormatted, cidCodes: [], protocolos: [], exames: [], prescricoes: [] });
       setProntuario((prev) => ({ ...prev, anamnese: anamneseFormatted } as Prontuario));
       setEditedAnamnese(anamneseFormatted);
       setIsEditingAnamnese(true); // Sempre deixar em modo de edição
@@ -620,6 +631,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
 
     setIsProcessing(true);
+    setProcessingContext('suggestions');
     setProcessingStage('analyzing');
 
     try {
@@ -647,6 +659,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       setAnalysisResults((prev) => ({
         anamnese: prev?.anamnese || anamneseText,
         cidCodes: data.cidCodes || [],
+        protocolos: data.protocolos || [],
         exames: data.exames || [],
         prescricoes: data.prescricoes || [],
       }));
@@ -718,6 +731,53 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       };
       setPrescricoes(next);
     }
+    setMedicamentoDialogOpen(false);
+    setMedicamentoSearch("");
+    setSelectedPrescricaoIndex(null);
+  };
+
+  const handlePreSelectMedicamento = (med: typeof medicamentos[0]) => {
+    const dosagem = med.concentracao && med.unidade
+      ? `${med.concentracao}${med.unidade}`
+      : med.apresentacao || "";
+    setPendingMedicamento({
+      nome: med.nome,
+      dosagem,
+      posologia: "",
+      duracao: "",
+    });
+  };
+
+  const handlePreSelectManipulado = (manipulado: typeof manipulados[0]) => {
+    setPendingMedicamento({
+      nome: manipulado.descricao,
+      dosagem: "",
+      posologia: manipulado.informacoes || "",
+      duracao: "",
+    });
+  };
+
+  const handleConfirmPendingMedicamento = () => {
+    if (!pendingMedicamento) return;
+    if (selectedPrescricaoIndex === null) {
+      setPrescricoes([...prescricoes, {
+        medicamento: pendingMedicamento.nome,
+        dosagem: pendingMedicamento.dosagem,
+        posologia: pendingMedicamento.posologia,
+        duracao: pendingMedicamento.duracao,
+      }]);
+    } else {
+      const next = [...prescricoes];
+      next[selectedPrescricaoIndex] = {
+        ...next[selectedPrescricaoIndex],
+        medicamento: pendingMedicamento.nome,
+        dosagem: pendingMedicamento.dosagem,
+        posologia: pendingMedicamento.posologia,
+        duracao: pendingMedicamento.duracao,
+      };
+      setPrescricoes(next);
+    }
+    setPendingMedicamento(null);
     setMedicamentoDialogOpen(false);
     setMedicamentoSearch("");
     setSelectedPrescricaoIndex(null);
@@ -1348,7 +1408,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const patient = {
     name: consulta.paciente.nome,
     age: calcularIdade(consulta.paciente.dataNascimento),
-    id: consulta.paciente.numeroProntuario ? consulta.paciente.numeroProntuario.toString() : consulta.paciente.id.substring(0, 12).toUpperCase(),
+    id: consulta.paciente.numeroProntuario ? consulta.paciente.numeroProntuario.toString() : "N/A",
     phone: consulta.paciente.celular || consulta.paciente.telefone || "-",
     email: consulta.paciente.email || "-",
     bloodType: "Não informado", // Campo não disponível no schema atual
@@ -1369,8 +1429,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const inicial = consulta.paciente.nome.trim().charAt(0).toUpperCase();
   const idade = calcularIdade(consulta.paciente.dataNascimento);
   const prontuarioLabel = consulta.paciente.numeroProntuario
-    ? `Pront. ${String(consulta.paciente.numeroProntuario).padStart(5, "0")}`
-    : `ID ${consulta.paciente.id.substring(0, 8).toUpperCase()}`;
+    ? `Prontuário: ${String(consulta.paciente.numeroProntuario).padStart(5, "0")}`
+    : "Prontuário: N/A";
   const hasAllergies = patient.allergies.length > 0;
 
   const vitalStatusDot: Record<string, string> = {
@@ -1413,7 +1473,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-base font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
+                  <span className="text-xl font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
                   <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                     Em Atendimento
@@ -1425,17 +1485,31 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 flex-wrap">
-                  <span className="font-medium text-slate-700 whitespace-nowrap">{idade} anos</span>
-                  <span className="text-slate-300">·</span>
-                  <span className="whitespace-nowrap">Nasc. {formatDate(consulta.paciente.dataNascimento)}</span>
-                  <span className="text-slate-300">·</span>
-                  <span className="font-medium text-slate-600 whitespace-nowrap">{prontuarioLabel}</span>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  {/* Demographics */}
+                  <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{idade} anos</span>
+                  <span className="text-xs text-slate-300">·</span>
+                  <span className="text-xs text-slate-500 whitespace-nowrap">{formatDate(new Date(consulta.paciente.dataNascimento))}</span>
+
+                  {/* Divider */}
+                  <span className="h-3.5 w-px bg-slate-200 mx-0.5" />
+
+                  {/* ID badge */}
+                  <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">{prontuarioLabel}</Badge>
+
+                  {/* Tipo consulta badge */}
                   {consulta.tipoConsulta && (
-                    <>
-                      <span className="text-slate-300">·</span>
-                      <span className="truncate">{consulta.tipoConsulta.nome}</span>
-                    </>
+                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">{consulta.tipoConsulta.nome}</Badge>
+                  )}
+
+                  {/* Plan badge */}
+                  {(consulta as any).operadora ? (
+                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      {(consulta as any).operadora.nomeFantasia}
+                      {(consulta as any).planoSaude && ` · ${(consulta as any).planoSaude.nome}`}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">Particular</Badge>
                   )}
                 </div>
               </div>
@@ -1495,7 +1569,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto space-y-4 px-4 lg:px-8 pt-5 pb-10 overflow-x-hidden">
+      <div className="max-w-[1400px] mx-auto space-y-4 px-4 lg:px-8 pt-5 pb-16 overflow-x-hidden">
         {/* Zona 2 — Histórico do Paciente (colapsável) */}
         <PatientHistory
           isExpanded={isHistoryExpanded}
@@ -1552,9 +1626,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           />
         ) : (
           <>
-          <div className="grid grid-cols-12 gap-4 items-start">
+          <div className="grid grid-cols-12 gap-4 items-stretch">
             {/* Coluna Anamnese */}
-            <div className="col-span-8">
+            <div className="col-span-8 h-full flex flex-col">
               <Step2Anamnesis
                 isProcessing={isProcessing}
                 analysisResults={analysisResults}
@@ -1621,8 +1695,37 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                 />
             </div>
           </div>
+
           </>
         )}
+      </div>
+
+      {/* ── Barra de ações fixada no bottom ── */}
+      <div
+        className="fixed bottom-0 right-0 z-[15] bg-white/90 backdrop-blur-sm border-t border-slate-200 transition-[left] duration-200"
+        style={{ left: !isMobile && sidebarOpen ? "var(--sidebar-width)" : "0" }}
+      >
+        <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-2.5 flex items-center justify-end gap-2">
+          <button
+            onClick={() => toast.info("Funcionalidade de assinar documento em desenvolvimento")}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+          >
+            <FileCheck className="w-3.5 h-3.5" />
+            Assinar Documento
+          </button>
+
+          <div className="w-px h-4 bg-slate-200" />
+
+          <button
+            onClick={handleFinalizarAtendimento}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            {saving ? "Salvando..." : "Finalizar Atendimento"}
+          </button>
+        </div>
       </div>
 
       {/* Pill flutuante de transcrição */}
@@ -1775,8 +1878,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
       {/* Modal de Processamento */}
       <ProcessingModal
-        isOpen={isProcessing} 
+        isOpen={isProcessing}
         stage={processingStage}
+        context={processingContext}
         examesCount={0}
         imagensCount={0}
       />
@@ -1879,15 +1983,76 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       <Dialog open={medicamentoDialogOpen} onOpenChange={(open) => {
         setMedicamentoDialogOpen(open);
         if (!open) {
-          // Resetar estados quando fechar
           setActiveMedicamentoTab("medicamentos");
           setMedicamentoSearch("");
+          setPendingMedicamento(null);
         }
       }}>
         <DialogContent className="max-w-2xl h-[600px] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Selecionar Medicamento ou Manipulado</DialogTitle>
+            <DialogTitle>
+              {pendingMedicamento ? "Detalhar Prescrição" : "Selecionar Medicamento ou Manipulado"}
+            </DialogTitle>
           </DialogHeader>
+
+          {/* ── Passo 2: formulário de posologia ── */}
+          {pendingMedicamento && (
+            <div className="flex flex-col gap-5 flex-1 overflow-y-auto py-2 px-1">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100">
+                <Pill className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <span className="text-sm font-semibold text-slate-800 truncate">{pendingMedicamento.nome}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Dosagem</label>
+                  <Input
+                    placeholder="Ex: 500mg, 10ml"
+                    value={pendingMedicamento.dosagem}
+                    onChange={(e) => setPendingMedicamento((p) => p ? { ...p, dosagem: e.target.value } : p)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Duração</label>
+                  <Input
+                    placeholder="Ex: 7 dias, 1 mês"
+                    value={pendingMedicamento.duracao}
+                    onChange={(e) => setPendingMedicamento((p) => p ? { ...p, duracao: e.target.value } : p)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Posologia</label>
+                <textarea
+                  placeholder="Ex: Tomar 1 comprimido a cada 8 horas, após as refeições"
+                  value={pendingMedicamento.posologia}
+                  onChange={(e) => setPendingMedicamento((p) => p ? { ...p, posologia: e.target.value } : p)}
+                  rows={4}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setPendingMedicamento(null)}
+                >
+                  Voltar
+                </Button>
+                <Button
+                  className="flex-1 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white"
+                  onClick={handleConfirmPendingMedicamento}
+                >
+                  Confirmar Prescrição
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Passo 1: seleção de medicamento ── */}
+          {!pendingMedicamento && (
           <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
             <Tabs value={activeMedicamentoTab} onValueChange={(value) => {
               const newTab = value as "medicamentos" | "manipulados";
@@ -1936,7 +2101,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                       {medicamentos.map((med) => (
                         <button
                           key={med.id}
-                          onClick={() => handleSelectMedicamento(med)}
+                          onClick={() => handlePreSelectMedicamento(med)}
                           className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -1985,7 +2150,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                       {manipulados.map((manipulado) => (
                         <button
                           key={manipulado.id}
-                          onClick={() => handleSelectManipulado(manipulado)}
+                          onClick={() => handlePreSelectManipulado(manipulado)}
                           className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -2005,6 +2170,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               </TabsContent>
             </Tabs>
           </div>
+          )} {/* fim passo 1 */}
         </DialogContent>
       </Dialog>
 
@@ -2270,34 +2436,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Box de ações finais */}
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-5 pb-10">
-        <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-end gap-3">
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => {
-                // TODO: Implementar função de assinar documento
-                toast.info("Funcionalidade de assinar documento em desenvolvimento");
-              }}
-              className="h-11 px-6 text-sm gap-2 border-slate-200 text-slate-700 hover:bg-slate-50"
-            >
-              <FileCheck className="w-4 h-4" />
-              Assinar Documento
-            </Button>
-            <Button
-              size="lg"
-              onClick={handleFinalizarAtendimento}
-              disabled={saving}
-              className="h-11 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-sm"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              Finalizar Atendimento
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

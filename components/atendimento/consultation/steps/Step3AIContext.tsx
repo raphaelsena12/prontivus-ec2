@@ -202,7 +202,7 @@ export function Step3AIContext({
           <Button
             onClick={onGenerateSuggestions}
             disabled={isProcessing}
-            className="h-10 px-8 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200"
+            className="h-10 px-8 text-sm gap-2 bg-transparent border border-[#1E40AF] text-[#1E40AF] hover:bg-blue-50"
           >
             {isProcessing ? (
               <>

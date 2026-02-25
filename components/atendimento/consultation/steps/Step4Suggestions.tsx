@@ -180,7 +180,7 @@ export function Step4Suggestions({
     <div className="space-y-4">
       {/* 4.1 — CID Sugerido */}
       <AccordionSection
-        title="CID-10 / Diagnóstico"
+        title="CID 10 Sugerido por IA"
         icon={FileText}
         badge={allCids.length > 0 ? `${allCids.length} sugestão(ões)` : undefined}
       >
@@ -237,7 +237,7 @@ export function Step4Suggestions({
 
       {/* 4.2 — Exames Sugeridos */}
       <AccordionSection
-        title="Exames Sugeridos"
+        title="Exames Sugeridos por IA"
         icon={FlaskConical}
         badge={allExames.length > 0 ? `${allExames.length} sugestão(ões)` : undefined}
       >

@@ -111,6 +111,18 @@ export async function GET(request: NextRequest) {
             nome: true,
           },
         },
+        operadora: {
+          select: {
+            id: true,
+            nomeFantasia: true,
+          },
+        },
+        planoSaude: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
       },
     });
 

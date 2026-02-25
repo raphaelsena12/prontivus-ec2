@@ -90,6 +90,7 @@ export function Step5Documents({
 }: Step5DocumentsProps) {
   const [loadingDoc, setLoadingDoc] = useState<string | null>(null);
   const [showAllDocs, setShowAllDocs] = useState(false);
+  const [documentosImpressos, setDocumentosImpressos] = useState<Set<string>>(new Set());
 
   const isGenerated = (id: string) =>
     documentosGerados.some((d) => d.tipoDocumento === id);
@@ -107,6 +108,18 @@ export function Step5Documents({
     if (doc.pdfBlob) {
       const url = URL.createObjectURL(doc.pdfBlob);
       window.open(url, "_blank");
+    }
+  };
+
+  const printDoc = (doc: DocumentoGerado) => {
+    if (doc.pdfBlob) {
+      const url = URL.createObjectURL(doc.pdfBlob);
+      const win = window.open(url, "_blank");
+      win?.addEventListener("load", () => {
+        win.print();
+        // Marcar documento como impresso
+        setDocumentosImpressos((prev) => new Set(prev).add(doc.id));
+      });
     }
   };
 
@@ -276,8 +289,12 @@ export function Step5Documents({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => window.print()}
-                        className="h-7 px-2 text-xs gap-1 text-slate-500 hover:text-slate-700"
+                        onClick={() => printDoc(doc)}
+                        className={`h-7 px-2 text-xs gap-1 ${
+                          documentosImpressos.has(doc.id)
+                            ? "text-emerald-600 hover:text-emerald-700"
+                            : "text-slate-500 hover:text-slate-700"
+                        }`}
                       >
                         <Printer className="w-3.5 h-3.5" />
                         Imprimir

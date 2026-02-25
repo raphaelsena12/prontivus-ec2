@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles,
   Loader2,
-  Play,
+  Mic,
+  Radio,
 } from "lucide-react";
 
 interface AnalysisResults {
@@ -52,8 +53,9 @@ const ANAMNESE_SECTIONS = [
   { key: "hda",             label: "História da Doença Atual (HDA)", placeholder: "Início, evolução, fatores de melhora e piora, sintomas associados..." },
   { key: "antecedentes",    label: "Antecedentes Pessoais", placeholder: "Doenças pregressas, cirurgias, internações, alergias conhecidas..." },
   { key: "revisaoSistemas", label: "Revisão de Sistemas", placeholder: "Sintomas em cada sistema (cardiovascular, respiratório, digestivo...)" },
-  { key: "exameFisico",     label: "Exame Físico", placeholder: "Dados vitais, aspecto geral, achados por sistema..." },
 ];
+
+const EXAME_FISICO_TITLES = ["EXAME FÍSICO", "EXAME FISICO", "EXAME FÍSICO GERAL"];
 
 function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
   const lines = anamnese.split("\n");
@@ -88,7 +90,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
   let currentTitle = "";
   let currentContent: string[] = [];
 
-  // Títulos conhecidos da anamnese
   const knownTitles = [
     "ANAMNESE",
     "QUEIXA PRINCIPAL",
@@ -97,7 +98,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
     "ANTECEDENTES FAMILIARES",
     "HÁBITOS DE VIDA",
     "HISTÓRIA SOCIAL",
-    "HISTÓRIA GINECO-OBSTÉTRICA",
     "MEDICAMENTOS EM USO ATUAL",
     "EXAMES REALIZADOS",
   ];
@@ -105,37 +105,33 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
-    
+
     if (!trimmed) {
-      // Linha vazia - se já temos conteúdo, mantém para espaçamento
       if (currentContent.length > 0) {
         currentContent.push("");
       }
       continue;
     }
-    
-    // Verifica se a linha contém um título (pode ter conteúdo na mesma linha)
+
     let titleMatch: { title: string; content: string } | null = null;
-    
-    // Padrão 1: Linha que termina com ":" e começa com maiúscula
+
     if (trimmed.includes(":")) {
       const colonIndex = trimmed.indexOf(":");
       const beforeColon = trimmed.substring(0, colonIndex).trim();
       const afterColon = trimmed.substring(colonIndex + 1).trim();
       const upperBefore = beforeColon.toUpperCase();
-      
-      // Verifica se é um título conhecido ou parece um título (tudo maiúscula)
-      const isKnownTitle = knownTitles.some(title => 
-        upperBefore === title || 
+
+      const isKnownTitle = knownTitles.some(title =>
+        upperBefore === title ||
         upperBefore.startsWith(title) ||
         title.startsWith(upperBefore)
       );
-      
-      const looksLikeTitle = 
+
+      const looksLikeTitle =
         beforeColon === upperBefore &&
         beforeColon.length < 80 &&
         beforeColon.match(/^[A-Z\s\-\/ÉÁÍÓÚÇÃÕÊÔ]+$/);
-      
+
       if (isKnownTitle || looksLikeTitle) {
         titleMatch = {
           title: beforeColon,
@@ -143,16 +139,15 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
         };
       }
     }
-    
-    // Padrão 2: Linha toda em maiúscula sem ":" mas é um título conhecido
+
     if (!titleMatch) {
       const upperTrimmed = trimmed.toUpperCase();
-      const isKnownTitle = knownTitles.some(title => 
-        upperTrimmed === title || 
+      const isKnownTitle = knownTitles.some(title =>
+        upperTrimmed === title ||
         upperTrimmed.startsWith(title + " ") ||
         title.startsWith(upperTrimmed)
       );
-      
+
       if (isKnownTitle && trimmed === upperTrimmed && trimmed.length < 80) {
         titleMatch = {
           title: trimmed,
@@ -160,8 +155,7 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
         };
       }
     }
-    
-    // Padrão 3: Linha com "**" no início e fim
+
     if (!titleMatch && trimmed.startsWith("**") && trimmed.endsWith("**")) {
       titleMatch = {
         title: trimmed.replace(/^\*\*/g, "").replace(/\*\*$/g, "").trim(),
@@ -170,7 +164,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
     }
 
     if (titleMatch) {
-      // Salva a seção anterior
       if (currentTitle || currentContent.length > 0) {
         const content = currentContent.join("\n").trim();
         if (currentTitle || content) {
@@ -180,15 +173,12 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
           });
         }
       }
-      // Inicia nova seção
       currentTitle = titleMatch.title;
       currentContent = titleMatch.content ? [titleMatch.content] : [];
     } else {
-      // Adiciona ao conteúdo da seção atual
       if (currentTitle || currentContent.length > 0) {
         currentContent.push(trimmed);
       } else {
-        // Se não há título ainda, pode ser que o texto comece sem título
         if (sections.length === 0) {
           currentContent.push(trimmed);
         }
@@ -196,7 +186,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
     }
   }
 
-  // Adiciona a última seção
   if (currentTitle || currentContent.length > 0) {
     const content = currentContent.join("\n").trim();
     if (currentTitle || content) {
@@ -207,7 +196,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
     }
   }
 
-  // Se não encontrou nenhuma seção formatada, retorna tudo como uma seção
   if (sections.length === 0) {
     return [{ title: "", content: text }];
   }
@@ -235,59 +223,47 @@ export function Step2Anamnesis({
   anamneseConfirmed,
   onConfirmAnamnese,
   onAdvance,
-  consultationMode,
+  consultationMode = "ai",
   onToggleMode,
   isTranscribing,
   startTranscription,
   transcriptionText = "",
 }: Step2AnamnesisProps) {
-  // Garantir que as quebras de linha sejam preservadas
   const rawAnamnese = isAnamneseEdited
     ? editedAnamnese
     : analysisResults?.anamnese || prontuario?.anamnese || "";
   let anamneseText = rawAnamnese.replace(/\\n/g, '\n').replace(/\\r/g, '');
-  
-  // Garantir que sempre tenha o primeiro tópico "ANAMNESE" com o texto da transcrição
+
   if (transcriptionText && transcriptionText.trim()) {
     const trimmedTranscription = transcriptionText.trim();
     const upperAnamnese = anamneseText.toUpperCase().trim();
-    
-    // Verifica se já começa com "ANAMNESE:"
+
     if (upperAnamnese.startsWith("ANAMNESE:")) {
-      // Se já tem o título, verifica se tem conteúdo após "ANAMNESE:"
       const lines = anamneseText.split('\n');
       const firstLine = lines[0]?.trim() || '';
       const afterColon = firstLine.substring(firstLine.indexOf(':') + 1).trim();
-      
-      // Se não tem conteúdo na mesma linha ou na próxima linha, adiciona a transcrição
       if (!afterColon) {
         const secondLine = lines[1]?.trim() || '';
         if (!secondLine) {
-          // Se não tem conteúdo após "ANAMNESE:", adiciona a transcrição
           anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${lines.slice(1).join('\n')}`;
         }
       }
     } else if (upperAnamnese.startsWith("ANAMNESE")) {
-      // Se começa com "ANAMNESE" mas sem ":", adiciona ":" e a transcrição
       const lines = anamneseText.split('\n');
       if (lines[0]?.trim().toUpperCase() === "ANAMNESE") {
         anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${lines.slice(1).join('\n')}`;
       }
     } else {
-      // Se não tem o título "ANAMNESE", adiciona no início
       anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${anamneseText}`;
     }
   }
 
-  // Estado para armazenar edições das seções
   const [sectionEdits, setSectionEdits] = useState<Record<number, string>>({});
 
-  // Resetar edições quando a anamnese mudar
   useEffect(() => {
     setSectionEdits({});
   }, [anamneseText]);
 
-  // ── Estado de seções para modo manual ──────────────────────────────────────
   const [sectionValues, setSectionValues] = useState<Record<string, string>>(() => {
     const base = analysisResults?.anamnese || prontuario?.anamnese || "";
     if (!base) return {};
@@ -308,8 +284,8 @@ export function Step2Anamnesis({
   }
 
   return (
-    <div className="space-y-2 overflow-x-hidden">
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col overflow-x-hidden">
+    <div className="h-full overflow-x-hidden">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col h-full overflow-x-hidden">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
@@ -322,21 +298,37 @@ export function Step2Anamnesis({
               </span>
             )}
           </div>
-          {/* Botão Iniciar Gravação - somente quando não há anamnese gerada */}
-          {!isTranscribing && !anamneseText && startTranscription && (
-            <Button
-              onClick={startTranscription}
-              size="sm"
-              className="h-9 px-4 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white"
-            >
-              <Play className="w-4 h-4" fill="currentColor" />
-              Iniciar Gravação
-            </Button>
+
+          {/* Toggle Manual / Assistido por IA */}
+          {onToggleMode && (
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
+              <button
+                onClick={() => onToggleMode("manual")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  consultationMode === "manual"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Manual
+              </button>
+              <button
+                onClick={() => onToggleMode("ai")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  consultationMode === "ai"
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                Assistido por IA
+              </button>
+            </div>
           )}
         </div>
 
         {/* ── Corpo ── */}
-        <div className="p-3 overflow-x-hidden">
+        <div className="p-3 overflow-x-hidden flex-1 overflow-y-auto">
           {isProcessing ? (
             /* Loading IA */
             <div className="space-y-2">
@@ -352,37 +344,106 @@ export function Step2Anamnesis({
               ))}
             </div>
 
+          ) : consultationMode === "manual" ? (
+            /* ── Modo Manual: inputs por tópico ── */
+            <div className="divide-y divide-slate-100">
+              {ANAMNESE_SECTIONS.map((section) => (
+                <div key={section.key} className="space-y-1.5 pt-4 first:pt-0">
+                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    {section.label}
+                  </label>
+                  <Textarea
+                    value={sectionValues[section.key] || ""}
+                    onChange={(e) => handleSectionChange(section.key, e.target.value)}
+                    placeholder={section.placeholder}
+                    className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                  />
+                </div>
+              ))}
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Exames Físicos
+                </label>
+                <Textarea
+                  value={prontuario?.exameFisico || ""}
+                  onChange={(e) => prontuario && setProntuario({ ...prontuario, exameFisico: e.target.value })}
+                  placeholder="Dados vitais, aspecto geral, achados por sistema..."
+                  className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
           ) : !anamneseText ? (
-            /* Vazio */
-            <div className="text-center py-6 text-slate-400">
-              <Sparkles className="w-6 h-6 text-slate-200 mx-auto mb-1.5" />
-              <p className="text-xs">A anamnese será preenchida automaticamente após processar a transcrição.</p>
+            /* ── Empty state (modo IA) ── */
+            <div className="flex flex-col items-center justify-center py-10 px-6 text-center select-none">
+              <div className="relative mb-5">
+                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
+                    {isTranscribing ? (
+                      <Radio className="w-5 h-5 text-red-500 animate-pulse" />
+                    ) : (
+                      <Mic className="w-5 h-5 text-[#1E40AF]" />
+                    )}
+                  </div>
+                </div>
+                {isTranscribing && (
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-red-400/10 animate-ping" />
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    </span>
+                  </>
+                )}
+              </div>
+
+              {isTranscribing ? (
+                <>
+                  <p className="text-base font-semibold text-slate-700 mb-1">Gravando consulta...</p>
+                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
+                    A anamnese será gerada automaticamente ao encerrar a gravação.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
+                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
+                    Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
+                  </p>
+                  {startTranscription && (
+                    <Button
+                      onClick={startTranscription}
+                      className="h-10 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200 font-semibold rounded-xl"
+                    >
+                      <Mic className="w-4 h-4" />
+                      Iniciar Gravação
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
 
           ) : (
-            /* Anamnese formatada com títulos - sempre editável */
-            <div className="space-y-4">
-              {formatAnamneseWithTitles(anamneseText).map((section, index) => {
+            /* ── Anamnese formatada com títulos — sempre editável ── */
+            <div className="divide-y divide-slate-100">
+              {formatAnamneseWithTitles(anamneseText)
+                .filter((s) => !EXAME_FISICO_TITLES.includes(s.title.toUpperCase()) && s.title.toUpperCase() !== "ANAMNESE")
+                .map((section, index) => {
                 const displayContent = section.content || "";
                 const currentContent = sectionEdits[index] !== undefined ? sectionEdits[index] : displayContent;
 
                 const handleContentChange = (newContent: string) => {
-                  // Atualiza o estado local da seção
                   setSectionEdits((prev) => ({ ...prev, [index]: newContent }));
-                  
-                  // Reconstrói a anamnese completa com todas as seções
+
                   const allSections = formatAnamneseWithTitles(anamneseText);
                   allSections[index].content = newContent;
-                  
-                  // Aplica outras edições pendentes
+
                   Object.keys(sectionEdits).forEach((key) => {
                     const editIndex = parseInt(key);
                     if (editIndex !== index && allSections[editIndex]) {
                       allSections[editIndex].content = sectionEdits[editIndex];
                     }
                   });
-                  
-                  // Reconstrói a anamnese completa
+
                   const newAnamnese = allSections
                     .map((s) => {
                       if (s.title) {
@@ -391,7 +452,7 @@ export function Step2Anamnesis({
                       return s.content;
                     })
                     .join("\n\n");
-                  
+
                   setEditedAnamnese(newAnamnese);
                   setIsAnamneseEdited(true);
                   if (prontuario) {
@@ -400,7 +461,7 @@ export function Step2Anamnesis({
                 };
 
                 return (
-                  <div key={index} className="space-y-1.5">
+                  <div key={index} className="space-y-1.5 pt-4 first:pt-0">
                     {section.title && (
                       <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
                         {section.title}
@@ -411,9 +472,9 @@ export function Step2Anamnesis({
                       onChange={(e) => handleContentChange(e.target.value)}
                       placeholder={displayContent ? undefined : "Sem informações"}
                       className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
-                      style={{ 
-                        whiteSpace: 'pre-wrap', 
-                        wordBreak: 'break-word', 
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
                         overflowX: 'hidden',
                         overflowY: 'visible'
                       }}
@@ -421,6 +482,19 @@ export function Step2Anamnesis({
                   </div>
                 );
               })}
+
+              <div className="space-y-1.5 pt-4">
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                  Exames Físicos
+                </h3>
+                <Textarea
+                  value={prontuario?.exameFisico || ""}
+                  onChange={(e) => prontuario && setProntuario({ ...prontuario, exameFisico: e.target.value })}
+                  placeholder="Preencha após o exame físico..."
+                  className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
+                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowX: 'hidden', overflowY: 'visible' }}
+                />
+              </div>
             </div>
           )}
         </div>

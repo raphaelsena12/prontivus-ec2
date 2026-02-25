@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Stack CloudFormation para Prontivus - EC2 t3.small com Ubuntu, VPC e Security Groups'
+Description: 'Stack CloudFormation para Prontivus - EC2 t3.medium com Ubuntu, VPC e Security Groups'
 
 Parameters:
   KeyPairName:
@@ -238,7 +238,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: ami-03a79217ca48f4d1e  # Ubuntu 22.04 LTS em sa-east-1
-      InstanceType: t3.small
+      InstanceType: t3.medium
       KeyName: !Ref KeyPairName
       SubnetId: !Ref ProntivusPublicSubnet1
       SecurityGroupIds:
