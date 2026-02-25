@@ -19,30 +19,47 @@ jobs:
       - name: Configurar SSH
         run: |
           mkdir -p ~/.ssh
+          # Salvar chave preservando quebras de linha
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
           
-          # Verificar se a chave foi salva corretamente (sem mostrar o conteúdo)
+          # Verificar se a chave foi salva corretamente
           echo "Verificando chave SSH..."
           if [ -f ~/.ssh/deploy_key ]; then
             KEY_LINES=$(wc -l < ~/.ssh/deploy_key)
-            echo "✅ Chave salva com $KEY_LINES linhas"
-            echo "Primeira linha: $(head -1 ~/.ssh/deploy_key)"
-            echo "Última linha: $(tail -1 ~/.ssh/deploy_key)"
+            FIRST_LINE=$(head -1 ~/.ssh/deploy_key)
+            LAST_LINE=$(tail -1 ~/.ssh/deploy_key)
+            FILE_SIZE=$(stat -f%z ~/.ssh/deploy_key 2>/dev/null || stat -c%s ~/.ssh/deploy_key 2>/dev/null || echo "unknown")
+            
+            echo "✅ Chave salva:"
+            echo "   - Linhas: $KEY_LINES"
+            echo "   - Tamanho: $FILE_SIZE bytes"
+            echo "   - Primeira linha: $FIRST_LINE"
+            echo "   - Última linha: $LAST_LINE"
+            
+            # Verificar se começa e termina corretamente
+            if [[ "$FIRST_LINE" != *"BEGIN"* ]]; then
+              echo "❌ ERRO: Chave não começa com BEGIN"
+              echo "Primeiras 3 linhas:"
+              head -3 ~/.ssh/deploy_key
+              exit 1
+            fi
+            
+            if [[ "$LAST_LINE" != *"END"* ]]; then
+              echo "❌ ERRO: Chave não termina com END"
+              echo "Últimas 3 linhas:"
+              tail -3 ~/.ssh/deploy_key
+              exit 1
+            fi
+            
+            # Verificar tipo da chave
+            echo "Verificando tipo da chave..."
+            ssh-keygen -l -f ~/.ssh/deploy_key 2>&1 || echo "⚠️ Não foi possível verificar tipo da chave"
           else
             echo "❌ Erro: Chave não foi salva"
             exit 1
           fi
-          
-          # Testar conexão com debug
-          echo "Testando conexão SSH..."
-          ssh -v -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            -o IdentitiesOnly=yes \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "echo 'Conexão SSH funcionando!'" || echo "⚠️ Teste de conexão falhou, mas continuando..."
 
       - name: Copiar script de deploy para EC2
         run: |
