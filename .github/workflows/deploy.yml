@@ -22,36 +22,55 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          
+          # Verificar se a chave foi salva corretamente (sem mostrar o conteúdo)
+          echo "Verificando chave SSH..."
+          if [ -f ~/.ssh/deploy_key ]; then
+            KEY_LINES=$(wc -l < ~/.ssh/deploy_key)
+            echo "✅ Chave salva com $KEY_LINES linhas"
+            echo "Primeira linha: $(head -1 ~/.ssh/deploy_key)"
+            echo "Última linha: $(tail -1 ~/.ssh/deploy_key)"
+          else
+            echo "❌ Erro: Chave não foi salva"
+            exit 1
+          fi
+          
+          # Testar conexão com debug
+          echo "Testando conexão SSH..."
+          ssh -v -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
+            "echo 'Conexão SSH funcionando!'" || echo "⚠️ Teste de conexão falhou, mas continuando..."
 
       - name: Copiar script de deploy para EC2
         run: |
           scp -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            -v \
             infrastructure/scripts/deploy.sh \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/tmp/deploy.sh
-
-      - name: Copiar ecosystem.config.js para EC2
-        run: |
-          scp -i ~/.ssh/deploy_key \
-            -o StrictHostKeyChecking=no \
-            infrastructure/ecosystem.config.js \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/prontivus/ecosystem.config.js
 
       - name: Executar deploy na EC2
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
             
-            # Criar diretório da aplicação se não existir
-            sudo mkdir -p /opt/prontivus
-            sudo mkdir -p /opt/prontivus/logs
+            # Diretório da aplicação
+            APP_DIR="/opt/prontivus"
+            cd "$APP_DIR" || exit 1
             
             # Verificar se é um repositório Git
-            if [ ! -d /opt/prontivus/.git ]; then
-              echo "⚠️ Aviso: Diretório não é um repositório Git. Execute manualmente:"
-              echo "  cd /opt/prontivus && sudo git clone <repo-url> . && sudo chown -R ubuntu:ubuntu /opt/prontivus"
+            if [ ! -d .git ]; then
+              echo "❌ Erro: Diretório não é um repositório Git"
+              exit 1
             fi
             
             # Tornar script executável
@@ -68,20 +87,25 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o StrictHostKeyChecking=no \
+            -o IdentitiesOnly=yes \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            echo "Status do PM2:"
+            echo "=== Status do PM2 ==="
             pm2 status
             
             echo ""
-            echo "Últimas linhas de log:"
+            echo "=== Últimas linhas de log ==="
             pm2 logs prontivus --lines 20 --nostream || true
           EOF
 
       - name: Health Check
         run: |
           sleep 10
-          if curl -f http://${{ secrets.EC2_HOST }}:3000 > /dev/null 2>&1; then
-            echo "✅ Aplicação está respondendo"
+          # Testar via HTTPS (domínio)
+          if curl -f https://prontivus.com > /dev/null 2>&1; then
+            echo "✅ Aplicação está respondendo via HTTPS"
+          elif curl -f http://${{ secrets.EC2_HOST }}:3000 > /dev/null 2>&1; then
+            echo "✅ Aplicação está respondendo via HTTP"
           else
             echo "⚠️ Aplicação pode não estar respondendo ainda"
             exit 0  # Não falhar o workflow, apenas avisar
