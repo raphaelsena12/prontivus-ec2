@@ -3,11 +3,11 @@ import { LoginForm } from "@/components/login-form";
 export default function Page() {
   return (
     <div className="min-h-svh relative overflow-hidden bg-white">
-      {/* Degradê branco para azul vivo */}
+      {/* Degradê branco para azul vivo (diagonal) */}
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(to bottom, #ffffff 0%, #f0f7ff 25%, #dbeafe 50%, #93c5fd 75%, #1E4ED8 100%)',
+          background: 'linear-gradient(to bottom right, #ffffff 0%, #f0f7ff 25%, #dbeafe 50%, #93c5fd 75%, #1E4ED8 100%)',
         }}
       />
 
