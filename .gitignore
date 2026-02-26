@@ -24,6 +24,8 @@
 # misc
 .DS_Store
 *.pem
+*.zip
+.cursor.zip
 
 # debug
 npm-debug.log*
