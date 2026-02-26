@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawDualSignature, drawBottomBar,
+  drawDualSignature, drawFooterSignature, drawBottomBar,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
   formatCPF,
 } from "./pdf-base";
