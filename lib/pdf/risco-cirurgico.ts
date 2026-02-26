@@ -1,28 +1,15 @@
 import {
-  createDoc, drawTopBar, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawBottomBar, drawSectionLabel, drawFieldRow,
-  COLORS, CONTENT_WIDTH, MARGIN,
+  BaseDocumentData,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard,
+  drawFooterSignature, drawBottomBar,
+  drawRichParagraph,
+  MARGIN, CONTENT_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
 
-interface RiscoCirurgicoData {
-  clinicaNome: string;
-  clinicaCnpj: string;
-  clinicaTelefone?: string;
-  clinicaEmail?: string;
-  clinicaEndereco?: string;
-  logoBase64?: string;
-
-  medicoNome: string;
-  medicoCrm: string;
-  medicoEspecialidade: string;
-
-  pacienteNome: string;
-  pacienteCpf: string;
-  pacienteDataNascimento: string;
-
-  dataEmissao: string;
-  cidade?: string;
-
+// =====================================================
+// INTERFACE
+// =====================================================
+interface RiscoCirurgicoData extends BaseDocumentData {
   goldman?: string;
   asa?: string;
   ecg?: string;
@@ -38,64 +25,67 @@ interface RiscoCirurgicoData {
   observacoes?: string;
 }
 
+// =====================================================
+// 20. RISCO CIRÚRGICO CARDÍACO
+// =====================================================
 export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer {
   const doc = createDoc();
-
-  drawTopBar(doc);
-  drawClinicHeader(doc, data);
-
-  let y = drawTitle(doc, "RISCO CIRURGICO CARDIACO", "Avaliacao pre-operatoria");
-
+  const headerY = drawClinicHeader(doc, data);
+  let y = drawTitle(doc, "RISCO CIRÚRGICO CARDÍACO", undefined, headerY);
   y = drawPatientCard(doc, data, y);
 
-  // =====================================================
-  // CAMPOS DE AVALIAÇÃO
-  // =====================================================
-  const fieldX = MARGIN;
-  const fieldW = CONTENT_WIDTH;
+  // Função auxiliar para desenhar um campo com label e valor
+  const drawField = (label: string, value?: string): void => {
+    y = drawRichParagraph(doc, [
+      { text: `${label}: `, bold: true },
+      { text: value || "______________________________", bold: true },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 3; // Espaçamento reduzido entre tópicos
+  };
 
-  let fieldY = y;
+  // Função auxiliar para desenhar um campo sem dois pontos (apenas label)
+  const drawFieldNoColon = (label: string, value?: string): void => {
+    if (value) {
+      y = drawRichParagraph(doc, [
+        { text: label, bold: true },
+      ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+      y += 2;
+      // Texto do valor (pode ter múltiplas linhas) - em negrito
+      const valueLines = doc.splitTextToSize(value, CONTENT_WIDTH);
+      doc.setFontSize(10);
+      doc.setFont(PDF_FONT, "bold");
+      doc.setTextColor(...COLORS.slate800);
+      doc.setLineHeightFactor(1.4);
+      doc.text(valueLines, MARGIN, y);
+      y += valueLines.length * 7;
+      y += 1; // Espaçamento reduzido após o valor
+    } else {
+      y = drawRichParagraph(doc, [
+        { text: label, bold: true },
+      ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+      y += 3; // Espaçamento reduzido
+    }
+  };
 
-  fieldY = drawFieldRow(doc, "RISCO CIRURGICO CARDIACO", data.riscoCirurgicoCardiaco || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "GOLDMAN", data.goldman || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "ASA", data.asa || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "ECG", data.ecg || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "ALERGIAS", data.alergias || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "CIRURGIAS ANTERIORES", data.cirurgiasAnteriores || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "INTERCORRENCIAS", data.intercorrencias || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "MEDICACOES EM USO", data.medicacoesEmUso || "", fieldX, fieldY, fieldW);
-  fieldY = drawFieldRow(doc, "ANTECEDENTES PESSOAIS", data.antecedentesPessoais || "", fieldX, fieldY, fieldW);
+  // ── Campos do formulário ──
+  drawField("RISCO CIRÚRGICO CARDÍACO", data.riscoCirurgicoCardiaco);
+  drawField("GOLDMAN", data.goldman);
+  drawField("ASA", data.asa);
+  drawField("ECG", data.ecg);
+  drawField("ALERGIAS", data.alergias);
+  drawField("CIRURGIAS ANTERIORES", data.cirurgiasAnteriores);
+  drawField("INTERCORRÊNCIAS", data.intercorrencias);
+  drawField("MEDICAÇÕES EM USO", data.medicacoesEmUso);
+  drawField("ANTECEDENTES PESSOAIS", data.antecedentesPessoais);
+  
+  // Campos sem dois pontos
+  drawFieldNoColon("ECOCARDIOGRAMA", data.ecocardiograma);
+  drawFieldNoColon("ERGOMETRIA", data.ergometria);
+  drawFieldNoColon("RX - TORAX", data.rxTorax);
+  drawField("OBS", data.observacoes);
 
-  y = fieldY + 6;
-
-  // =====================================================
-  // EXAMES
-  // =====================================================
-  y = drawSectionLabel(doc, "EXAMES", y);
-
-  let examY = y;
-  examY = drawFieldRow(doc, "ECOCARDIOGRAMA", data.ecocardiograma || "", fieldX, examY, fieldW);
-  examY = drawFieldRow(doc, "ERGOMETRIA", data.ergometria || "", fieldX, examY, fieldW);
-  examY = drawFieldRow(doc, "RX - TORAX", data.rxTorax || "", fieldX, examY, fieldW);
-
-  y = examY + 6;
-
-  // =====================================================
-  // OBSERVAÇÕES
-  // =====================================================
-  if (data.observacoes && data.observacoes.trim()) {
-    y = drawSectionLabel(doc, "OBS", y);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.slate600);
-    const obsText = doc.splitTextToSize(data.observacoes, CONTENT_WIDTH - 4);
-    doc.text(obsText, MARGIN + 2, y);
-    y += obsText.length * 4 + 6;
-  }
-
-  drawFooterSignature(doc, data, y + 10);
-  drawBottomBar(doc);
-
+  // ── Assinatura apenas do médico (centralizado) ──
+  drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
+  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

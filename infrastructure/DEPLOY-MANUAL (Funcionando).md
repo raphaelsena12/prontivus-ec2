@@ -51,23 +51,7 @@ git log HEAD..origin/main --oneline
 
 Este comando mostra os commits que estão no repositório remoto e não estão na versão local.
 
-### 4. Fazer Backup da Versão Atual
-
-```bash
-# Voltar para /opt
-cd /opt
-
-# Criar backup com timestamp
-sudo cp -r prontivus prontivus-backup-$(date +%Y%m%d-%H%M%S)
-
-# Verificar se o backup foi criado
-ls -la /opt/prontivus-backup-*
-
-# Verificar tamanho do backup
-du -sh /opt/prontivus-backup-*
-```
-
-### 5. Parar a Aplicação Temporariamente
+### 4. Parar a Aplicação Temporariamente
 
 ```bash
 # Parar o PM2
@@ -77,14 +61,28 @@ pm2 stop prontivus
 pm2 status
 ```
 
-### 6. Renomear a Pasta Atual (Backup Adicional)
+### 5. Preservar Arquivo .env (IMPORTANTE!)
+
+```bash
+cd /opt/prontivus
+
+# Copiar o arquivo .env para um local temporário (IMPORTANTE!)
+sudo cp .env /tmp/prontivus.env
+
+# Verificar se foi copiado
+ls -la /tmp/prontivus.env
+```
+
+### 6. Remover a Pasta Atual
 
 ```bash
 cd /opt
-sudo mv prontivus prontivus-old-$(date +%Y%m%d-%H%M%S)
 
-# Verificar
-ls -la /opt/prontivus-old-*
+# Remover a pasta atual completamente
+sudo rm -rf prontivus
+
+# Verificar se foi removida
+ls -la /opt/prontivus
 ```
 
 ### 7. Clonar a Nova Versão
@@ -105,23 +103,32 @@ cd /opt/prontivus
 git log --oneline -1
 ```
 
-### 8. Copiar Arquivos Importantes do Backup
+### 8. Restaurar Arquivo .env
 
 ```bash
 cd /opt/prontivus
 
-# Copiar o arquivo .env do backup (IMPORTANTE!)
-sudo cp /opt/prontivus-old-*/.env /opt/prontivus/.env
+# Copiar o arquivo .env do local temporário (IMPORTANTE!)
+sudo cp /tmp/prontivus.env /opt/prontivus/.env
 
 # Verificar se o .env foi copiado
 ls -la .env
 
-# Ajustar permissões do .env
+# Ajustar permissões do .env (pode estar como root após copiar com sudo)
 sudo chown ubuntu:ubuntu .env
 chmod 600 .env
 
+# Verificar se as permissões estão corretas (deve mostrar: -rw------- 1 ubuntu ubuntu)
+ls -la .env
+
+# Remover o arquivo temporário (pode estar protegido, usar sudo)
+sudo rm /tmp/prontivus.env
+
+# Verificar se o arquivo temporário foi removido
+ls -la /tmp/prontivus.env 2>&1 || echo "Arquivo temporário removido com sucesso"
+
 # Verificar se o ecosystem.config.js está na raiz ou na pasta infrastructure
-ls -la ecosystem.config.js
+ls -la ecosystem.config.js 2>&1 || echo "ecosystem.config.js não está na raiz"
 ls -la infrastructure/ecosystem.config.js
 ```
 
@@ -135,52 +142,44 @@ npm ci --legacy-peer-deps
 # npm install --legacy-peer-deps
 ```
 
-### 10. ⚠️ PROBLEMA COMUM: Gerar Prisma Client
+### 10. Gerar Prisma Client
 
-**IMPORTANTE**: Este é um problema que já aconteceu antes. O Prisma Client precisa ser gerado ANTES do build E o arquivo `index.ts` precisa ser criado.
+**OBRIGATÓRIO**: O Prisma Client precisa ser gerado ANTES do build e o arquivo `index.ts` precisa ser criado.
 
 ```bash
 cd /opt/prontivus
 
-# Gerar Prisma Client (isso criará os arquivos em lib/generated/prisma)
-npx prisma generate
-
-# Verificar se os arquivos foram criados
+# 1. Verificar se o Prisma Client foi gerado
 ls -la lib/generated/prisma/
 ls -la lib/generated/prisma/enums.ts
 
-# ⚠️ IMPORTANTE: Criar arquivo index.ts (Prisma não cria automaticamente)
-# Este arquivo é necessário para que os imports funcionem
+# 2. Se não existir, gerar o Prisma Client
+npx prisma generate
+
+# 3. Verificar se foi criado
+ls -la lib/generated/prisma/enums.ts
+
+# 4. Criar o arquivo index.ts (OBRIGATÓRIO)
 cat > lib/generated/prisma/index.ts << 'EOF'
 // Exportar apenas enums (tipos que podem ser usados no cliente e servidor)
 export * from './enums';
 EOF
 
-# Verificar se o index.ts foi criado
+# 5. Verificar se o index.ts foi criado
 ls -la lib/generated/prisma/index.ts
+cat lib/generated/prisma/index.ts
 
-# Se os arquivos não existirem, verificar o schema
-cat prisma/schema.prisma | head -10
+# 6. Limpar cache do Next.js
+rm -rf .next node_modules/.cache
+rm -f tsconfig.tsbuildinfo
 
-# Validar o schema do Prisma
-npx prisma validate
-
-# Se ainda não funcionar, tentar com caminho explícito
-npx prisma generate --schema=./prisma/schema.prisma
 ```
 
-**Sintomas do problema**:
-- Erro: `Module not found: Can't resolve '@/lib/generated/prisma'`
-- Build falha com múltiplos erros de importação de tipos Prisma
-- Erro: `the chunking context does not support external modules` (quando index.ts exporta client/models)
+**Nota Importante**: O `index.ts` deve exportar APENAS `enums`, não `client` ou `models`, pois estes contêm código do servidor que não pode ser usado no cliente.
 
-**Solução**: Sempre execute `npx prisma generate` e crie o `index.ts` (exportando apenas enums) antes de `npm run build`
+### 11. Instalar Pacote AWS SDK Polly
 
-**Nota**: O `index.ts` deve exportar APENAS `enums`, não `client` ou `models`, pois estes contêm código do servidor.
-
-### 11. ⚠️ PROBLEMA COMUM: Instalar Pacote AWS SDK Polly
-
-**IMPORTANTE**: Este é outro problema que já aconteceu antes. O pacote `@aws-sdk/client-polly` pode não estar no `package.json` ou não ser instalado corretamente.
+**OBRIGATÓRIO**: O pacote `@aws-sdk/client-polly` é necessário para a funcionalidade de text-to-speech.
 
 ```bash
 cd /opt/prontivus
@@ -190,16 +189,7 @@ npm install @aws-sdk/client-polly --legacy-peer-deps
 
 # Verificar se foi instalado
 npm list @aws-sdk/client-polly
-
-# OU se preferir instalar todas as dependências novamente:
-# npm ci --legacy-peer-deps
 ```
-
-**Sintomas do problema**:
-- Erro: `Module not found: Can't resolve '@aws-sdk/client-polly'`
-- Build falha no arquivo `app/api/secretaria/text-to-speech/route.ts`
-
-**Solução**: Sempre instale o pacote `@aws-sdk/client-polly` antes do build
 
 ### 12. Executar Migrations do Banco
 
@@ -271,38 +261,40 @@ git show HEAD --stat
 Se preferir atualizar sem clonar do zero (mais rápido):
 
 ```bash
-# 1. Backup
-cd /opt
-sudo cp -r prontivus prontivus-backup-$(date +%Y%m%d-%H%M%S)
-
-# 2. Parar aplicação
+# 1. Parar aplicação
 pm2 stop prontivus
 
-# 3. Atualizar código
+# 2. Atualizar código
 cd /opt/prontivus
 git fetch origin
 git reset --hard origin/main
 
-# 4. Instalar dependências
+# 3. Instalar dependências
 npm ci --legacy-peer-deps
 
-# 5. ⚠️ IMPORTANTE: Gerar Prisma Client (problema comum)
+# 4. Gerar Prisma Client (passo obrigatório)
 npx prisma generate
 
-# 6. ⚠️ IMPORTANTE: Instalar AWS Polly (problema comum)
+# 4.1. Criar index.ts do Prisma (passo obrigatório)
+cat > lib/generated/prisma/index.ts << 'EOF'
+// Exportar apenas enums (tipos que podem ser usados no cliente e servidor)
+export * from './enums';
+EOF
+
+# 5. Instalar AWS SDK Polly (passo obrigatório)
 npm install @aws-sdk/client-polly --legacy-peer-deps
 
-# 7. Prisma migrations
+# 6. Prisma migrations
 npx prisma migrate deploy
 
-# 8. Build
+# 7. Build
 rm -rf .next node_modules/.cache
 npm run build
 
-# 9. Reiniciar
+# 8. Reiniciar
 pm2 restart prontivus --update-env
 
-# 10. Verificar
+# 9. Verificar
 pm2 status
 pm2 logs prontivus --lines 20 --nostream
 curl -I http://localhost:3000
@@ -312,25 +304,40 @@ curl -I http://localhost:3000
 
 ## 🛡️ Rollback (Se Algo Der Errado)
 
+**Nota**: Como não fazemos backup, o rollback deve ser feito via Git:
+
 ```bash
 # 1. Parar aplicação atual
 pm2 stop prontivus
 
-# 2. Remover versão com problema
-cd /opt
-sudo rm -rf prontivus
+# 2. Voltar para commit anterior
+cd /opt/prontivus
+git log --oneline -5  # Ver commits disponíveis
+git reset --hard <commit-hash-anterior>  # Substituir pelo hash do commit anterior
 
-# 3. Restaurar backup
-sudo mv prontivus-backup-YYYYMMDD-HHMMSS prontivus
-# OU
-sudo cp -r prontivus-backup-YYYYMMDD-HHMMSS prontivus
+# 3. Reinstalar dependências (se necessário)
+npm ci --legacy-peer-deps
 
-# 4. Ajustar permissões
-sudo chown -R ubuntu:ubuntu prontivus
+# 4. Regenerar Prisma Client
+npx prisma generate
+cat > lib/generated/prisma/index.ts << 'EOF'
+export * from './enums';
+EOF
 
-# 5. Reiniciar
-cd prontivus
+# 5. Rebuild
+rm -rf .next node_modules/.cache
+npm run build
+
+# 6. Reiniciar
 pm2 restart prontivus --update-env
+
+# OU se preferir clonar novamente uma versão específica:
+# cd /opt
+# sudo rm -rf prontivus
+# sudo git clone https://github.com/raphaelsena12/prontivus-ec2.git prontivus
+# cd prontivus
+# git checkout <commit-hash>
+# sudo cp /tmp/prontivus.env .env  # Se tiver preservado o .env
 ```
 
 ---
@@ -388,96 +395,31 @@ git log HEAD..origin/main --oneline
 git show HEAD
 ```
 
-### Limpeza de Backups
+### Limpeza de Espaço em Disco
 
 ```bash
-# Remover backups antigos (manter apenas os últimos 3)
-cd /opt
-ls -lt prontivus-backup-* | tail -n +4 | awk '{print $NF}' | xargs sudo rm -rf
-ls -lt prontivus-old-* | tail -n +4 | awk '{print $NF}' | xargs sudo rm -rf
+# Limpar cache do npm
+npm cache clean --force
+
+# Limpar logs do PM2
+pm2 flush
+
+# Limpar pacotes não utilizados do sistema
+sudo apt autoremove -y
+sudo apt autoclean
+
+# Limpar logs do sistema (últimos 7 dias)
+sudo journalctl --vacuum-time=7d
+
+# Verificar espaço disponível
+df -h
 ```
 
 ---
 
 ## ⚠️ Problemas Comuns e Soluções
 
-### 🔴 Problema 1: Erro no Build - Prisma Client não encontrado
-
-**Sintomas**:
-```
-Module not found: Can't resolve '@/lib/generated/prisma'
-```
-
-**Causa**: O Prisma Client não foi gerado antes do build OU o arquivo `index.ts` não existe.
-
-**Solução**:
-```bash
-cd /opt/prontivus
-
-# 1. Gerar Prisma Client
-npx prisma generate
-
-# 2. Verificar se foi criado
-ls -la lib/generated/prisma/
-ls -la lib/generated/prisma/enums.ts
-
-# 3. Se não existir, validar schema
-npx prisma validate
-
-# 4. Tentar novamente
-npx prisma generate --schema=./prisma/schema.prisma
-
-# 5. ⚠️ IMPORTANTE: Criar arquivo index.ts se não existir
-# O Prisma não cria automaticamente o index.ts, precisamos criar manualmente
-cat > lib/generated/prisma/index.ts << 'EOF'
-// Exportar apenas enums (tipos que podem ser usados no cliente e servidor)
-export * from './enums';
-EOF
-
-# 6. Verificar se o index.ts foi criado
-ls -la lib/generated/prisma/index.ts
-
-# 7. Limpar cache e fazer build novamente
-rm -rf .next node_modules/.cache
-rm -f tsconfig.tsbuildinfo
-npm run build
-```
-
-**Nota Importante**: O arquivo `index.ts` deve exportar APENAS `enums`, não `client` ou `models`, pois estes contêm código do servidor que não pode ser usado no cliente.
-
-**Prevenção**: Sempre execute `npx prisma generate` e crie o `index.ts` antes de `npm run build`
-
----
-
-### 🔴 Problema 2: Erro no Build - AWS SDK Polly não encontrado
-
-**Sintomas**:
-```
-Module not found: Can't resolve '@aws-sdk/client-polly'
-```
-
-**Causa**: O pacote `@aws-sdk/client-polly` não está instalado.
-
-**Solução**:
-```bash
-cd /opt/prontivus
-
-# 1. Instalar o pacote
-npm install @aws-sdk/client-polly --legacy-peer-deps
-
-# 2. Verificar se foi instalado
-npm list @aws-sdk/client-polly
-
-# 3. Limpar cache e fazer build novamente
-rm -rf .next
-npm run build
-```
-
-**Prevenção**: Sempre instale o pacote `@aws-sdk/client-polly` antes do build
-
----
-
-### 🔴 Problema 3: Aplicação não inicia após deploy
+### 🔴 Problema 1: Aplicação não inicia após deploy
 
 **Sintomas**: PM2 mostra status `errored` ou `stopped`
 
@@ -501,7 +443,7 @@ ls -la /opt/prontivus
 
 ---
 
-### 🔴 Problema 4: Erro no build geral
+### 🔴 Problema 2: Erro no build geral
 
 **Sintomas**: Build falha com erros diversos
 
@@ -516,10 +458,13 @@ rm -rf .next node_modules/.cache
 rm -rf node_modules
 npm ci --legacy-peer-deps
 
-# 3. Gerar Prisma Client
+# 3. Gerar Prisma Client e criar index.ts
 npx prisma generate
+cat > lib/generated/prisma/index.ts << 'EOF'
+export * from './enums';
+EOF
 
-# 4. Instalar AWS Polly (se necessário)
+# 4. Instalar AWS Polly
 npm install @aws-sdk/client-polly --legacy-peer-deps
 
 # 5. Tentar build novamente
@@ -528,7 +473,7 @@ npm run build
 
 ---
 
-### 🔴 Problema 5: Erro no Prisma Migrations
+### 🔴 Problema 3: Erro no Prisma Migrations
 
 **Sintomas**: `npx prisma migrate deploy` falha
 
@@ -558,15 +503,16 @@ cat .env | grep DATABASE_URL
 
 Antes de finalizar, verifique:
 
-- [ ] Backup criado com sucesso
+- [ ] Arquivo .env preservado em /tmp antes de remover pasta
 - [ ] Aplicação parada antes do deploy
-- [ ] Pasta antiga renomeada/removida
+- [ ] Pasta antiga removida completamente
 - [ ] Repositório clonado corretamente
 - [ ] Permissões ajustadas (ubuntu:ubuntu)
-- [ ] Arquivo .env copiado e com permissões corretas
+- [ ] Arquivo .env restaurado e com permissões corretas
 - [ ] Dependências instaladas sem erros
-- [ ] **Prisma Client gerado** (⚠️ problema comum)
-- [ ] **AWS SDK Polly instalado** (⚠️ problema comum)
+- [ ] **Prisma Client gerado** (passo obrigatório)
+- [ ] **Index.ts do Prisma criado** (passo obrigatório)
+- [ ] **AWS SDK Polly instalado** (passo obrigatório)
 - [ ] Migrations executadas
 - [ ] Build concluído com sucesso
 - [ ] PM2 iniciado/reiniciado
@@ -582,55 +528,61 @@ Antes de finalizar, verifique:
 Para evitar problemas, siga esta sequência EXATA:
 
 ```bash
-# 1. Backup
-cd /opt
-sudo cp -r prontivus prontivus-backup-$(date +%Y%m%d-%H%M%S)
+# 1. Preservar .env
+cd /opt/prontivus
+sudo cp .env /tmp/prontivus.env
 
 # 2. Parar aplicação
 pm2 stop prontivus
 
-# 3. Clonar/Atualizar
+# 3. Remover pasta atual
 cd /opt
-sudo mv prontivus prontivus-old-$(date +%Y%m%d-%H%M%S)
+sudo rm -rf prontivus
+
+# 4. Clonar nova versão
 sudo git clone https://github.com/raphaelsena12/prontivus-ec2.git prontivus
 sudo chown -R ubuntu:ubuntu /opt/prontivus
 
-# 4. Copiar .env
+# 5. Restaurar .env
 cd /opt/prontivus
-sudo cp /opt/prontivus-old-*/.env /opt/prontivus/.env
+sudo cp /tmp/prontivus.env /opt/prontivus/.env
 sudo chown ubuntu:ubuntu .env
 chmod 600 .env
+# Verificar permissões (deve mostrar: -rw------- 1 ubuntu ubuntu)
+ls -la .env
+# Remover arquivo temporário (pode estar protegido, usar sudo)
+sudo rm /tmp/prontivus.env
 
-# 5. Instalar dependências
+# 6. Instalar dependências
 npm ci --legacy-peer-deps
 
-# 6. ⚠️ GERAR PRISMA CLIENT (OBRIGATÓRIO)
+# 7. Gerar Prisma Client
 npx prisma generate
 ls -la lib/generated/prisma/
 
-# 6.1. ⚠️ CRIAR INDEX.TS DO PRISMA (OBRIGATÓRIO)
+# 7.1. Criar index.ts do Prisma
 cat > lib/generated/prisma/index.ts << 'EOF'
 // Exportar apenas enums (tipos que podem ser usados no cliente e servidor)
 export * from './enums';
 EOF
 ls -la lib/generated/prisma/index.ts
 
-# 7. ⚠️ INSTALAR AWS POLLY (OBRIGATÓRIO)
+# 8. Instalar AWS SDK Polly
 npm install @aws-sdk/client-polly --legacy-peer-deps
 
-# 8. Migrations
+# 9. Migrations
 npx prisma migrate deploy
 
-# 9. Build
+# 10. Build
 rm -rf .next node_modules/.cache
 npm run build
 
-# 10. Reiniciar PM2
+# 11. Reiniciar PM2
 pm2 delete prontivus
 pm2 start infrastructure/ecosystem.config.js
 pm2 save
 
-# 11. Verificar
+# 12. Verificar
 pm2 status
 pm2 logs prontivus --lines 20 --nostream
 curl -I http://localhost:3000
@@ -640,30 +592,30 @@ curl -I http://localhost:3000
 
 ## ⚠️ Importante
 
-- ✅ **Sempre faça backup** antes de atualizar
+- ✅ **SEMPRE preserve o .env** antes de remover a pasta (copiar para /tmp)
 - ✅ **Teste localmente** antes de fazer deploy em produção
 - ✅ **Monitore logs** após cada deploy
 - ✅ **Verifique health check** após reiniciar
-- ✅ **Mantenha backups** dos últimos 3 deploys
 - ✅ **Verifique o .env** antes de reiniciar
 - ✅ **Confirme o caminho do ecosystem.config.js** (infrastructure/ecosystem.config.js)
-- ⚠️ **SEMPRE gere o Prisma Client** antes do build
-- ⚠️ **SEMPRE instale o AWS SDK Polly** antes do build
+- ✅ **SEMPRE gere o Prisma Client** antes do build (passo obrigatório)
+- ✅ **SEMPRE crie o index.ts do Prisma** antes do build (passo obrigatório - exportar apenas enums)
+- ✅ **SEMPRE instale o AWS SDK Polly** antes do build (passo obrigatório)
 
 ---
 
 ## 📝 Notas
 
 - O arquivo `ecosystem.config.js` está localizado em `infrastructure/ecosystem.config.js`
-- O arquivo `.env` deve ser copiado do backup e ter permissões 600
+- O arquivo `.env` deve ser preservado antes de remover a pasta (copiar para /tmp) e restaurado após clonar, com permissões 600
 - O PM2 deve ser iniciado com o caminho completo: `infrastructure/ecosystem.config.js`
 - Sempre use `npm ci --legacy-peer-deps` para instalar dependências em produção
 - O build do Next.js cria a pasta `.next` que é necessária para produção
-- **Problemas comuns**: Prisma Client (gerar + criar index.ts) e AWS SDK Polly - sempre verifique antes do build
+- **Passos obrigatórios**: Sempre gere o Prisma Client, crie o index.ts (exportando apenas enums) e instale o AWS SDK Polly antes do build
 - **Importante**: O arquivo `lib/generated/prisma/index.ts` deve exportar APENAS `enums`, não `client` ou `models`
 
 ---
 
 **Última atualização**: 26 de Fevereiro de 2025  
 **Repositório**: https://github.com/raphaelsena12/prontivus-ec2.git  
-**Versão**: 1.1 - Inclui correção do Prisma Client (criação do index.ts)
+**Versão**: 1.3 - Prisma Client e AWS SDK Polly transformados em passos obrigatórios do processo (não mais como problemas/erros)

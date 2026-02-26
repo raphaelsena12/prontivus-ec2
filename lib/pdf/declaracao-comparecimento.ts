@@ -1,167 +1,177 @@
 import {
-  createDoc, drawTopBar, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawDualSignature, drawBottomBar, drawSectionLabel,
-  COLORS, CONTENT_WIDTH, MARGIN,
+  BaseDocumentData,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard,
+  drawFooterSignature, drawDualSignature, drawBottomBar,
+  drawRichParagraph,
+  MARGIN, CONTENT_WIDTH,
 } from "./pdf-base";
 
-interface DeclaracaoData {
-  clinicaNome: string;
-  clinicaCnpj: string;
-  clinicaTelefone?: string;
-  clinicaEmail?: string;
-  clinicaEndereco?: string;
-  logoBase64?: string;
-
-  medicoNome: string;
-  medicoCrm: string;
-  medicoEspecialidade: string;
-
-  pacienteNome: string;
-  pacienteCpf: string;
-  pacienteDataNascimento: string;
-
-  dataEmissao: string;
-  cidade?: string;
+// =====================================================
+// INTERFACE COMPARTILHADA
+// =====================================================
+interface DeclaracaoData extends BaseDocumentData {
   horaInicio?: string;
   horaFim?: string;
-
-  // Para declaração acompanhante
   nomeAcompanhante?: string;
-
-  // Para declaração com CID
   cidCodigo?: string;
   cidDescricao?: string;
-
-  tipo: "simples" | "acompanhante" | "horario-cid";
+  dataConsulta?: string;
+  horaConsulta?: string;
+  fichaNumero?: string;
 }
 
-export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): ArrayBuffer {
+// =====================================================
+// 13. DECLARAÇÃO DE COMPARECIMENTO ACOMPANHANTE
+// =====================================================
+export function generateDeclaracaoComparecimentoAcompanhantePDF(data: DeclaracaoData): ArrayBuffer {
   const doc = createDoc();
-
-  drawTopBar(doc);
-  drawClinicHeader(doc, data);
-
-  const subtitulos: Record<string, string> = {
-    "simples": "Afastamento temporario",
-    "acompanhante": "Afastamento temporario de acompanhante",
-    "horario-cid": "Afastamento temporario",
-  };
-
-  let y = drawTitle(doc, "DECLARACAO DE COMPARECIMENTO", subtitulos[data.tipo]);
-
+  const headerY = drawClinicHeader(doc, data);
+  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO DE ACOMPANHANTE", headerY);
   y = drawPatientCard(doc, data, y);
 
-  // =====================================================
-  // CORPO
-  // =====================================================
+  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
+  const dataConsulta = data.dataConsulta || data.dataEmissao;
+  const horaInicio = data.horaInicio || data.horaConsulta || "";
+  const horaFim = data.horaFim || "";
+  const fichaNumero = data.fichaNumero || "";
+
+  y = drawRichParagraph(doc, [
+    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: fichaNumero, bold: true },
+    { text: " no dia " },
+    { text: dataConsulta, bold: true },
+    { text: " às " },
+    { text: horaInicio, bold: true },
+    { text: horaFim ? " até " : "" },
+    { text: horaFim, bold: horaFim ? true : false },
+    { text: ". Acompanhado(a) do Sr(a) " },
+    { text: data.nomeAcompanhante || "______________________________", bold: !!data.nomeAcompanhante },
+    { text: "." },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
-  
-  // Label da seção
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.slate400);
-  doc.text("DECLARAÇÃO", MARGIN, y);
-  y += 6;
 
-  doc.setFontSize(10.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.slate800);
-  doc.setLineHeightFactor(1.6);
+  // ── Autorização (nome do paciente em negrito) ──
+  y = drawRichParagraph(doc, [
+    { text: "Eu, " },
+    { text: data.pacienteNome.toUpperCase(), bold: true },
+    { text: ", autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 8;
 
-  const horaInicio = data.horaInicio || "____";
-  const horaFim = data.horaFim || "____";
-
-  let texto: string;
-
-  switch (data.tipo) {
-    case "simples":
-      texto =
-        `Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade ` +
-        `medica no dia ${data.dataEmissao}, as ${horaInicio} ate ${horaFim}.`;
-      break;
-
-    case "acompanhante": {
-      const acompanhante = data.nomeAcompanhante || "________________________________";
-      texto =
-        `Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade ` +
-        `medica no dia ${data.dataEmissao}, as ${horaInicio} ate ${horaFim}. ` +
-        `Acompanhado(a) do Sr(a) ${acompanhante}.`;
-      break;
-    }
-
-    case "horario-cid":
-      texto =
-        `Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade ` +
-        `medica no dia ${data.dataEmissao}, as ${horaInicio} ate ${horaFim}.`;
-      break;
-  }
-
-  const splitText = doc.splitTextToSize(texto, CONTENT_WIDTH);
-  doc.text(splitText, MARGIN, y);
-  y += splitText.length * 5 + 10;
-
-  // =====================================================
-  // AUTORIZAÇÃO + CID (acompanhante e horario-cid)
-  // =====================================================
-  if (data.tipo === "acompanhante" || data.tipo === "horario-cid") {
+  // ── CID ──
+  if (data.cidCodigo || data.cidDescricao) {
+    y = drawRichParagraph(doc, [
+      { text: "CID " },
+      { text: data.cidCodigo || "Z00.", bold: true },
+      { text: data.cidDescricao ? ` — ${data.cidDescricao}` : "" },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
     y += 8;
-    
-    // Label da seção
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COLORS.slate400);
-    doc.text("AUTORIZAÇÃO", MARGIN, y);
-    y += 6;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.slate800);
-    doc.setLineHeightFactor(1.5);
-
-    const textoAuth =
-      `Eu, ${data.pacienteNome}, autorizo o medico a declarar nominalmente, ou atraves do CID, ` +
-      `meu diagnostico, liberando-o da guarda do sigilo profissional.`;
-
-    const splitAuth = doc.splitTextToSize(textoAuth, CONTENT_WIDTH);
-    doc.text(splitAuth, MARGIN, y);
-    y += splitAuth.length * 5 + 8;
-
-    // CID
-    if (data.cidCodigo) {
-      y += 6;
-      
-      // Label da seção
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...COLORS.slate400);
-      doc.text("CID-10", MARGIN, y);
-      y += 6;
-
-      doc.setFontSize(10.5);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...COLORS.slate800);
-      const cidText = data.cidDescricao
-        ? `${data.cidCodigo} — ${data.cidDescricao}`
-        : data.cidCodigo;
-      doc.text(cidText, MARGIN, y);
-
-      y += 12;
-    }
-  }
-
-  // =====================================================
-  // ASSINATURA
-  // =====================================================
-  if (data.tipo === "acompanhante" || data.tipo === "horario-cid") {
-    drawDualSignature(doc, {
-      ...data,
-      pacienteNome: data.pacienteNome,
-    }, y + 20);
   } else {
-    drawFooterSignature(doc, data, y + 20);
+    // Se não houver CID, mostra apenas "CID Z00."
+    y = drawRichParagraph(doc, [
+      { text: "CID " },
+      { text: "Z00.", bold: true },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 8;
   }
 
-  drawBottomBar(doc);
+  // ── Assinaturas do paciente e médico ──
+  drawDualSignature(doc, data, y + 10, { hideDateLine: true });
+  drawBottomBar(doc, data);
+  return doc.output("arraybuffer");
+}
 
+// =====================================================
+// 14. DECLARAÇÃO DE COMPARECIMENTO DE HORÁRIO COM CID
+// =====================================================
+export function generateDeclaracaoComparecimentoHorarioCidPDF(data: DeclaracaoData): ArrayBuffer {
+  const doc = createDoc();
+  const headerY = drawClinicHeader(doc, data);
+  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO", headerY);
+  y = drawPatientCard(doc, data, y);
+
+  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
+  const dataConsulta = data.dataConsulta || data.dataEmissao;
+  const horaInicio = data.horaInicio || data.horaConsulta || "____";
+  const horaFim = data.horaFim || "_____";
+  const fichaNumero = data.fichaNumero || "";
+
+  y = drawRichParagraph(doc, [
+    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: fichaNumero, bold: true },
+    { text: " no dia " },
+    { text: dataConsulta, bold: true },
+    { text: " às " },
+    { text: horaInicio, bold: true },
+    { text: " até " },
+    { text: horaFim, bold: true },
+    { text: ". Acompanhado(a) do Sr(a) " },
+    { text: data.nomeAcompanhante || "______________________________", bold: !!data.nomeAcompanhante },
+    { text: "." },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 8;
+
+  // ── Autorização (nome do paciente em negrito) ──
+  y = drawRichParagraph(doc, [
+    { text: "Eu, " },
+    { text: data.pacienteNome.toUpperCase(), bold: true },
+    { text: ", autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 8;
+
+  // ── CID ──
+  if (data.cidCodigo || data.cidDescricao) {
+    y = drawRichParagraph(doc, [
+      { text: "CID " },
+      { text: data.cidCodigo || "Z00.", bold: true },
+      { text: data.cidDescricao ? ` — ${data.cidDescricao}` : "" },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 8;
+  } else {
+    // Se não houver CID, mostra apenas "CID Z00."
+    y = drawRichParagraph(doc, [
+      { text: "CID " },
+      { text: "Z00.", bold: true },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 8;
+  }
+
+  // ── Assinaturas do paciente e médico ──
+  drawDualSignature(doc, data, y + 10, { hideDateLine: true });
+  drawBottomBar(doc, data);
+  return doc.output("arraybuffer");
+}
+
+// =====================================================
+// 15. DECLARAÇÃO DE COMPARECIMENTO
+// =====================================================
+export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): ArrayBuffer {
+  const doc = createDoc();
+  const headerY = drawClinicHeader(doc, data);
+  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO", headerY);
+  y = drawPatientCard(doc, data, y);
+
+  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
+  const dataConsulta = data.dataConsulta || data.dataEmissao;
+  const horaInicio = data.horaInicio || data.horaConsulta || "____";
+  const horaFim = data.horaFim || "_____";
+  const fichaNumero = data.fichaNumero || "";
+
+  y = drawRichParagraph(doc, [
+    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: fichaNumero, bold: true },
+    { text: " no dia " },
+    { text: dataConsulta, bold: true },
+    { text: " às " },
+    { text: horaInicio, bold: true },
+    { text: " até " },
+    { text: horaFim, bold: true },
+    { text: "." },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 8;
+
+  // ── Assinaturas do paciente e médico ──
+  drawDualSignature(doc, data, y + 10, { hideDateLine: true });
+  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

@@ -29,6 +29,16 @@ export interface PacienteData {
   pacienteNome: string;
   pacienteCpf: string;
   pacienteDataNascimento: string;
+  pacienteMatricula?: string;
+  pacienteRg?: string;
+  pacienteEndereco?: string;
+  pacienteNumero?: string;
+  pacienteBairro?: string;
+  pacienteCidade?: string;
+  pacienteCep?: string;
+  pacienteSexo?: string;
+  pacienteIdade?: number;
+  pacienteCelular?: string;
 }
 
 export interface BaseDocumentData extends ClinicaData, MedicoData, PacienteData {
@@ -120,10 +130,9 @@ export function createDoc(): jsPDF {
   return doc;
 }
 
-/** Desenha a barra superior decorativa */
-export function drawTopBar(doc: jsPDF): void {
-  doc.setFillColor(...COLORS.slate800);
-  doc.rect(0, 0, PAGE_WIDTH, 4, "F");
+/** Barra superior — removida conforme novo padrão visual */
+export function drawTopBar(_doc: jsPDF): void {
+  // não desenha mais barra decorativa no topo
 }
 
 /**
@@ -236,13 +245,14 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
 
     return 67; // Aumentado de 59 para 67 para acomodar o cabeçalho bem mais baixo
   } else {
-    // ── Layout legado: logo à esquerda, info de contato à direita ──
+    // ── Layout padrão: logo grande à esquerda, informações da clínica à direita ──
     const logoY = 8;
+    const maxH = 40; // logo maior (era 18mm)
+    const maxW = midX - MARGIN - 6;
+
     if (data.logoBase64) {
       try {
         const props = doc.getImageProperties(data.logoBase64);
-        const maxH = 18;
-        const maxW = midX - MARGIN - 6;
         const ratio = props.width / props.height;
         let logoW = maxH * ratio;
         let logoH = maxH;
@@ -251,122 +261,175 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
         const imgFmt = data.logoBase64.startsWith("data:image/png") ? "PNG" : "WEBP";
         doc.addImage(data.logoBase64, imgFmt, MARGIN, logoTopY, logoW, logoH);
       } catch {
-        doc.setFontSize(14);
+        doc.setFontSize(16);
         doc.setFont(PDF_FONT, "bold");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(data.clinicaNome, MARGIN, logoY + 10);
+        doc.text(data.clinicaNome, MARGIN, logoY + 22);
       }
     } else {
-      doc.setFontSize(14);
+      doc.setFontSize(16);
       doc.setFont(PDF_FONT, "bold");
       doc.setTextColor(...COLORS.slate800);
-      doc.text(data.clinicaNome, MARGIN, logoY + 10);
+      doc.text(data.clinicaNome, MARGIN, logoY + 22);
     }
 
-    doc.setFontSize(7.5);
+    // ── Informações da clínica: coluna direita, alinhadas à direita ──
+    const rightX = PAGE_WIDTH - MARGIN;
+    let infoY = logoY + 6;
+
+    // Nome da clínica em destaque
+    doc.setFontSize(12);
+    doc.setFont(PDF_FONT, "bold");
+    doc.setTextColor(...COLORS.slate800);
+    doc.text(data.clinicaNome, rightX, infoY, { align: "right" });
+    infoY += 6;
+
+    doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
-    const rightX = PAGE_WIDTH - MARGIN;
-    let infoY = logoY + 2;
+
+    // Endereço: rua + número + bairro
     if (data.clinicaEndereco) {
-      doc.text(data.clinicaEndereco, rightX, infoY, { align: "right" });
-      infoY += 3.5;
+      let addr = data.clinicaEndereco;
+      if (data.clinicaNumero) addr += `, nº ${data.clinicaNumero}`;
+      if (data.clinicaBairro) addr += ` — ${data.clinicaBairro}`;
+      doc.text(addr, rightX, infoY, { align: "right" });
+      infoY += 5;
     }
-    if (data.clinicaTelefone) {
-      doc.text(`Tel: ${data.clinicaTelefone}`, rightX, infoY, { align: "right" });
-      infoY += 3.5;
+
+    // Cidade / Estado   CEP
+    if (data.clinicaCidade || data.clinicaEstado) {
+      const city = [data.clinicaCidade, data.clinicaEstado].filter(Boolean).join(" / ");
+      const cepStr = data.clinicaCep ? `   CEP ${data.clinicaCep}` : "";
+      doc.text(`${city}${cepStr}`, rightX, infoY, { align: "right" });
+      infoY += 5;
     }
+
+    // E-mail
     if (data.clinicaEmail) {
       doc.text(data.clinicaEmail, rightX, infoY, { align: "right" });
-      infoY += 3.5;
+      infoY += 5;
     }
+
+    // CNPJ
     doc.text(`CNPJ: ${formatCNPJ(data.clinicaCnpj)}`, rightX, infoY, { align: "right" });
+    infoY += 5;
 
+    // Telefone (abaixo do CNPJ)
+    if (data.clinicaTelefone) {
+      doc.text(`Tel: ${data.clinicaTelefone}`, rightX, infoY, { align: "right" });
+    }
+
+    // Linha separadora abaixo do cabeçalho
+    const sepY = logoY + maxH + 8; // 8 + 40 + 8 = 56
     doc.setDrawColor(...COLORS.slate200);
-    doc.setLineWidth(0.5);
-    doc.line(MARGIN, 30, PAGE_WIDTH - MARGIN, 30);
+    doc.setLineWidth(0.4);
+    doc.line(MARGIN, sepY, PAGE_WIDTH - MARGIN, sepY);
 
-    return 40;
+    return sepY + 8; // 64
   }
 }
 
-/** Desenha título e subtítulo centralizado. Retorna Y após título */
-export function drawTitle(doc: jsPDF, title: string, subtitle?: string): number {
-  let y = 40;
+/** Desenha título e subtítulo alinhados à esquerda. Retorna Y após título */
+export function drawTitle(doc: jsPDF, title: string, subtitle?: string, startY?: number): number {
+  let y = startY ?? 64;
 
-  doc.setFontSize(20);
+  doc.setFontSize(18);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(title, PAGE_WIDTH / 2, y, { align: "center" });
-
-  y += 6;
+  doc.text(title, MARGIN, y);
+  y += 7;
 
   if (subtitle) {
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont(PDF_FONT, "normal");
-    doc.setTextColor(...COLORS.slate400);
-    doc.text(subtitle, PAGE_WIDTH / 2, y, { align: "center" });
+    doc.setTextColor(...COLORS.slate600);
+    doc.text(subtitle, MARGIN, y);
+    y += 5;
   }
 
-  return y + 14;
+  return y + 8;
 }
 
-/** Desenha identificação do paciente sem box colorido. Retorna Y após seção */
+/** Desenha identificação do paciente em grid (Matrícula/Nasc/RG | Nome/CPF | End/Bairro | Cidade/CEP). Retorna Y após seção */
 export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): number {
-  // Label da seção
-  doc.setFontSize(7);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate400);
-  doc.text("PACIENTE", MARGIN, y);
-  y += 5;
-
-  // Nome do paciente em destaque
-  doc.setFontSize(13);
+  // Título da seção
+  doc.setFontSize(9);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome, MARGIN, y);
+  doc.text("IDENTIFICAÇÃO DO PACIENTE", MARGIN, y);
+  y += 7;
 
-  y += 6;
+  const ROW_H = 7;
+  // posições absolutas das colunas (A4: margem 20mm)
+  const colMid = 75;  // "Nasc." na linha 1
+  const colDir = 125; // "RG", "CPF", "Bairro", "CEP" — coluna direita
 
-  // Informações do paciente
-  doc.setFontSize(8);
-  doc.setFont(PDF_FONT, "normal");
-  doc.setTextColor(...COLORS.slate600);
-  const pacienteInfo = `CPF: ${formatCPF(data.pacienteCpf)}     |     Data de Nascimento: ${data.pacienteDataNascimento}`;
-  doc.text(pacienteInfo, MARGIN, y);
+  /** Escreve label (cinza, normal 10pt) + valor (escuro, normal 10pt) na posição x, y */
+  const lv = (label: string, value: string, x: number, ly: number) => {
+    doc.setFontSize(10);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate600);
+    doc.text(label, x, ly);
+    doc.setTextColor(...COLORS.slate800);
+    doc.text(value || "", x + doc.getTextWidth(label), ly);
+  };
 
-  y += 8;
+  // Linha 1: Nº Matrícula | Nasc. | RG (acima do CPF)
+  lv("Nº Matrícula: ", data.pacienteMatricula || "", MARGIN, y);
+  lv("Nasc. ", data.pacienteDataNascimento, colMid, y);
+  lv("RG: ", data.pacienteRg || "", colDir, y);
+  y += ROW_H;
 
-  // Linha separadora sutil
+  // Linha 2: Nome | CPF (RG fica acima)
+  lv("Nome: ", data.pacienteNome.toUpperCase(), MARGIN, y);
+  lv("CPF: ", formatCPF(data.pacienteCpf), colDir, y);
+  y += ROW_H;
+
+  // Linha 3: Endereço | Bairro
+  lv("Endereço: ", data.pacienteEndereco || "", MARGIN, y);
+  lv("Bairro: ", data.pacienteBairro || "", colDir, y);
+  y += ROW_H;
+
+  // Linha 4: Cidade | CEP
+  lv("Cidade: ", data.pacienteCidade || "", MARGIN, y);
+  lv("CEP: ", data.pacienteCep || "", colDir, y);
+  y += ROW_H + 4;
+
+  // Separador
   doc.setDrawColor(...COLORS.slate200);
   doc.setLineWidth(0.3);
   doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
 
-  return y + 10;
+  return y + 8;
 }
 
 /** Desenha rodapé com assinatura do médico. Posiciona fixo no fim da página */
 export function drawFooterSignature(
   doc: jsPDF,
   data: MedicoData & { dataEmissao: string; cidade?: string },
-  minY?: number
+  minY?: number,
+  options?: { hideDateLine?: boolean }
 ): void {
-  const footerY = Math.max(minY || 0, PAGE_HEIGHT - 80);
+  const sigY = options?.hideDateLine
+    ? PAGE_HEIGHT - 42
+    : Math.max(minY || 0, PAGE_HEIGHT - 80) + 28;
 
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
+  if (!options?.hideDateLine) {
+    const footerY = sigY - 28;
+    doc.setDrawColor(...COLORS.slate200);
+    doc.setLineWidth(0.3);
+    doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
 
-  const localData = data.cidade
-    ? `${data.cidade}, ${data.dataEmissao}`
-    : data.dataEmissao;
+    const localData = data.cidade
+      ? `${data.cidade}, ${data.dataEmissao}`
+      : data.dataEmissao;
 
-  doc.setFontSize(10);
-  doc.setFont(PDF_FONT, "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(localData, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
-
-  const sigY = footerY + 28;
+    doc.setFontSize(10);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate600);
+    doc.text(localData, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
+  }
 
   doc.setDrawColor(...COLORS.slate800);
   doc.setLineWidth(0.4);
@@ -375,138 +438,124 @@ export function drawFooterSignature(
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, PAGE_WIDTH / 2, sigY + 5, { align: "center" });
+  doc.text(`Dr(a). ${data.medicoNome}`, PAGE_WIDTH / 2, sigY + 8, { align: "center" });
 
   doc.setFontSize(8);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${data.medicoCrm} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, sigY + 10, { align: "center" });
+  doc.text(`CRM ${data.medicoCrm} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, sigY + 14, { align: "center" });
 }
 
-/** Desenha rodapé com duas assinaturas (paciente + médico) */
+/** Desenha rodapé com duas assinaturas (paciente + médico), fixas no rodapé da página */
 export function drawDualSignature(
   doc: jsPDF,
   data: MedicoData & { pacienteNome: string; dataEmissao: string; cidade?: string },
-  minY?: number
+  _minY?: number,
+  options?: { hideDateLine?: boolean }
 ): void {
-  const footerY = Math.max(minY || 0, PAGE_HEIGHT - 80);
+  // Assinaturas sempre fixas no final da página
+  const sigY = options?.hideDateLine
+    ? PAGE_HEIGHT - 42
+    : PAGE_HEIGHT - 55;
 
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
+  if (!options?.hideDateLine) {
+    const localData = data.cidade
+      ? `${data.cidade}, ${data.dataEmissao}`
+      : data.dataEmissao;
 
-  const localData = data.cidade
-    ? `${data.cidade}, ${data.dataEmissao}`
-    : data.dataEmissao;
+    doc.setFontSize(10);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate600);
+    doc.text(localData, PAGE_WIDTH / 2, sigY - 10, { align: "center" });
+  }
 
-  doc.setFontSize(10);
-  doc.setFont(PDF_FONT, "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text(localData, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
-
-  const sigY = footerY + 28;
   const leftCenter = MARGIN + CONTENT_WIDTH / 4;
   const rightCenter = MARGIN + (CONTENT_WIDTH * 3) / 4;
 
-  // Assinatura paciente (esquerda)
+  // ── Assinatura paciente (esquerda) ──
   doc.setDrawColor(...COLORS.slate800);
   doc.setLineWidth(0.4);
   doc.line(leftCenter - 35, sigY, leftCenter + 35, sigY);
 
+  doc.setFontSize(9);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text(data.pacienteNome.toUpperCase(), leftCenter, sigY + 8, { align: "center" });
+
   doc.setFontSize(8);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Paciente ou Responsavel", leftCenter, sigY + 5, { align: "center" });
+  doc.text("Paciente ou Responsável", leftCenter, sigY + 14, { align: "center" });
 
-  // Assinatura médico (direita)
+  // ── Assinatura médico (direita) ──
+  doc.setDrawColor(...COLORS.slate800);
   doc.line(rightCenter - 35, sigY, rightCenter + 35, sigY);
 
   doc.setFontSize(9);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, rightCenter, sigY + 5, { align: "center" });
+  doc.text(data.medicoNome.toUpperCase(), rightCenter, sigY + 8, { align: "center" });
 
   doc.setFontSize(8);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${data.medicoCrm}`, rightCenter, sigY + 10, { align: "center" });
+  doc.text(`CRM  ${data.medicoCrm}`, rightCenter, sigY + 14, { align: "center" });
 }
 
 /**
- * Desenha barra inferior do documento.
- * - Com `data`: exibe endereço, telefone, e-mail e site da clínica.
- * - Sem `data`: exibe texto legal genérico (comportamento legado).
+ * Desenha rodapé simples com informações da clínica (sem barras coloridas).
+ * - Com `data`: linha separadora sutil + nome · contato.
+ * - Sem `data`: texto legal genérico discreto.
  */
 export function drawBottomBar(doc: jsPDF, data?: ClinicaData): void {
+  const footerY = PAGE_HEIGHT - 16;
+
+  // Linha separadora sutil
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
+
   if (data) {
-    const footerTop = PAGE_HEIGHT - 30;
+    // Linha 1: nome da clínica + contatos
+    const line1: string[] = [data.clinicaNome];
+    if (data.clinicaTelefone) line1.push(`Tel: ${data.clinicaTelefone}`);
+    if (data.clinicaEmail) line1.push(data.clinicaEmail);
+    if (data.clinicaSite) line1.push(data.clinicaSite);
 
-    // Linha decorativa azul acima do rodapé
-    doc.setDrawColor(...COLORS.blue600);
-    doc.setLineWidth(0.6);
-    doc.line(0, footerTop, PAGE_WIDTH, footerTop);
+    doc.setFontSize(6.5);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate600);
+    doc.text(line1.join("  ·  "), PAGE_WIDTH / 2, footerY + 5, { align: "center" });
 
-    // Fundo sutil do rodapé
-    doc.setFillColor(248, 250, 252); // slate50
-    doc.rect(0, footerTop, PAGE_WIDTH, 26, "F");
-
-    let lineY = footerTop + 6;
-
-    // Linha 1: nome da clínica (destaque)
-    doc.setFontSize(7.5);
-    doc.setFont(PDF_FONT, "bold");
-    doc.setTextColor(...COLORS.slate800);
-    doc.text(data.clinicaNome, PAGE_WIDTH / 2, lineY, { align: "center" });
-    lineY += 5;
-
-    // Linha 2: endereço, número, bairro, cidade, UF, CEP
-    const addrParts: string[] = [];
+    // Linha 2: endereço + CNPJ
+    const line2: string[] = [];
     if (data.clinicaEndereco) {
       let addr = data.clinicaEndereco;
       if (data.clinicaNumero) addr += `, nº ${data.clinicaNumero}`;
-      addrParts.push(addr);
+      if (data.clinicaBairro) addr += ` — ${data.clinicaBairro}`;
+      line2.push(addr);
     }
-    if (data.clinicaBairro) addrParts.push(data.clinicaBairro);
     if (data.clinicaCidade || data.clinicaEstado) {
-      const city = [data.clinicaCidade, data.clinicaEstado].filter(Boolean).join(" / ");
-      addrParts.push(city);
+      line2.push([data.clinicaCidade, data.clinicaEstado].filter(Boolean).join(" / "));
     }
-    if (data.clinicaCep) addrParts.push(`CEP ${data.clinicaCep}`);
-    if (addrParts.length > 0) {
-      doc.setFontSize(6.5);
-      doc.setFont(PDF_FONT, "normal");
-      doc.setTextColor(...COLORS.slate600);
-      doc.text(addrParts.join("  ·  "), PAGE_WIDTH / 2, lineY, { align: "center" });
-      lineY += 5;
-    }
+    if (data.clinicaCep) line2.push(`CEP ${data.clinicaCep}`);
+    if (data.clinicaCnpj) line2.push(`CNPJ: ${formatCNPJ(data.clinicaCnpj)}`);
 
-    // Linha 3: telefone · e-mail · site
-    const contactParts: string[] = [];
-    if (data.clinicaTelefone) contactParts.push(`Tel: ${data.clinicaTelefone}`);
-    if (data.clinicaEmail) contactParts.push(data.clinicaEmail);
-    if (data.clinicaSite) contactParts.push(data.clinicaSite);
-    if (contactParts.length > 0) {
-      doc.setFontSize(6.5);
-      doc.setFont(PDF_FONT, "normal");
-      doc.setTextColor(...COLORS.slate600);
-      doc.text(contactParts.join("  ·  "), PAGE_WIDTH / 2, lineY, { align: "center" });
+    if (line2.length > 0) {
+      doc.setFontSize(6);
+      doc.text(line2.join("  ·  "), PAGE_WIDTH / 2, footerY + 10, { align: "center" });
     }
   } else {
-    // Texto legal genérico (comportamento legado)
     doc.setFontSize(6);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate400);
     doc.text(
-      "Este documento foi gerado eletronicamente pelo sistema Prontivus e possui validade legal conforme legislacao vigente.",
+      "Documento gerado eletronicamente — Prontivus",
       PAGE_WIDTH / 2,
-      PAGE_HEIGHT - 7,
+      footerY + 6,
       { align: "center" }
     );
   }
-
-  // Barra escura no rodapé
-  doc.setFillColor(...COLORS.slate800);
-  doc.rect(0, PAGE_HEIGHT - 4, PAGE_WIDTH, 4, "F");
 }
 
 /** Desenha seção de label + conteúdo */
@@ -538,6 +587,57 @@ export function drawObservationCard(doc: jsPDF, text: string, y: number): number
   y += obsText.length * 5 + 8;
 
   return y;
+}
+
+/**
+ * Renderiza um parágrafo com trechos em negrito/normal inline, com quebra de linha automática.
+ * Retorna Y após a última linha.
+ */
+export function drawRichParagraph(
+  doc: jsPDF,
+  segments: Array<{ text: string; bold?: boolean }>,
+  x: number,
+  startY: number,
+  maxWidth: number,
+  fontSize: number = 10,
+  lineHeight: number = 5.5
+): number {
+  // Tokeniza em (palavra, bold), preservando espaços como tokens separados
+  const tokens: Array<{ word: string; bold: boolean }> = [];
+  for (const seg of segments) {
+    const parts = seg.text.split(/(\s+)/);
+    for (const p of parts) {
+      if (p !== "") tokens.push({ word: p, bold: !!seg.bold });
+    }
+  }
+
+  let curX = x;
+  let curY = startY;
+
+  for (const token of tokens) {
+    const isWS = /^\s+$/.test(token.word);
+    doc.setFontSize(fontSize);
+    doc.setFont(PDF_FONT, token.bold ? "bold" : "normal");
+    doc.setTextColor(...COLORS.slate800);
+    const w = doc.getTextWidth(token.word);
+
+    // Quebra de linha antes de palavras que ultrapassam o limite
+    if (!isWS && curX > x && curX + w > x + maxWidth) {
+      curX = x;
+      curY += lineHeight;
+      doc.setFontSize(fontSize);
+      doc.setFont(PDF_FONT, token.bold ? "bold" : "normal");
+      doc.setTextColor(...COLORS.slate800);
+    }
+
+    // Não renderiza espaços no início de linha
+    if (!isWS || curX > x) {
+      doc.text(token.word, curX, curY);
+    }
+    curX += w;
+  }
+
+  return curY + lineHeight;
 }
 
 /** Desenha campo de formulário inline (label: valor) dentro de um card */

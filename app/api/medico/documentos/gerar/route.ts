@@ -2,16 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId, getUserMedicoId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { generateAtestadoPDF } from "@/lib/pdf/atestado-medico";
-import { generateAtestadoAptidaoPDF } from "@/lib/pdf/atestado-aptidao";
-import { generateDeclaracaoComparecimentoPDF } from "@/lib/pdf/declaracao-comparecimento";
+import {
+  generateAtestadoAfastamentoPDF,
+  generateAtestadoAfastamentoSemCidPDF,
+  generateAtestadoAfastamentoComCidPDF,
+  generateAtestadoAfastamentoHistoricoCidPDF,
+  generateAtestadoAfastamentoIndeterminadoPDF,
+} from "@/lib/pdf/atestado-afastamento";
+import {
+  generateAtestadoAptidaoFisicaMentalPDF,
+  generateAtestadoAptidaoFisicaPiscinasPDF,
+  generateAtestadoAptidaoFisicaPDF,
+} from "@/lib/pdf/atestado-aptidao";
+import {
+  generateDeclaracaoComparecimentoPDF,
+  generateDeclaracaoComparecimentoAcompanhantePDF,
+  generateDeclaracaoComparecimentoHorarioCidPDF,
+} from "@/lib/pdf/declaracao-comparecimento";
 import { generateReceitaSimplesPDF } from "@/lib/pdf/receita-simples";
 import { generateReceitaControleEspecialPDF } from "@/lib/pdf/receita-controle-especial";
 import { generateGuiaEncaminhamentoPDF } from "@/lib/pdf/guia-encaminhamento";
 import { generateRiscoCirurgicoPDF } from "@/lib/pdf/risco-cirurgico";
-import { generateJustificativaExamesPDF } from "@/lib/pdf/justificativa-exames";
-import { generateControleDiabetesPDF } from "@/lib/pdf/controle-diabetes";
-import { generateControlePressaoPDF } from "@/lib/pdf/controle-pressao";
+import { generateJustificativaPedidosExamesPDF } from "@/lib/pdf/justificativa-exames";
+import { generateControleDiabetesPDF, generateControleDiabetesAnaliticoPDF } from "@/lib/pdf/controle-diabetes";
+import { generateControlePressaoPDF, generateControlePressaoAnaliticoPDF } from "@/lib/pdf/controle-pressao";
 import { generateFichaAtendimentoPDF } from "@/lib/pdf/ficha-atendimento";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
@@ -194,28 +208,90 @@ export async function POST(request: NextRequest) {
       // =====================================================
       // ATESTADOS DE AFASTAMENTO
       // =====================================================
-      case "atestado-afastamento":
-      case "atestado-afastamento-cid":
-      case "atestado-afastamento-sem-cid":
-      case "atestado-afastamento-historico-cid":
-      case "atestado-afastamento-indeterminado": {
-        const tipoMap: Record<string, string> = {
-          "atestado-afastamento": "afastamento",
-          "atestado-afastamento-cid": "afastamento-cid",
-          "atestado-afastamento-sem-cid": "afastamento-sem-cid",
-          "atestado-afastamento-historico-cid": "afastamento-historico-cid",
-          "atestado-afastamento-indeterminado": "afastamento-indeterminado",
-        };
+      case "atestado-afastamento": {
+        const consultaDHAfast = new Date(consulta.dataHora);
+        const dataConsultaAfast = `${String(consultaDHAfast.getDate()).padStart(2, "0")}/${String(consultaDHAfast.getMonth() + 1).padStart(2, "0")}/${consultaDHAfast.getFullYear()}`;
+        const horaConsultaAfast = `${String(consultaDHAfast.getHours()).padStart(2, "0")}:${String(consultaDHAfast.getMinutes()).padStart(2, "0")}:${String(consultaDHAfast.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAfastamentoPDF({
+          ...baseData,
+          diasAfastamento: dados?.diasAfastamento || 1,
+          observacoes: dados?.observacoes || undefined,
+          dataConsulta: dataConsultaAfast,
+          horaConsulta: horaConsultaAfast,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+        });
+        break;
+      }
 
-        pdfBuffer = generateAtestadoPDF({
+      case "atestado-afastamento-sem-cid": {
+        const consultaDHSemCid = new Date(consulta.dataHora);
+        const dataConsultaSemCid = `${String(consultaDHSemCid.getDate()).padStart(2, "0")}/${String(consultaDHSemCid.getMonth() + 1).padStart(2, "0")}/${consultaDHSemCid.getFullYear()}`;
+        const horaConsultaSemCid = `${String(consultaDHSemCid.getHours()).padStart(2, "0")}:${String(consultaDHSemCid.getMinutes()).padStart(2, "0")}:${String(consultaDHSemCid.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAfastamentoSemCidPDF({
+          ...baseData,
+          diasAfastamento: dados?.diasAfastamento || 1,
+          observacoes: dados?.observacoes || undefined,
+          dataConsulta: dataConsultaSemCid,
+          horaConsulta: horaConsultaSemCid,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+        });
+        break;
+      }
+
+      case "atestado-afastamento-cid": {
+        const consultaDH = new Date(consulta.dataHora);
+        const dataConsultaFmt = `${String(consultaDH.getDate()).padStart(2, "0")}/${String(consultaDH.getMonth() + 1).padStart(2, "0")}/${consultaDH.getFullYear()}`;
+        const horaConsultaFmt = `${String(consultaDH.getHours()).padStart(2, "0")}:${String(consultaDH.getMinutes()).padStart(2, "0")}:${String(consultaDH.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAfastamentoComCidPDF({
           ...baseData,
           diasAfastamento: dados?.diasAfastamento || 1,
           cidCodigo: dados?.cidCodigo || undefined,
           cidDescricao: dados?.cidDescricao || undefined,
-          incluirCid: tipoDocumento === "atestado-afastamento-cid",
           observacoes: dados?.observacoes || undefined,
-          tipo: tipoMap[tipoDocumento] as any,
+          dataConsulta: dataConsultaFmt,
+          horaConsulta: horaConsultaFmt,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+        });
+        break;
+      }
+
+      case "atestado-afastamento-historico-cid": {
+        const consultaDHHist = new Date(consulta.dataHora);
+        const dataConsultaHist = `${String(consultaDHHist.getDate()).padStart(2, "0")}/${String(consultaDHHist.getMonth() + 1).padStart(2, "0")}/${consultaDHHist.getFullYear()}`;
+        const horaConsultaHist = `${String(consultaDHHist.getHours()).padStart(2, "0")}:${String(consultaDHHist.getMinutes()).padStart(2, "0")}:${String(consultaDHHist.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAfastamentoHistoricoCidPDF({
+          ...baseData,
           historicoCids: dados?.historicoCids || undefined,
+          observacoes: dados?.observacoes || undefined,
+          dataConsulta: dataConsultaHist,
+          horaConsulta: horaConsultaHist,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+        });
+        break;
+      }
+
+      case "atestado-afastamento-indeterminado": {
+        const consultaDHInd = new Date(consulta.dataHora);
+        const dataConsultaInd = `${String(consultaDHInd.getDate()).padStart(2, "0")}/${String(consultaDHInd.getMonth() + 1).padStart(2, "0")}/${consultaDHInd.getFullYear()}`;
+        const horaConsultaInd = `${String(consultaDHInd.getHours()).padStart(2, "0")}:${String(consultaDHInd.getMinutes()).padStart(2, "0")}:${String(consultaDHInd.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAfastamentoIndeterminadoPDF({
+          ...baseData,
+          cidCodigo: dados?.cidCodigo || undefined,
+          cidDescricao: dados?.cidDescricao || undefined,
+          observacoes: dados?.observacoes || undefined,
+          dataConsulta: dataConsultaInd,
+          horaConsulta: horaConsultaInd,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
         });
         break;
       }
@@ -224,29 +300,42 @@ export async function POST(request: NextRequest) {
       // ATESTADOS DE APTIDÃO
       // =====================================================
       case "atestado-aptidao-fisica-mental": {
-        pdfBuffer = generateAtestadoAptidaoPDF({
+        const consultaDHApt1 = new Date(consulta.dataHora);
+        const dataConsultaApt1 = `${String(consultaDHApt1.getDate()).padStart(2, "0")}/${String(consultaDHApt1.getMonth() + 1).padStart(2, "0")}/${consultaDHApt1.getFullYear()}`;
+        const horaConsultaApt1 = `${String(consultaDHApt1.getHours()).padStart(2, "0")}:${String(consultaDHApt1.getMinutes()).padStart(2, "0")}:${String(consultaDHApt1.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAptidaoFisicaMentalPDF({
           ...baseData,
-          tipo: "fisica-mental",
           observacoes: dados?.observacoes || undefined,
           mesesValidade: dados?.mesesValidade || undefined,
+          dataConsulta: dataConsultaApt1,
+          horaConsulta: horaConsultaApt1,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
         });
         break;
       }
 
       case "atestado-aptidao-piscinas": {
-        pdfBuffer = generateAtestadoAptidaoPDF({
+        const consultaDHApt2 = new Date(consulta.dataHora);
+        const dataConsultaApt2 = `${String(consultaDHApt2.getDate()).padStart(2, "0")}/${String(consultaDHApt2.getMonth() + 1).padStart(2, "0")}/${consultaDHApt2.getFullYear()}`;
+        const horaConsultaApt2 = `${String(consultaDHApt2.getHours()).padStart(2, "0")}:${String(consultaDHApt2.getMinutes()).padStart(2, "0")}:${String(consultaDHApt2.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateAtestadoAptidaoFisicaPiscinasPDF({
           ...baseData,
-          tipo: "piscinas",
           observacoes: dados?.observacoes || undefined,
+          dataConsulta: dataConsultaApt2,
+          horaConsulta: horaConsultaApt2,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
           mesesValidade: dados?.mesesValidade || undefined,
         });
         break;
       }
 
       case "atestado-aptidao-fisica": {
-        pdfBuffer = generateAtestadoAptidaoPDF({
+        pdfBuffer = generateAtestadoAptidaoFisicaPDF({
           ...baseData,
-          tipo: "fisica",
           observacoes: dados?.observacoes || undefined,
           mesesValidade: dados?.mesesValidade || undefined,
         });
@@ -257,20 +346,34 @@ export async function POST(request: NextRequest) {
       // DECLARAÇÕES DE COMPARECIMENTO
       // =====================================================
       case "declaracao-comparecimento": {
+        const consultaDHComp = new Date(consulta.dataHora);
+        const dataConsultaComp = `${String(consultaDHComp.getDate()).padStart(2, "0")}/${String(consultaDHComp.getMonth() + 1).padStart(2, "0")}/${consultaDHComp.getFullYear()}`;
+        const horaConsultaComp = `${String(consultaDHComp.getHours()).padStart(2, "0")}:${String(consultaDHComp.getMinutes()).padStart(2, "0")}:${String(consultaDHComp.getSeconds()).padStart(2, "0")}`;
         pdfBuffer = generateDeclaracaoComparecimentoPDF({
           ...baseData,
-          tipo: "simples",
-          horaInicio: dados?.horaInicio || horaAtual,
+          dataConsulta: dataConsultaComp,
+          horaConsulta: horaConsultaComp,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+          horaInicio: dados?.horaInicio || horaConsultaComp,
           horaFim: dados?.horaFim || undefined,
         });
         break;
       }
 
       case "declaracao-comparecimento-acompanhante": {
-        pdfBuffer = generateDeclaracaoComparecimentoPDF({
+        const consultaDHAcomp = new Date(consulta.dataHora);
+        const dataConsultaAcomp = `${String(consultaDHAcomp.getDate()).padStart(2, "0")}/${String(consultaDHAcomp.getMonth() + 1).padStart(2, "0")}/${consultaDHAcomp.getFullYear()}`;
+        const horaConsultaAcomp = `${String(consultaDHAcomp.getHours()).padStart(2, "0")}:${String(consultaDHAcomp.getMinutes()).padStart(2, "0")}:${String(consultaDHAcomp.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateDeclaracaoComparecimentoAcompanhantePDF({
           ...baseData,
-          tipo: "acompanhante",
-          horaInicio: dados?.horaInicio || horaAtual,
+          dataConsulta: dataConsultaAcomp,
+          horaConsulta: horaConsultaAcomp,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+          horaInicio: dados?.horaInicio || horaConsultaAcomp,
           horaFim: dados?.horaFim || undefined,
           nomeAcompanhante: dados?.nomeAcompanhante || undefined,
           cidCodigo: dados?.cidCodigo || undefined,
@@ -280,11 +383,19 @@ export async function POST(request: NextRequest) {
       }
 
       case "declaracao-comparecimento-horario-cid": {
-        pdfBuffer = generateDeclaracaoComparecimentoPDF({
+        const consultaDHHorario = new Date(consulta.dataHora);
+        const dataConsultaHorario = `${String(consultaDHHorario.getDate()).padStart(2, "0")}/${String(consultaDHHorario.getMonth() + 1).padStart(2, "0")}/${consultaDHHorario.getFullYear()}`;
+        const horaConsultaHorario = `${String(consultaDHHorario.getHours()).padStart(2, "0")}:${String(consultaDHHorario.getMinutes()).padStart(2, "0")}:${String(consultaDHHorario.getSeconds()).padStart(2, "0")}`;
+        pdfBuffer = generateDeclaracaoComparecimentoHorarioCidPDF({
           ...baseData,
-          tipo: "horario-cid",
-          horaInicio: dados?.horaInicio || horaAtual,
+          dataConsulta: dataConsultaHorario,
+          horaConsulta: horaConsultaHorario,
+          fichaNumero: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            : undefined,
+          horaInicio: dados?.horaInicio || horaConsultaHorario,
           horaFim: dados?.horaFim || undefined,
+          nomeAcompanhante: dados?.nomeAcompanhante || undefined,
           cidCodigo: dados?.cidCodigo || undefined,
           cidDescricao: dados?.cidDescricao || undefined,
         });
@@ -376,7 +487,7 @@ export async function POST(request: NextRequest) {
       // JUSTIFICATIVA DE EXAMES
       // =====================================================
       case "justificativa-exames-plano": {
-        pdfBuffer = generateJustificativaExamesPDF({
+        pdfBuffer = generateJustificativaPedidosExamesPDF({
           ...baseData,
           convenio: dados?.convenio || undefined,
           justificativa: dados?.justificativa || undefined,
@@ -390,15 +501,13 @@ export async function POST(request: NextRequest) {
       case "controle-diabetes": {
         pdfBuffer = generateControleDiabetesPDF({
           ...baseData,
-          analitico: false,
         });
         break;
       }
 
       case "controle-diabetes-analitico": {
-        pdfBuffer = generateControleDiabetesPDF({
+        pdfBuffer = generateControleDiabetesAnaliticoPDF({
           ...baseData,
-          analitico: true,
         });
         break;
       }
@@ -409,15 +518,13 @@ export async function POST(request: NextRequest) {
       case "controle-pressao-arterial": {
         pdfBuffer = generateControlePressaoPDF({
           ...baseData,
-          analitico: false,
         });
         break;
       }
 
       case "controle-pressao-arterial-analitico": {
-        pdfBuffer = generateControlePressaoPDF({
+        pdfBuffer = generateControlePressaoAnaliticoPDF({
           ...baseData,
-          analitico: true,
         });
         break;
       }

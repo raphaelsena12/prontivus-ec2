@@ -355,6 +355,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (consultaCompleta && prontuario) {
+        const hoje = new Date();
+        const dataEmissao = `${String(hoje.getDate()).padStart(2, "0")}/${String(hoje.getMonth() + 1).padStart(2, "0")}/${hoje.getFullYear()}`;
         const pdfBuffer = generateProntuarioPDF({
           clinicaNome: consultaCompleta.clinica.nome,
           clinicaCnpj: consultaCompleta.clinica.cnpj || "",
@@ -366,6 +368,7 @@ export async function POST(request: NextRequest) {
           pacienteNome: consultaCompleta.paciente.nome,
           pacienteCpf: consultaCompleta.paciente.cpf,
           pacienteDataNascimento: consultaCompleta.paciente.dataNascimento.toISOString().split('T')[0],
+          dataEmissao,
           dataConsulta: consultaCompleta.dataHora.toISOString().split('T')[0],
           anamnese: prontuario.anamnese || "",
           exameFisico: prontuario.exameFisico || "",
