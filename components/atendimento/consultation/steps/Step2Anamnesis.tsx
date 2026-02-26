@@ -50,12 +50,22 @@ interface Step2AnamnesisProps {
 
 const ANAMNESE_SECTIONS = [
   { key: "queixaPrincipal", label: "Queixa Principal", placeholder: "Descreva o motivo principal da consulta..." },
-  { key: "hda",             label: "História da Doença Atual (HDA)", placeholder: "Início, evolução, fatores de melhora e piora, sintomas associados..." },
-  { key: "antecedentes",    label: "Antecedentes Pessoais", placeholder: "Doenças pregressas, cirurgias, internações, alergias conhecidas..." },
+  { key: "hda", label: "História da Doença Atual (HDA)", placeholder: "Início, evolução, fatores de melhora e piora, sintomas associados..." },
+  { key: "antecedentes", label: "Antecedentes Pessoais", placeholder: "Doenças pregressas, cirurgias, internações, alergias conhecidas..." },
   { key: "revisaoSistemas", label: "Revisão de Sistemas", placeholder: "Sintomas em cada sistema (cardiovascular, respiratório, digestivo...)" },
 ];
 
-const EXAME_FISICO_TITLES = ["EXAME FÍSICO", "EXAME FISICO", "EXAME FÍSICO GERAL"];
+const knownTitles = [
+  "ANAMNESE",
+  "QUEIXA PRINCIPAL",
+  "HISTÓRIA DA DOENÇA ATUAL",
+  "ANTECEDENTES PESSOAIS PATOLÓGICOS",
+  "ANTECEDENTES FAMILIARES",
+  "HÁBITOS DE VIDA",
+  "HISTÓRIA SOCIAL",
+  "MEDICAMENTOS EM USO ATUAL",
+  "EXAMES REALIZADOS",
+];
 
 function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
   const lines = anamnese.split("\n");
@@ -84,23 +94,18 @@ function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
   return result.join("\n") || "";
 }
 
+function combineSections(values: Record<string, string>): string {
+  return ANAMNESE_SECTIONS.filter((s) => values[s.key]?.trim())
+    .map((s) => `${s.label.toUpperCase()}\n${values[s.key].trim()}`)
+    .join("\n\n");
+}
+
+// Função para formatar anamnese em seções com títulos
 function formatAnamneseWithTitles(text: string): Array<{ title: string; content: string }> {
   const sections: Array<{ title: string; content: string }> = [];
   const lines = text.split("\n");
   let currentTitle = "";
   let currentContent: string[] = [];
-
-  const knownTitles = [
-    "ANAMNESE",
-    "QUEIXA PRINCIPAL",
-    "HISTÓRIA DA DOENÇA ATUAL",
-    "ANTECEDENTES PESSOAIS PATOLÓGICOS",
-    "ANTECEDENTES FAMILIARES",
-    "HÁBITOS DE VIDA",
-    "HISTÓRIA SOCIAL",
-    "MEDICAMENTOS EM USO ATUAL",
-    "EXAMES REALIZADOS",
-  ];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -156,13 +161,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
       }
     }
 
-    if (!titleMatch && trimmed.startsWith("**") && trimmed.endsWith("**")) {
-      titleMatch = {
-        title: trimmed.replace(/^\*\*/g, "").replace(/\*\*$/g, "").trim(),
-        content: ""
-      };
-    }
-
     if (titleMatch) {
       if (currentTitle || currentContent.length > 0) {
         const content = currentContent.join("\n").trim();
@@ -203,12 +201,6 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
   return sections;
 }
 
-function combineSections(values: Record<string, string>): string {
-  return ANAMNESE_SECTIONS.filter((s) => values[s.key]?.trim())
-    .map((s) => `${s.label.toUpperCase()}\n${values[s.key].trim()}`)
-    .join("\n\n");
-}
-
 export function Step2Anamnesis({
   isProcessing,
   analysisResults,
@@ -229,48 +221,66 @@ export function Step2Anamnesis({
   startTranscription,
   transcriptionText = "",
 }: Step2AnamnesisProps) {
+  // Determinar o texto da anamnese
   const rawAnamnese = isAnamneseEdited
     ? editedAnamnese
     : analysisResults?.anamnese || prontuario?.anamnese || "";
-  let anamneseText = rawAnamnese.replace(/\\n/g, '\n').replace(/\\r/g, '');
-
-  if (transcriptionText && transcriptionText.trim()) {
-    const trimmedTranscription = transcriptionText.trim();
-    const upperAnamnese = anamneseText.toUpperCase().trim();
-
-    if (upperAnamnese.startsWith("ANAMNESE:")) {
-      const lines = anamneseText.split('\n');
-      const firstLine = lines[0]?.trim() || '';
-      const afterColon = firstLine.substring(firstLine.indexOf(':') + 1).trim();
-      if (!afterColon) {
-        const secondLine = lines[1]?.trim() || '';
-        if (!secondLine) {
-          anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${lines.slice(1).join('\n')}`;
-        }
-      }
-    } else if (upperAnamnese.startsWith("ANAMNESE")) {
-      const lines = anamneseText.split('\n');
-      if (lines[0]?.trim().toUpperCase() === "ANAMNESE") {
-        anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${lines.slice(1).join('\n')}`;
-      }
+  
+  // Converter para string de forma robusta
+  let rawAnamneseStr = '';
+  if (typeof rawAnamnese === 'string') {
+    rawAnamneseStr = rawAnamnese;
+  } else if (rawAnamnese && typeof rawAnamnese === 'object') {
+    // Se for um objeto, tentar extrair a propriedade 'anamnese' ou converter para JSON
+    const anamneseObj = rawAnamnese as any;
+    if ('anamnese' in anamneseObj && typeof anamneseObj.anamnese === 'string') {
+      rawAnamneseStr = anamneseObj.anamnese;
     } else {
-      anamneseText = `ANAMNESE:\n${trimmedTranscription}\n\n${anamneseText}`;
+      rawAnamneseStr = JSON.stringify(rawAnamnese);
+    }
+  } else if (rawAnamnese) {
+    rawAnamneseStr = String(rawAnamnese);
+  }
+  
+  let anamneseText = rawAnamneseStr.replace(/\\n/g, '\n').replace(/\\r/g, '');
+  
+  // Debug: verificar o tipo e conteúdo
+  useEffect(() => {
+    if (analysisResults?.anamnese) {
+      console.log("🔍 Step2Anamnesis - analysisResults.anamnese:", {
+        type: typeof analysisResults.anamnese,
+        isString: typeof analysisResults.anamnese === 'string',
+        length: typeof analysisResults.anamnese === 'string' ? analysisResults.anamnese.length : 'N/A',
+        preview: typeof analysisResults.anamnese === 'string' ? analysisResults.anamnese.substring(0, 100) : String(analysisResults.anamnese).substring(0, 100)
+      });
+    }
+    if (anamneseText) {
+      console.log("📝 Step2Anamnesis - anamneseText:", {
+        length: anamneseText.length,
+        preview: anamneseText.substring(0, 100)
+      });
+    }
+  }, [analysisResults?.anamnese, anamneseText]);
+  
+  // Se estiver transcrevendo, adicionar transcrição ao texto
+  if (isTranscribing && transcriptionText && transcriptionText.trim()) {
+    if (!anamneseText) {
+      anamneseText = transcriptionText;
     }
   }
 
   const [sectionEdits, setSectionEdits] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    setSectionEdits({});
-  }, [anamneseText]);
-
   const [sectionValues, setSectionValues] = useState<Record<string, string>>(() => {
     const base = analysisResults?.anamnese || prontuario?.anamnese || "";
     if (!base) return {};
     return Object.fromEntries(
-      ANAMNESE_SECTIONS.map((s) => [s.key, parseAnamneseSection(base, s.label)])
+      ANAMNESE_SECTIONS.map((s: { key: string; label: string; placeholder: string }) => [s.key, parseAnamneseSection(base, s.label)])
     );
   });
+
+  useEffect(() => {
+    setSectionEdits({});
+  }, [anamneseText]);
 
   function handleSectionChange(key: string, value: string) {
     const updated = { ...sectionValues, [key]: value };
@@ -279,14 +289,13 @@ export function Step2Anamnesis({
     setEditedAnamnese(combined);
     setIsAnamneseEdited(true);
     if (prontuario) {
-      setProntuario({ ...prontuario, anamnese: combined });
+      setProntuario({ ...prontuario, anamnese: combined } as Prontuario);
     }
   }
 
   return (
     <div className="h-full overflow-x-hidden">
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col h-full overflow-x-hidden">
-
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
@@ -296,6 +305,12 @@ export function Step2Anamnesis({
               <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5">
                 Gerada por IA
               </span>
+            )}
+            {isTranscribing && (
+              <div className="flex items-center gap-1.5">
+                <Radio className="w-3 h-3 text-red-500 animate-pulse" />
+                <span className="text-xs text-red-600 font-medium">Gravando...</span>
+              </div>
             )}
           </div>
 
@@ -343,11 +358,10 @@ export function Step2Anamnesis({
                 </div>
               ))}
             </div>
-
           ) : consultationMode === "manual" ? (
             /* ── Modo Manual: inputs por tópico ── */
             <div className="divide-y divide-slate-100">
-              {ANAMNESE_SECTIONS.map((section) => (
+              {ANAMNESE_SECTIONS.map((section: { key: string; label: string; placeholder: string }) => (
                 <div key={section.key} className="space-y-1.5 pt-4 first:pt-0">
                   <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     {section.label}
@@ -360,145 +374,114 @@ export function Step2Anamnesis({
                   />
                 </div>
               ))}
-              <div className="space-y-1.5 pt-4">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Exames Físicos
-                </label>
+            </div>
+          ) : isTranscribing && transcriptionText ? (
+            /* ── Mostrar transcrição durante gravação ── */
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-3">
+                <Radio className="w-4 h-4 text-red-500 animate-pulse" />
+                <span className="text-sm font-semibold text-slate-700">Gravando consulta...</span>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                 <Textarea
-                  value={prontuario?.exameFisico || ""}
-                  onChange={(e) => prontuario && setProntuario({ ...prontuario, exameFisico: e.target.value })}
-                  placeholder="Dados vitais, aspecto geral, achados por sistema..."
-                  className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                  value={transcriptionText}
+                  readOnly
+                  className="text-sm min-h-[300px] resize-none bg-white border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] leading-relaxed"
+                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+                  placeholder="Aguardando transcrição..."
                 />
               </div>
+              <p className="text-xs text-slate-400 text-center">
+                A anamnese será gerada automaticamente ao encerrar a gravação.
+              </p>
             </div>
-
           ) : !anamneseText ? (
-            /* ── Empty state (modo IA) ── */
+            /* ── Empty state ── */
             <div className="flex flex-col items-center justify-center py-10 px-6 text-center select-none">
               <div className="relative mb-5">
                 <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
                   <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
-                    {isTranscribing ? (
-                      <Radio className="w-5 h-5 text-red-500 animate-pulse" />
-                    ) : (
-                      <Mic className="w-5 h-5 text-[#1E40AF]" />
-                    )}
+                    <Mic className="w-5 h-5 text-[#1E40AF]" />
                   </div>
                 </div>
-                {isTranscribing && (
-                  <>
-                    <span className="absolute inset-0 rounded-full bg-red-400/10 animate-ping" />
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
-                      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    </span>
-                  </>
-                )}
               </div>
-
-              {isTranscribing ? (
-                <>
-                  <p className="text-base font-semibold text-slate-700 mb-1">Gravando consulta...</p>
-                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
-                    A anamnese será gerada automaticamente ao encerrar a gravação.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
-                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
-                    Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
-                  </p>
-                  {startTranscription && (
-                    <Button
-                      onClick={startTranscription}
-                      className="h-10 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200 font-semibold rounded-xl"
-                    >
-                      <Mic className="w-4 h-4" />
-                      Iniciar Gravação
-                    </Button>
-                  )}
-                </>
+              <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
+              <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
+                Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
+              </p>
+              {startTranscription && (
+                <Button
+                  onClick={startTranscription}
+                  className="h-10 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200 font-semibold rounded-xl"
+                >
+                  <Mic className="w-4 h-4" />
+                  Iniciar Gravação
+                </Button>
               )}
             </div>
-
           ) : (
             /* ── Anamnese formatada com títulos — sempre editável ── */
             <div className="divide-y divide-slate-100">
               {formatAnamneseWithTitles(anamneseText)
-                .filter((s) => !EXAME_FISICO_TITLES.includes(s.title.toUpperCase()) && s.title.toUpperCase() !== "ANAMNESE")
+                .filter((s) => s.title.toUpperCase() !== "ANAMNESE")
                 .map((section, index) => {
-                const displayContent = section.content || "";
-                const currentContent = sectionEdits[index] !== undefined ? sectionEdits[index] : displayContent;
+                  const displayContent = section.content || "";
+                  const currentContent = sectionEdits[index] !== undefined ? sectionEdits[index] : displayContent;
 
-                const handleContentChange = (newContent: string) => {
-                  setSectionEdits((prev) => ({ ...prev, [index]: newContent }));
+                  const handleContentChange = (newContent: string) => {
+                    setSectionEdits((prev) => ({ ...prev, [index]: newContent }));
 
-                  const allSections = formatAnamneseWithTitles(anamneseText);
-                  allSections[index].content = newContent;
+                    const allSections = formatAnamneseWithTitles(anamneseText);
+                    allSections[index].content = newContent;
 
-                  Object.keys(sectionEdits).forEach((key) => {
-                    const editIndex = parseInt(key);
-                    if (editIndex !== index && allSections[editIndex]) {
-                      allSections[editIndex].content = sectionEdits[editIndex];
-                    }
-                  });
-
-                  const newAnamnese = allSections
-                    .map((s) => {
-                      if (s.title) {
-                        return `${s.title}:\n${s.content}`;
+                    Object.keys(sectionEdits).forEach((key) => {
+                      const editIndex = parseInt(key);
+                      if (editIndex !== index && allSections[editIndex]) {
+                        allSections[editIndex].content = sectionEdits[editIndex];
                       }
-                      return s.content;
-                    })
-                    .join("\n\n");
+                    });
 
-                  setEditedAnamnese(newAnamnese);
-                  setIsAnamneseEdited(true);
-                  if (prontuario) {
-                    setProntuario({ ...prontuario, anamnese: newAnamnese } as Prontuario);
-                  }
-                };
+                    const newAnamnese = allSections
+                      .map((s) => {
+                        if (s.title) {
+                          return `${s.title}:\n${s.content}`;
+                        }
+                        return s.content;
+                      })
+                      .join("\n\n");
 
-                return (
-                  <div key={index} className="space-y-1.5 pt-4 first:pt-0">
-                    {section.title && (
-                      <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                        {section.title}
-                      </h3>
-                    )}
-                    <Textarea
-                      value={currentContent}
-                      onChange={(e) => handleContentChange(e.target.value)}
-                      placeholder={displayContent ? undefined : "Sem informações"}
-                      className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
-                      style={{
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        overflowX: 'hidden',
-                        overflowY: 'visible'
-                      }}
-                    />
-                  </div>
-                );
-              })}
+                    setEditedAnamnese(newAnamnese);
+                    setIsAnamneseEdited(true);
+                    if (prontuario) {
+                      setProntuario({ ...prontuario, anamnese: newAnamnese } as Prontuario);
+                    }
+                  };
 
-              <div className="space-y-1.5 pt-4">
-                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                  Exames Físicos
-                </h3>
-                <Textarea
-                  value={prontuario?.exameFisico || ""}
-                  onChange={(e) => prontuario && setProntuario({ ...prontuario, exameFisico: e.target.value })}
-                  placeholder="Preencha após o exame físico..."
-                  className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
-                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowX: 'hidden', overflowY: 'visible' }}
-                />
-              </div>
+                  return (
+                    <div key={index} className="space-y-1.5 pt-4 first:pt-0">
+                      {section.title && (
+                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                          {section.title}
+                        </h3>
+                      )}
+                      <Textarea
+                        value={currentContent}
+                        onChange={(e) => handleContentChange(e.target.value)}
+                        placeholder={displayContent ? undefined : "Sem informações"}
+                        className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
+                        style={{
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          overflowX: 'hidden',
+                          overflowY: 'visible'
+                        }}
+                      />
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

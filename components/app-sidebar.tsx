@@ -344,7 +344,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       },
       {
         title: "Prontuários Completos",
-        url: "/medico/pacientes",
+        url: "/medico/prontuarios",
         icon: IconUsers,
       },
       {

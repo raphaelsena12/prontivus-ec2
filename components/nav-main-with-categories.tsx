@@ -81,8 +81,8 @@ export function NavMainWithCategories({
     <SidebarGroup>
       <SidebarGroupContent>
         <SidebarMenu className="gap-1 px-2">
-          {itemsToShow.map((item) => (
-            <SidebarMenuItem key={item.url} className="mb-1">
+          {itemsToShow.map((item, index) => (
+            <SidebarMenuItem key={`${item.url}-${index}-${item.title}`} className="mb-1">
               <SidebarMenuButton
                 asChild
                 isActive={pathname === item.url || pathname?.startsWith(item.url + "/")}

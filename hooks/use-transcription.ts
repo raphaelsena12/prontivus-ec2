@@ -182,29 +182,30 @@ export function useTranscription() {
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Erro no reconhecimento de voz:", event.error, event);
+      // Tratar erro "no-speech" de forma silenciosa - é normal quando não há fala
       if (event.error === "no-speech") {
-        // Não fazer nada, apenas aguardar - não encerrar
-        console.log("Nenhuma fala detectada, aguardando...");
+        // Não fazer nada - o Web Speech API continuará aguardando
+        // O evento onend será chamado e o reconhecimento será reiniciado automaticamente
         return;
       }
+      
+      // Logar outros erros apenas se forem importantes
       if (event.error === "not-allowed") {
         console.error("Permissão de microfone negada");
         isStartingRef.current = false;
         setIsTranscribing(false);
         toast.error("Permissão de microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador.");
       } else if (event.error === "aborted") {
-        // Reconhecimento foi abortado manualmente
-        console.log("Reconhecimento abortado");
+        // Reconhecimento foi abortado manualmente - não é um erro
         return;
-      } else {
+      } else if (event.error === "network" || event.error === "service-not-allowed") {
         console.error(`Erro na transcrição: ${event.error}`);
-        // Não parar imediatamente para erros menores
-        if (event.error === "network" || event.error === "service-not-allowed") {
-          isStartingRef.current = false;
-          setIsTranscribing(false);
-          toast.error(`Erro na transcrição: ${event.error}`);
-        }
+        isStartingRef.current = false;
+        setIsTranscribing(false);
+        toast.error(`Erro na transcrição: ${event.error}`);
+      } else {
+        // Outros erros - logar apenas em modo debug (não como erro)
+        console.log(`Aviso no reconhecimento: ${event.error}`);
       }
     };
 

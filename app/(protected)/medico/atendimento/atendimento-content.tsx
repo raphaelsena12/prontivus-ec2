@@ -556,16 +556,21 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
   // ── Fase 1: gerar apenas anamnese a partir da transcrição ─────────────────
   const handleGenerateAnamnese = async () => {
+    console.log("🚀 handleGenerateAnamnese chamado");
     const transcriptionText = transcription
       .filter((e) => !e.isPartial)
       .map((e) => e.text)
       .join(" ") || transcription.map((e) => e.text).join(" ");
 
+    console.log("📋 Transcrição para processar:", transcriptionText.substring(0, 200) + "...");
+
     if (!transcriptionText.trim()) {
+      console.error("❌ Transcrição vazia!");
       toast.error("Nenhuma transcrição disponível para processar");
       return;
     }
 
+    console.log("⏳ Iniciando processamento...");
     setIsProcessing(true);
     setProcessingContext('anamnese');
     setProcessingStage('processing');
@@ -587,13 +592,28 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
       const data = await response.json();
       // Garantir que as quebras de linha sejam preservadas
-      const anamneseFormatted = data.anamnese
-        ? data.anamnese.replace(/\\n/g, '\n').replace(/\\r/g, '')
-        : '';
+      let anamneseRaw = data.anamnese;
+      
+      // Se data.anamnese for um objeto, tentar extrair a string
+      if (anamneseRaw && typeof anamneseRaw === 'object') {
+        if ('anamnese' in anamneseRaw && typeof anamneseRaw.anamnese === 'string') {
+          anamneseRaw = anamneseRaw.anamnese;
+        } else {
+          anamneseRaw = JSON.stringify(anamneseRaw);
+        }
+      }
+      
+      const anamneseFormatted = anamneseRaw && typeof anamneseRaw === 'string'
+        ? anamneseRaw.replace(/\\n/g, '\n').replace(/\\r/g, '')
+        : (anamneseRaw ? String(anamneseRaw) : '');
+      
+      console.log("📋 Anamnese formatada:", anamneseFormatted.substring(0, 200));
       setAnalysisResults({ anamnese: anamneseFormatted, cidCodes: [], protocolos: [], exames: [], prescricoes: [] });
       setProntuario((prev) => ({ ...prev, anamnese: anamneseFormatted } as Prontuario));
       setEditedAnamnese(anamneseFormatted);
       setIsEditingAnamnese(true); // Sempre deixar em modo de edição
+      // Resetar flag de transcrição finalizada para permitir nova gravação
+      setTranscricaoFinalizada(false);
       toast.success("Anamnese gerada com sucesso!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao gerar anamnese");
@@ -606,11 +626,37 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
   // ── Auto-gerar anamnese ao encerrar transcrição ────────────────────────────
   useEffect(() => {
-    if (transcricaoFinalizada && transcription.length > 0) {
-      handleGenerateAnamnese();
+    if (transcricaoFinalizada && transcription.length > 0 && !isProcessing) {
+      console.log("🔄 Transcrição finalizada, preparando para gerar anamnese...", {
+        transcricaoFinalizada,
+        transcriptionLength: transcription.length,
+        isProcessing,
+        hasAnamnese: !!(analysisResults?.anamnese || prontuario?.anamnese)
+      });
+      
+      // Pequeno delay para garantir que a transcrição está completa
+      const timer = setTimeout(() => {
+        const transcriptionText = transcription
+          .filter((e) => !e.isPartial)
+          .map((e) => e.text)
+          .join(" ") || transcription.map((e) => e.text).join(" ");
+        
+        console.log("📝 Texto da transcrição:", transcriptionText.substring(0, 200) + "...");
+        
+        if (transcriptionText.trim()) {
+          console.log("✅ Iniciando geração de anamnese...");
+          handleGenerateAnamnese();
+        } else {
+          console.warn("⚠️ Transcrição vazia, não é possível gerar anamnese");
+          toast.error("Transcrição vazia. Não é possível gerar anamnese.");
+          setTranscricaoFinalizada(false);
+        }
+      }, 800);
+      
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcricaoFinalizada]);
+  }, [transcricaoFinalizada, transcription.length]);
 
   // Mantido para compatibilidade com fluxo legado (telemedicina etc.)
   const handleStep1Complete = async () => {

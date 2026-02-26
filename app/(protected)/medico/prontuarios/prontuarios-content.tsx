@@ -1,103 +1,92 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Filter, Search } from "lucide-react";
-import { ProntuariosTable } from "./prontuarios-table";
+import { Search, Eye, Users, FileText } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { formatDate, formatCPF } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { Loader2 } from "lucide-react";
 
-interface Prontuario {
+interface Paciente {
   id: string;
-  paciente: {
-    id: string;
-    numeroProntuario: number | null;
-    nome: string;
-    cpf: string;
-    dataNascimento: Date | null;
-  };
-  medico: {
-    usuario: {
-      nome: string;
-    };
-  };
-  consulta: {
-    id: string;
-    dataHora: Date;
-  } | null;
-  anamnese: string | null;
-  exameFisico: string | null;
-  diagnostico: string | null;
-  conduta: string | null;
-  evolucao: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  numeroProntuario: number | null;
+  nome: string;
+  cpf: string;
+  email: string | null;
+  telefone: string | null;
+  celular: string | null;
+  dataNascimento: Date;
+  ativo: boolean;
 }
 
 export function ProntuariosContent() {
-  const [prontuarios, setProntuarios] = useState<Prontuario[]>([]);
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    loadProntuarios();
-  }, [search]);
-
-  const loadProntuarios = async () => {
-    setLoading(true);
+  const fetchPacientes = useCallback(async () => {
     try {
-      const params = new URLSearchParams();
-      if (search) {
-        params.append("search", search);
-      }
+      setLoading(true);
+      const params = new URLSearchParams({
+        ...(search && { search }),
+      });
 
       const response = await fetch(
-        `/api/medico/prontuarios?${params.toString()}`
+        `/api/medico/pacientes?${params.toString()}`
       );
-      
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || `Erro ${response.status}: ${response.statusText}`;
-        console.error("Erro ao carregar prontuários:", {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorMessage,
-        });
-        throw new Error(errorMessage);
+        throw new Error("Erro ao carregar pacientes");
       }
-      
+
       const data = await response.json();
-      setProntuarios(data.prontuarios || []);
+      setPacientes(data.pacientes || []);
     } catch (error) {
-      console.error("Erro ao carregar prontuários:", error);
-      const errorMessage = error instanceof Error ? error.message : "Erro ao carregar prontuários";
-      toast.error(errorMessage);
+      toast.error("Erro ao carregar pacientes");
+      console.error(error);
     } finally {
       setLoading(false);
     }
+  }, [search]);
+
+  useEffect(() => {
+    fetchPacientes();
+  }, [fetchPacientes]);
+
+  const handleViewProntuario = (pacienteId: string) => {
+    router.push(`/prontuario-paciente/${pacienteId}`);
   };
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
       <PageHeader
-        icon={FileText}
-        title="Prontuários"
-        subtitle="Visualize e gerencie os prontuários dos pacientes"
+        icon={Users}
+        title="Pacientes"
+        subtitle="Visualize o prontuário completo dos pacientes"
       />
 
-      {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3 w-3 text-muted-foreground" />
-            <CardTitle className="text-sm font-semibold">Lista de Prontuários</CardTitle>
-          </div>
+          <CardTitle className="text-sm font-semibold">Lista de Pacientes</CardTitle>
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
             <Input 
               type="search"
-              placeholder="Buscar por paciente..." 
+              placeholder="Buscar por nome ou CPF..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 h-8 text-xs bg-background w-64" 
@@ -109,11 +98,74 @@ export function ProntuariosContent() {
             <div className="flex items-center justify-center py-12 px-6">
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Carregando prontuários...</p>
+                <p className="text-sm text-muted-foreground">Carregando pacientes...</p>
               </div>
             </div>
+          ) : pacientes.length === 0 ? (
+            <div className="flex items-center justify-center py-12 px-6">
+              <p className="text-sm text-muted-foreground">
+                {search ? "Nenhum paciente encontrado" : "Nenhum paciente cadastrado"}
+              </p>
+            </div>
           ) : (
-            <ProntuariosTable data={prontuarios} search={search} onSearchChange={setSearch} />
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs font-semibold py-3">Nº Prontuário</TableHead>
+                    <TableHead className="text-xs font-semibold py-3">Nome</TableHead>
+                    <TableHead className="text-xs font-semibold py-3">CPF</TableHead>
+                    <TableHead className="text-xs font-semibold py-3">Data de Nascimento</TableHead>
+                    <TableHead className="text-xs font-semibold py-3">Contato</TableHead>
+                    <TableHead className="text-xs font-semibold py-3">Status</TableHead>
+                    <TableHead className="text-xs font-semibold py-3 text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pacientes.map((paciente) => (
+                    <TableRow key={paciente.id}>
+                      <TableCell className="text-xs">
+                        {paciente.numeroProntuario || "-"}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {paciente.nome}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatCPF(paciente.cpf)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {formatDate(paciente.dataNascimento)}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {paciente.celular || paciente.telefone || "-"}
+                      </TableCell>
+                      <TableCell>
+                        {paciente.ativo ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                            Ativo
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
+                            Inativo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1.5"
+                          onClick={() => handleViewProntuario(paciente.id)}
+                        >
+                          <FileText className="w-3 h-3" />
+                          Ver Prontuário
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
