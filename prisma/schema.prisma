@@ -101,6 +101,7 @@ model Tenant {
   manipulados                 Manipulado[]
   documentosGerados           DocumentoGerado[]
   medicoDocumentos            MedicoDocumento[]
+  medicosCertificadosDigitais MedicoCertificadoDigital[]
   pagamentosConsultas         PagamentoConsulta[]
   listasEspera                ListaEspera[]
   autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
@@ -286,6 +287,7 @@ model Medico {
   manipulados                 Manipulado[]
   documentos                  DocumentoGerado[]
   medicoDocumentos            MedicoDocumento[]
+  certificadoDigital          MedicoCertificadoDigital?
   listasEspera                ListaEspera[]
   autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
 
@@ -294,6 +296,28 @@ model Medico {
   @@index([crm])
   @@index([usuarioId])
   @@map("medicos")
+}
+
+model MedicoCertificadoDigital {
+  id           String   @id @default(uuid())
+  clinicaId    String
+  medicoId     String   @unique
+  pfxS3Key     String
+  pfxMimeType  String
+  pfxTamanho   Int
+  senhaEnc     String
+  validTo      DateTime?
+  subject      String?
+  issuer       String?
+  serialNumber String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@map("medicos_certificados_digitais")
 }
 
 model Exame {

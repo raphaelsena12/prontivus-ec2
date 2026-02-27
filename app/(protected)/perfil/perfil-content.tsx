@@ -27,7 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { formatCPF } from "@/lib/utils";
-import { Loader2, ArrowLeft, Camera, Lock, User } from "lucide-react";
+import { Loader2, ArrowLeft, Camera, Lock, User, FileCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Usuario {
@@ -93,6 +93,22 @@ export function PerfilContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [certLoading, setCertLoading] = useState(false);
+  const [certInfo, setCertInfo] = useState<{
+    configured: boolean;
+    certificado: null | {
+      validTo: string | null;
+      subject: string | null;
+      issuer: string | null;
+      serialNumber: string | null;
+      createdAt: string;
+      updatedAt: string;
+    };
+  } | null>(null);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certSenha, setCertSenha] = useState("");
+  const [certUploading, setCertUploading] = useState(false);
+  const [certDeleting, setCertDeleting] = useState(false);
 
   const perfilForm = useForm<PerfilFormValues>({
     resolver: zodResolver(updatePerfilSchema),
@@ -105,6 +121,25 @@ export function PerfilContent() {
   useEffect(() => {
     loadPerfil();
   }, []);
+
+  const loadCertificado = async () => {
+    setCertLoading(true);
+    try {
+      const res = await fetch("/api/medico/certificado");
+      if (!res.ok) {
+        // Se não for médico ou não existir rota para o usuário, apenas não exibe erro global
+        setCertInfo(null);
+        return;
+      }
+      const data = await res.json();
+      setCertInfo(data);
+    } catch (e) {
+      console.error("Erro ao carregar certificado:", e);
+      setCertInfo(null);
+    } finally {
+      setCertLoading(false);
+    }
+  };
 
   const loadPerfil = async () => {
     setLoading(true);
@@ -122,6 +157,10 @@ export function PerfilContent() {
           ? formatPhone(data.usuario.telefone)
           : "",
       });
+
+      if (data.usuario?.tipo === "MEDICO") {
+        loadCertificado();
+      }
     } catch (error) {
       console.error("Erro ao carregar perfil:", error);
       toast.error("Erro ao carregar perfil");
@@ -268,6 +307,65 @@ export function PerfilContent() {
     }
   };
 
+  const handleUploadCertificado = async () => {
+    if (!certFile) {
+      toast.error("Selecione um arquivo .pfx");
+      return;
+    }
+    if (!certSenha) {
+      toast.error("Informe a senha do certificado");
+      return;
+    }
+
+    setCertUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", certFile);
+      formData.append("senha", certSenha);
+
+      const res = await fetch("/api/medico/certificado/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erro ao enviar certificado");
+      }
+
+      toast.success("Certificado enviado com sucesso!");
+      setCertFile(null);
+      setCertSenha("");
+      await loadCertificado();
+    } catch (e: any) {
+      console.error("Erro ao enviar certificado:", e);
+      toast.error(e?.message || "Erro ao enviar certificado");
+    } finally {
+      setCertUploading(false);
+    }
+  };
+
+  const handleDeleteCertificado = async () => {
+    const confirmed = window.confirm("Remover o certificado digital deste usuário?");
+    if (!confirmed) return;
+
+    setCertDeleting(true);
+    try {
+      const res = await fetch("/api/medico/certificado", { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Erro ao remover certificado");
+      }
+      toast.success("Certificado removido!");
+      await loadCertificado();
+    } catch (e: any) {
+      console.error("Erro ao remover certificado:", e);
+      toast.error(e?.message || "Erro ao remover certificado");
+    } finally {
+      setCertDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -298,6 +396,12 @@ export function PerfilContent() {
                 <Lock className="h-3.5 w-3.5" />
                 Alterar Senha
               </TabsTrigger>
+              {usuario?.tipo === "MEDICO" && (
+                <TabsTrigger value="certificado" className="flex items-center gap-2 text-xs">
+                  <FileCheck className="h-3.5 w-3.5" />
+                  Certificado Digital
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="perfil" className="space-y-4">
@@ -566,6 +670,120 @@ export function PerfilContent() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {usuario?.tipo === "MEDICO" && (
+              <TabsContent value="certificado" className="space-y-4">
+                <Card>
+                  <CardHeader className="p-4 pb-3">
+                    <CardTitle className="text-xl">Certificado Digital (.pfx)</CardTitle>
+                    <CardDescription className="text-xs">
+                      Envie seu certificado para assinar digitalmente os documentos gerados no atendimento.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0 space-y-4">
+                    {certLoading ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Carregando status do certificado...
+                      </div>
+                    ) : certInfo?.configured ? (
+                      <div className="space-y-2">
+                        <div className="text-xs text-slate-700">
+                          <span className="font-medium">Status:</span>{" "}
+                          <span className="text-emerald-700">Configurado</span>
+                        </div>
+                        {certInfo.certificado?.validTo && (
+                          <div className="text-xs text-slate-700">
+                            <span className="font-medium">Validade:</span> {certInfo.certificado.validTo}
+                          </div>
+                        )}
+                        {certInfo.certificado?.subject && (
+                          <div className="text-xs text-slate-700 break-words">
+                            <span className="font-medium">Titular:</span> {certInfo.certificado.subject}
+                          </div>
+                        )}
+                        {certInfo.certificado?.issuer && (
+                          <div className="text-xs text-slate-700 break-words">
+                            <span className="font-medium">Emissor:</span> {certInfo.certificado.issuer}
+                          </div>
+                        )}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleDeleteCertificado}
+                            disabled={certDeleting}
+                            className="text-xs"
+                          >
+                            {certDeleting ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                Removendo...
+                              </>
+                            ) : (
+                              "Remover certificado"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        Nenhum certificado configurado.
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          Arquivo .pfx
+                        </label>
+                          <Input
+                            type="file"
+                            accept=".pfx,.p12"
+                            onChange={(e) => setCertFile(e.target.files?.[0] || null)}
+                            className="cursor-pointer text-xs"
+                          />
+                        <p className="text-xs text-muted-foreground">
+                          Formatos aceitos: .pfx / .p12
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          Senha do certificado
+                        </label>
+                        <Input
+                          type="password"
+                          placeholder="Senha do .pfx"
+                          value={certSenha}
+                          onChange={(e) => setCertSenha(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={handleUploadCertificado}
+                        disabled={certUploading || !certFile || !certSenha}
+                        className="text-xs"
+                      >
+                        {certUploading ? (
+                          <>
+                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          "Enviar certificado"
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>

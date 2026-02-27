@@ -9,7 +9,9 @@ import {
   Plus,
   Loader2,
   FileText,
+  FileCheck,
   FlaskConical,
+  AlertCircle,
   AlertTriangle,
   Pill,
   Stethoscope,
@@ -98,8 +100,12 @@ interface AISidebarProps {
     nomeDocumento: string;
     createdAt: string;
     pdfBlob?: Blob;
+    assinado: boolean;
+    assinando?: boolean;
+    erroAssinatura?: string;
   }>;
   handleGenerateDocument: (modelId: string) => Promise<void>;
+  onSignDocument?: (id: string) => void | Promise<void>;
   onDeleteDocument?: (id: string) => void;
   // Action
   onGenerateSuggestions: (context: AIContext) => void;
@@ -142,6 +148,7 @@ export function AISidebar({
   documentModels,
   documentosGerados,
   handleGenerateDocument,
+  onSignDocument,
   onDeleteDocument,
   onGenerateSuggestions,
 }: AISidebarProps) {
@@ -839,6 +846,16 @@ export function AISidebar({
                   <span className="text-xs text-slate-700 truncate flex-1">
                     {doc.nomeDocumento}
                   </span>
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border flex-shrink-0 ${
+                      doc.assinado
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : "bg-amber-50 border-amber-200 text-amber-700"
+                    }`}
+                    title={doc.assinado ? "Assinado" : "Não assinado"}
+                  >
+                    {doc.assinado ? "Assinado" : "Não assinado"}
+                  </span>
                   <div className="flex items-center gap-0.5 flex-shrink-0">
                     {doc.pdfBlob && (
                       <>
@@ -861,6 +878,40 @@ export function AISidebar({
                           <Printer className="w-3 h-3" />
                         </button>
                       </>
+                    )}
+                    {doc.erroAssinatura && (
+                      <span
+                        title={doc.erroAssinatura}
+                        className="p-0.5 rounded text-red-500 bg-red-50"
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                      </span>
+                    )}
+                    {onSignDocument && doc.pdfBlob && (
+                      <button
+                        onClick={() => onSignDocument(doc.id)}
+                        title={
+                          doc.assinando
+                            ? "Assinando..."
+                            : doc.assinado
+                              ? "Documento já assinado"
+                              : "Assinar digitalmente"
+                        }
+                        disabled={!!doc.assinado || !!doc.assinando}
+                        className={`p-0.5 rounded transition-colors ${
+                          doc.assinado
+                            ? "text-emerald-600 bg-emerald-50"
+                            : "text-slate-400 hover:text-[#1E40AF] hover:bg-blue-50"
+                        } ${doc.assinando ? "opacity-70 cursor-not-allowed" : ""}`}
+                      >
+                        {doc.assinado ? (
+                          <CheckCircle2 className="w-3 h-3" />
+                        ) : doc.assinando ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <FileCheck className="w-3 h-3" />
+                        )}
+                      </button>
                     )}
                     {onDeleteDocument && (
                       <button

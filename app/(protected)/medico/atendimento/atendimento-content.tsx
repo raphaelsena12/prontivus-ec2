@@ -174,7 +174,17 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     posologia: string;
     duracao: string;
   } | null>(null);
-  const [documentosGerados, setDocumentosGerados] = useState<Array<{ id: string; tipoDocumento: string; nomeDocumento: string; createdAt: string; pdfBlob?: Blob }>>([]);
+  type DocumentoGeradoLocal = {
+    id: string;
+    tipoDocumento: string;
+    nomeDocumento: string;
+    createdAt: string;
+    pdfBlob?: Blob;
+    assinado: boolean;
+    assinando?: boolean;
+    erroAssinatura?: string;
+  };
+  const [documentosGerados, setDocumentosGerados] = useState<DocumentoGeradoLocal[]>([]);
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [selectedConsultaForDocumentos, setSelectedConsultaForDocumentos] = useState<string | null>(null);
   const [selectedConsultaDataForDocumentos, setSelectedConsultaDataForDocumentos] = useState<string | null>(null);
@@ -721,6 +731,79 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
   const handleDeleteDocument = (id: string) => {
     setDocumentosGerados((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const handleSignDocument = async (id: string) => {
+    const doc = documentosGerados.find((d) => d.id === id);
+    if (!doc?.pdfBlob) {
+      toast.warning("PDF não disponível para assinatura");
+      return;
+    }
+    if (doc.assinado) {
+      toast.info("Documento já está assinado");
+      return;
+    }
+
+    setDocumentosGerados((prev) =>
+      prev.map((d) =>
+        d.id === id ? { ...d, assinando: true, erroAssinatura: undefined } : d
+      )
+    );
+
+    try {
+      const formData = new FormData();
+      formData.append("consultaId", consultaId);
+      formData.append("tipoDocumento", doc.tipoDocumento);
+      formData.append("nomeDocumento", doc.nomeDocumento);
+      formData.append("pdfFile", doc.pdfBlob, `${doc.tipoDocumento}.pdf`);
+
+      const res = await fetch("/api/medico/documentos/assinar", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        let message = `Erro ao assinar (HTTP ${res.status})`;
+        try {
+          const err = await res.json();
+          message = err.error || message;
+        } catch {
+          const txt = await res.text();
+          if (txt) message = txt;
+        }
+        throw new Error(message);
+      }
+
+      const signedBlob = await res.blob();
+      
+      // Log para debug: verificar se o blob mudou
+      const originalSize = doc.pdfBlob?.size || 0;
+      const signedSize = signedBlob.size;
+      console.log("[Assinatura] Tamanhos:", {
+        original: originalSize,
+        assinado: signedSize,
+        diferenca: signedSize - originalSize,
+        mudou: signedSize !== originalSize,
+      });
+
+      setDocumentosGerados((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? { ...d, pdfBlob: signedBlob, assinado: true, assinando: false }
+            : d
+        )
+      );
+
+      toast.success(`Documento assinado com sucesso! (${(signedSize / 1024).toFixed(1)} KB)`);
+    } catch (e: any) {
+      const msg = e?.message || "Erro ao assinar documento";
+      setDocumentosGerados((prev) =>
+        prev.map((d) =>
+          d.id === id ? { ...d, assinando: false, erroAssinatura: msg } : d
+        )
+      );
+      toast.error(msg);
+    }
   };
 
   const handleSelectMedicamento = (medicamento: typeof medicamentos[0]) => {
@@ -1417,6 +1500,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         nomeDocumento,
         createdAt: new Date().toISOString(),
         pdfBlob, // Armazenar o blob para visualização posterior
+        assinado: false,
       };
 
       setDocumentosGerados([...documentosGerados, novoDocumento]);
@@ -1740,6 +1824,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   documentModels={documentModels}
                   documentosGerados={documentosGerados}
                   handleGenerateDocument={handleGenerateDocument}
+                  onSignDocument={handleSignDocument}
                   onDeleteDocument={handleDeleteDocument}
                   onGenerateSuggestions={handleGenerateSuggestions}
                   consultationMode={consultationMode}
@@ -1758,7 +1843,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       >
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-2.5 flex items-center justify-end gap-2 w-full min-w-0 overflow-x-hidden mr-[60px]">
           <button
-            onClick={() => toast.info("Funcionalidade de assinar documento em desenvolvimento")}
+            onClick={() => toast.info("Para assinar, use o ícone de assinatura na lista de documentos (na lateral).")}
             className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
           >
             <FileCheck className="w-3.5 h-3.5" />

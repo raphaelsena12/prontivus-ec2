@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || "prontivus-documentos";
@@ -262,3 +267,73 @@ export async function getSignedUrlFromS3(key: string, expiresIn: number = 3600):
   }
 }
 
+async function streamToBuffer(body: any): Promise<Buffer> {
+  if (!body) return Buffer.alloc(0);
+  // AWS SDK v3 no Node retorna Readable
+  if (typeof body.transformToByteArray === "function") {
+    const arr = await body.transformToByteArray();
+    return Buffer.from(arr);
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of body as AsyncIterable<any>) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+export async function getObjectBufferFromS3(key: string): Promise<Buffer> {
+  const s3Client = getS3Client();
+  const command = new GetObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+  const res = await s3Client.send(command);
+  return await streamToBuffer(res.Body);
+}
+
+export async function deleteObjectFromS3(key: string): Promise<void> {
+  const s3Client = getS3Client();
+  const command = new DeleteObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  });
+  await s3Client.send(command);
+}
+
+/**
+ * Upload de certificado digital do médico (.pfx/.p12).
+ * Estrutura: clinicas/{clinicaId}/medicos/{medicoId}/Certificados/{tipoDocumento}-{timestamp}-{fileName}
+ */
+export async function uploadMedicoCertificadoToS3(
+  fileBuffer: Buffer,
+  fileName: string,
+  options: {
+    clinicaId: string;
+    medicoId: string;
+    tipoDocumento: string; // ex.: "certificado-digital-pfx"
+  },
+  contentType: string
+): Promise<string> {
+  // Reaproveita a mesma validação de credenciais do getS3Client()
+  const timestamp = Date.now();
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+  const key = `clinicas/${options.clinicaId}/medicos/${options.medicoId}/Certificados/${options.tipoDocumento}-${timestamp}-${sanitizedFileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: contentType,
+    Metadata: {
+      clinicaId: options.clinicaId,
+      medicoId: options.medicoId,
+      tipoDocumento: options.tipoDocumento,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  const s3Client = getS3Client();
+  await s3Client.send(command);
+  return key;
+}
