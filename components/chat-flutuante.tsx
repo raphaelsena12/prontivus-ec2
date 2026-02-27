@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { useChat } from "@/components/chat-context";
 
 interface Mensagem {
   id: string;
@@ -53,17 +54,23 @@ interface ChatFlutuanteProps {
   userId: string;
   clinicaId: string;
   userTipo: TipoUsuario;
+  showFloatingButton?: boolean;
 }
 
-export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProps) {
+export function ChatFlutuante({ userId, clinicaId, userTipo, showFloatingButton = false }: ChatFlutuanteProps) {
   const { data: session } = useSession();
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, setIsOpen, setMensagensNaoLidas: setMensagensNaoLidasContext } = useChat();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<Usuario | null>(null);
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [novaMensagem, setNovaMensagem] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
   const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0);
+  
+  // Sincronizar com o contexto
+  useEffect(() => {
+    setMensagensNaoLidasContext(mensagensNaoLidas);
+  }, [mensagensNaoLidas, setMensagensNaoLidasContext]);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [meuStatus, setMeuStatus] = useState<StatusUsuario>("online");
@@ -514,38 +521,34 @@ export function ChatFlutuante({ userId, clinicaId, userTipo }: ChatFlutuanteProp
     return null;
   }
 
-  const botaoFlutuante = (
-    <button
-      onClick={() => setIsOpen(!isOpen)}
-      className={cn(
-        "fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:shadow-xl relative",
-        isOpen && "hidden"
-      )}
-      style={{
-        position: "fixed",
-        bottom: "1.5rem",
-        right: "1.5rem",
-        zIndex: 9999,
-      }}
-      aria-label="Abrir chat"
-    >
-      <IconMessage className="h-6 w-6" />
-      {mensagensNaoLidas > 0 && (
-        <div className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground px-2 text-xs font-semibold shadow-lg animate-pulse border-2 border-background">
-          {mensagensNaoLidas > 9 ? "9+" : mensagensNaoLidas}
-        </div>
-      )}
-    </button>
-  );
-
   if (!mounted) {
     return null;
   }
 
   return (
     <>
-      {typeof window !== "undefined" && createPortal(
-        botaoFlutuante,
+      {showFloatingButton && typeof window !== "undefined" && createPortal(
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "fixed bottom-6 right-6 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:shadow-xl relative",
+            isOpen && "hidden"
+          )}
+          style={{
+            position: "fixed",
+            bottom: "1.5rem",
+            right: "1.5rem",
+            zIndex: 9999,
+          }}
+          aria-label="Abrir chat"
+        >
+          <IconMessage className="h-6 w-6" />
+          {mensagensNaoLidas > 0 && (
+            <div className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground px-2 text-xs font-semibold shadow-lg animate-pulse border-2 border-background">
+              {mensagensNaoLidas > 9 ? "9+" : mensagensNaoLidas}
+            </div>
+          )}
+        </button>,
         document.body
       )}
       

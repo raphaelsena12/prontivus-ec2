@@ -70,8 +70,8 @@ IMPORTANTE:
   3. "ANTECEDENTES PESSOAIS PATOLÓGICOS:" - Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos
   4. "ANTECEDENTES FAMILIARES:" - Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes
   5. "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:" - Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional
-  6. "HISTÓRIA GINECO-OBSTÉTRICA:" - Apenas quando aplicável (menarca, ciclo menstrual, gestações/partos/abortos, menopausa, métodos contraceptivos)
-  7. "MEDICAMENTOS EM USO ATUAL:" - Nome, dose, frequência, tempo de uso
+  6. "MEDICAMENTOS EM USO ATUAL:" - Nome, dose, frequência, tempo de uso
+  7. "EXAMES FÍSICOS:" - Achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
 - Use títulos em MAIÚSCULAS seguidos de dois pontos (:) para seções principais
 - Se alguma seção não for mencionada na transcrição, exiba o título seguido de "N/A"
 - A seção "EXAMES REALIZADOS" deve conter APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros nesta seção.
@@ -84,7 +84,7 @@ IMPORTANTE:
 
 Formato JSON esperado:
 {
-  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nHISTÓRIA GINECO-OBSTÉTRICA:\\n... (ou N/A se não aplicável)\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...",
+  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...\\n\\nEXAMES FÍSICOS:\\n...",
   "cidCodes": [
     {"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}
   ],
@@ -258,7 +258,7 @@ ${transcriptionText}
 ${examesContext}
 
 IMPORTANTE:
-- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "HISTÓRIA GINECO-OBSTÉTRICA:" (quando aplicável), e "MEDICAMENTOS EM USO ATUAL:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "MEDICAMENTOS EM USO ATUAL:", e "EXAMES FÍSICOS:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
 - Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros.
 - Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
 - Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS".
@@ -366,8 +366,8 @@ A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULA
 3. ANTECEDENTES PESSOAIS PATOLÓGICOS: — doenças prévias, internações, cirurgias, alergias, medicamentos crônicos
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
 5. HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — tabagismo, etilismo, atividade física, ocupação
-6. HISTÓRIA GINECO-OBSTÉTRICA: — apenas quando aplicável, caso contrário "N/A"
-7. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+6. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+7. EXAMES FÍSICOS: — achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
 
 Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
 Retorne APENAS um JSON com o campo "anamnese".`;

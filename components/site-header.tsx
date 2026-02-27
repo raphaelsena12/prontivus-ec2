@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { IconBell, IconLogout, IconUserCircle } from "@tabler/icons-react";
+import { IconBell, IconLogout, IconUserCircle, IconMessage } from "@tabler/icons-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { TenantSelector } from "@/components/tenant-selector";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { ChatContext } from "@/components/chat-context";
 import { Printer, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -179,6 +180,10 @@ export function SiteHeader({ user }: SiteHeaderProps) {
   const { data: session } = useSession();
   const [autorizacoes, setAutorizacoes] = useState<AutorizacaoFechamento[]>([]);
   const [loadingAutorizacoes, setLoadingAutorizacoes] = useState(false);
+  const chatContext = useContext(ChatContext);
+  const isOpen = chatContext?.isOpen ?? false;
+  const setIsOpen = chatContext?.setIsOpen ?? (() => {});
+  const mensagensNaoLidas = chatContext?.mensagensNaoLidas ?? 0;
 
   useEffect(() => {
     setMounted(true);
@@ -643,6 +648,21 @@ export function SiteHeader({ user }: SiteHeaderProps) {
               orientation="vertical"
               className="h-6 bg-border hidden md:block"
             />
+
+            {/* Botão de Chat */}
+            {(session?.user?.tipo === TipoUsuario.MEDICO || session?.user?.tipo === TipoUsuario.SECRETARIA) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative hover:bg-muted text-foreground transition-all duration-200"
+                onClick={() => setIsOpen(!isOpen)}
+              >
+                <IconMessage className="h-5 w-5" />
+                {mensagensNaoLidas > 0 && (
+                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                )}
+              </Button>
+            )}
 
             {/* Botão de Notificações */}
             {(session?.user?.tipo === TipoUsuario.SECRETARIA || session?.user?.tipo === TipoUsuario.ADMIN_CLINICA) ? (

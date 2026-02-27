@@ -370,15 +370,15 @@ function generateAnamnese(
   // HÁBITOS DE VIDA / HISTÓRIA SOCIAL
   anamnese += `HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\nN/A\n\n`;
   
-  // HISTÓRIA GINECO-OBSTÉTRICA (pode ser omitida se não aplicável)
-  // anamnese += `HISTÓRIA GINECO-OBSTÉTRICA:\nN/A\n\n`;
-  
   // MEDICAMENTOS EM USO ATUAL
   if (medicamentos) {
     anamnese += `MEDICAMENTOS EM USO ATUAL:\n${medicamentos}\n\n`;
   } else {
     anamnese += `MEDICAMENTOS EM USO ATUAL:\nN/A\n\n`;
   }
+
+  // EXAMES FÍSICOS
+  anamnese += `EXAMES FÍSICOS:\nN/A\n\n`;
 
   // EXAMES REALIZADOS (se houver)
   if (exames) {

@@ -292,11 +292,11 @@ export function AISidebar({
   ];
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 w-full min-w-0 overflow-x-hidden">
 
       {/* ── Box 1: IA Clínica ── */}
       <div
-        className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col"
+        className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col w-full min-w-0"
         style={{ backgroundColor: isProcessing ? "#EEF3FF" : "#F5F8FF" }}
       >
 
@@ -628,7 +628,7 @@ export function AISidebar({
                 onClick={() => setExameDialogOpen(true)}
                 className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
               >
-                <Plus className="w-3 h-3" /> Manual
+                <Plus className="w-3 h-3" /> Adicionar exames manualmente
               </button>
             </div>
           </div>
@@ -746,7 +746,7 @@ export function AISidebar({
       </div>
 
       {/* ── Box 2: Documentos ── */}
-      <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col" style={{ backgroundColor: "#F5F8FF" }}>
+      <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col w-full min-w-0" style={{ backgroundColor: "#F5F8FF" }}>
 
         {/* Cabeçalho — mesmo estilo do box IA Clínica */}
         <div

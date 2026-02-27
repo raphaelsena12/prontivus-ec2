@@ -49,10 +49,13 @@ interface Step2AnamnesisProps {
 }
 
 const ANAMNESE_SECTIONS = [
-  { key: "queixaPrincipal", label: "Queixa Principal", placeholder: "Descreva o motivo principal da consulta..." },
-  { key: "hda", label: "História da Doença Atual (HDA)", placeholder: "Início, evolução, fatores de melhora e piora, sintomas associados..." },
-  { key: "antecedentes", label: "Antecedentes Pessoais", placeholder: "Doenças pregressas, cirurgias, internações, alergias conhecidas..." },
-  { key: "revisaoSistemas", label: "Revisão de Sistemas", placeholder: "Sintomas em cada sistema (cardiovascular, respiratório, digestivo...)" },
+  { key: "queixaPrincipal", label: "QUEIXA PRINCIPAL", placeholder: "Descreva o motivo principal da consulta (2-3 palavras)..." },
+  { key: "hda", label: "HISTÓRIA DA DOENÇA ATUAL", placeholder: "Início, evolução, localização, intensidade, fatores de melhora e piora, sintomas associados..." },
+  { key: "antecedentesPessoais", label: "ANTECEDENTES PESSOAIS PATOLÓGICOS", placeholder: "Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos..." },
+  { key: "antecedentesFamiliares", label: "ANTECEDENTES FAMILIARES", placeholder: "Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes..." },
+  { key: "habitosVida", label: "HÁBITOS DE VIDA / HISTÓRIA SOCIAL", placeholder: "Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional..." },
+  { key: "medicamentosUso", label: "MEDICAMENTOS EM USO ATUAL", placeholder: "Nome, dose, frequência, tempo de uso..." },
+  { key: "examesFisicos", label: "EXAMES FÍSICOS", placeholder: "Achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)..." },
 ];
 
 const knownTitles = [
@@ -64,6 +67,7 @@ const knownTitles = [
   "HÁBITOS DE VIDA",
   "HISTÓRIA SOCIAL",
   "MEDICAMENTOS EM USO ATUAL",
+  "EXAMES FÍSICOS",
   "EXAMES REALIZADOS",
 ];
 
@@ -294,8 +298,8 @@ export function Step2Anamnesis({
   }
 
   return (
-    <div className="h-full overflow-x-hidden">
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col h-full overflow-x-hidden">
+    <div className="h-full overflow-x-hidden w-full min-w-0">
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col h-full overflow-x-hidden w-full min-w-0">
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
