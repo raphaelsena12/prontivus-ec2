@@ -137,7 +137,7 @@ export function ManipuladosTable({
           </span>
         ),
         cell: ({ row }) => (
-          <span className="text-xs py-3">{formatDate(row.original.createdAt)}</span>
+          <span className="text-xs">{formatDate(row.original.createdAt)}</span>
         ),
       },
       {
@@ -148,7 +148,7 @@ export function ManipuladosTable({
           </span>
         ),
         cell: ({ row }) => (
-          <div className="font-medium text-xs py-3">{row.original.descricao}</div>
+          <div className="font-medium text-xs">{row.original.descricao}</div>
         ),
         enableHiding: false,
       },
@@ -160,7 +160,7 @@ export function ManipuladosTable({
           </span>
         ),
         cell: ({ row }) => (
-          <div className="max-w-md truncate text-xs py-3">
+          <div className="max-w-md truncate text-xs">
             {row.original.informacoes || (
               <span className="text-muted-foreground">-</span>
             )}
@@ -175,7 +175,7 @@ export function ManipuladosTable({
           </span>
         ),
         cell: ({ row }) => (
-          <div className="py-3">
+          <div>
             {getStatusBadge(row.original.ativo)}
           </div>
         ),
@@ -186,7 +186,7 @@ export function ManipuladosTable({
           <div className="w-full text-right text-xs font-semibold">Ações</div>
         ),
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2 py-3">
+          <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -238,18 +238,17 @@ export function ManipuladosTable({
   return (
     <div className="flex flex-col gap-4 overflow-auto">
       {/* Table */}
-      <div className="overflow-hidden">
-        <div className="px-6 pt-6">
+      <div className="overflow-x-auto px-6 pt-6">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-b-0 hover:bg-transparent">
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
                       colSpan={header.colSpan}
-                      className="text-xs font-semibold py-3 bg-slate-100 px-4"
+                      className="text-xs font-semibold py-3"
                     >
                       {header.isPlaceholder
                         ? null
@@ -268,10 +267,9 @@ export function ManipuladosTable({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="border-b border-border/30 hover:bg-neutral-50/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="px-4 py-3 text-xs">
+                    <TableCell key={cell.id} className="text-xs py-3">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -292,7 +290,6 @@ export function ManipuladosTable({
             )}
           </TableBody>
         </Table>
-        </div>
       </div>
 
       {/* Pagination */}

@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronDown, ChevronUp, Calendar, Stethoscope, Eye } from 'lucide-react';
+import { ChevronDown, ChevronUp, Calendar, Stethoscope, Eye, FileText, Loader2 } from 'lucide-react';
 import { formatDate, formatTime } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 interface HistoricoConsultasSectionProps {
   consultas: Array<{
@@ -38,6 +40,47 @@ interface HistoricoConsultasSectionProps {
 
 export function HistoricoConsultasSection({ consultas, expanded, onToggle }: HistoricoConsultasSectionProps) {
   const router = useRouter();
+  const [loadingFicha, setLoadingFicha] = useState<string | null>(null);
+
+  const handleAbrirFichaAtendimento = async (consultaId: string) => {
+    try {
+      setLoadingFicha(consultaId);
+
+      // Gerar ficha de atendimento
+      // A API busca os dados do prontuário automaticamente
+      const response = await fetch('/api/medico/documentos/gerar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tipoDocumento: 'ficha-atendimento',
+          consultaId: consultaId,
+          dados: {}, // A API busca os dados do prontuário automaticamente
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao gerar ficha de atendimento');
+      }
+
+      // Criar blob do PDF e abrir em nova aba
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Limpar URL após um tempo
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      
+      toast.success('Ficha de atendimento gerada com sucesso');
+    } catch (error: any) {
+      console.error('Erro ao abrir ficha de atendimento:', error);
+      toast.error(error.message || 'Erro ao abrir ficha de atendimento');
+    } finally {
+      setLoadingFicha(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -131,6 +174,30 @@ export function HistoricoConsultasSection({ consultas, expanded, onToggle }: His
                       <div className="mt-3 pt-3 border-t border-slate-100">
                         <p className="text-xs text-slate-500 mb-1">Diagnóstico:</p>
                         <p className="text-sm text-slate-700 line-clamp-2">{prontuario.diagnostico}</p>
+                      </div>
+                    )}
+
+                    {consulta.status === 'REALIZADA' && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAbrirFichaAtendimento(consulta.id)}
+                          disabled={loadingFicha === consulta.id}
+                          className="w-full text-xs"
+                        >
+                          {loadingFicha === consulta.id ? (
+                            <>
+                              <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                              Gerando...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-3 h-3 mr-2" />
+                              Abrir Ficha de Atendimento
+                            </>
+                          )}
+                        </Button>
                       </div>
                     )}
 

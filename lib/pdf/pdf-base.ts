@@ -75,6 +75,18 @@ export function formatCNPJ(cnpj: string): string {
   return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}/${cleaned.slice(8, 12)}-${cleaned.slice(12)}`;
 }
 
+export function formatCRM(crm: string): string {
+  // Remove prefixo "CRM" ou "CRM-" se existir (case insensitive)
+  const cleaned = crm.replace(/^CRM\s*-?\s*/i, "").trim();
+  return cleaned || crm; // Retorna o valor limpo ou o original se estiver vazio
+}
+
+export function formatMedicoNome(nome: string): string {
+  // Remove prefixos "Dr.", "Dr(a).", "Dra.", "Dr " se existir (case insensitive)
+  const cleaned = nome.replace(/^(Dr\(a\)\.|Dra\.|Dr\.|Dr\s+)/i, "").trim();
+  return cleaned || nome; // Retorna o valor limpo ou o original se estiver vazio
+}
+
 export function extenso(num: number): string {
   const unidades = [
     "", "um", "dois", "tres", "quatro", "cinco", "seis", "sete", "oito", "nove",
@@ -146,8 +158,8 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
 
   if (title) {
     // ── Layout moderno: logo (esquerda) | informações da clínica (direita) ──
-    const logoY = 20; // Aumentado de 12 para 20 para abaixar bem mais do topo
-    const maxH = 45; // Aumentado de 35 para 45mm
+    const logoY = 12; // Reduzido para diminuir o cabeçalho
+    const maxH = 28; // Reduzido de 45 para 28mm
     const maxW = midX - MARGIN - 8; // Mais espaço para o logo
 
     // Logo na metade esquerda
@@ -162,25 +174,25 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
         const imgFmt = data.logoBase64.startsWith("data:image/png") ? "PNG" : "WEBP";
         doc.addImage(data.logoBase64, imgFmt, MARGIN, logoTopY, logoW, logoH);
       } catch {
-        doc.setFontSize(18);
+        doc.setFontSize(16);
         doc.setFont(PDF_FONT, "bold");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(data.clinicaNome, MARGIN, logoY + 20);
+        doc.text(data.clinicaNome, MARGIN, logoY + 12);
       }
     } else {
-      doc.setFontSize(18);
+      doc.setFontSize(16);
       doc.setFont(PDF_FONT, "bold");
       doc.setTextColor(...COLORS.slate800);
-      doc.text(data.clinicaNome, MARGIN, logoY + 20);
+      doc.text(data.clinicaNome, MARGIN, logoY + 12);
     }
 
     // Informações da clínica no lado direito com ícones
-    const IS = 3.5;         // tamanho do ícone aumentado (mm)
+    const IS = 3;         // tamanho do ícone reduzido (mm)
     const IR = IS / 2;      // raio / metade
     const itemStartX = midX + 4; // Reduzido de 8 para 4 para melhor alinhamento
     const iconCX = itemStartX + IR;  // centro X do ícone
     const textX = itemStartX + IS + 3; // início do texto com mais espaço
-    let infoY = logoY + 4; // Ajustado para melhor alinhamento vertical
+    let infoY = logoY + 2; // Ajustado para melhor alinhamento vertical com logo menor
 
     // Ícone de telefone: rounded rect com 2 linhas brancas
     const drawPhoneIcon = (ty: number) => {
@@ -216,26 +228,26 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
     };
 
     // Nome da clínica (alinhado à esquerda junto com os demais itens)
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setFont(PDF_FONT, "bold");
     doc.setTextColor(...COLORS.slate800);
     doc.text(data.clinicaNome, itemStartX, infoY);
-    infoY += 6.5; // Espaçamento ajustado
+    infoY += 5.5; // Espaçamento ajustado
 
-    doc.setFontSize(9.5); // Aumentado de 9 para 9.5
+    doc.setFontSize(8.5); // Reduzido para ficar proporcional
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
 
     if (data.clinicaTelefone) {
       drawPhoneIcon(infoY);
       doc.text(data.clinicaTelefone, textX, infoY);
-      infoY += 5.5; // Espaçamento ajustado
+      infoY += 5; // Espaçamento ajustado
     }
 
     if (data.clinicaEmail) {
       drawEmailIcon(infoY);
       doc.text(data.clinicaEmail, textX, infoY);
-      infoY += 5.5; // Espaçamento ajustado
+      infoY += 5; // Espaçamento ajustado
     }
 
     if (data.clinicaSite) {
@@ -243,11 +255,11 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
       doc.text(data.clinicaSite, textX, infoY);
     }
 
-    return 67; // Aumentado de 59 para 67 para acomodar o cabeçalho bem mais baixo
+    return 50; // Reduzido para acomodar o cabeçalho menor
   } else {
     // ── Layout padrão: logo grande à esquerda, informações da clínica à direita ──
     const logoY = 8;
-    const maxH = 40; // logo maior (era 18mm)
+    const maxH = 25; // Reduzido de 40 para 25mm
     const maxW = midX - MARGIN - 6;
 
     if (data.logoBase64) {
@@ -261,28 +273,28 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
         const imgFmt = data.logoBase64.startsWith("data:image/png") ? "PNG" : "WEBP";
         doc.addImage(data.logoBase64, imgFmt, MARGIN, logoTopY, logoW, logoH);
       } catch {
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.setFont(PDF_FONT, "bold");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(data.clinicaNome, MARGIN, logoY + 22);
+        doc.text(data.clinicaNome, MARGIN, logoY + 14);
       }
     } else {
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont(PDF_FONT, "bold");
       doc.setTextColor(...COLORS.slate800);
-      doc.text(data.clinicaNome, MARGIN, logoY + 22);
+      doc.text(data.clinicaNome, MARGIN, logoY + 14);
     }
 
     // ── Informações da clínica: coluna direita, alinhadas à direita ──
     const rightX = PAGE_WIDTH - MARGIN;
-    let infoY = logoY + 6;
+    let infoY = logoY + 4;
 
     // Nome da clínica em destaque
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont(PDF_FONT, "bold");
     doc.setTextColor(...COLORS.slate800);
     doc.text(data.clinicaNome, rightX, infoY, { align: "right" });
-    infoY += 6;
+    infoY += 5;
 
     doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
@@ -294,7 +306,7 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
       if (data.clinicaNumero) addr += `, nº ${data.clinicaNumero}`;
       if (data.clinicaBairro) addr += ` — ${data.clinicaBairro}`;
       doc.text(addr, rightX, infoY, { align: "right" });
-      infoY += 5;
+      infoY += 4.5;
     }
 
     // Cidade / Estado   CEP
@@ -302,18 +314,18 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
       const city = [data.clinicaCidade, data.clinicaEstado].filter(Boolean).join(" / ");
       const cepStr = data.clinicaCep ? `   CEP ${data.clinicaCep}` : "";
       doc.text(`${city}${cepStr}`, rightX, infoY, { align: "right" });
-      infoY += 5;
+      infoY += 4.5;
     }
 
     // E-mail
     if (data.clinicaEmail) {
       doc.text(data.clinicaEmail, rightX, infoY, { align: "right" });
-      infoY += 5;
+      infoY += 4.5;
     }
 
     // CNPJ
     doc.text(`CNPJ: ${formatCNPJ(data.clinicaCnpj)}`, rightX, infoY, { align: "right" });
-    infoY += 5;
+    infoY += 4.5;
 
     // Telefone (abaixo do CNPJ)
     if (data.clinicaTelefone) {
@@ -321,12 +333,12 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
     }
 
     // Linha separadora abaixo do cabeçalho
-    const sepY = logoY + maxH + 8; // 8 + 40 + 8 = 56
+    const sepY = logoY + maxH + 6; // 8 + 25 + 6 = 39
     doc.setDrawColor(...COLORS.slate200);
     doc.setLineWidth(0.4);
     doc.line(MARGIN, sepY, PAGE_WIDTH - MARGIN, sepY);
 
-    return sepY + 8; // 64
+    return sepY + 6; // 45
   }
 }
 
@@ -409,7 +421,7 @@ export function drawFooterSignature(
   doc: jsPDF,
   data: MedicoData & { dataEmissao: string; cidade?: string },
   minY?: number,
-  options?: { hideDateLine?: boolean }
+  options?: { hideDateLine?: boolean; hideSignatureLine?: boolean }
 ): void {
   const sigY = options?.hideDateLine
     ? PAGE_HEIGHT - 42
@@ -431,19 +443,25 @@ export function drawFooterSignature(
     doc.text(localData, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
   }
 
-  doc.setDrawColor(...COLORS.slate800);
-  doc.setLineWidth(0.4);
-  doc.line(PAGE_WIDTH / 2 - 40, sigY, PAGE_WIDTH / 2 + 40, sigY);
+  // Desenhar traço da assinatura apenas se não estiver oculto
+  if (!options?.hideSignatureLine) {
+    doc.setDrawColor(...COLORS.slate800);
+    doc.setLineWidth(0.4);
+    doc.line(PAGE_WIDTH / 2 - 40, sigY, PAGE_WIDTH / 2 + 40, sigY);
+  }
+
+  // Ajustar posição do nome baseado na presença do traço
+  const nomeY = options?.hideSignatureLine ? sigY : sigY + 8;
 
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${data.medicoNome}`, PAGE_WIDTH / 2, sigY + 8, { align: "center" });
+  doc.text(`Dr(a). ${formatMedicoNome(data.medicoNome)}`, PAGE_WIDTH / 2, nomeY, { align: "center" });
 
   doc.setFontSize(8);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${data.medicoCrm} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, sigY + 14, { align: "center" });
+  doc.text(`CRM ${formatCRM(data.medicoCrm)} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, nomeY + 6, { align: "center" });
 }
 
 /** Desenha rodapé com duas assinaturas (paciente + médico), fixas no rodapé da página */
@@ -453,10 +471,10 @@ export function drawDualSignature(
   _minY?: number,
   options?: { hideDateLine?: boolean }
 ): void {
-  // Assinaturas sempre fixas no final da página
+  // Assinaturas sempre fixas no final da página (abaixadas)
   const sigY = options?.hideDateLine
-    ? PAGE_HEIGHT - 42
-    : PAGE_HEIGHT - 55;
+    ? PAGE_HEIGHT - 30
+    : PAGE_HEIGHT - 43;
 
   if (!options?.hideDateLine) {
     const localData = data.cidade
@@ -477,29 +495,29 @@ export function drawDualSignature(
   doc.setLineWidth(0.4);
   doc.line(leftCenter - 35, sigY, leftCenter + 35, sigY);
 
-  doc.setFontSize(9);
+  doc.setFontSize(7.5);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.pacienteNome.toUpperCase(), leftCenter, sigY + 8, { align: "center" });
+  doc.text(data.pacienteNome.toUpperCase(), leftCenter, sigY + 6, { align: "center" });
 
-  doc.setFontSize(8);
+  doc.setFontSize(6.5);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text("Paciente ou Responsável", leftCenter, sigY + 14, { align: "center" });
+  doc.text("Paciente ou Responsável", leftCenter, sigY + 11, { align: "center" });
 
   // ── Assinatura médico (direita) ──
   doc.setDrawColor(...COLORS.slate800);
   doc.line(rightCenter - 35, sigY, rightCenter + 35, sigY);
 
-  doc.setFontSize(9);
+  doc.setFontSize(7.5);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.medicoNome.toUpperCase(), rightCenter, sigY + 8, { align: "center" });
+  doc.text(data.medicoNome.toUpperCase(), rightCenter, sigY + 6, { align: "center" });
 
-  doc.setFontSize(8);
+  doc.setFontSize(6.5);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM  ${data.medicoCrm}`, rightCenter, sigY + 14, { align: "center" });
+  doc.text(`CRM ${formatCRM(data.medicoCrm)}`, rightCenter, sigY + 11, { align: "center" });
 }
 
 /**

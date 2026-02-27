@@ -34,14 +34,8 @@ export async function POST(request: NextRequest) {
   try {
     // Autenticação
     const session = await getSession();
-    if (!session || session.user.tipo !== TipoUsuario.MEDICO) {
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
-    }
-
-    const clinicaId = await getUserClinicaId();
-    const medicoId = await getUserMedicoId();
-    if (!clinicaId || !medicoId) {
-      return NextResponse.json({ error: "Clínica ou médico não encontrado" }, { status: 403 });
     }
 
     const body = await request.json();
@@ -49,6 +43,38 @@ export async function POST(request: NextRequest) {
 
     if (!tipoDocumento || !consultaId) {
       return NextResponse.json({ error: "Tipo de documento e ID da consulta são obrigatórios" }, { status: 400 });
+    }
+
+    // Para ficha de atendimento, permitir médico, secretaria e admin-clinica
+    // Para outros documentos, apenas médico
+    const isFichaAtendimento = tipoDocumento === "ficha-atendimento";
+    const userTipo = session.user.tipo;
+    
+    if (isFichaAtendimento) {
+      // Permitir médico, secretaria e admin-clinica para ficha de atendimento
+      if (userTipo !== TipoUsuario.MEDICO && 
+          userTipo !== TipoUsuario.SECRETARIA && 
+          userTipo !== TipoUsuario.ADMIN_CLINICA) {
+        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      }
+    } else {
+      // Para outros documentos, apenas médico
+      if (userTipo !== TipoUsuario.MEDICO) {
+        return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+      }
+    }
+
+    const clinicaId = await getUserClinicaId();
+    if (!clinicaId) {
+      return NextResponse.json({ error: "Clínica não encontrada" }, { status: 403 });
+    }
+
+    // Para documentos que não são ficha de atendimento, ainda precisa de médico
+    if (!isFichaAtendimento) {
+      const medicoId = await getUserMedicoId();
+      if (!medicoId) {
+        return NextResponse.json({ error: "Médico não encontrado" }, { status: 403 });
+      }
     }
 
     // Buscar dados completos
@@ -411,7 +437,9 @@ export async function POST(request: NextRequest) {
         const medicamentosReceita = (dados?.prescricoes || dados?.medicamentos || []).map((p: any) => ({
           nome: p.medicamento || p.nome || "",
           dosagem: p.dosagem || undefined,
-          posologia: [p.posologia, p.duracao ? `por ${p.duracao}` : ""].filter(Boolean).join(" — "),
+          posologia: p.posologia || "",
+          duracao: p.duracao || undefined,
+          quantidade: p.quantidade || undefined,
         }));
         pdfBuffer = generateReceitaSimplesPDF({
           ...baseData,
@@ -544,25 +572,115 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Buscar CIDs selecionados
-        const cidCodes = dados?.cidCodes || [];
+        // Buscar CIDs - primeiro dos dados fornecidos, senão buscar do documento salvo anteriormente
+        let cidCodes = dados?.cidCodes || [];
+        if (cidCodes.length === 0) {
+          // Tentar buscar do documento gerado anteriormente
+          const documentoAnterior = await prisma.documentoGerado.findFirst({
+            where: {
+              consultaId,
+              tipoDocumento: "ficha-atendimento",
+              clinicaId,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
+          if (documentoAnterior?.dados && typeof documentoAnterior.dados === 'object') {
+            const dadosAnteriores = documentoAnterior.dados as any;
+            cidCodes = dadosAnteriores.cidCodes || [];
+          }
+        }
 
-        // Buscar exames selecionados
-        const exames = dados?.exames || [];
+        // Buscar exames - primeiro dos dados fornecidos, senão buscar do banco
+        let exames = dados?.exames || [];
+        if (exames.length === 0) {
+          // Buscar exames solicitados da consulta
+          const solicitacoesExames = await prisma.solicitacaoExame.findMany({
+            where: {
+              consultaId,
+              clinicaId,
+            },
+            include: {
+              exame: {
+                select: {
+                  nome: true,
+                  tipo: true,
+                },
+              },
+            },
+          });
+          exames = solicitacoesExames.map(se => ({
+            nome: se.exame.nome,
+            tipo: se.exame.tipo || "Laboratorial",
+          }));
+        }
 
-        // Buscar prescrições
-        const prescricoes = dados?.prescricoes || [];
+        // Buscar protocolos - primeiro dos dados fornecidos, senão buscar do documento salvo
+        let protocolos = dados?.protocolos || [];
+        if (protocolos.length === 0) {
+          const documentoAnterior = await prisma.documentoGerado.findFirst({
+            where: {
+              consultaId,
+              tipoDocumento: "ficha-atendimento",
+              clinicaId,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          });
+          if (documentoAnterior?.dados && typeof documentoAnterior.dados === 'object') {
+            const dadosAnteriores = documentoAnterior.dados as any;
+            protocolos = dadosAnteriores.protocolos || [];
+          }
+        }
 
-        // Formatar data da consulta
+        // Buscar prescrições - primeiro dos dados fornecidos, senão buscar do banco
+        let prescricoes = dados?.prescricoes || [];
+        if (prescricoes.length === 0) {
+          // Buscar prescrições da consulta
+          const prescricoesMedicamentos = await prisma.prescricaoMedicamento.findMany({
+            where: {
+              consultaId,
+              clinicaId,
+            },
+            include: {
+              medicamento: {
+                select: {
+                  nome: true,
+                  apresentacao: true,
+                  concentracao: true,
+                  unidade: true,
+                },
+              },
+            },
+          });
+          prescricoes = prescricoesMedicamentos.map(pm => {
+            const dosagem = pm.medicamento.concentracao && pm.medicamento.unidade
+              ? `${pm.medicamento.concentracao}${pm.medicamento.unidade}`
+              : pm.medicamento.apresentacao || "";
+            return {
+              medicamento: pm.medicamento.nome,
+              dosagem,
+              posologia: pm.posologia,
+              duracao: pm.observacoes || (pm.quantidade ? `${pm.quantidade} unidades` : ""),
+            };
+          });
+        }
+
+        // Formatar data e hora da consulta
         const dataConsulta = new Date(consulta.dataHora);
         const dataConsultaFormatada = `${String(dataConsulta.getDate()).padStart(2, "0")}/${String(dataConsulta.getMonth() + 1).padStart(2, "0")}/${dataConsulta.getFullYear()}`;
+        const horaConsultaFormatada = `${String(dataConsulta.getHours()).padStart(2, "0")}:${String(dataConsulta.getMinutes()).padStart(2, "0")}`;
 
         pdfBuffer = generateFichaAtendimentoPDF({
           ...baseData,
           dataConsulta: dataConsultaFormatada,
+          horaConsulta: horaConsultaFormatada,
           anamnese: prontuario?.anamnese || dados?.anamnese || "",
           cidCodes,
           exames,
+          protocolos,
           prescricoes,
         });
         break;

@@ -323,6 +323,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         icon: IconDashboard,
       },
       {
+        title: "Fila de Atendimento",
+        url: "/medico/fila-atendimento",
+        icon: IconList,
+      },
+      {
         title: "Agendamentos",
         url: "/medico/agendamentos",
         icon: IconCalendar,
@@ -333,19 +338,9 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         icon: IconCheck,
       },
       {
-        title: "Fila de Atendimento",
-        url: "/medico/fila-atendimento",
-        icon: IconList,
-      },
-      {
-        title: "Histórico de Prontuários",
+        title: "Prontuários",
         url: "/medico/prontuarios",
         icon: IconFileText,
-      },
-      {
-        title: "Prontuários Completos",
-        url: "/medico/prontuarios",
-        icon: IconUsers,
       },
       {
         title: "Fórmulas Manipuladas",

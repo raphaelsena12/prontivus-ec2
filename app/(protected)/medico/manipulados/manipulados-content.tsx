@@ -96,6 +96,8 @@ export function ManipuladosContent({ clinicaId }: ManipuladosContentProps) {
           <div className="flex items-center gap-2">
             <Filter className="h-3 w-3 text-muted-foreground" />
             <CardTitle className="text-sm font-semibold">Lista de Manipulados</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
               <Input 
@@ -106,11 +108,11 @@ export function ManipuladosContent({ clinicaId }: ManipuladosContentProps) {
                 className="pl-9 h-8 text-xs bg-background w-64" 
               />
             </div>
+            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
+              <Plus className="mr-1.5 h-3 w-3" />
+              Novo Manipulado
+            </Button>
           </div>
-          <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
-            <Plus className="mr-1.5 h-3 w-3" />
-            Novo Manipulado
-          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (

@@ -30,6 +30,7 @@ function getCategoriaFromTipoDocumento(tipoDocumento: string): string {
     'exame-pdf': 'Exames',
     'exame-documento': 'Exames',
     'prontuario': 'Prontuários',
+    'ficha-atendimento': 'Prontuários',
     'receita-medica': 'Receita',
     'receita': 'Receita',
     'atestado': 'Atestado',

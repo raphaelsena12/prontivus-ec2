@@ -11,17 +11,12 @@ import {
   Calendar,
   Phone,
   Mail,
-  FileText,
-  Download,
-  Printer,
   ArrowLeft,
   Loader2,
   Stethoscope,
   Pill,
   ClipboardList,
   FileCheck,
-  CreditCard,
-  MessageSquare,
   Building2,
   History,
   Activity,
@@ -35,12 +30,9 @@ import { formatDate, formatCPF } from '@/lib/utils';
 import { DadosPessoaisSection } from './components/dados-pessoais-section';
 import { PlanosSaudeSection } from './components/planos-saude-section';
 import { HistoricoConsultasSection } from './components/historico-consultas-section';
-import { ProntuariosSection } from './components/prontuarios-section';
 import { ExamesSection } from './components/exames-section';
 import { PrescricoesSection } from './components/prescricoes-section';
-import { PagamentosSection } from './components/pagamentos-section';
 import { DocumentosSection } from './components/documentos-section';
-import { MensagensSection } from './components/mensagens-section';
 
 interface ProntuarioCompleto {
   paciente: {
@@ -112,14 +104,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
     }
   };
 
-  const handleExportPDF = () => {
-    toast.info("Funcionalidade de exportação PDF em desenvolvimento");
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -165,12 +149,9 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   const tabs = [
     { id: 'dados-pessoais', label: 'Dados Pessoais', icon: User },
     { id: 'consultas', label: 'Consultas', icon: Calendar },
-    { id: 'prontuarios', label: 'Prontuários', icon: FileText },
     { id: 'exames', label: 'Exames', icon: ClipboardList },
     { id: 'prescricoes', label: 'Prescrições', icon: Pill },
     { id: 'documentos', label: 'Documentos', icon: FileCheck },
-    { id: 'pagamentos', label: 'Pagamentos', icon: CreditCard },
-    { id: 'mensagens', label: 'Mensagens', icon: MessageSquare },
   ];
 
   // Sinais vitais mockados (pode ser expandido no futuro)
@@ -228,28 +209,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                   </div>
                 )}
               </div>
-
-              {/* Ações */}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportPDF}
-                  className="gap-2 text-xs"
-                >
-                  <Download className="w-4 h-4" />
-                  Exportar PDF
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="gap-2 text-xs"
-                >
-                  <Printer className="w-4 h-4" />
-                  Imprimir
-                </Button>
-              </div>
             </div>
           </div>
 
@@ -258,12 +217,9 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const count = tab.id === 'consultas' ? data.consultas.length :
-                           tab.id === 'prontuarios' ? data.prontuarios.length :
                            tab.id === 'exames' ? data.solicitacoesExames.length :
                            tab.id === 'prescricoes' ? data.prescricoes.length :
-                           tab.id === 'documentos' ? data.documentos.length :
-                           tab.id === 'pagamentos' ? data.pagamentos.length :
-                           tab.id === 'mensagens' ? data.mensagens.length : 0;
+                           tab.id === 'documentos' ? data.documentos.length : 0;
               
               return (
                 <button
@@ -359,12 +315,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-600">Prontuários</span>
-                        <Badge variant="outline" className="font-semibold text-xs">
-                          {data.prontuarios.length}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
                         <span className="text-xs text-slate-600">Exames</span>
                         <Badge variant="outline" className="font-semibold text-xs">
                           {data.solicitacoesExames.length}
@@ -394,17 +344,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
             <div className="animate-in fade-in duration-500 px-8 pt-6 pb-28 max-w-[1600px] mx-auto">
               <HistoricoConsultasSection
                 consultas={data.consultas}
-                expanded={true}
-                onToggle={() => {}}
-              />
-            </div>
-          )}
-
-          {/* Prontuários Tab */}
-          {activeTab === 'prontuarios' && (
-            <div className="animate-in fade-in duration-500 px-8 pt-6 pb-28 max-w-[1600px] mx-auto">
-              <ProntuariosSection
-                prontuarios={data.prontuarios}
                 expanded={true}
                 onToggle={() => {}}
               />
@@ -471,45 +410,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
             </div>
           )}
 
-          {/* Pagamentos Tab */}
-          {activeTab === 'pagamentos' && (
-            <div className="animate-in fade-in duration-500 px-8 pt-6 pb-28 max-w-[1600px] mx-auto">
-              {data.pagamentos.length > 0 ? (
-                <PagamentosSection
-                  pagamentos={data.pagamentos}
-                  expanded={true}
-                  onToggle={() => {}}
-                />
-              ) : (
-                <Card className="border-slate-200 shadow-sm">
-                  <CardContent className="p-12 text-center">
-                    <CreditCard className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-sm text-slate-500">Nenhum pagamento encontrado</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Mensagens Tab */}
-          {activeTab === 'mensagens' && (
-            <div className="animate-in fade-in duration-500 px-8 pt-6 pb-28 max-w-[1600px] mx-auto">
-              {data.mensagens.length > 0 ? (
-                <MensagensSection
-                  mensagens={data.mensagens}
-                  expanded={true}
-                  onToggle={() => {}}
-                />
-              ) : (
-                <Card className="border-slate-200 shadow-sm">
-                  <CardContent className="p-12 text-center">
-                    <MessageSquare className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <p className="text-sm text-slate-500">Nenhuma mensagem encontrada</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

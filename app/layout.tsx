@@ -12,6 +12,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Prontivus - Sistema de Gestão Médica",
   description: "Sistema completo de gestão para clínicas médicas",
+  icons: {
+    icon: "/LogotipoemFundoTransparente.webp",
+    shortcut: "/LogotipoemFundoTransparente.webp",
+    apple: "/LogotipoemFundoTransparente.webp",
+  },
 };
 
 export default function RootLayout({

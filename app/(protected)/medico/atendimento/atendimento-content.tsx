@@ -1150,6 +1150,10 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         const examesManuaisList = examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }));
         const allExames = [...selectedExamesList, ...examesManuaisList];
         
+        const selectedProtocolosList = analysisResults?.protocolos?.filter((_, i) => selectedProtocolosAI.has(i)).map(p => ({ nome: p.nome, descricao: p.descricao })) || [];
+        const protocolosManuaisList = protocolosManuais.map(p => ({ nome: p.nome, descricao: p.descricao }));
+        const allProtocolos = [...selectedProtocolosList, ...protocolosManuaisList];
+        
         const fichaRequestData = {
           tipoDocumento: "ficha-atendimento",
           consultaId,
@@ -1157,6 +1161,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
             cidCodes: selectedCidsList,
             exames: allExames,
+            protocolos: allProtocolos,
             prescricoes: prescricoes,
           },
         };
