@@ -682,6 +682,7 @@ export async function POST(request: NextRequest) {
           exames,
           protocolos,
           prescricoes,
+          atestados: dados?.atestados || [],
         });
         break;
       }

@@ -1,7 +1,6 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawPatientCard,
-  drawBottomBar,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -211,6 +210,5 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   doc.setTextColor(...COLORS.slate600);
   doc.text("ASSINATURA DO FARMACÊUTICO", rightBoxX + boxWidth / 2, rightBoxY, { align: "center" });
   
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

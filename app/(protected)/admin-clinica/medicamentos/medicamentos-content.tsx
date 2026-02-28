@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pill, Upload, Filter, Plus, Search } from "lucide-react";
+import { Loader2, Pill, Upload, Filter, Plus, Search, Database } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { MedicamentosTable } from "./components/medicamentos-table";
 import { MedicamentoDeleteDialog } from "./components/medicamento-delete-dialog";
 import { MedicamentoDialog } from "./components/medicamento-dialog";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
+import { AnvisaSyncDialog } from "./components/anvisa-sync-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Medicamento {
@@ -40,6 +41,7 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [medicamentoToDelete, setMedicamentoToDelete] = useState<Medicamento | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [anvisaSyncDialogOpen, setAnvisaSyncDialogOpen] = useState(false);
 
   const fetchMedicamentos = useCallback(async () => {
     try {
@@ -113,6 +115,14 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
                 className="pl-9 h-8 text-xs bg-background w-64" 
               />
             </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setAnvisaSyncDialogOpen(true)} 
+              className="h-8 text-xs px-3 border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <Database className="mr-1.5 h-3 w-3" />
+              Integração Anvisa
+            </Button>
             <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
               <Upload className="mr-1.5 h-3 w-3" />
               Upload em Massa
@@ -169,6 +179,13 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
         endpoint="/api/admin-clinica/upload/medicamentos"
         title="Upload de Medicamentos em Massa"
         description="Faça upload de um arquivo Excel (.xlsx) com os dados dos medicamentos. O arquivo deve conter colunas: nome, principio_ativo, laboratorio, apresentacao, concentracao, unidade, etc."
+        onSuccess={handleSuccess}
+      />
+
+      <AnvisaSyncDialog
+        open={anvisaSyncDialogOpen}
+        onOpenChange={setAnvisaSyncDialogOpen}
+        clinicaId={clinicaId}
         onSuccess={handleSuccess}
       />
     </div>

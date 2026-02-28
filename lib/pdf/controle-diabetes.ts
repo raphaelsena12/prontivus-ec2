@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawDualSignature, drawFooterSignature, drawBottomBar,
+  drawDualSignature, drawFooterSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
   formatCPF,
 } from "./pdf-base";
@@ -216,7 +216,6 @@ export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData)
 
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 20, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -351,6 +350,5 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

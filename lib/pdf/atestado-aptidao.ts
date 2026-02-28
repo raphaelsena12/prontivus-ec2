@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawBottomBar, drawRichParagraph,
+  drawFooterSignature, drawRichParagraph,
   MARGIN, CONTENT_WIDTH,
 } from "./pdf-base";
 
@@ -43,7 +43,6 @@ export function generateAtestadoAptidaoFisicaMentalPDF(data: AptidaoData): Array
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
-  drawBottomBar(doc);
   return doc.output("arraybuffer");
 }
 
@@ -87,7 +86,6 @@ export function generateAtestadoAptidaoFisicaPiscinasPDF(data: AptidaoData): Arr
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
-  drawBottomBar(doc);
   return doc.output("arraybuffer");
 }
 
@@ -131,6 +129,5 @@ export function generateAtestadoAptidaoFisicaPDF(data: AptidaoData): ArrayBuffer
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
-  drawBottomBar(doc);
   return doc.output("arraybuffer");
 }

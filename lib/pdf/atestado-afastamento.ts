@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawDualSignature, drawBottomBar,
+  drawDualSignature,
   drawRichParagraph, drawSectionLabel,
   MARGIN, CONTENT_WIDTH, COLORS, PDF_FONT,
 } from "./pdf-base";
@@ -54,7 +54,6 @@ export function generateAtestadoAfastamentoPDF(data: AfastamentoData): ArrayBuff
 
   // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -84,7 +83,6 @@ export function generateAtestadoAfastamentoSemCidPDF(data: AfastamentoData): Arr
 
   // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -130,7 +128,6 @@ export function generateAtestadoAfastamentoComCidPDF(data: AfastamentoData): Arr
 
   // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -179,7 +176,6 @@ export function generateAtestadoAfastamentoHistoricoCidPDF(data: AfastamentoData
 
   // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -220,6 +216,5 @@ export function generateAtestadoAfastamentoIndeterminadoPDF(data: AfastamentoDat
 
   // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

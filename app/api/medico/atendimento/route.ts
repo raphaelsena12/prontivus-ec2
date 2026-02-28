@@ -88,16 +88,12 @@ export async function GET(request: NextRequest) {
       },
       include: {
         paciente: {
-          select: {
-            id: true,
-            nome: true,
-            cpf: true,
-            dataNascimento: true,
-            telefone: true,
-            celular: true,
-            email: true,
-            observacoes: true,
-            numeroProntuario: true,
+          include: {
+            usuario: {
+              select: {
+                avatar: true,
+              },
+            },
           },
         },
         codigoTuss: {
@@ -142,6 +138,156 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Buscar avatar do paciente da mesma forma que o perfil faz
+    // O perfil usa session.user.id, aqui tentamos pelo usuarioId primeiro
+    // Se não encontrar, tentamos por CPF ou email (caso o avatar esteja em outro usuario)
+    // Se ainda não encontrar, tentamos buscar diretamente no S3
+    let avatarEncontrado: string | null = null;
+    
+    if (consulta.paciente.usuarioId) {
+      // Buscar avatar do usuario vinculado ao paciente
+      const usuarioCompleto = await prisma.usuario.findUnique({
+        where: { id: consulta.paciente.usuarioId },
+        select: {
+          avatar: true,
+        },
+      });
+      
+      avatarEncontrado = usuarioCompleto?.avatar || null;
+      
+      // Se não encontrou no banco, tentar buscar no S3 diretamente
+      if (!avatarEncontrado) {
+        try {
+          const { S3Client, ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+          const s3Client = new S3Client({
+            region: process.env.AWS_REGION || "sa-east-1",
+            credentials: {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+            },
+          });
+          
+          const bucketName = process.env.AWS_S3_BUCKET_NAME || "prontivus-documentos";
+          
+          // Tentar diferentes formatos de busca
+          const prefixes = [
+            `usuarios/${consulta.paciente.usuarioId}-`, // Formato padrão: usuarios/{userId}-{timestamp}.ext
+            `usuarios/${consulta.paciente.usuarioId}`,  // Sem hífen: usuarios/{userId}
+          ];
+          
+          let arquivoEncontrado: string | null = null;
+          
+          for (const prefix of prefixes) {
+            const listCommand = new ListObjectsV2Command({
+              Bucket: bucketName,
+              Prefix: prefix,
+              MaxKeys: 100, // Buscar mais arquivos
+            });
+            
+            const listResult = await s3Client.send(listCommand);
+            
+            if (listResult.Contents && listResult.Contents.length > 0) {
+              // Filtrar apenas arquivos de imagem
+              const imageFiles = listResult.Contents.filter(c => {
+                const key = c.Key || '';
+                return key.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+              });
+              
+              if (imageFiles.length > 0) {
+                // Ordenar por data (mais recente primeiro) e pegar o primeiro
+                const sortedContents = imageFiles.sort((a, b) => {
+                  const timeA = a.LastModified?.getTime() || 0;
+                  const timeB = b.LastModified?.getTime() || 0;
+                  return timeB - timeA; // Mais recente primeiro
+                });
+                
+                arquivoEncontrado = sortedContents[0].Key || null;
+                break; // Parar na primeira busca que encontrar
+              }
+            }
+          }
+          
+          // Se não encontrou com prefixos específicos, buscar todos na pasta usuarios/ e filtrar
+          if (!arquivoEncontrado) {
+            const listAllCommand = new ListObjectsV2Command({
+              Bucket: bucketName,
+              Prefix: 'usuarios/',
+              MaxKeys: 1000,
+            });
+            
+            const listAllResult = await s3Client.send(listAllCommand);
+            
+            if (listAllResult.Contents && listAllResult.Contents.length > 0) {
+              // Filtrar arquivos que contenham o usuarioId no nome
+              const arquivosDoUsuario = listAllResult.Contents.filter(c => {
+                const key = c.Key || '';
+                return key.includes(consulta.paciente.usuarioId) && 
+                       key.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+              });
+              
+              if (arquivosDoUsuario.length > 0) {
+                // Ordenar por data (mais recente primeiro)
+                const sorted = arquivosDoUsuario.sort((a, b) => {
+                  const timeA = a.LastModified?.getTime() || 0;
+                  const timeB = b.LastModified?.getTime() || 0;
+                  return timeB - timeA;
+                });
+                
+                arquivoEncontrado = sorted[0].Key || null;
+              }
+            }
+          }
+          
+          // Atualizar o banco de dados com a key encontrada
+          if (arquivoEncontrado) {
+            avatarEncontrado = arquivoEncontrado;
+            await prisma.usuario.update({
+              where: { id: consulta.paciente.usuarioId },
+              data: { avatar: arquivoEncontrado },
+            });
+          }
+        } catch (s3Error) {
+          console.error("Erro ao buscar avatar no S3:", s3Error);
+          // Continua mesmo se falhar
+        }
+      }
+    }
+    
+    // Se não encontrou pelo usuarioId, tentar por CPF (mesmo CPF pode ter avatar em outro usuario)
+    if (!avatarEncontrado && consulta.paciente.cpf) {
+      const cpfLimpo = consulta.paciente.cpf.replace(/\D/g, '');
+      const usuarioPorCpf = await prisma.usuario.findUnique({
+        where: { cpf: cpfLimpo },
+        select: {
+          avatar: true,
+        },
+      });
+      if (usuarioPorCpf?.avatar) {
+        avatarEncontrado = usuarioPorCpf.avatar;
+      }
+    }
+    
+    // Se ainda não encontrou, tentar por email
+    if (!avatarEncontrado && consulta.paciente.email) {
+      const usuarioPorEmail = await prisma.usuario.findUnique({
+        where: { email: consulta.paciente.email },
+        select: {
+          avatar: true,
+        },
+      });
+      if (usuarioPorEmail?.avatar) {
+        avatarEncontrado = usuarioPorEmail.avatar;
+      }
+    }
+    
+    // Garantir que o objeto usuario existe e atualizar com o avatar encontrado
+    if (!consulta.paciente.usuario) {
+      consulta.paciente.usuario = { avatar: null };
+    }
+    consulta.paciente.usuario.avatar = avatarEncontrado;
+    
+    
+
     return NextResponse.json(
       {
         consulta,
@@ -167,7 +313,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { consultaId, anamnese, exameFisico, diagnostico, conduta, evolucao } = body;
+    const { consultaId, anamnese, exameFisico, diagnostico, conduta, evolucao, cids, exames, prescricoes } = body;
 
     if (!consultaId) {
       return NextResponse.json(
@@ -239,6 +385,51 @@ export async function POST(request: NextRequest) {
           evolucao: evolucao || null,
         },
       });
+    }
+
+    // Salvar CIDs, exames e prescrições da consulta
+    try {
+      const clinicaId = auth.clinicaId!;
+
+      if (Array.isArray(cids) && cids.length > 0) {
+        await prisma.consultaCid.deleteMany({ where: { consultaId } });
+        await prisma.consultaCid.createMany({
+          data: cids.map((c: { code: string; description: string }) => ({
+            consultaId,
+            clinicaId,
+            code: c.code,
+            description: c.description,
+          })),
+        });
+      }
+
+      if (Array.isArray(exames) && exames.length > 0) {
+        await prisma.consultaExame.deleteMany({ where: { consultaId } });
+        await prisma.consultaExame.createMany({
+          data: exames.map((e: { nome: string; tipo?: string }) => ({
+            consultaId,
+            clinicaId,
+            nome: e.nome,
+            tipo: e.tipo || null,
+          })),
+        });
+      }
+
+      if (Array.isArray(prescricoes) && prescricoes.length > 0) {
+        await prisma.consultaPrescricao.deleteMany({ where: { consultaId } });
+        await prisma.consultaPrescricao.createMany({
+          data: prescricoes.map((p: { medicamento: string; dosagem?: string; posologia: string; duracao?: string }) => ({
+            consultaId,
+            clinicaId,
+            medicamento: p.medicamento,
+            dosagem: p.dosagem || null,
+            posologia: p.posologia,
+            duracao: p.duracao || null,
+          })),
+        });
+      }
+    } catch (err) {
+      console.error("Erro ao salvar CIDs/exames/prescrições:", err);
     }
 
     // Atualizar status da consulta para REALIZADA e salvar momento do fim

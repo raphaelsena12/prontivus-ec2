@@ -72,27 +72,48 @@ const knownTitles = [
 ];
 
 function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
+  const trimmed = anamnese.trim();
+  const upperTitle = sectionTitle.toUpperCase();
+
+  // ── Formato JSON ──────────────────────────────────────
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, string>;
+      for (const [key, value] of Object.entries(parsed)) {
+        if (key.toUpperCase() === upperTitle) {
+          const v = (value || "").trim();
+          return v === "N/A" || v === "n/a" ? "" : v;
+        }
+      }
+      return "";
+    } catch {
+      // fall through to text parsing
+    }
+  }
+
+  // ── Formato texto (linhas) ─────────────────────────────
   const lines = anamnese.split("\n");
   let capturing = false;
   const result: string[] = [];
-  const upperTitle = sectionTitle.toUpperCase();
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    const upperLine = trimmed.toUpperCase();
+    const t = line.trim();
+    const upper = t.toUpperCase();
     if (
-      upperLine === upperTitle ||
-      upperLine.startsWith(upperTitle + ":") ||
-      upperLine.startsWith(upperTitle + " -")
+      upper === upperTitle ||
+      upper.startsWith(upperTitle + ":") ||
+      upper.startsWith(upperTitle + " -")
     ) {
       capturing = true;
+      const afterColon = t.includes(":") ? t.slice(t.indexOf(":") + 1).trim() : "";
+      if (afterColon) result.push(afterColon);
       continue;
     }
     if (capturing) {
       const isNewSection =
-        trimmed.length > 0 && trimmed === trimmed.toUpperCase() && trimmed.length < 60;
+        t.length > 0 && t === t.toUpperCase() && t.length < 80;
       if (isNewSection && result.length > 0) break;
-      if (trimmed) result.push(trimmed);
+      if (t) result.push(t);
     }
   }
   return result.join("\n") || "";
@@ -281,6 +302,18 @@ export function Step2Anamnesis({
       ANAMNESE_SECTIONS.map((s: { key: string; label: string; placeholder: string }) => [s.key, parseAnamneseSection(base, s.label)])
     );
   });
+
+  // Quando a IA gera (ou atualiza) a anamnese, repopula os campos do modo manual
+  useEffect(() => {
+    const base = analysisResults?.anamnese || "";
+    if (!base) return;
+    setSectionValues(
+      Object.fromEntries(
+        ANAMNESE_SECTIONS.map((s) => [s.key, parseAnamneseSection(base, s.label)])
+      )
+    );
+    setSectionEdits({});
+  }, [analysisResults?.anamnese]);
 
   useEffect(() => {
     setSectionEdits({});

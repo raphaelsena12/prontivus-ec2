@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawBottomBar,
+  drawFooterSignature,
   drawRichParagraph,
   MARGIN, CONTENT_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
@@ -56,6 +56,5 @@ export function generateJustificativaPedidosExamesPDF(data: JustificativaExamesD
 
   // ── Assinatura apenas do médico (centralizado) ──
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

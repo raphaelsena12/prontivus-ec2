@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawDualSignature, drawBottomBar,
+  drawFooterSignature, drawDualSignature,
   drawRichParagraph,
   MARGIN, CONTENT_WIDTH,
 } from "./pdf-base";
@@ -77,7 +77,6 @@ export function generateDeclaracaoComparecimentoAcompanhantePDF(data: Declaracao
 
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -138,7 +137,6 @@ export function generateDeclaracaoComparecimentoHorarioCidPDF(data: DeclaracaoDa
 
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -172,6 +170,5 @@ export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): Array
 
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

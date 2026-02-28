@@ -416,7 +416,7 @@ export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): numb
   return y + 8;
 }
 
-/** Desenha rodapé com assinatura do médico. Posiciona fixo no fim da página */
+/** Desenha rodapé com assinatura do médico. Posiciona fixo no fim da página, alinhada à direita */
 export function drawFooterSignature(
   doc: jsPDF,
   data: MedicoData & { dataEmissao: string; cidade?: string },
@@ -424,7 +424,7 @@ export function drawFooterSignature(
   options?: { hideDateLine?: boolean; hideSignatureLine?: boolean }
 ): void {
   const sigY = options?.hideDateLine
-    ? PAGE_HEIGHT - 42
+    ? PAGE_HEIGHT - 30
     : Math.max(minY || 0, PAGE_HEIGHT - 80) + 28;
 
   if (!options?.hideDateLine) {
@@ -443,25 +443,27 @@ export function drawFooterSignature(
     doc.text(localData, PAGE_WIDTH / 2, footerY + 10, { align: "center" });
   }
 
-  // Desenhar traço da assinatura apenas se não estiver oculto
+  // Mesma posição do médico em drawDualSignature (quarto direito da página)
+  const sigCenterX = MARGIN + (CONTENT_WIDTH * 3) / 4;
+
+  // Traço da assinatura
   if (!options?.hideSignatureLine) {
     doc.setDrawColor(...COLORS.slate800);
     doc.setLineWidth(0.4);
-    doc.line(PAGE_WIDTH / 2 - 40, sigY, PAGE_WIDTH / 2 + 40, sigY);
+    doc.line(sigCenterX - 35, sigY, sigCenterX + 35, sigY);
   }
 
-  // Ajustar posição do nome baseado na presença do traço
   const nomeY = options?.hideSignatureLine ? sigY : sigY + 8;
 
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`Dr(a). ${formatMedicoNome(data.medicoNome)}`, PAGE_WIDTH / 2, nomeY, { align: "center" });
+  doc.text(`Dr(a). ${formatMedicoNome(data.medicoNome)}`, sigCenterX, nomeY, { align: "center" });
 
   doc.setFontSize(8);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${formatCRM(data.medicoCrm)} — ${data.medicoEspecialidade}`, PAGE_WIDTH / 2, nomeY + 6, { align: "center" });
+  doc.text(`CRM ${formatCRM(data.medicoCrm)} — ${data.medicoEspecialidade}`, sigCenterX, nomeY + 6, { align: "center" });
 }
 
 /** Desenha rodapé com duas assinaturas (paciente + médico), fixas no rodapé da página */

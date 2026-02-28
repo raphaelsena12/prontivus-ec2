@@ -53,6 +53,7 @@ interface Medicamento {
   laboratorio: string | null;
   concentracao: string | null;
   apresentacao: string | null;
+  controle: string | null;
   unidade: string | null;
   ativo: boolean;
   createdAt: Date;
@@ -108,7 +109,7 @@ export function MedicamentosTable({
       const principioAtivo = med.principioAtivo?.toLowerCase() || "";
       const laboratorio = med.laboratorio?.toLowerCase() || "";
       const concentracao = med.concentracao?.toLowerCase() || "";
-      const apresentacao = med.apresentacao?.toLowerCase() || "";
+      const controle = med.controle?.toLowerCase() || "";
       const unidade = med.unidade?.toLowerCase() || "";
       const status = med.ativo ? "ativo" : "inativo";
       return (
@@ -116,7 +117,7 @@ export function MedicamentosTable({
         principioAtivo.includes(search) || 
         laboratorio.includes(search) ||
         concentracao.includes(search) ||
-        apresentacao.includes(search) ||
+        controle.includes(search) ||
         unidade.includes(search) ||
         status.includes(search)
       );
@@ -126,24 +127,12 @@ export function MedicamentosTable({
   const columns: ColumnDef<Medicamento>[] = React.useMemo(
     () => [
       {
-        accessorKey: "createdAt",
-        header: "Data",
-        cell: ({ row }) => formatDate(row.original.createdAt),
-      },
-      {
-        accessorKey: "apresentacao",
-        header: "Apresentação",
-        cell: ({ row }) => (
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
-            {row.original.apresentacao || "-"}
-          </Badge>
-        ),
-      },
-      {
         accessorKey: "nome",
         header: "Nome",
         cell: ({ row }) => (
-          <div className="font-medium">{row.original.nome}</div>
+          <div className="font-medium max-w-[200px] truncate" title={row.original.nome}>
+            {row.original.nome}
+          </div>
         ),
         enableHiding: false,
       },
@@ -164,9 +153,31 @@ export function MedicamentosTable({
         cell: ({ row }) => <div>{row.original.laboratorio || "-"}</div>,
       },
       {
-        accessorKey: "concentracao",
-        header: "Concentração",
-        cell: ({ row }) => <div>{row.original.concentracao || "-"}</div>,
+        accessorKey: "controle",
+        header: "Controle",
+        cell: ({ row }) => {
+          const controle = row.original.controle || "Simples";
+          const getBadgeColor = (controle: string) => {
+            const controleLower = controle.toLowerCase();
+            if (controleLower.includes("preta") || controleLower.includes("preto")) {
+              return "bg-black text-white border-black";
+            }
+            if (controleLower.includes("vermelha") || controleLower.includes("vermelho")) {
+              return "bg-red-600 text-white border-red-600";
+            }
+            // Verde para Simples e outros
+            return "bg-green-600 text-white border-green-600";
+          };
+          
+          return (
+            <Badge 
+              variant="outline" 
+              className={`text-[10px] py-0.5 px-1.5 leading-tight ${getBadgeColor(controle)}`}
+            >
+              {controle}
+            </Badge>
+          );
+        },
       },
       {
         accessorKey: "ativo",

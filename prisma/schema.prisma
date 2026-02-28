@@ -99,12 +99,16 @@ model Tenant {
   mensagensMedicoSecretaria   MensagemMedicoSecretaria[]   @relation("MensagensMedicoSecretaria")
   bloqueiosAgenda             BloqueioAgenda[]
   manipulados                 Manipulado[]
+  gruposExames                GrupoExame[]
   documentosGerados           DocumentoGerado[]
   medicoDocumentos            MedicoDocumento[]
   medicosCertificadosDigitais MedicoCertificadoDigital[]
   pagamentosConsultas         PagamentoConsulta[]
   listasEspera                ListaEspera[]
   autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
+  consultaCids                ConsultaCid[]
+  consultaExames              ConsultaExame[]
+  consultaPrescricoes         ConsultaPrescricao[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -285,6 +289,7 @@ model Medico {
   medicoEspecialidades        MedicoEspecialidade[]
   bloqueiosAgenda             BloqueioAgenda[]
   manipulados                 Manipulado[]
+  gruposExames                GrupoExame[]
   documentos                  DocumentoGerado[]
   medicoDocumentos            MedicoDocumento[]
   certificadoDigital          MedicoCertificadoDigital?
@@ -334,6 +339,7 @@ model Exame {
   clinica            Tenant             @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   codigoTuss         CodigoTuss?        @relation(fields: [codigoTussId], references: [id], onDelete: SetNull)
   solicitacoesExames SolicitacaoExame[]
+  gruposExames       GrupoExameItem[]
 
   @@index([clinicaId])
   @@index([nome])
@@ -344,12 +350,14 @@ model Exame {
 model Medicamento {
   id             String   @id @default(uuid())
   clinicaId      String
+  numeroRegistro String?  // Número de registro da ANVISA (para sincronização)
   nome           String
   principioAtivo String?
   laboratorio    String?
   apresentacao   String?
   concentracao   String?
   unidade        String?
+  controle       String?  // Tipo de controle: Simples, Controlado, etc
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -359,8 +367,10 @@ model Medicamento {
   prescricoesMedicamentos   PrescricaoMedicamento[]
   procedimentosMedicamentos ProcedimentoMedicamento[]
 
+  @@unique([clinicaId, numeroRegistro])
   @@index([clinicaId])
   @@index([nome])
+  @@index([numeroRegistro])
   @@map("medicamentos")
 }
 
@@ -636,6 +646,9 @@ model Consulta {
   documentos              DocumentoGerado[]
   pagamentos              PagamentoConsulta[]
   telemedicineSession     TelemedicineSession?
+  consultaCids            ConsultaCid[]
+  consultaExames          ConsultaExame[]
+  consultaPrescricoes     ConsultaPrescricao[]
 
   @@index([clinicaId])
   @@index([pacienteId])
@@ -1066,6 +1079,42 @@ model Manipulado {
   @@map("manipulados")
 }
 
+model GrupoExame {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  medicoId    String
+  nome        String
+  descricao   String?
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clinica Tenant           @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico           @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  exames  GrupoExameItem[]
+
+  @@index([clinicaId])
+  @@index([medicoId])
+  @@index([nome])
+  @@map("grupos_exames")
+}
+
+model GrupoExameItem {
+  id          String   @id @default(uuid())
+  grupoExameId String
+  exameId     String
+  ordem       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  grupoExame GrupoExame @relation(fields: [grupoExameId], references: [id], onDelete: Cascade)
+  exame      Exame      @relation(fields: [exameId], references: [id], onDelete: Cascade)
+
+  @@unique([grupoExameId, exameId])
+  @@index([grupoExameId])
+  @@index([exameId])
+  @@map("grupos_exames_itens")
+}
+
 model DocumentoGerado {
   id            String   @id @default(uuid())
   clinicaId     String
@@ -1264,4 +1313,58 @@ model TelemedicineConsent {
 
   @@index([sessionId])
   @@map("telemedicine_consents")
+}
+
+// =====================================================
+// CONSULTA — DADOS CLÍNICOS PERSISTIDOS
+// =====================================================
+
+model ConsultaCid {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  consultaId  String
+  code        String
+  description String
+  createdAt   DateTime @default(now())
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@map("consulta_cids")
+}
+
+model ConsultaExame {
+  id         String   @id @default(uuid())
+  clinicaId  String
+  consultaId String
+  nome       String
+  tipo       String?
+  createdAt  DateTime @default(now())
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@map("consulta_exames")
+}
+
+model ConsultaPrescricao {
+  id          String   @id @default(uuid())
+  clinicaId   String
+  consultaId  String
+  medicamento String
+  dosagem     String?
+  posologia   String
+  duracao     String?
+  createdAt   DateTime @default(now())
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([consultaId])
+  @@map("consulta_prescricoes")
 }

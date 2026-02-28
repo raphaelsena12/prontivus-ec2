@@ -210,17 +210,18 @@ export async function signPdfBufferWithP12({
 
   console.log("[PAdES Sign] Dimensoes da pagina:", { width, height, totalPages: pages.length });
 
-  // Bloco de assinatura: metade direita da página, acima da assinatura do médico.
-  // O rodapé jsPDF (drawFooterSignature) ocupa ~80mm do fundo (footerY ≈ 217mm do topo).
-  // Convertendo A4: (297-217mm) * 2.835 ≈ 227pt do fundo → usamos proporção para qualquer tamanho.
-  const marginSide      = 20;
-  const blockWidth      = Math.round((width - marginSide * 2) / 2);
-  const signatureHeight = 80;
-  // posiciona justo acima da assinatura jsPDF (sigY ≈ 119–147pt do fundo para A4)
-  const marginBottom    = Math.round(height * 0.178) - 50;
+  // Converte mm → pt para a largura real da página (funciona para qualquer tamanho)
+  const mmToPt = width / 210;
 
+  // Margens laterais equivalentes às do jsPDF (20mm)
+  const marginSide      = Math.round(20 * mmToPt);
+  const signatureHeight = 75;
+  // Posiciona rente ao rodapé (8pt = ~3mm da borda inferior)
+  const marginBottom    = 8;
+
+  // Bloco full-width: de margem a margem, fixo no fundo da última página
   const widgetRect = [
-    width - marginSide - blockWidth,  // metade direita
+    marginSide,
     marginBottom,
     width - marginSide,
     marginBottom + signatureHeight,
@@ -264,15 +265,24 @@ export async function signPdfBufferWithP12({
   try {
     const signedDoc  = await PDFDocument.load(signed, { ignoreEncryption: true, updateMetadata: false });
     const signedPage = signedDoc.getPages()[signedDoc.getPageCount() - 1];
-    const { width: sw, height: sh } = signedPage.getSize();
-    const sBlockWidth     = Math.round((sw - marginSide * 2) / 2);
-    const sMarginBottom   = Math.round(sh * 0.178) - 50;
+    const { width: sw } = signedPage.getSize();
+    const smmToPt     = sw / 210;
+    const sMarginSide = Math.round(20 * smmToPt);
+
+    // Cobrir a área do traço/nome/CRM do jsPDF com retângulo branco (≈ 55mm do fundo)
+    signedPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width: sw,
+      height: Math.round(55 * smmToPt),
+      color: rgb(1, 1, 1),
+    });
 
     const signedWidgetRect = [
-      sw - marginSide - sBlockWidth,
-      sMarginBottom,
-      sw - marginSide,
-      sMarginBottom + signatureHeight,
+      sMarginSide,
+      marginBottom,
+      sw - sMarginSide,
+      marginBottom + signatureHeight,
     ];
 
     await buildSignatureBlock(signedDoc, signedPage, signedWidgetRect, visualOpts);

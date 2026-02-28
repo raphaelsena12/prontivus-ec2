@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawPatientCard,
-  drawDualSignature, drawBottomBar,
+  drawDualSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
   formatCPF,
 } from "./pdf-base";
@@ -122,7 +122,6 @@ export function generateControlePressaoAnaliticoPDF(data: ControlePressaoData): 
   // ── Assinaturas do paciente e médico ──
   y += 8;
   drawDualSignature(doc, data, y, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }
 
@@ -215,6 +214,5 @@ export function generateControlePressaoPDF(data: ControlePressaoData): ArrayBuff
   
   // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature, drawBottomBar,
+  drawFooterSignature,
 } from "./pdf-base";
 
 // =====================================================
@@ -25,6 +25,5 @@ export function generateProntuarioPDF(data: ProntuarioData): ArrayBuffer {
   let y = drawTitle(doc, "PRONTUÁRIO MÉDICO", `Consulta: ${data.dataConsulta}`, headerY);
   y = drawPatientCard(doc, data, y);
   drawFooterSignature(doc, data, y + 20);
-  drawBottomBar(doc);
   return doc.output("arraybuffer");
 }

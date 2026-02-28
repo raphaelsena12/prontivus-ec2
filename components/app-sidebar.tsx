@@ -347,6 +347,11 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         url: "/medico/manipulados",
         icon: IconFlask,
       },
+      {
+        title: "Grupos de Exames",
+        url: "/medico/grupos-exames",
+        icon: IconFileText,
+      },
     ];
   } else if (hasCategories) {
     // Para outros tipos com categorias, apenas Início

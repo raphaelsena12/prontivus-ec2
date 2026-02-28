@@ -17,6 +17,9 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "script:gerar-pagamentos": "tsx scripts/gerar-pagamentos-mensais.ts",
+    "sync:anvisa": "tsx scripts/sync-anvisa-medicamentos.ts",
+    "clear:anvisa": "tsx scripts/clear-anvisa-medicamentos.ts",
+    "test:anvisa": "tsx scripts/test-anvisa-api.ts",
     "clean": "rm -rf .next node_modules/.cache",
     "clean:win": "powershell -Command \"if (Test-Path .next) { Remove-Item -Recurse -Force .next }; if (Test-Path node_modules\\.cache) { Remove-Item -Recurse -Force node_modules\\.cache }\""
   },

@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawPatientCard,
-  drawFooterSignature, drawBottomBar,
+  drawFooterSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -126,6 +126,5 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
   
   // ── Assinatura do médico (alinhada no rodapé, sem data) ──
   drawFooterSignature(doc, data, undefined, { hideDateLine: true });
-  drawBottomBar(doc, data);
   return doc.output("arraybuffer");
 }

@@ -95,17 +95,79 @@ export async function POST(request: NextRequest) {
       folder: "usuarios",
     });
 
-    // Atualizar avatar no banco com a key do S3 (formato: usuarios/{userId}-{timestamp}.{ext})
-    const usuario = await prisma.usuario.update({
+    console.log('=== UPLOAD AVATAR ===');
+    console.log('UsuarioId da sessão:', session.user.id);
+    console.log('Tipo de usuário:', session.user.tipo);
+    console.log('AvatarKey retornada do S3:', avatarKey);
+    console.log('Formato esperado: usuarios/{userId}-{timestamp}.{ext}');
+
+    // Garantir que a key está no formato correto
+    if (!avatarKey) {
+      throw new Error("Erro ao fazer upload: key não retornada");
+    }
+
+    // Verificar se o usuarioId existe antes de atualizar
+    const usuarioAntes = await prisma.usuario.findUnique({
       where: { id: session.user.id },
-      data: { avatar: avatarKey },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        avatar: true,
-      },
+      select: { id: true, nome: true, avatar: true },
     });
+    
+    if (!usuarioAntes) {
+      throw new Error("Usuário não encontrado no banco de dados");
+    }
+    
+    console.log('Usuario antes do update:', {
+      id: usuarioAntes.id,
+      nome: usuarioAntes.nome,
+      avatarAntes: usuarioAntes.avatar,
+    });
+
+    // Atualizar avatar no banco com a key do S3 (formato: usuarios/{userId}-{timestamp}.{ext})
+    // Usar transação para garantir que o update seja bem-sucedido
+    const usuario = await prisma.$transaction(async (tx) => {
+      const updated = await tx.usuario.update({
+        where: { id: session.user.id },
+        data: { avatar: avatarKey },
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          avatar: true,
+        },
+      });
+      
+      console.log('Usuario após update (dentro da transação):', updated);
+      
+      // Verificar imediatamente se foi salvo
+      const verificado = await tx.usuario.findUnique({
+        where: { id: session.user.id },
+        select: { avatar: true },
+      });
+      
+      console.log('Usuario verificado (dentro da transação):', verificado);
+      
+      if (verificado?.avatar !== avatarKey) {
+        console.error('ERRO: Avatar não corresponde!', {
+          esperado: avatarKey,
+          encontrado: verificado?.avatar,
+        });
+        throw new Error("Avatar não foi salvo corretamente no banco de dados");
+      }
+      
+      return updated;
+    });
+
+    // Verificar novamente após a transação
+    const usuarioApos = await prisma.usuario.findUnique({
+      where: { id: session.user.id },
+      select: { avatar: true },
+    });
+    
+    console.log('Avatar salvo no banco:', usuario.avatar);
+    console.log('AvatarKey esperada:', avatarKey);
+    console.log('Match:', usuario.avatar === avatarKey ? 'SIM ✓' : 'NÃO ✗');
+    console.log('Usuario após transação (verificação externa):', usuarioApos);
+    console.log('========================');
 
     return NextResponse.json({ usuario });
   } catch (error) {

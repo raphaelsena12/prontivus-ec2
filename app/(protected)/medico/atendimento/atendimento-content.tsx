@@ -80,6 +80,7 @@ import { TranscriptionBar } from '@/components/atendimento/consultation/Transcri
 import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
 import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
 import { TelemedicineView } from '@/components/atendimento/consultation/TelemedicineView';
+import { AvatarWithS3 } from '@/components/avatar-with-s3';
 
 interface Consulta {
   id: string;
@@ -94,6 +95,10 @@ interface Consulta {
     dataNascimento: string;
     observacoes?: string | null;
     numeroProntuario: number | null;
+    usuarioId: string | null;
+    usuario: {
+      avatar: string | null;
+    } | null;
   };
   codigoTuss: {
     codigoTuss: string;
@@ -136,6 +141,14 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [historicoConsultas, setHistoricoConsultas] = useState<any[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  type HistoricoConsultaClinica = {
+    consultaId: string;
+    dataHora: string;
+    cids: Array<{ code: string; description: string }>;
+    exames: Array<{ nome: string; tipo: string | null }>;
+    prescricoes: Array<{ medicamento: string; dosagem: string | null; posologia: string; duracao: string | null }>;
+  };
+  const [historicoClinico, setHistoricoClinico] = useState<HistoricoConsultaClinica[]>([]);
   const [expandedConsultas, setExpandedConsultas] = useState<Set<string>>(new Set());
   const [selectedExams, setSelectedExams] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
@@ -230,6 +243,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [loadingMedicamentosEmUso, setLoadingMedicamentosEmUso] = useState(false);
   const [examesCadastrados, setExamesCadastrados] = useState<Array<{ id: string; nome: string; descricao: string; tipo: string }>>([]);
   const [loadingExamesCadastrados, setLoadingExamesCadastrados] = useState(false);
+  const [gruposExames, setGruposExames] = useState<Array<{ id: string; nome: string; descricao: string | null; exames: Array<{ exame: { id: string; nome: string; tipo: string | null; descricao: string | null } }> }>>([]);
+  const [loadingGruposExames, setLoadingGruposExames] = useState(false);
+  const [activeExameTab, setActiveExameTab] = useState<"exames" | "grupos">("exames");
 
   // ─── UI states do redesign (não afetam lógica de negócio) ─────────────────
   const [currentStep, setCurrentStep] = useState<1|2|3|4|5>(1);
@@ -237,6 +253,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
+  const [loadingFichaPreview, setLoadingFichaPreview] = useState(false);
 
   // Hook de transcrição
   const {
@@ -324,6 +341,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     if (consulta?.paciente?.id) {
       fetchHistoricoConsultas(consulta.paciente.id);
       fetchMedicamentosEmUso(consulta.paciente.id);
+      fetchHistoricoClinico(consulta.paciente.id);
     }
   }, [consulta?.paciente?.id]);
 
@@ -469,8 +487,16 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   useEffect(() => {
     if (exameSearchDialogOpen) {
       fetchExamesCadastrados();
+      fetchGruposExames();
     }
   }, [exameSearchDialogOpen, exameSearch]);
+
+  // Buscar grupos de exames quando a tab mudar
+  useEffect(() => {
+    if (exameSearchDialogOpen && activeExameTab === "grupos") {
+      fetchGruposExames();
+    }
+  }, [exameSearchDialogOpen, activeExameTab]);
 
   const fetchMedicamentos = async () => {
     try {
@@ -515,7 +541,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     try {
       setLoadingExamesCadastrados(true);
       const params = new URLSearchParams();
-      if (exameSearch) {
+      if (exameSearch && activeExameTab === "exames") {
         params.append("search", exameSearch);
       }
       const response = await fetch(`/api/medico/exames?${params.toString()}`);
@@ -530,8 +556,39 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
+  const fetchGruposExames = async () => {
+    try {
+      setLoadingGruposExames(true);
+      const params = new URLSearchParams();
+      if (exameSearch && activeExameTab === "grupos") {
+        params.append("search", exameSearch);
+      }
+      params.append("limit", "1000");
+      const response = await fetch(`/api/medico/grupos-exames?${params.toString()}`);
+      if (!response.ok) throw new Error("Erro ao buscar grupos de exames");
+      const data = await response.json();
+      setGruposExames(data.gruposExames || []);
+    } catch (error) {
+      console.error("Erro ao buscar grupos de exames:", error);
+      toast.error("Erro ao buscar grupos de exames");
+    } finally {
+      setLoadingGruposExames(false);
+    }
+  };
+
   const handleSelectExame = (exame: typeof examesCadastrados[0]) => {
     setExamesManuais([...examesManuais, { nome: exame.nome, tipo: exame.tipo }]);
+    setExameSearchDialogOpen(false);
+    setExameSearch("");
+  };
+
+  const handleSelectGrupoExame = (grupoExame: typeof gruposExames[0]) => {
+    // Expandir o grupo de exames em exames individuais
+    const novosExames = grupoExame.exames.map((item) => ({
+      nome: item.exame.nome,
+      tipo: item.exame.tipo || "Não especificado",
+    }));
+    setExamesManuais([...examesManuais, ...novosExames]);
     setExameSearchDialogOpen(false);
     setExameSearch("");
   };
@@ -1019,6 +1076,55 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
+  const fetchHistoricoClinico = async (pacienteId: string) => {
+    try {
+      const params = new URLSearchParams({ limit: "3", excluirConsultaId: consultaId });
+      const response = await fetch(`/api/medico/pacientes/${pacienteId}/historico-consulta?${params}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setHistoricoClinico(data || []);
+    } catch (e) {
+      console.error("Erro ao buscar histórico clínico:", e);
+    }
+  };
+
+  const handleRepetirItens = (itens: {
+    cids: Array<{ code: string; description: string }>;
+    exames: Array<{ nome: string; tipo: string | null }>;
+    prescricoes: Array<{ medicamento: string; dosagem: string | null; posologia: string; duracao: string | null }>;
+  }) => {
+    if (itens.cids.length > 0) {
+      setCidsManuais(prev => {
+        const existing = new Set(prev.map(c => c.code));
+        const novos = itens.cids.filter(c => !existing.has(c.code));
+        return [...prev, ...novos];
+      });
+    }
+    if (itens.exames.length > 0) {
+      setExamesManuais(prev => {
+        const existing = new Set(prev.map(e => e.nome.toLowerCase()));
+        const novos = itens.exames
+          .filter(e => !existing.has(e.nome.toLowerCase()))
+          .map(e => ({ nome: e.nome, tipo: e.tipo || "" }));
+        return [...prev, ...novos];
+      });
+    }
+    if (itens.prescricoes.length > 0) {
+      setPrescricoes(prev => {
+        const existing = new Set(prev.map(p => p.medicamento.toLowerCase()));
+        const novos = itens.prescricoes
+          .filter(p => !existing.has(p.medicamento.toLowerCase()))
+          .map(p => ({
+            medicamento: p.medicamento,
+            dosagem: p.dosagem || "",
+            posologia: p.posologia,
+            duracao: p.duracao || "",
+          }));
+        return [...prev, ...novos];
+      });
+    }
+  };
+
   const handleViewFichaAtendimento = async (consultaId: string) => {
     try {
       // Buscar documentos da consulta
@@ -1166,6 +1272,62 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
+  const handlePreviewFicha = async () => {
+    try {
+      setLoadingFichaPreview(true);
+
+      const selectedCidsList = [
+        ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
+        ...cidsManuais,
+      ];
+      const selectedExamesList = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || [];
+      const allExames = [...selectedExamesList, ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }))];
+      const selectedProtocolosList = analysisResults?.protocolos?.filter((_, i) => selectedProtocolosAI.has(i)).map(p => ({ nome: p.nome, descricao: p.descricao })) || [];
+      const allProtocolos = [...selectedProtocolosList, ...protocolosManuais.map(p => ({ nome: p.nome, descricao: p.descricao }))];
+
+      // Atestados e declarações gerados na consulta (excluindo ficha de atendimento e receitas)
+      const tiposAtestado = new Set([
+        "atestado-afastamento", "atestado-afastamento-cid", "atestado-afastamento-sem-cid",
+        "atestado-afastamento-historico-cid", "atestado-afastamento-indeterminado",
+        "atestado-aptidao-fisica-mental", "atestado-aptidao-piscinas", "atestado-aptidao-fisica",
+        "declaracao-comparecimento", "declaracao-comparecimento-acompanhante",
+        "declaracao-comparecimento-horario-cid",
+      ]);
+      const atestados = documentosGerados
+        .filter(d => tiposAtestado.has(d.tipoDocumento))
+        .map(d => ({ nome: d.nomeDocumento }));
+
+      const response = await fetch("/api/medico/documentos/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipoDocumento: "ficha-atendimento",
+          consultaId,
+          dados: {
+            anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+            cidCodes: selectedCidsList,
+            exames: allExames,
+            protocolos: allProtocolos,
+            prescricoes,
+            atestados,
+          },
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro ao gerar ficha de atendimento");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      // Revogar após 60s (tempo suficiente para o browser carregar o PDF)
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao gerar ficha de atendimento");
+    } finally {
+      setLoadingFichaPreview(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -1215,6 +1377,15 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
           evolucao: prontuario?.evolucao || "",
+          cids: [
+            ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
+            ...cidsManuais,
+          ],
+          exames: [
+            ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || []),
+            ...examesManuais,
+          ],
+          prescricoes,
         }),
       });
 
@@ -1598,13 +1769,26 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
           {/* Corpo principal */}
           <div className="p-6 flex items-center justify-between gap-6 overflow-hidden w-full min-w-0">
+            {/* Estilo customizado para o avatar do paciente */}
+            <style dangerouslySetInnerHTML={{
+              __html: `
+                #patient-avatar-${consulta.paciente.id} [class*="AvatarFallback"] {
+                  background-color: ${avatarColor.bg} !important;
+                  color: ${avatarColor.text} !important;
+                }
+              `
+            }} />
+            
             {/* Coluna esquerda — identidade */}
             <div className="flex items-center gap-4 min-w-0 flex-1 overflow-x-hidden">
-              <div
-                className="w-13 h-13 rounded-full flex items-center justify-center flex-shrink-0 text-base font-bold select-none"
-                style={{ backgroundColor: avatarColor.bg, color: avatarColor.text, width: 52, height: 52 }}
-              >
-                {inicial}
+              <div className="flex-shrink-0 relative" id={`patient-avatar-${consulta.paciente.id}`}>
+                <AvatarWithS3
+                  avatar={consulta.paciente.usuario?.avatar || null}
+                  alt={consulta.paciente.nome}
+                  fallback={inicial}
+                  className="w-[72px] h-[72px]"
+                  fallbackClassName="text-lg font-bold select-none"
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1620,70 +1804,72 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <div className="flex items-end gap-2 mt-1.5 flex-wrap">
                   {/* Demographics */}
-                  <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{idade} anos</span>
-                  <span className="text-xs text-slate-300">·</span>
-                  <span className="text-xs text-slate-500 whitespace-nowrap">{formatDate(new Date(consulta.paciente.dataNascimento))}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{idade} anos</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500 whitespace-nowrap">{formatDate(new Date(consulta.paciente.dataNascimento))}</span>
+                  </div>
 
                   {/* Divider */}
                   <span className="h-3.5 w-px bg-slate-200 mx-0.5" />
 
-                  {/* ID badge */}
-                  <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">{prontuarioLabel}</Badge>
-
-                  {/* Tipo consulta badge */}
-                  {consulta.tipoConsulta && (
-                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">{consulta.tipoConsulta.nome}</Badge>
-                  )}
-
-                  {/* Plan badge */}
-                  {(consulta as any).operadora ? (
-                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">
-                      {(consulta as any).operadora.nomeFantasia}
-                      {(consulta as any).planoSaude && ` · ${(consulta as any).planoSaude.nome}`}
+                  {/* Badges alinhados no bottom */}
+                  <div className="flex items-end gap-2 flex-wrap">
+                    {/* ID badge - Azul */}
+                    <Badge className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                      {prontuarioLabel}
                     </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[11px] font-medium text-slate-600 bg-slate-50 border-slate-200 px-2 py-0.5 rounded-full whitespace-nowrap">Particular</Badge>
-                  )}
+
+                    {/* Tipo consulta badge - Roxo/Indigo */}
+                    {consulta.tipoConsulta && (
+                      <Badge className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                        {consulta.tipoConsulta.nome}
+                      </Badge>
+                    )}
+
+                    {/* Plan badge - Verde para convênio, Laranja para particular */}
+                    {(consulta as any).operadora ? (
+                      <Badge className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                        {(consulta as any).operadora.nomeFantasia}
+                        {(consulta as any).planoSaude && ` · ${(consulta as any).planoSaude.nome}`}
+                      </Badge>
+                    ) : (
+                      <Badge className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                        Particular
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Coluna direita — vitais (topo) + ações (baixo) */}
+            {/* Coluna direita — ações (topo) + vitais (baixo) */}
             <div className="flex flex-col items-end gap-3 flex-shrink-0 min-w-0">
-              {/* Vitais — chips compactos */}
-              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
-                {vitals.map((v, i) => {
-                  const Icon = v.icon;
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0"
-                    >
-                      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${v.iconColor}`} />
-                      <span className="text-xs font-bold text-slate-800 tabular-nums leading-none whitespace-nowrap">{v.value}</span>
-                      <span className="text-[10px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${vitalStatusDot[v.status]}`} />
-                    </div>
-                  );
-                })}
-              </div>
-
               {/* Botões de ação */}
               <div className="flex items-center gap-2.5 flex-shrink-0 flex-wrap justify-end">
-                <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 flex-shrink-0">
-                  <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <span className="text-sm font-mono font-semibold text-slate-700 tabular-nums whitespace-nowrap">{sessionDuration}</span>
+                <div className="relative flex items-center gap-2 px-4 py-2.5 flex-shrink-0">
+                  {/* Indicador pulsante */}
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-75" />
+                    </div>
+                    <Clock className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <span className="text-sm font-mono font-bold text-slate-800 tabular-nums whitespace-nowrap tracking-tight">
+                      {sessionDuration}
+                    </span>
+                  </div>
                 </div>
 
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setResumoClinicoDialogOpen(true)}
-                  className="h-9 px-4 text-xs gap-1.5 border-slate-200 text-slate-600 hover:bg-slate-50 flex-shrink-0"
+                  className="h-9 px-4 text-xs gap-1.5 border-blue-300 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 flex-shrink-0 font-semibold transition-colors"
                 >
-                  <FileText className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                   <span className="whitespace-nowrap">Resumo Clínico</span>
                 </Button>
 
@@ -1698,6 +1884,24 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                     <span className="whitespace-nowrap">Videochamada</span>
                   </Button>
                 )}
+              </div>
+
+              {/* Vitais — chips compactos */}
+              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
+                {vitals.map((v, i) => {
+                  const Icon = v.icon;
+                  const isDroplet = Icon === Droplet;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0"
+                    >
+                      {!isDroplet && <Icon className={`w-3 h-3 flex-shrink-0 ${v.iconColor}`} />}
+                      <span className="text-[11px] font-bold text-slate-800 tabular-nums leading-none whitespace-nowrap">{v.value}</span>
+                      <span className="text-[9px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1805,10 +2009,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   setSelectedCids={setSelectedCids}
                   cidsManuais={cidsManuais}
                   setCidDialogOpen={setCidDialogOpen}
-                  selectedProtocolosAI={selectedProtocolosAI}
-                  setSelectedProtocolosAI={setSelectedProtocolosAI}
-                  protocolosManuais={protocolosManuais}
-                  setProtocoloDialogOpen={setProtocoloDialogOpen}
                   selectedExamesAI={selectedExamesAI}
                   setSelectedExamesAI={setSelectedExamesAI}
                   examesManuais={examesManuais}
@@ -1829,6 +2029,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   onDeleteDocument={handleDeleteDocument}
                   onGenerateSuggestions={handleGenerateSuggestions}
                   consultationMode={consultationMode}
+                  historicoClinico={historicoClinico}
+                  onRepetirItens={handleRepetirItens}
                 />
             </div>
           </div>
@@ -1843,6 +2045,17 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         style={{ left: !isMobile && sidebarOpen ? "var(--sidebar-width)" : "0" }}
       >
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-2.5 flex items-center justify-end gap-2 w-full min-w-0 overflow-x-hidden mr-[60px]">
+          <button
+            onClick={handlePreviewFicha}
+            disabled={loadingFichaPreview}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+          >
+            {loadingFichaPreview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
+            Ficha de Atendimento
+          </button>
+
+          <div className="w-px h-5 bg-slate-200" />
+
           <button
             onClick={() => toast.info("Para assinar, use o ícone de assinatura na lista de documentos (na lateral).")}
             className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
@@ -2520,55 +2733,115 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             <DialogTitle>Selecionar Exame</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
-            <div className="relative flex-shrink-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder="Buscar exame por nome ou descrição..."
-                value={exameSearch}
-                onChange={(e) => setExameSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <ScrollArea className="flex-1 border rounded-lg min-h-0">
-              {loadingExamesCadastrados ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
-                </div>
-              ) : examesCadastrados.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                  <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
-                  <p className="text-sm text-slate-500 font-medium">Nenhum exame encontrado</p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {exameSearch ? "Tente uma busca diferente" : "Digite para buscar exames cadastrados"}
-                  </p>
-                </div>
-              ) : (
-                <div className="p-2 space-y-1">
-                  {examesCadastrados.map((exame) => (
-                    <button
-                      key={exame.id}
-                      onClick={() => handleSelectExame(exame)}
-                      className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{exame.nome}</p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
-                              {exame.tipo}
-                            </Badge>
-                            {exame.descricao && (
-                              <span className="text-xs text-slate-500">{exame.descricao}</span>
-                            )}
+            <Tabs value={activeExameTab} onValueChange={(value) => {
+              setActiveExameTab(value as "exames" | "grupos");
+              setExameSearch("");
+            }}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="exames">Exames</TabsTrigger>
+                <TabsTrigger value="grupos">Grupos de Exames</TabsTrigger>
+              </TabsList>
+              <div className="relative flex-shrink-0 mt-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder={activeExameTab === "exames" ? "Buscar exame por nome ou descrição..." : "Buscar grupo de exames por nome ou descrição..."}
+                  value={exameSearch}
+                  onChange={(e) => {
+                    setExameSearch(e.target.value);
+                    if (activeExameTab === "exames") {
+                      fetchExamesCadastrados();
+                    } else {
+                      fetchGruposExames();
+                    }
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              <TabsContent value="exames" className="mt-0 flex-1 min-h-0 flex flex-col">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0">
+                  {loadingExamesCadastrados ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    </div>
+                  ) : examesCadastrados.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                      <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-500 font-medium">Nenhum exame encontrado</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {exameSearch ? "Tente uma busca diferente" : "Digite para buscar exames cadastrados"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {examesCadastrados.map((exame) => (
+                        <button
+                          key={exame.id}
+                          onClick={() => handleSelectExame(exame)}
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{exame.nome}</p>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
+                                  {exame.tipo}
+                                </Badge>
+                                {exame.descricao && (
+                                  <span className="text-xs text-slate-500">{exame.descricao}</span>
+                                )}
+                              </div>
+                            </div>
+                            <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                           </div>
-                        </div>
-                        <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+              <TabsContent value="grupos" className="mt-0 flex-1 min-h-0 flex flex-col">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0">
+                  {loadingGruposExames ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                    </div>
+                  ) : gruposExames.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                      <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
+                      <p className="text-sm text-slate-500 font-medium">Nenhum grupo de exames encontrado</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {exameSearch ? "Tente uma busca diferente" : "Digite para buscar grupos de exames cadastrados"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-2 space-y-1">
+                      {gruposExames.map((grupoExame) => (
+                        <button
+                          key={grupoExame.id}
+                          onClick={() => handleSelectGrupoExame(grupoExame)}
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{grupoExame.nome}</p>
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
+                                  {grupoExame.exames.length} {grupoExame.exames.length === 1 ? "exame" : "exames"}
+                                </Badge>
+                                {grupoExame.descricao && (
+                                  <span className="text-xs text-slate-500">{grupoExame.descricao}</span>
+                                )}
+                              </div>
+                            </div>
+                            <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </div>
         </DialogContent>
       </Dialog>
