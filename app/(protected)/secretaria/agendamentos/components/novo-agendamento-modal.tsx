@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, Search, X, FileCheck } from "lucide-react";
+import { Loader2, AlertTriangle, Search, X, FileCheck, Monitor, Video } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { maskCPF, removeMask } from "@/lib/masks";
@@ -28,6 +28,7 @@ const agendamentoSchema = z.object({
   medicoId: z.string().uuid("Médico é obrigatório"),
   data: z.string().min(1, "Data é obrigatória"),
   hora: z.string().min(1, "Hora é obrigatória"),
+  modalidade: z.enum(["PRESENCIAL", "TELEMEDICINA"]),
   codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
@@ -329,6 +330,7 @@ export function NovoAgendamentoModal({
       medicoId: initialData?.medicoId || "",
       data: initialData?.data || "",
       hora: initialData?.hora || "",
+      modalidade: "PRESENCIAL" as const,
       codigoTussId: "",
       tipoConsultaId: "",
       procedimentoId: null,
@@ -811,6 +813,46 @@ export function NovoAgendamentoModal({
                       )}
                     />
                   </div>
+
+                  {/* Modalidade: Presencial / Telemedicina */}
+                  <FormField
+                    control={form.control}
+                    name="modalidade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium">Modalidade</FormLabel>
+                        <FormControl>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => field.onChange("PRESENCIAL")}
+                              className={`flex-1 flex items-center justify-center gap-2 h-8 rounded-md border text-xs font-medium transition-all ${
+                                field.value === "PRESENCIAL"
+                                  ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                  : "border-input bg-background text-muted-foreground hover:bg-accent"
+                              }`}
+                            >
+                              <Monitor className="w-3.5 h-3.5" />
+                              Presencial
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => field.onChange("TELEMEDICINA")}
+                              className={`flex-1 flex items-center justify-center gap-2 h-8 rounded-md border text-xs font-medium transition-all ${
+                                field.value === "TELEMEDICINA"
+                                  ? "bg-emerald-600 border-emerald-600 text-white shadow-sm"
+                                  : "border-input bg-background text-muted-foreground hover:bg-accent"
+                              }`}
+                            >
+                              <Video className="w-3.5 h-3.5" />
+                              Telemedicina
+                            </button>
+                          </div>
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
 
                   {/* Row 3: Tipo Consulta, Procedimento, Convênio e Carteirinha */}
                   <div className="flex flex-wrap items-start gap-2.5">

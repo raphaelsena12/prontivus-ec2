@@ -60,4 +60,8 @@ export {
   gerarEmailRecuperacaoSenha,
   gerarEmailRecuperacaoSenhaTexto,
 } from "./templates/recuperacao-senha";
+export {
+  gerarEmailTelemedicinalink,
+  gerarEmailTelemedicinalinkTexto,
+} from "./templates/telemedicina-link";
 

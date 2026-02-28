@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
         id: true,
         dataHora: true,
         status: true,
+        modalidade: true,
         paciente: {
           select: {
             id: true,

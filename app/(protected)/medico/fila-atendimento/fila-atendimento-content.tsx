@@ -28,6 +28,7 @@ interface Consulta {
   id: string;
   dataHora: Date | string;
   status: string;
+  modalidade?: string;
   paciente: {
     id: string;
     nome: string;
@@ -104,7 +105,7 @@ export function FilaAtendimentoContent() {
     }
   }, [fetchConsultas, mounted]);
 
-  const handleIniciarAtendimento = async (consultaId: string) => {
+  const handleIniciarAtendimento = async (consultaId: string, modalidade?: string) => {
     try {
       const response = await fetch("/api/medico/fila-atendimento", {
         method: "POST",
@@ -119,10 +120,29 @@ export function FilaAtendimentoContent() {
         throw new Error(error.error || "Erro ao iniciar atendimento");
       }
 
-      toast.success("Atendimento iniciado com sucesso");
-      // Atualizar a lista para mostrar a consulta com status atualizado
       await fetchConsultas(true);
-      router.push(`/medico/atendimento?consultaId=${consultaId}`);
+
+      // Redireciona conforme modalidade
+      if (modalidade === "TELEMEDICINA") {
+        toast.success("Iniciando sessão de telemedicina...");
+        // Cria a sessão de telemedicina e obtém o sessionId
+        const sessaoRes = await fetch("/api/medico/telemedicina/criar-sessao", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ consultaId }),
+        });
+
+        if (!sessaoRes.ok) {
+          const err = await sessaoRes.json();
+          throw new Error(err.error || "Erro ao criar sessão de telemedicina");
+        }
+
+        const sessaoData = await sessaoRes.json();
+        router.push(`/medico/telemedicina/sessao/${sessaoData.sessionId}`);
+      } else {
+        toast.success("Atendimento iniciado com sucesso");
+        router.push(`/medico/atendimento?consultaId=${consultaId}`);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao iniciar atendimento");
       console.error(error);
@@ -271,11 +291,18 @@ export function FilaAtendimentoContent() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">
-                        {consulta.tipoConsulta ? (
-                          <span className="text-xs text-foreground">{consulta.tipoConsulta.nome}</span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
+                        <div className="flex flex-col gap-1">
+                          {consulta.tipoConsulta ? (
+                            <span className="text-xs text-foreground">{consulta.tipoConsulta.nome}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                          {consulta.modalidade === "TELEMEDICINA" && (
+                            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 w-fit">
+                              📹 Telemedicina
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">
                         {consulta.operadora ? (
@@ -320,7 +347,7 @@ export function FilaAtendimentoContent() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleIniciarAtendimento(consulta.id)}
+                            onClick={() => handleIniciarAtendimento(consulta.id, consulta.modalidade)}
                             className="text-xs h-7"
                           >
                             {consulta.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar"}

@@ -75,6 +75,8 @@ export default withAuth(
           "/api/public",
           "/api/stripe",
           "/pagamento",
+          "/telemedicina",                              // Página de acesso público do paciente
+          "/api/paciente/telemedicina/sessao",          // APIs públicas de telemedicina do paciente
         ];
 
         // Rotas especiais que requerem auth mas não devem redirecionar

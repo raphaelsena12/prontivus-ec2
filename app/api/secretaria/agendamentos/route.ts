@@ -23,6 +23,7 @@ const agendamentoSchema = z.object({
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().optional().nullable(),
   observacoes: z.string().optional(),
+  modalidade: z.enum(["PRESENCIAL", "TELEMEDICINA"]).optional().default("PRESENCIAL"),
 });
 
 async function checkAuthorization() {
@@ -475,6 +476,7 @@ export async function POST(request: NextRequest) {
         planoSaudeId: data.planoSaudeId,
         numeroCarteirinha: data.numeroCarteirinha,
         valorCobrado: data.valorCobrado,
+        modalidade: data.modalidade ?? "PRESENCIAL",
         observacoes: motivoAprovacao 
           ? `${data.observacoes || ''}\n\n[Motivo para aprovação: ${motivoAprovacao}]`.trim()
           : data.observacoes,

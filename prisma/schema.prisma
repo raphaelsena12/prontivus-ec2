@@ -619,6 +619,7 @@ model Consulta {
   valorCobrado      Decimal?  @db.Decimal(10, 2)
   valorRepassado    Decimal?  @db.Decimal(10, 2)
   procedimentoId    String?
+  modalidade        String    @default("PRESENCIAL") // PRESENCIAL, TELEMEDICINA
 
   clinica                 Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   paciente                Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -634,6 +635,7 @@ model Consulta {
   guiasTiss               GuiaTiss[]
   documentos              DocumentoGerado[]
   pagamentos              PagamentoConsulta[]
+  telemedicineSession     TelemedicineSession?
 
   @@index([clinicaId])
   @@index([pacienteId])
@@ -1185,4 +1187,81 @@ model AutorizacaoFechamentoCaixa {
   @@index([data])
   @@index([status])
   @@map("autorizacoes_fechamento_caixa")
+}
+
+// ─── Telemedicina ────────────────────────────────────────────────────────────
+
+model TelemedicineSession {
+  id                    String    @id @default(uuid())
+  consultaId            String    @unique
+  meetingId             String?   // AWS Chime Meeting ID
+  meetingData           Json?     // Resposta completa do CreateMeeting (para join)
+  status                String    @default("scheduled") // scheduled|waiting|in_progress|finished|cancelled
+  patientToken          String    @unique              // Token do link público do paciente
+  patientTokenExpiresAt DateTime
+  identityVerifiedAt    DateTime? // Preenchido após validação do CPF
+  createdAt             DateTime  @default(now())
+  startedAt             DateTime?
+  finishedAt            DateTime?
+
+  consulta     Consulta                  @relation(fields: [consultaId], references: [id])
+  participants TelemedicineParticipant[]
+  logs         TelemedicineLog[]
+  consents     TelemedicineConsent[]
+
+  @@index([patientToken])
+  @@index([status])
+  @@map("telemedicine_sessions")
+}
+
+model TelemedicineParticipant {
+  id           String    @id @default(uuid())
+  sessionId    String
+  pacienteId   String?
+  medicoId     String?
+  role         String    // DOCTOR | PATIENT
+  attendeeId   String?   // AWS Chime Attendee ID
+  attendeeData Json?     // Resposta completa do CreateAttendee
+  joinTime     DateTime?
+  leaveTime    DateTime?
+
+  session TelemedicineSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@index([role])
+  @@map("telemedicine_participants")
+}
+
+model TelemedicineLog {
+  id         String   @id @default(uuid())
+  sessionId  String
+  pacienteId String?
+  medicoId   String?
+  role       String?  // DOCTOR | PATIENT
+  eventType  String   // SESSION_CREATED | PATIENT_LINK_SENT | IDENTITY_VERIFIED | IDENTITY_FAILED | CONSENT_GIVEN | PATIENT_JOINED | DOCTOR_JOINED | SESSION_STARTED | SESSION_ENDED | DISCONNECT
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  session TelemedicineSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@index([eventType])
+  @@map("telemedicine_logs")
+}
+
+model TelemedicineConsent {
+  id               String   @id @default(uuid())
+  sessionId        String
+  pacienteId       String
+  consentGiven     Boolean  @default(false)
+  consentVersion   String   @default("1.0")
+  ipAddress        String?
+  userAgent        String?
+  consentTimestamp DateTime @default(now())
+
+  session TelemedicineSession @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId])
+  @@map("telemedicine_consents")
 }

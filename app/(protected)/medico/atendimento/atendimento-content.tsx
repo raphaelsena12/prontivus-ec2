@@ -1748,6 +1748,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             chatMessage={chatMessage}
             setChatMessage={setChatMessage}
             chatMessages={chatMessages}
+            onSendMessage={() => {}}
             isTranscribing={isTranscribing}
             isPaused={isPaused}
             transcription={transcription}

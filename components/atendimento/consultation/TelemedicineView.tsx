@@ -1,30 +1,36 @@
 "use client";
 
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   User,
-  Mic,
-  MicOff,
-  Video,
-  VideoOff,
+  Mic, MicOff,
+  Video, VideoOff,
   Monitor,
   MessageSquare,
   Send,
-  Maximize2,
-  Minimize2,
+  Maximize2, Minimize2,
   Settings,
-  Camera,
-  Share2,
-  FileText,
-  Play,
-  Pause,
-  Square,
+  Phone,
+  Play, Pause, Square,
   Sparkles,
+  Copy,
+  FileText,
+  Brain,
+  Activity, Heart, Thermometer, Wind,
+  Link2,
+  CheckCircle2,
+  Wifi,
+  Stethoscope,
+  Pill,
+  ClipboardList,
+  FilePlus,
+  ExternalLink,
 } from "lucide-react";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TranscriptionEntry {
   time: string;
@@ -54,6 +60,8 @@ interface VitalSign {
   iconColor: string;
 }
 
+type SidebarTab = "chat" | "transcript" | "ai" | "docs";
+
 interface TelemedicineViewProps {
   patient: PatientInfo;
   vitals: VitalSign[];
@@ -72,6 +80,7 @@ interface TelemedicineViewProps {
   chatMessage: string;
   setChatMessage: (v: string) => void;
   chatMessages: ChatMessage[];
+  onSendMessage: (text: string) => void;
   isTranscribing: boolean;
   isPaused: boolean;
   transcription: TranscriptionEntry[];
@@ -82,7 +91,12 @@ interface TelemedicineViewProps {
   handleProcessTranscription: () => Promise<void>;
   onOpenResumoClinico: () => void;
   onEncerrar: () => void;
+  localVideoRef?: React.RefObject<HTMLVideoElement | null>;
+  remoteVideoRef?: React.RefObject<HTMLVideoElement | null>;
+  patientLink?: string;
 }
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function TelemedicineView({
   patient,
@@ -97,11 +111,10 @@ export function TelemedicineView({
   setIsScreenSharing,
   isFullscreen,
   setIsFullscreen,
-  isChatOpen,
-  setIsChatOpen,
   chatMessage,
   setChatMessage,
   chatMessages,
+  onSendMessage,
   isTranscribing,
   isPaused,
   transcription,
@@ -112,429 +125,561 @@ export function TelemedicineView({
   handleProcessTranscription,
   onOpenResumoClinico,
   onEncerrar,
+  localVideoRef,
+  remoteVideoRef,
+  patientLink,
 }: TelemedicineViewProps) {
+  const [activeTab, setActiveTab] = useState<SidebarTab>("chat");
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [isProcessingAi, setIsProcessingAi] = useState(false);
+
+  const initials = patient.name
+    .split(" ")
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
+
+  const qualityConfig = {
+    excellent: { color: "text-emerald-400", dot: "bg-emerald-400", label: "Excelente" },
+    good: { color: "text-yellow-400", dot: "bg-yellow-400", label: "Boa" },
+    unstable: { color: "text-red-400", dot: "bg-red-400", label: "Instável" },
+  };
+  const quality = qualityConfig[connectionQuality as keyof typeof qualityConfig] ?? qualityConfig.excellent;
+
+  const copyLink = () => {
+    if (!patientLink) return;
+    navigator.clipboard.writeText(patientLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const tabs: { id: SidebarTab; icon: React.ElementType; label: string }[] = [
+    { id: "chat", icon: MessageSquare, label: "Chat" },
+    { id: "transcript", icon: Mic, label: "Trans." },
+    { id: "ai", icon: Brain, label: "IA" },
+    { id: "docs", icon: FileText, label: "Docs" },
+  ];
+
   return (
-    <div className="grid grid-cols-12 gap-4 animate-in fade-in duration-500">
-      {/* Main Video Area */}
-      <div className="col-span-8 space-y-3">
-        {/* Patient Video - Large */}
-        <Card className="border-slate-200 shadow-2xl shadow-emerald-500/20 overflow-hidden relative group">
-          {/* Video Container */}
-          <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 aspect-video flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-500/10 to-blue-500/10" />
+    <div className="flex flex-col h-full bg-slate-950 rounded-xl overflow-hidden shadow-2xl shadow-black/40">
 
-            {/* Patient Placeholder */}
-            <div className="relative z-10 text-center">
-              <div className="w-24 h-24 mx-auto mb-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-pulse">
-                <User className="w-12 h-12 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-white mb-1.5">{patient.name}</h3>
-              <Badge className="bg-emerald-500 text-white font-semibold text-xs">Conectado</Badge>
-            </div>
-
-            {/* Connection Quality */}
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1.5 rounded-lg">
-              <div
-                className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                  connectionQuality === "excellent"
-                    ? "bg-emerald-500"
-                    : connectionQuality === "good"
-                    ? "bg-yellow-500"
-                    : "bg-red-500"
-                }`}
-              />
-              <span className="text-xs text-white font-semibold">
-                {connectionQuality === "excellent"
-                  ? "Excelente"
-                  : connectionQuality === "good"
-                  ? "Bom"
-                  : "Instável"}
-              </span>
-            </div>
-
-            {/* Doctor PiP */}
-            <div className="absolute bottom-3 right-3 w-36 h-28 bg-gradient-to-br from-slate-700 to-slate-800 rounded-lg border-2 border-white/20 shadow-2xl overflow-hidden group-hover:scale-105 transition-transform">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <User className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                <Badge className="bg-blue-600 text-white text-xs font-semibold w-full justify-center">
-                  Você
-                </Badge>
-              </div>
-            </div>
-
-            {/* Timer */}
-            <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-white font-mono font-bold text-sm">{sessionDuration}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Video Controls */}
-          <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => setIsMicOn(!isMicOn)}
-                  className={`rounded-full w-10 h-10 ${
-                    isMicOn ? "bg-slate-700 hover:bg-slate-600" : "bg-red-600 hover:bg-red-700"
-                  }`}
-                >
-                  {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setIsCameraOn(!isCameraOn)}
-                  className={`rounded-full w-10 h-10 ${
-                    isCameraOn ? "bg-slate-700 hover:bg-slate-600" : "bg-red-600 hover:bg-red-700"
-                  }`}
-                >
-                  {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setIsScreenSharing(!isScreenSharing)}
-                  className={`rounded-full w-10 h-10 ${
-                    isScreenSharing
-                      ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-slate-700 hover:bg-slate-600"
-                  }`}
-                >
-                  <Monitor className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-white hover:bg-slate-700 rounded-full"
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                >
-                  {isFullscreen ? (
-                    <Minimize2 className="w-4 h-4" />
-                  ) : (
-                    <Maximize2 className="w-4 h-4" />
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-white hover:bg-slate-700 rounded-full"
-                >
-                  <Settings className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700 rounded-full px-6 font-bold text-xs"
-                  onClick={onEncerrar}
-                >
-                  Encerrar Chamada
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-auto py-3 flex-col gap-1.5 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all"
-          >
-            <Share2 className="w-5 h-5" />
-            <span className="text-xs font-semibold">Compartilhar Exame</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all"
-          >
-            <FileText className="w-5 h-5" />
-            <span className="text-xs font-semibold">Gerar Receita</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-auto py-3 flex-col gap-1.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all"
-          >
-            <Camera className="w-5 h-5" />
-            <span className="text-xs font-semibold">Capturar Imagem</span>
-          </Button>
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-900/90 backdrop-blur-sm border-b border-white/5 shrink-0">
+        {/* Avatar */}
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+          <span className="text-white font-bold text-xs">{initials}</span>
         </div>
+
+        {/* Patient info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-white font-bold text-sm leading-none truncate">{patient.name}</h2>
+            <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] px-1.5 py-0 shrink-0 leading-5">
+              Em Consulta
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            <span className="text-slate-400 text-[11px]">{patient.age} anos · {patient.bloodType}</span>
+            {vitals.map((v, i) => (
+              <span key={i} className="text-[11px]">
+                <span className={`font-semibold ${v.iconColor}`}>{v.label}</span>
+                <span className="text-slate-500 ml-0.5">{v.value}{v.unit}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Timer */}
+        <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-3 py-1.5 shrink-0 border border-white/5">
+          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+          <span className="text-white font-mono font-bold text-sm tabular-nums">{sessionDuration}</span>
+        </div>
+
+        {/* Connection quality */}
+        <div className={`flex items-center gap-1.5 shrink-0 ${quality.color}`}>
+          <Wifi className="w-3.5 h-3.5" />
+          <span className="text-xs font-medium">{quality.label}</span>
+        </div>
+
+        {/* Copy patient link */}
+        {patientLink && (
+          <button
+            onClick={copyLink}
+            className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 text-xs font-medium transition-all shrink-0"
+          >
+            {linkCopied ? (
+              <><CheckCircle2 className="w-3.5 h-3.5" />Copiado!</>
+            ) : (
+              <><Link2 className="w-3.5 h-3.5" />Link do paciente</>
+            )}
+          </button>
+        )}
+
+        {/* Settings */}
+        <button className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-all shrink-0">
+          <Settings className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Right Sidebar — Chat & Transcription */}
-      <div className="col-span-4 space-y-3">
-        {/* Patient Info */}
-        <Card className="border-slate-200 shadow-lg shadow-blue-100/50 overflow-hidden">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                <User className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-slate-800 text-sm">{patient.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {patient.age} anos · {patient.bloodType}
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={onOpenResumoClinico}
-              size="sm"
-              variant="outline"
-              className="w-full h-8 mb-2 text-xs gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Resumo Clínico
-            </Button>
-            <div className="grid grid-cols-2 gap-1.5">
-              {vitals.slice(0, 2).map((v, idx) => {
-                const Icon = v.icon;
-                return (
-                  <div key={idx} className="bg-emerald-50 rounded-lg p-1.5 border border-emerald-200">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <Icon className="w-3 h-3 text-emerald-600" />
-                      <span className="text-xs text-emerald-700 font-bold">{v.label}</span>
-                    </div>
-                    <div className="text-sm font-bold text-slate-800">{v.value}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── Body ─────────────────────────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Tabs: Chat / Transcrição */}
-        <Card
-          className="border-slate-200 shadow-lg overflow-hidden flex flex-col"
-          style={{ height: "calc(100vh - 300px)" }}
-        >
-          <div className="flex border-b border-slate-200">
-            <button
-              onClick={() => setIsChatOpen(true)}
-              className={`flex-1 px-3 py-2 font-semibold text-xs transition-all ${
-                isChatOpen
-                  ? "bg-indigo-50 text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <MessageSquare className="w-3 h-3 inline mr-1.5" />
-              Chat
-            </button>
-            <button
-              onClick={() => setIsChatOpen(false)}
-              className={`flex-1 px-3 py-2 font-semibold text-xs transition-all relative ${
-                !isChatOpen
-                  ? "bg-blue-50 text-blue-600 border-b-2 border-blue-600"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <Mic className="w-3 h-3 inline mr-1.5" />
-              Transcrição
-              {!isChatOpen && isTranscribing && (
-                <div className="absolute top-1.5 right-1.5">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      isPaused ? "bg-amber-500" : "bg-emerald-500 animate-pulse"
-                    }`}
-                  />
+        {/* ── Left column: Video + Controls ─────────────────────────────── */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+          {/* Video area */}
+          <div className="flex-1 relative bg-slate-950 overflow-hidden">
+            {/* Patient placeholder */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-0">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-2xl shadow-emerald-500/20 animate-pulse">
+                <User className="w-12 h-12 text-white" />
+              </div>
+              <div className="text-center">
+                <p className="text-white font-bold text-base">{patient.name}</p>
+                <p className="text-slate-500 text-sm mt-0.5">Aguardando paciente conectar...</p>
+              </div>
+            </div>
+
+            {/* Remote video (patient) — covers placeholder */}
+            {remoteVideoRef && (
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover z-10"
+              />
+            )}
+
+            {/* Quality badge — top left */}
+            <div className="absolute top-3 left-3 z-20">
+              <div className={`flex items-center gap-1.5 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 ${quality.color}`}>
+                <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${quality.dot}`} />
+                <span className="text-xs font-semibold">{quality.label}</span>
+              </div>
+            </div>
+
+            {/* Doctor PiP — bottom right */}
+            <div className="absolute bottom-4 right-4 w-40 h-28 rounded-2xl overflow-hidden bg-slate-800 border-2 border-white/15 shadow-2xl z-20 group transition-transform hover:scale-105">
+              {/* Placeholder when camera off */}
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">{initials}</span>
                 </div>
+              </div>
+              {/* Local video (doctor) */}
+              {localVideoRef && (
+                <video
+                  ref={localVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
               )}
-            </button>
+              <div className="absolute bottom-1.5 inset-x-0 text-center z-10">
+                <span className="text-white text-[10px] font-semibold drop-shadow-sm">Você</span>
+              </div>
+            </div>
           </div>
 
-          {isChatOpen ? (
-            <>
-              <ScrollArea className="flex-1 p-3">
-                <div className="space-y-2">
-                  {chatMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.sender === "doctor" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg p-2 ${
+          {/* ── Controls bar ──────────────────────────────────────────────── */}
+          <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-900 border-t border-white/5 shrink-0 min-h-0">
+            {/* Left controls */}
+            <div className="flex items-center gap-2">
+              <ControlButton
+                active={isMicOn}
+                activeIcon={<Mic className="w-4 h-4" />}
+                inactiveIcon={<MicOff className="w-4 h-4" />}
+                label={isMicOn ? "Microfone" : "Mudo"}
+                danger={!isMicOn}
+                onClick={() => setIsMicOn(!isMicOn)}
+              />
+              <ControlButton
+                active={isCameraOn}
+                activeIcon={<Video className="w-4 h-4" />}
+                inactiveIcon={<VideoOff className="w-4 h-4" />}
+                label={isCameraOn ? "Câmera" : "Câmera off"}
+                danger={!isCameraOn}
+                onClick={() => setIsCameraOn(!isCameraOn)}
+              />
+              <ControlButton
+                active={!isScreenSharing}
+                activeIcon={<Monitor className="w-4 h-4" />}
+                inactiveIcon={<Monitor className="w-4 h-4" />}
+                label="Compartilhar"
+                accent={isScreenSharing}
+                onClick={() => setIsScreenSharing(!isScreenSharing)}
+              />
+              <ControlButton
+                active
+                activeIcon={isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                inactiveIcon={<Maximize2 className="w-4 h-4" />}
+                label={isFullscreen ? "Sair tela cheia" : "Tela cheia"}
+                onClick={() => setIsFullscreen(!isFullscreen)}
+              />
+            </div>
+
+            {/* End call */}
+            <button
+              onClick={onEncerrar}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-red-600/30"
+            >
+              <Phone className="w-4 h-4 rotate-[135deg]" />
+              Encerrar Consulta
+            </button>
+          </div>
+        </div>
+
+        {/* ── Right Sidebar ─────────────────────────────────────────────── */}
+        <div className="w-72 bg-slate-900 border-l border-white/5 flex flex-col overflow-hidden shrink-0">
+
+          {/* Tab bar */}
+          <div className="flex shrink-0 border-b border-white/5">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 flex flex-col items-center gap-1 py-2 text-[11px] font-semibold transition-all ${
+                  activeTab === tab.id
+                    ? "text-blue-400 border-b-2 border-blue-400 bg-blue-500/5"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/5"
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content wrapper — fills remaining sidebar height */}
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+
+          {/* ── Chat tab ────────────────────────────────────────────────── */}
+          {activeTab === "chat" && (
+            <div className="flex flex-col h-full overflow-hidden">
+              <ScrollArea className="flex-1 min-h-0 p-3">
+                {chatMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <MessageSquare className="w-8 h-8 text-slate-700 mb-2" />
+                    <p className="text-slate-600 text-xs font-medium">Nenhuma mensagem</p>
+                    <p className="text-slate-700 text-xs mt-0.5">Escreva abaixo para começar</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {chatMessages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.sender === "doctor" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[85%] rounded-xl px-3 py-2 ${
                           msg.sender === "doctor"
-                            ? "bg-gradient-to-br from-blue-600 to-indigo-600 text-white"
-                            : "bg-slate-100 text-slate-800"
-                        }`}
-                      >
-                        <p className="text-xs leading-relaxed">{msg.text}</p>
-                        <span
-                          className={`text-xs mt-0.5 block ${
-                            msg.sender === "doctor" ? "text-blue-100" : "text-slate-500"
-                          }`}
-                        >
-                          {msg.time}
-                        </span>
+                            ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white"
+                            : "bg-slate-800 text-slate-200 border border-white/5"
+                        }`}>
+                          {msg.sender !== "doctor" && (
+                            <p className="text-[10px] font-semibold text-slate-400 mb-0.5">Paciente</p>
+                          )}
+                          <p className="text-xs leading-relaxed">{msg.text}</p>
+                          <p className={`text-[10px] mt-1 ${msg.sender === "doctor" ? "text-blue-200" : "text-slate-500"}`}>
+                            {msg.time}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
-              <div className="p-2 border-t border-slate-200 bg-slate-50">
-                <div className="flex gap-1.5">
+              <div className="p-3 border-t border-white/5 shrink-0">
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Digite sua mensagem..."
-                    className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                    onKeyPress={(e) => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter" && chatMessage.trim()) {
+                        onSendMessage(chatMessage.trim());
                         setChatMessage("");
                       }
                     }}
+                    placeholder="Mensagem para o paciente..."
+                    className="flex-1 bg-slate-800 text-white placeholder-slate-600 text-xs px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-blue-500/50 transition-colors"
                   />
-                  <Button size="sm" className="rounded-lg bg-blue-600 hover:bg-blue-700 px-3">
-                    <Send className="w-3 h-3" />
-                  </Button>
+                  <button
+                    onClick={() => {
+                      if (chatMessage.trim()) {
+                        onSendMessage(chatMessage.trim());
+                        setChatMessage("");
+                      }
+                    }}
+                    className="w-8 h-8 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center text-white transition-colors shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
-            </>
-          ) : (
-            <>
-              {/* Transcrição Controls */}
-              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-1.5">
-                  {!isTranscribing && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-50 border border-blue-200">
-                      <Sparkles className="w-3 h-3 text-blue-600" />
-                      <span className="text-xs text-blue-700 font-medium">Análise: OpenAI GPT</span>
+            </div>
+          )}
+
+          {/* ── Transcript tab ───────────────────────────────────────────── */}
+          {activeTab === "transcript" && (
+            <div className="flex flex-col h-full overflow-hidden">
+              {/* Controls */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-2">
+                  {isTranscribing ? (
+                    <div className={`flex items-center gap-1.5 text-xs font-semibold ${isPaused ? "text-amber-400" : "text-emerald-400"}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${isPaused ? "bg-amber-400" : "bg-emerald-400 animate-pulse"}`} />
+                      {isPaused ? "Pausado" : "Ao vivo"}
                     </div>
-                  )}
-                  {isTranscribing && (
-                    <div
-                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${
-                        isPaused
-                          ? "bg-amber-50 text-amber-700 border-amber-200"
-                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      }`}
-                    >
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          isPaused ? "bg-amber-500" : "bg-emerald-500 animate-pulse"
-                        }`}
-                      />
-                      <span className="font-medium">{isPaused ? "Pausado" : "Ao vivo"}</span>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-blue-400" />
+                      <span className="text-blue-400 text-xs font-medium">GPT-4o</span>
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-1">
                   {!isTranscribing ? (
-                    <Button
+                    <button
                       onClick={startTranscription}
-                      size="sm"
-                      className="h-6 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
+                      className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors"
                     >
                       <Play className="w-2.5 h-2.5" fill="currentColor" />
                       Iniciar
-                    </Button>
+                    </button>
                   ) : isPaused ? (
                     <>
-                      <Button
+                      <button
                         onClick={resumeTranscription}
-                        size="sm"
-                        className="h-6 px-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
+                        className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2 py-1 rounded-lg transition-colors"
                       >
                         <Play className="w-2.5 h-2.5" fill="currentColor" />
                         Retomar
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          await stopTranscription();
-                          setTimeout(() => handleProcessTranscription(), 1000);
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="h-6 w-6 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                      </button>
+                      <button
+                        onClick={async () => { await stopTranscription(); setTimeout(handleProcessTranscription, 500); }}
+                        className="w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                       >
                         <Square className="w-2.5 h-2.5" fill="currentColor" />
-                      </Button>
+                      </button>
                     </>
                   ) : (
                     <>
-                      <Button
+                      <button
                         onClick={pauseTranscription}
-                        size="sm"
-                        variant="outline"
-                        className="h-6 w-6 p-0 border-amber-300 text-amber-600 hover:bg-amber-50"
+                        className="w-6 h-6 flex items-center justify-center text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
                       >
                         <Pause className="w-2.5 h-2.5" fill="currentColor" />
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          await stopTranscription();
-                          setTimeout(() => handleProcessTranscription(), 1000);
-                        }}
-                        size="sm"
-                        variant="outline"
-                        className="h-6 w-6 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                      </button>
+                      <button
+                        onClick={async () => { await stopTranscription(); setTimeout(handleProcessTranscription, 500); }}
+                        className="w-6 h-6 flex items-center justify-center text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                       >
                         <Square className="w-2.5 h-2.5" fill="currentColor" />
-                      </Button>
+                      </button>
                     </>
                   )}
                 </div>
               </div>
 
-              <ScrollArea className="flex-1 p-3">
-                <div className="space-y-2">
-                  {transcription.length === 0 && !isTranscribing && (
-                    <div className="text-center py-4">
-                      <Mic className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                      <p className="text-xs text-slate-500">Nenhuma transcrição ainda</p>
-                    </div>
-                  )}
+              <ScrollArea className="flex-1 min-h-0 p-3">
+                {transcription.length === 0 && !isTranscribing && (
+                  <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <Mic className="w-8 h-8 text-slate-700 mb-2" />
+                    <p className="text-slate-600 text-xs font-medium">Nenhuma transcrição</p>
+                    <p className="text-slate-700 text-xs mt-0.5">Clique em Iniciar para começar</p>
+                  </div>
+                )}
+                <div className="space-y-3">
                   {transcription.map((entry, idx) => (
-                    <div key={idx} className="space-y-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <Badge
-                          className={`text-xs ${
-                            entry.speaker === "Médico"
-                              ? "bg-blue-600 text-white"
-                              : "bg-slate-600 text-white"
-                          }`}
-                        >
+                    <div key={idx}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          entry.speaker === "Médico"
+                            ? "bg-blue-500/20 text-blue-400"
+                            : "bg-slate-700 text-slate-400"
+                        }`}>
                           {entry.speaker}
-                        </Badge>
-                        <span className="text-xs text-slate-400 font-mono">{entry.time}</span>
-                        {entry.isPartial && (
-                          <span className="text-xs text-blue-500 font-medium">(digitando...)</span>
-                        )}
+                        </span>
+                        <span className="text-[10px] text-slate-600 font-mono">{entry.time}</span>
+                        {entry.isPartial && <span className="text-[10px] text-blue-500">(digitando...)</span>}
                       </div>
-                      <p
-                        className={`text-xs text-slate-700 leading-relaxed pl-1.5 border-l-2 ${
-                          entry.isPartial
-                            ? "border-blue-200 border-dashed opacity-75"
-                            : "border-blue-200"
-                        }`}
-                      >
+                      <p className={`text-xs text-slate-300 leading-relaxed pl-2 border-l ${
+                        entry.isPartial ? "border-blue-500/30 border-dashed opacity-60" : "border-blue-500/20"
+                      }`}>
                         {entry.text}
                       </p>
                     </div>
                   ))}
                   {isTranscribing && transcription.length === 0 && (
-                    <div className="flex items-center gap-1.5 text-blue-600 animate-pulse">
-                      <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                      <span className="text-xs font-medium">Transcrevendo...</span>
+                    <div className="flex items-center gap-2 text-blue-400 animate-pulse">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                      <span className="text-xs">Transcrevendo...</span>
                     </div>
                   )}
                 </div>
               </ScrollArea>
-            </>
+            </div>
           )}
-        </Card>
-      </div>
+
+          {/* ── IA Clínica tab ───────────────────────────────────────────── */}
+          {activeTab === "ai" && (
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {/* Info card */}
+              <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border border-blue-500/20 rounded-xl p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 rounded-md bg-blue-500/20 flex items-center justify-center">
+                    <Brain className="w-3.5 h-3.5 text-blue-400" />
+                  </div>
+                  <span className="text-blue-400 font-semibold text-xs">IA Clínica — GPT-4o</span>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Analise a transcrição em tempo real para obter resumo clínico, hipóteses diagnósticas e sugestões de conduta.
+                </p>
+              </div>
+
+              {/* Analyze button */}
+              <button
+                onClick={async () => {
+                  setIsProcessingAi(true);
+                  await handleProcessTranscription();
+                  setIsProcessingAi(false);
+                }}
+                disabled={isProcessingAi || transcription.length === 0}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white font-semibold text-xs py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20"
+              >
+                {isProcessingAi ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Analisando transcrição...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Analisar com IA
+                  </>
+                )}
+              </button>
+
+              {/* Prontuário link */}
+              <button
+                onClick={onOpenResumoClinico}
+                className="w-full flex items-center justify-center gap-2 border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium py-2.5 rounded-xl transition-all"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Abrir prontuário completo
+              </button>
+
+              {transcription.length === 0 && (
+                <div className="bg-slate-800/50 border border-white/5 rounded-xl p-3 text-center">
+                  <p className="text-slate-500 text-xs">
+                    Ative a transcrição na aba <span className="text-slate-400 font-semibold">Trans.</span> para habilitar a análise por IA.
+                  </p>
+                </div>
+              )}
+
+              {/* Vitals */}
+              <div>
+                <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-2">Sinais Vitais</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {vitals.map((v, i) => {
+                    const Icon = v.icon;
+                    return (
+                      <div key={i} className="bg-slate-800/60 border border-white/5 rounded-lg p-2">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Icon className={`w-3 h-3 ${v.iconColor}`} />
+                          <span className={`text-[10px] font-bold ${v.iconColor}`}>{v.label}</span>
+                        </div>
+                        <p className="text-white text-sm font-bold leading-none">
+                          {v.value}
+                          <span className="text-slate-500 text-[10px] ml-0.5">{v.unit}</span>
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Documentos tab ───────────────────────────────────────────── */}
+          {activeTab === "docs" && (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-3">Ações Rápidas</p>
+
+              {([
+                { icon: Pill, label: "Receita Médica", desc: "Prescrever medicamentos", color: "blue" },
+                { icon: ClipboardList, label: "Pedido de Exame", desc: "Solicitar exames diagnósticos", color: "purple" },
+                { icon: FilePlus, label: "Atestado Médico", desc: "Gerar atestado de saúde", color: "emerald" },
+                { icon: Stethoscope, label: "Encaminhamento", desc: "Encaminhar para especialista", color: "amber" },
+                { icon: FileText, label: "Prontuário", desc: "Abrir ficha completa do paciente", color: "slate" },
+              ] as const).map((action, i) => {
+                const Icon = action.icon;
+                const colorMap = {
+                  blue: "bg-blue-500/15 text-blue-400",
+                  purple: "bg-purple-500/15 text-purple-400",
+                  emerald: "bg-emerald-500/15 text-emerald-400",
+                  amber: "bg-amber-500/15 text-amber-400",
+                  slate: "bg-slate-700 text-slate-400",
+                };
+                return (
+                  <button
+                    key={i}
+                    onClick={action.label === "Prontuário" ? onOpenResumoClinico : undefined}
+                    className="w-full flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-white/10 rounded-xl p-3 text-left transition-all group"
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorMap[action.color]}`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-200 text-xs font-semibold">{action.label}</p>
+                      <p className="text-slate-500 text-[11px] truncate">{action.desc}</p>
+                    </div>
+                    <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          </div>{/* end tab content wrapper */}
+        </div>{/* end sidebar */}
+      </div>{/* end body */}
     </div>
+  );
+}
+
+// ─── ControlButton helper ─────────────────────────────────────────────────────
+
+function ControlButton({
+  active,
+  activeIcon,
+  inactiveIcon,
+  label,
+  danger,
+  accent,
+  onClick,
+}: {
+  active: boolean;
+  activeIcon: React.ReactNode;
+  inactiveIcon: React.ReactNode;
+  label: string;
+  danger?: boolean;
+  accent?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap shrink-0 ${
+        danger
+          ? "bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25"
+          : accent
+          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25"
+          : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-white/5"
+      }`}
+    >
+      {active ? activeIcon : inactiveIcon}
+      <span className="hidden lg:inline leading-none">{label}</span>
+    </button>
   );
 }

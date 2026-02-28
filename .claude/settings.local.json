@@ -19,7 +19,8 @@
       "Bash(wc:*)",
       "Bash(python3:*)",
       "Bash(head:*)",
-      "Bash(tail:*)"
+      "Bash(tail:*)",
+      "Bash(xargs grep -l \"iniciar\\\\|atendimento\\\\|consulta\")"
     ]
   }
 }
