@@ -33,6 +33,12 @@ interface Estatisticas {
   receitaTotal: number;
 }
 
+interface ChartsData {
+  faturamentoParticular: { semanas: { label: string; valor: number }[]; hoje: number; mes: number };
+  consultasFinalizadas: { mes: string; realizadas: number; faltas: number; cancelamentos: number }[];
+  convenios: { convenio: string; valor: number }[];
+}
+
 const faturamentoConfig: ChartConfig = {
   valor: {
     label: "Faturamento",
@@ -55,77 +61,26 @@ const consultasConfig: ChartConfig = {
   },
 };
 
-const conveniosConfig: ChartConfig = {
-  unimed: {
-    label: "Unimed",
-    color: "#334155",
-  },
-  bradesco: {
-    label: "Bradesco Saúde",
-    color: "#7dd3fc",
-  },
-  sulamerica: {
-    label: "SulAmérica",
-    color: "#38bdf8",
-  },
-  amil: {
-    label: "Amil",
-    color: "#94a3b8",
-  },
-  particular: {
-    label: "Particular",
-    color: "#cbd5e1",
-  },
-};
 
-const mockFaturamento = {
-  semanas: [
-    { label: "Sem 1", valor: 4200.00 },
-    { label: "Sem 2", valor: 5650.50 },
-    { label: "Sem 3", valor: 3800.00 },
-    { label: "Sem 4", valor: 6100.75 },
-    { label: "Sem 5", valor: 2050.00 },
-  ],
-  hoje: 1250.00,
-  mes: 21800.25,
-};
-
-const mockConsultas = [
-  { mes: "set", realizadas: 52, faltas: 6, cancelamentos: 4 },
-  { mes: "out", realizadas: 48, faltas: 8, cancelamentos: 3 },
-  { mes: "nov", realizadas: 58, faltas: 5, cancelamentos: 7 },
-  { mes: "dez", realizadas: 42, faltas: 10, cancelamentos: 5 },
-  { mes: "jan", realizadas: 62, faltas: 4, cancelamentos: 6 },
-  { mes: "fev", realizadas: 38, faltas: 3, cancelamentos: 2 },
-];
-
-const mockConvenios = [
-  { convenio: "unimed", valor: 145 },
-  { convenio: "bradesco", valor: 98 },
-  { convenio: "sulamerica", valor: 72 },
-  { convenio: "amil", valor: 54 },
-  { convenio: "particular", valor: 86 },
-];
 
 export function SecretariaContent({ nome }: SecretariaContentProps) {
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
+  const [chartsData, setChartsData] = useState<ChartsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingCharts, setLoadingCharts] = useState(true);
 
   useEffect(() => {
-    const fetchEstatisticas = async () => {
-      try {
-        const response = await fetch("/api/secretaria/dashboard/estatisticas");
-        if (!response.ok) throw new Error("Erro ao carregar estatísticas");
-        const data = await response.json();
-        setEstatisticas(data);
-      } catch (error) {
-        console.error("Erro ao carregar estatísticas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetch("/api/secretaria/dashboard/estatisticas")
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setEstatisticas)
+      .catch((e) => console.error("Erro estatísticas:", e))
+      .finally(() => setLoading(false));
 
-    fetchEstatisticas();
+    fetch("/api/secretaria/dashboard/charts")
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setChartsData)
+      .catch((e) => console.error("Erro charts:", e))
+      .finally(() => setLoadingCharts(false));
   }, []);
 
   return (
@@ -156,20 +111,23 @@ export function SecretariaContent({ nome }: SecretariaContentProps) {
                   <div className="text-right">
                     <p className="text-[10px] text-slate-400 uppercase tracking-wider">Hoje</p>
                     <p className="text-xs font-semibold text-slate-700">
-                      R$ {mockFaturamento.hoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {(chartsData?.faturamentoParticular.hoje ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="w-px h-6 bg-slate-200" />
                   <div className="text-right">
                     <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mês</p>
                     <p className="text-xs font-semibold text-slate-700">
-                      R$ {mockFaturamento.mes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {(chartsData?.faturamentoParticular.mes ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
               </div>
+              {loadingCharts ? (
+                <div className="h-[220px] animate-pulse rounded-md bg-slate-100" />
+              ) : (
               <ChartContainer config={faturamentoConfig} className="h-[220px] w-full">
-                <BarChart data={mockFaturamento.semanas}>
+                <BarChart data={chartsData?.faturamentoParticular.semanas ?? []}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="label"
@@ -197,6 +155,7 @@ export function SecretariaContent({ nome }: SecretariaContentProps) {
                   <Bar dataKey="valor" fill="var(--color-valor)" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ChartContainer>
+              )}
             </div>
 
             {/* Consultas Finalizadas - Barras Empilhadas */}
@@ -205,8 +164,11 @@ export function SecretariaContent({ nome }: SecretariaContentProps) {
                 <h3 className="text-sm font-semibold text-slate-800">Consultas Finalizadas</h3>
                 <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
               </div>
+              {loadingCharts ? (
+                <div className="h-[220px] animate-pulse rounded-md bg-slate-100" />
+              ) : (
               <ChartContainer config={consultasConfig} className="h-[220px] w-full">
-                <BarChart data={mockConsultas} barGap={0}>
+                <BarChart data={chartsData?.consultasFinalizadas ?? []} barGap={0}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="mes"
@@ -226,63 +188,54 @@ export function SecretariaContent({ nome }: SecretariaContentProps) {
                   <Bar dataKey="cancelamentos" stackId="a" fill="var(--color-cancelamentos)" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ChartContainer>
+              )}
               <div className="flex items-center justify-center gap-4 pt-3">
                 {(["realizadas", "faltas", "cancelamentos"] as const).map((key) => (
                   <div key={key} className="flex items-center gap-1.5 text-xs">
-                    <div
-                      className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                      style={{ backgroundColor: `var(--color-${key})` }}
-                    />
+                    <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: `var(--color-${key})` }} />
                     <span className="text-muted-foreground capitalize">{consultasConfig[key].label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Principais Convênios - Pizza */}
+            {/* Principais Convênios — dados reais */}
             <div className="rounded-lg border border-border/50 bg-card p-5">
               <div className="mb-4">
                 <h3 className="text-sm font-semibold text-slate-800">Principais Convênios</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Distribuição de atendimentos</p>
+                <p className="text-xs text-slate-400 mt-0.5">Distribuição de atendimentos no mês</p>
               </div>
-              <ChartContainer config={conveniosConfig} className="h-[220px] w-full">
-                <PieChart>
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent hideLabel />}
-                  />
-                  <Pie
-                    data={mockConvenios}
-                    dataKey="valor"
-                    nameKey="convenio"
-                    innerRadius={45}
-                    outerRadius={85}
-                    strokeWidth={2}
-                    stroke="#fff"
-                  >
-                    {mockConvenios.map((entry) => (
-                      <Cell
-                        key={entry.convenio}
-                        fill={`var(--color-${entry.convenio})`}
-                      />
+              {loadingCharts ? (
+                <div className="h-[220px] animate-pulse rounded-md bg-slate-100" />
+              ) : (chartsData?.convenios && chartsData.convenios.length > 0) ? (
+                <>
+                  <ChartContainer config={{}} className="h-[180px] w-full">
+                    <PieChart>
+                      <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                      <Pie data={chartsData.convenios} dataKey="valor" nameKey="convenio"
+                        innerRadius={45} outerRadius={75} strokeWidth={2} stroke="#fff">
+                        {chartsData.convenios.map((_, i) => (
+                          <Cell key={i} fill={["#6366f1","#0ea5e9","#10b981","#f59e0b","#f43f5e"][i % 5]} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ChartContainer>
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    {chartsData.convenios.map((entry, i) => (
+                      <div key={entry.convenio} className="flex items-center gap-1.5 text-xs">
+                        <div className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                          style={{ backgroundColor: ["#6366f1","#0ea5e9","#10b981","#f59e0b","#f43f5e"][i % 5] }} />
+                        <span className="text-muted-foreground">{entry.convenio}</span>
+                        <span className="font-medium text-slate-600">({entry.valor})</span>
+                      </div>
                     ))}
-                  </Pie>
-                </PieChart>
-              </ChartContainer>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-3">
-                {mockConvenios.map((entry) => {
-                  const config = conveniosConfig[entry.convenio as keyof typeof conveniosConfig];
-                  return (
-                    <div key={entry.convenio} className="flex items-center gap-1.5 text-xs">
-                      <div
-                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-                        style={{ backgroundColor: `var(--color-${entry.convenio})` }}
-                      />
-                      <span className="text-muted-foreground">{config?.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[220px] items-center justify-center text-sm text-slate-400">
+                  Nenhum atendimento este mês
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -79,64 +79,30 @@ const faturamentoConfig: ChartConfig = {
   },
 };
 
-const mockChartData: ChartData = {
-  presencialVsTele: [
-    { mes: "set", presencial: 42, telemedicina: 18 },
-    { mes: "out", presencial: 38, telemedicina: 22 },
-    { mes: "nov", presencial: 45, telemedicina: 25 },
-    { mes: "dez", presencial: 35, telemedicina: 20 },
-    { mes: "jan", presencial: 48, telemedicina: 28 },
-    { mes: "fev", presencial: 30, telemedicina: 15 },
-  ],
-  noShowPorMes: [
-    { mes: "set", taxa: 12, canceladas: 7, total: 60 },
-    { mes: "out", taxa: 10, canceladas: 6, total: 60 },
-    { mes: "nov", taxa: 14, canceladas: 10, total: 70 },
-    { mes: "dez", taxa: 8, canceladas: 4, total: 55 },
-    { mes: "jan", taxa: 11, canceladas: 8, total: 76 },
-    { mes: "fev", taxa: 7, canceladas: 3, total: 45 },
-  ],
-  tempoMedioPorMes: [
-    { mes: "set", minutos: 28 },
-    { mes: "out", minutos: 32 },
-    { mes: "nov", minutos: 25 },
-    { mes: "dez", minutos: 30 },
-    { mes: "jan", minutos: 27 },
-    { mes: "fev", minutos: 29 },
-  ],
-  faturamentoParticular: {
-    semanas: [
-      { label: "Sem 1", valor: 3200.00 },
-      { label: "Sem 2", valor: 4850.50 },
-      { label: "Sem 3", valor: 2900.00 },
-      { label: "Sem 4", valor: 5100.75 },
-      { label: "Sem 5", valor: 1450.00 },
-    ],
-    hoje: 850.00,
-    mes: 17500.25,
-  },
-};
 
 export function MedicoContent({ nome }: MedicoContentProps) {
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
-  const [chartData] = useState<ChartData>(mockChartData);
+  const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingCharts, setLoadingCharts] = useState(true);
 
   useEffect(() => {
-    const fetchEstatisticas = async () => {
-      try {
-        const response = await fetch("/api/medico/dashboard/estatisticas");
-        if (!response.ok) throw new Error("Erro ao carregar estatísticas");
-        const data = await response.json();
-        setEstatisticas(data);
-      } catch (error) {
-        console.error("Erro ao carregar estatísticas:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetch("/api/medico/dashboard/estatisticas")
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setEstatisticas)
+      .catch((e) => console.error("Erro estatísticas:", e))
+      .finally(() => setLoading(false));
 
-    fetchEstatisticas();
+    fetch("/api/medico/dashboard/charts")
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((json) => setChartData({
+        presencialVsTele: json.presencialVsTele ?? [],
+        noShowPorMes: json.noShowPorMes ?? [],
+        tempoMedioPorMes: json.tempoMedioPorMes ?? [],
+        faturamentoParticular: json.faturamentoParticular ?? { semanas: [], hoje: 0, mes: 0 },
+      }))
+      .catch((e) => console.error("Erro charts:", e))
+      .finally(() => setLoadingCharts(false));
   }, []);
 
   const primeiroNome = nome.split(" ")[0];
@@ -158,6 +124,14 @@ export function MedicoContent({ nome }: MedicoContentProps) {
         {/* Charts */}
         <div className="px-4 lg:px-6 pt-3 pb-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {loadingCharts && (
+              <>
+                {[1,2,3,4].map((i) => (
+                  <div key={i} className="rounded-lg border border-border/50 bg-card p-3 h-[290px] animate-pulse" />
+                ))}
+              </>
+            )}
+            {!loadingCharts && chartData && (<>
               {/* Consultas Presenciais × Telemedicina */}
               <div className="rounded-lg border border-border/50 bg-card p-3">
                 <div className="mb-3">
@@ -165,7 +139,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                   <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
                 </div>
                 <ChartContainer config={presencialTeleConfig} className="h-[220px] w-full">
-                  <BarChart data={chartData.presencialVsTele} barGap={2}>
+                  <BarChart data={chartData!.presencialVsTele} barGap={2}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis
                       dataKey="mes"
@@ -194,12 +168,12 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                     <h3 className="text-xs font-semibold text-slate-800">Taxa de Faltas</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Percentual de no-show por mês</p>
                   </div>
-                  {chartData.noShowPorMes.length > 0 && (
+                  {chartData!.noShowPorMes.length > 0 && (
                     <div className="flex items-center gap-1.5 text-xs">
                       {(() => {
-                        const ultimo = chartData.noShowPorMes[chartData.noShowPorMes.length - 1];
-                        const penultimo = chartData.noShowPorMes.length > 1
-                          ? chartData.noShowPorMes[chartData.noShowPorMes.length - 2]
+                        const ultimo = chartData!.noShowPorMes[chartData!.noShowPorMes.length - 1];
+                        const penultimo = chartData!.noShowPorMes.length > 1
+                          ? chartData!.noShowPorMes[chartData!.noShowPorMes.length - 2]
                           : null;
                         const diff = penultimo ? ultimo.taxa - penultimo.taxa : 0;
                         return diff <= 0 ? (
@@ -216,7 +190,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                   )}
                 </div>
                 <ChartContainer config={noShowConfig} className="h-[220px] w-full">
-                  <AreaChart data={chartData.noShowPorMes}>
+                  <AreaChart data={chartData!.noShowPorMes}>
                     <defs>
                       <linearGradient id="noShowGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#334155" stopOpacity={0.15} />
@@ -262,17 +236,17 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                     <h3 className="text-xs font-semibold text-slate-800">Tempo Médio de Consulta</h3>
                     <p className="text-xs text-slate-400 mt-0.5">Duração média em minutos</p>
                   </div>
-                  {chartData.tempoMedioPorMes.length > 0 && (
+                  {chartData!.tempoMedioPorMes.length > 0 && (
                     <div className="flex items-center gap-1.5 rounded-md bg-slate-100 px-2 py-1">
                       <Clock className="h-3 w-3 text-slate-500" />
                       <span className="text-xs font-medium text-slate-600">
-                        {chartData.tempoMedioPorMes[chartData.tempoMedioPorMes.length - 1]?.minutos || 0} min
+                        {chartData!.tempoMedioPorMes[chartData!.tempoMedioPorMes.length - 1]?.minutos || 0} min
                       </span>
                     </div>
                   )}
                 </div>
                 <ChartContainer config={tempoConfig} className="h-[220px] w-full">
-                  <LineChart data={chartData.tempoMedioPorMes}>
+                  <LineChart data={chartData!.tempoMedioPorMes}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis
                       dataKey="mes"
@@ -317,20 +291,20 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                     <div className="text-right">
                       <p className="text-[10px] text-slate-400 uppercase tracking-wider">Hoje</p>
                       <p className="text-xs font-semibold text-slate-700">
-                        R$ {chartData.faturamentoParticular.hoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {chartData!.faturamentoParticular.hoje.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                     <div className="w-px h-6 bg-slate-200" />
                     <div className="text-right">
                       <p className="text-[10px] text-slate-400 uppercase tracking-wider">Mês</p>
                       <p className="text-xs font-semibold text-slate-700">
-                        R$ {chartData.faturamentoParticular.mes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {chartData!.faturamentoParticular.mes.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </p>
                     </div>
                   </div>
                 </div>
                 <ChartContainer config={faturamentoConfig} className="h-[220px] w-full">
-                  <BarChart data={chartData.faturamentoParticular.semanas}>
+                  <BarChart data={chartData!.faturamentoParticular.semanas}>
                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis
                       dataKey="label"
@@ -359,6 +333,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                   </BarChart>
                 </ChartContainer>
               </div>
+            </>)}
             </div>
         </div>
       </div>

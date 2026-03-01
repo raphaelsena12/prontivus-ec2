@@ -23,6 +23,7 @@ import {
   IconLayoutGrid,
   IconCheck,
   IconHistory,
+  IconReportAnalytics,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -129,6 +130,44 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Fluxo de Caixa",
           url: "/admin-clinica/fluxo-caixa",
           icon: IconCash,
+        },
+      ],
+    });
+
+    categories.push({
+      title: "Relatórios",
+      icon: IconReportAnalytics,
+      defaultOpen: false,
+      items: [
+        {
+          title: "Faturamento",
+          url: "/admin-clinica/relatorios/faturamento",
+          icon: IconReportAnalytics,
+        },
+        {
+          title: "Vendas",
+          url: "/admin-clinica/relatorios/vendas",
+          icon: IconReportAnalytics,
+        },
+        {
+          title: "Faturamento por Médico",
+          url: "/admin-clinica/relatorios/faturamento-medico",
+          icon: IconReportAnalytics,
+        },
+        {
+          title: "Estoque (Movimentação)",
+          url: "/admin-clinica/relatorios/estoque",
+          icon: IconReportAnalytics,
+        },
+        {
+          title: "Contas a Pagar",
+          url: "/admin-clinica/relatorios/contas-pagar",
+          icon: IconReportAnalytics,
+        },
+        {
+          title: "Contas a Receber",
+          url: "/admin-clinica/relatorios/contas-receber",
+          icon: IconReportAnalytics,
         },
       ],
     });
