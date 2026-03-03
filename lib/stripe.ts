@@ -55,3 +55,11 @@ export const PLANOS_STRIPE = {
 } as const;
 
 export type PlanoKey = keyof typeof PLANOS_STRIPE;
+
+// IDs de preço do Stripe para upgrade/downgrade (configurar em .env)
+// STRIPE_PRICE_ID_BASICO, STRIPE_PRICE_ID_INTERMEDIARIO, STRIPE_PRICE_ID_PROFISSIONAL
+export const STRIPE_PRICE_IDS: Record<PlanoKey, string | undefined> = {
+  BASICO: process.env.STRIPE_PRICE_ID_BASICO,
+  INTERMEDIARIO: process.env.STRIPE_PRICE_ID_INTERMEDIARIO,
+  PROFISSIONAL: process.env.STRIPE_PRICE_ID_PROFISSIONAL,
+};

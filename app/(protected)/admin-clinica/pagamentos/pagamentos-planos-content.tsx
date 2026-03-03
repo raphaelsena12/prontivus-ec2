@@ -36,6 +36,8 @@ import {
   DollarSign,
   AlertCircle,
   Zap,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import {
   Select,
@@ -108,6 +110,7 @@ export function PagamentosPlanosContent({ data }: PagamentosPlanosContentProps) 
     typeof data.planos[0] | null
   >(null);
   const [isAlterando, setIsAlterando] = useState(false);
+  const [isAbrindoPortal, setIsAbrindoPortal] = useState(false);
   const [dialogGerarPagamentoOpen, setDialogGerarPagamentoOpen] = useState(false);
   const [isGerandoPagamento, setIsGerandoPagamento] = useState(false);
   const [metodoPagamento, setMetodoPagamento] = useState<string>("PIX");
@@ -199,6 +202,21 @@ export function PagamentosPlanosContent({ data }: PagamentosPlanosContentProps) 
       toast.error(error.message || "Erro ao alterar plano");
     } finally {
       setIsAlterando(false);
+    }
+  };
+
+  const handlePortal = async () => {
+    setIsAbrindoPortal(true);
+    try {
+      const response = await fetch("/api/admin-clinica/assinatura/portal", {
+        method: "POST",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Erro ao abrir portal");
+      window.location.href = result.url;
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao abrir portal de assinatura");
+      setIsAbrindoPortal(false);
     }
   };
 
@@ -305,9 +323,24 @@ export function PagamentosPlanosContent({ data }: PagamentosPlanosContentProps) 
                 {getPlanoLabel(data.clinica.planoAtual.nome)}
               </CardDescription>
             </div>
-            <Badge variant="default" className="text-lg px-4 py-1">
-              {formatCurrency(data.clinica.planoAtual.preco)}/mês
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Badge variant="default" className="text-lg px-4 py-1">
+                {formatCurrency(data.clinica.planoAtual.preco)}/mês
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePortal}
+                disabled={isAbrindoPortal}
+              >
+                {isAbrindoPortal ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                )}
+                Gerenciar Assinatura
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -24,6 +24,9 @@ import {
   IconCheck,
   IconHistory,
   IconReportAnalytics,
+  IconFilePlus,
+  IconFiles,
+  IconStack2,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -196,6 +199,37 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
     });
   }
 
+  // Secretaria - categoria TISS colapsável
+  if (tipo === TipoUsuario.SECRETARIA) {
+    categories.push({
+      title: "TISS",
+      icon: IconStack2,
+      defaultOpen: false,
+      items: [
+        {
+          title: "Nova Guia",
+          url: "/secretaria/tiss/nova-guia",
+          icon: IconFilePlus,
+        },
+        {
+          title: "Guias",
+          url: "/secretaria/tiss/guias",
+          icon: IconFiles,
+        },
+        {
+          title: "Lotes",
+          url: "/secretaria/tiss/lotes",
+          icon: IconStack2,
+        },
+        {
+          title: "Relatórios",
+          url: "/secretaria/tiss/relatorios",
+          icon: IconReportAnalytics,
+        },
+      ],
+    });
+  }
+
   // Médico - Menu categorizado
   if (tipo === TipoUsuario.MEDICO) {
     // Categoria "Atendimento" removida - itens movidos para topItems
@@ -356,49 +390,20 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
   if (user.tipo === TipoUsuario.MEDICO && hasCategories) {
     // Para médicos, mostrar os itens principais no topo
     topItems = [
-      {
-        title: "Início",
-        url: "/dashboard",
-        icon: IconDashboard,
-      },
-      {
-        title: "Fila de Atendimento",
-        url: "/medico/fila-atendimento",
-        icon: IconList,
-      },
-      {
-        title: "Agendamentos",
-        url: "/medico/agendamentos",
-        icon: IconCalendar,
-      },
-      {
-        title: "Aprovações",
-        url: "/medico/aprovacoes",
-        icon: IconCheck,
-      },
-      {
-        title: "Prontuários",
-        url: "/medico/prontuarios",
-        icon: IconFileText,
-      },
-      {
-        title: "Fórmulas Manipuladas",
-        url: "/medico/manipulados",
-        icon: IconFlask,
-      },
-      {
-        title: "Grupos de Exames",
-        url: "/medico/grupos-exames",
-        icon: IconFileText,
-      },
+      { title: "Início", url: "/dashboard", icon: IconDashboard },
+      { title: "Fila de Atendimento", url: "/medico/fila-atendimento", icon: IconList },
+      { title: "Agendamentos", url: "/medico/agendamentos", icon: IconCalendar },
+      { title: "Aprovações", url: "/medico/aprovacoes", icon: IconCheck },
+      { title: "Prontuários", url: "/medico/prontuarios", icon: IconFileText },
+      { title: "Fórmulas Manipuladas", url: "/medico/manipulados", icon: IconFlask },
+      { title: "Grupos de Exames", url: "/medico/grupos-exames", icon: IconFileText },
     ];
+  } else if (user.tipo === TipoUsuario.SECRETARIA && hasCategories) {
+    // Para secretária, os itens principais ficam no topo e TISS fica colapsável
+    topItems = simpleMenuItems;
   } else if (hasCategories) {
     // Para outros tipos com categorias, apenas Início
-    topItems = [{
-      title: "Início",
-      url: "/dashboard",
-      icon: IconDashboard,
-    }];
+    topItems = [{ title: "Início", url: "/dashboard", icon: IconDashboard }];
   }
 
 

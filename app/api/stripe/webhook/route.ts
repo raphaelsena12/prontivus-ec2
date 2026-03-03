@@ -39,10 +39,17 @@ export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
-  // Se não houver STRIPE_WEBHOOK_SECRET, processar sem validação (desenvolvimento)
   let event: Stripe.Event;
+  const isProduction = process.env.NODE_ENV === "production";
 
-  if (process.env.STRIPE_WEBHOOK_SECRET && signature) {
+  if (process.env.STRIPE_WEBHOOK_SECRET) {
+    if (!signature) {
+      console.error("Webhook recebido sem assinatura Stripe");
+      return NextResponse.json(
+        { error: "Assinatura ausente" },
+        { status: 400 }
+      );
+    }
     try {
       event = stripe.webhooks.constructEvent(
         body,
@@ -56,8 +63,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+  } else if (isProduction) {
+    // Em produção, STRIPE_WEBHOOK_SECRET é obrigatório
+    console.error("STRIPE_WEBHOOK_SECRET não configurado em produção");
+    return NextResponse.json(
+      { error: "Configuração de webhook ausente" },
+      { status: 500 }
+    );
   } else {
-    // Modo de desenvolvimento - parse direto
+    // Modo de desenvolvimento sem secret configurado
     try {
       event = JSON.parse(body) as Stripe.Event;
     } catch (err) {
@@ -78,10 +92,13 @@ export async function POST(request: NextRequest) {
       }
       break;
     }
-    case "customer.subscription.created":
+    case "customer.subscription.created": {
+      console.log("Assinatura criada:", (event.data.object as Stripe.Subscription).id);
+      break;
+    }
     case "customer.subscription.updated": {
       const subscription = event.data.object as Stripe.Subscription;
-      console.log("Assinatura atualizada:", subscription.id);
+      await handleSubscriptionUpdated(subscription);
       break;
     }
     case "customer.subscription.deleted": {
@@ -304,6 +321,15 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
       return;
     }
 
+    // P1-5: Idempotência — ignorar se esta invoice de falha já foi registrada
+    const pagamentoExistente = await prisma.pagamento.findFirst({
+      where: { transacaoId: invoice.id },
+    });
+    if (pagamentoExistente) {
+      console.log("Invoice de falha já processada, ignorando:", invoice.id);
+      return;
+    }
+
     // Buscar clínica pelo stripeCustomerId
     const clinica = await prisma.tenant.findUnique({
       where: { stripeCustomerId: customerId },
@@ -324,17 +350,14 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
       return;
     }
 
-    // Suspender a clínica
-    await prisma.tenant.update({
-      where: { id: clinica.id },
-      data: { status: StatusClinica.SUSPENSA },
-    });
+    // P2-7: Período de graça — só suspende se o Stripe não vai mais tentar
+    // invoice.next_payment_attempt === null significa que não há mais retries
+    const stripeVaiRetentar = invoice.next_payment_attempt !== null;
 
-    console.log("Clínica suspensa:", clinica.id);
-
-    // Registrar falha no pagamento
     const dataVencimento = invoice.due_date
       ? new Date(invoice.due_date * 1000)
+      : invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000)
       : new Date();
 
     await prisma.pagamento.create({
@@ -346,14 +369,31 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         metodoPagamento: "CARTAO",
         transacaoId: invoice.id,
         dataVencimento,
-        observacoes: `Falha no pagamento - Invoice ID: ${invoice.id}`,
+        observacoes: stripeVaiRetentar
+          ? `Falha no pagamento (retry agendado) - Invoice ID: ${invoice.id}`
+          : `Falha no pagamento (sem mais retries) - Invoice ID: ${invoice.id}`,
       },
     });
 
+    if (!stripeVaiRetentar) {
+      // Stripe desistiu de cobrar — suspender a clínica
+      await prisma.tenant.update({
+        where: { id: clinica.id },
+        data: { status: StatusClinica.SUSPENSA },
+      });
+      console.log("Clínica suspensa (sem retries restantes):", clinica.id);
+    } else {
+      console.log(
+        "Falha de pagamento — Stripe vai retentar em:",
+        new Date(invoice.next_payment_attempt! * 1000).toISOString(),
+        "— clínica mantida ativa:",
+        clinica.id
+      );
+    }
+
     // Enviar email de falha
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const planoNome =
-      PLANO_NOMES[plano.nome] || plano.nome;
+    const planoNome = PLANO_NOMES[plano.nome] || plano.nome;
 
     try {
       const emailHtml = gerarEmailPagamentoFalha({
@@ -372,7 +412,9 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 
       await sendEmail({
         to: clinica.email,
-        subject: `Problema com seu pagamento - Prontivus`,
+        subject: stripeVaiRetentar
+          ? `Atenção: problema com seu pagamento - Prontivus`
+          : `Sua conta foi suspensa - Prontivus`,
         html: emailHtml,
         text: emailTexto,
         fromName: "Prontivus",
@@ -386,7 +428,7 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     console.log("============================================");
     console.log("PAGAMENTO FALHOU:");
     console.log("Clínica:", clinica.nome);
-    console.log("Email:", clinica.email);
+    console.log("Suspensa:", !stripeVaiRetentar);
     console.log("Invoice:", invoice.id);
     console.log("============================================");
   } catch (error) {
@@ -410,6 +452,15 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       return;
     }
 
+    // P1-5: Idempotência — ignorar se esta invoice já foi processada
+    const pagamentoExistente = await prisma.pagamento.findFirst({
+      where: { transacaoId: invoice.id },
+    });
+    if (pagamentoExistente) {
+      console.log("Invoice já processada, ignorando:", invoice.id);
+      return;
+    }
+
     // Buscar clínica pelo stripeCustomerId
     const clinica = await prisma.tenant.findUnique({
       where: { stripeCustomerId: customerId },
@@ -430,18 +481,13 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       return;
     }
 
-    // Verificar se a clínica estava suspensa
     const estavaSuspensa = clinica.status === StatusClinica.SUSPENSA;
 
-    // Reativar a clínica se necessário
-    if (estavaSuspensa) {
-      await prisma.tenant.update({
-        where: { id: clinica.id },
-        data: { status: StatusClinica.ATIVA },
-      });
-
-      console.log("Clínica reativada:", clinica.id);
-    }
+    // P1-4: Calcular nova dataExpiracao a partir do período real da fatura
+    const periodoFim = (invoice.lines?.data?.[0]?.period as { end?: number } | undefined)?.end;
+    const novaDataExpiracao = periodoFim
+      ? new Date(periodoFim * 1000)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     // Registrar pagamento
     await prisma.pagamento.create({
@@ -453,27 +499,28 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         metodoPagamento: "CARTAO",
         transacaoId: invoice.id,
         dataPagamento: new Date(),
-        dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        dataVencimento: novaDataExpiracao,
         observacoes: `Pagamento recorrente - Invoice ID: ${invoice.id}`,
       },
     });
 
-    // Renovar tokens mensais
+    // Reativar clínica, renovar tokens e atualizar dataExpiracao em uma única operação
     await prisma.tenant.update({
       where: { id: clinica.id },
       data: {
+        status: StatusClinica.ATIVA,
         tokensMensaisDisponiveis: plano.tokensMensais,
         tokensConsumidos: 0,
+        dataExpiracao: novaDataExpiracao,
       },
     });
 
-    console.log("Tokens renovados para clínica:", clinica.id);
+    console.log("Clínica renovada — dataExpiracao:", novaDataExpiracao.toISOString());
 
     // Se a clínica estava suspensa, enviar email de reativação
     if (estavaSuspensa) {
       const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const planoNome =
-        PLANO_NOMES[plano.nome] || plano.nome;
+      const planoNome = PLANO_NOMES[plano.nome] || plano.nome;
 
       try {
         const emailHtml = gerarEmailPagamentoSucesso({
@@ -512,6 +559,62 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
     console.log("============================================");
   } catch (error) {
     console.error("Erro ao processar pagamento:", error);
+  }
+}
+
+// Mapeamento de valor em centavos → TipoPlano (espelha PLANOS_STRIPE em lib/stripe.ts)
+const PLANO_POR_VALOR: Record<number, TipoPlano> = {
+  29900: TipoPlano.BASICO,
+  59900: TipoPlano.INTERMEDIARIO,
+  99900: TipoPlano.PROFISSIONAL,
+};
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  try {
+    console.log("Sincronizando assinatura atualizada:", subscription.id);
+
+    const customerId = subscription.customer as string;
+    if (!customerId) return;
+
+    const clinica = await prisma.tenant.findUnique({
+      where: { stripeCustomerId: customerId },
+    });
+
+    if (!clinica) {
+      console.log("Clínica não encontrada para customer:", customerId);
+      return;
+    }
+
+    // Atualizar stripeSubscriptionId caso tenha mudado
+    if (clinica.stripeSubscriptionId !== subscription.id) {
+      await prisma.tenant.update({
+        where: { id: clinica.id },
+        data: { stripeSubscriptionId: subscription.id },
+      });
+    }
+
+    // Sincronizar plano local com base no valor do item da assinatura
+    const unitAmount = subscription.items?.data?.[0]?.price?.unit_amount ?? null;
+    if (unitAmount && PLANO_POR_VALOR[unitAmount]) {
+      const tipoPlano = PLANO_POR_VALOR[unitAmount];
+      const plano = await prisma.plano.findUnique({ where: { nome: tipoPlano } });
+
+      if (plano && plano.id !== clinica.planoId) {
+        await prisma.tenant.update({
+          where: { id: clinica.id },
+          data: {
+            planoId: plano.id,
+            tokensMensaisDisponiveis: plano.tokensMensais,
+            telemedicineHabilitada: plano.telemedicineHabilitada,
+          },
+        });
+        console.log(
+          `Plano sincronizado: ${clinica.planoId} → ${plano.id} (${tipoPlano}) para clínica ${clinica.id}`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("Erro ao sincronizar assinatura:", error);
   }
 }
 

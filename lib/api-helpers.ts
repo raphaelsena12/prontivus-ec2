@@ -1,7 +1,37 @@
 import { NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
-import { TipoUsuario } from "@/lib/generated/prisma";
+import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma";
 import { prisma } from "./prisma";
+
+async function verificarStatusClinica(clinicaId: string) {
+  const clinica = await prisma.tenant.findUnique({
+    where: { id: clinicaId },
+    select: { status: true },
+  });
+
+  if (!clinica) {
+    return NextResponse.json(
+      { error: "Clínica não encontrada" },
+      { status: 404 }
+    );
+  }
+
+  if (clinica.status === StatusClinica.SUSPENSA) {
+    return NextResponse.json(
+      { error: "Conta suspensa por inadimplência. Regularize seu pagamento para continuar." },
+      { status: 403 }
+    );
+  }
+
+  if (clinica.status === StatusClinica.INATIVA) {
+    return NextResponse.json(
+      { error: "Conta inativa. Entre em contato com o suporte." },
+      { status: 403 }
+    );
+  }
+
+  return null; // sem erro
+}
 
 export async function checkAdminClinicaAuth() {
   const session = await getSession();
@@ -36,6 +66,11 @@ export async function checkAdminClinicaAuth() {
         { status: 403 }
       ),
     };
+  }
+
+  const statusError = await verificarStatusClinica(clinicaId);
+  if (statusError) {
+    return { authorized: false, response: statusError };
   }
 
   return { authorized: true, clinicaId };
@@ -97,6 +132,11 @@ export async function checkMedicoAuth() {
     };
   }
 
+  const statusError = await verificarStatusClinica(medico.clinicaId);
+  if (statusError) {
+    return { authorized: false, response: statusError };
+  }
+
   return {
     authorized: true,
     medicoId: medico.id,
@@ -137,6 +177,11 @@ export async function checkSecretariaAuth() {
         { status: 403 }
       ),
     };
+  }
+
+  const statusError = await verificarStatusClinica(clinicaId);
+  if (statusError) {
+    return { authorized: false, response: statusError };
   }
 
   return { authorized: true, clinicaId };
@@ -184,6 +229,11 @@ export async function checkClinicaAuth() {
         { status: 403 }
       ),
     };
+  }
+
+  const statusError = await verificarStatusClinica(clinicaId);
+  if (statusError) {
+    return { authorized: false, response: statusError };
   }
 
   return {

@@ -109,6 +109,8 @@ model Tenant {
   consultaCids                ConsultaCid[]
   consultaExames              ConsultaExame[]
   consultaPrescricoes         ConsultaPrescricao[]
+  lotesTiss                   LoteTiss[]
+  guiaTissProcedimentos       GuiaTissProcedimento[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -258,6 +260,7 @@ model Paciente {
   prontuarios         Prontuario[]
   pagamentosConsultas PagamentoConsulta[]
   listasEspera        ListaEspera[]
+  guiasTiss           GuiaTiss[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -797,12 +800,13 @@ model CodigoTuss {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  grupo              TussGrupo?          @relation(fields: [grupoId], references: [id])
-  consultas          Consulta[]
-  exames             Exame[]
-  tussEspecialidades TussEspecialidade[]
-  tussOperadoras     TussOperadora[]
-  tussValores        TussValor[]
+  grupo                 TussGrupo?             @relation(fields: [grupoId], references: [id])
+  consultas             Consulta[]
+  exames                Exame[]
+  tussEspecialidades    TussEspecialidade[]
+  tussOperadoras        TussOperadora[]
+  tussValores           TussValor[]
+  guiaTissProcedimentos GuiaTissProcedimento[]
 
   @@index([codigoTuss])
   @@index([tipoProcedimento])
@@ -862,6 +866,8 @@ model Operadora {
   planosSaude    PlanoSaude[]
   tussOperadoras TussOperadora[]
   tussValores    TussValor[]
+  guiasTiss      GuiaTiss[]
+  lotesTiss      LoteTiss[]
 
   @@index([clinicaId])
   @@index([codigoAns])
@@ -886,6 +892,7 @@ model PlanoSaude {
   pacientesPlanos PacientePlano[]
   tussOperadoras  TussOperadora[]
   tussValores     TussValor[]
+  guiasTiss       GuiaTiss[]
 
   @@index([operadoraId])
   @@index([codigoAns])
@@ -968,29 +975,85 @@ model PacientePlano {
 }
 
 model GuiaTiss {
-  id           String    @id @default(uuid())
-  clinicaId    String
-  consultaId   String
-  tipoGuia     String
-  numeroGuia   String?   @unique
-  xmlGuia      String?
-  status       String    @default("GERADA")
-  dataGeracao  DateTime  @default(now())
-  dataEnvio    DateTime?
-  dataResposta DateTime?
-  observacoes  String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                 String    @id @default(uuid())
+  clinicaId          String
+  consultaId         String?
+  loteId             String?
+  tipoGuia           String    // CONSULTA, SPSADT, INTERNACAO, HONORARIO
+  numeroGuia         String?   @unique
+  pacienteId         String
+  operadoraId        String
+  planoSaudeId       String?
+  numeroCarteirinha  String
+  dataAtendimento    DateTime
+  xmlGuia            String?
+  status             String    @default("RASCUNHO") // RASCUNHO, VALIDADA, LOTE, GERADA, ENVIADA
+  dataGeracao        DateTime  @default(now())
+  dataEnvio          DateTime?
+  dataResposta       DateTime?
+  observacoes        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  consulta Consulta @relation(fields: [consultaId], references: [id], onDelete: Cascade)
+  clinica       Tenant                 @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consulta      Consulta?              @relation(fields: [consultaId], references: [id])
+  lote          LoteTiss?              @relation(fields: [loteId], references: [id])
+  paciente      Paciente               @relation(fields: [pacienteId], references: [id])
+  operadora     Operadora              @relation(fields: [operadoraId], references: [id])
+  planoSaude    PlanoSaude?            @relation(fields: [planoSaudeId], references: [id])
+  procedimentos GuiaTissProcedimento[]
 
   @@index([clinicaId])
   @@index([consultaId])
+  @@index([loteId])
+  @@index([pacienteId])
+  @@index([operadoraId])
   @@index([numeroGuia])
   @@index([status])
   @@index([tipoGuia])
   @@map("guias_tiss")
+}
+
+model LoteTiss {
+  id            String    @id @default(uuid())
+  clinicaId     String
+  numeroLote    String
+  operadoraId   String
+  status        String    @default("ABERTO") // ABERTO, FECHADO, XML_GERADO
+  xmlLote       String?   @db.Text
+  dataGeracao   DateTime?
+  observacoes   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  clinica   Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  operadora Operadora @relation(fields: [operadoraId], references: [id])
+  guias     GuiaTiss[]
+
+  @@index([clinicaId])
+  @@index([operadoraId])
+  @@index([status])
+  @@map("lotes_tiss")
+}
+
+model GuiaTissProcedimento {
+  id             String   @id @default(uuid())
+  clinicaId      String
+  guiaId         String
+  codigoTussId   String
+  quantidade     Int      @default(1)
+  valorUnitario  Decimal  @db.Decimal(10, 2)
+  valorTotal     Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinica    Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  guia       GuiaTiss   @relation(fields: [guiaId], references: [id], onDelete: Cascade)
+  codigoTuss CodigoTuss @relation(fields: [codigoTussId], references: [id])
+
+  @@index([guiaId])
+  @@index([codigoTussId])
+  @@map("guias_tiss_procedimentos")
 }
 
 model Mensagem {

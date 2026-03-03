@@ -26,7 +26,18 @@ const PLANO_NOMES: Record<string, string> = {
  * API para processar uma sessão de checkout manualmente (desenvolvimento)
  * GET /api/stripe/process-session?session_id=cs_xxx
  */
+// Endpoint de recuperação manual — apenas para SUPER_ADMIN / uso interno.
+// Requer: X-Internal-Secret: <PROCESS_SESSION_SECRET>
+// O webhook (handleCheckoutComplete) é o caminho primário para criação de contas.
 export async function GET(request: NextRequest) {
+  const internalSecret = request.headers.get("x-internal-secret");
+  if (
+    !process.env.PROCESS_SESSION_SECRET ||
+    internalSecret !== process.env.PROCESS_SESSION_SECRET
+  ) {
+    return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  }
+
   try {
     const sessionId = request.nextUrl.searchParams.get("session_id");
 
@@ -205,7 +216,6 @@ export async function GET(request: NextRequest) {
       data: {
         clinica: customerName,
         email: customerEmail,
-        senha: senhaGerada,
         plano: planoNome,
         emailEnviado,
       },

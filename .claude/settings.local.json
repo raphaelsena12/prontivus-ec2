@@ -20,7 +20,8 @@
       "Bash(python3:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
-      "Bash(xargs grep -l \"iniciar\\\\|atendimento\\\\|consulta\")"
+      "Bash(xargs grep -l \"iniciar\\\\|atendimento\\\\|consulta\")",
+      "Bash(npx prisma db push)"
     ]
   }
 }
