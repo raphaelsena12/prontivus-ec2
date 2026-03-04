@@ -125,6 +125,51 @@ function combineSections(values: Record<string, string>): string {
     .join("\n\n");
 }
 
+// Converte JSON de anamnese para texto formatado com seções (sempre todas as seções)
+function normalizeAnamneseText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return text;
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, string>;
+    const lines: string[] = [];
+    for (const section of ANAMNESE_SECTIONS) {
+      const value =
+        parsed[section.label] ??
+        Object.entries(parsed).find(
+          ([k]) => k.toUpperCase() === section.label.toUpperCase()
+        )?.[1] ??
+        "";
+      const v = (value || "").trim();
+      lines.push(`${section.label}:\n${v && v.toUpperCase() !== "N/A" ? v : "N/A"}`);
+    }
+    return lines.join("\n\n");
+  } catch {
+    return text;
+  }
+}
+
+// Garante que todas as seções apareçam no array final, adicionando as ausentes com N/A
+function ensureAllSections(
+  sections: Array<{ title: string; content: string }>
+): Array<{ title: string; content: string }> {
+  const result = [...sections];
+  for (const section of ANAMNESE_SECTIONS) {
+    const exists = result.some(
+      (s) => s.title.toUpperCase() === section.label.toUpperCase()
+    );
+    if (!exists) {
+      result.push({ title: section.label, content: "N/A" });
+    }
+  }
+  // Reordena para seguir a ordem de ANAMNESE_SECTIONS
+  return ANAMNESE_SECTIONS.map((s) => {
+    const found = result.find(
+      (r) => r.title.toUpperCase() === s.label.toUpperCase()
+    );
+    return found ?? { title: s.label, content: "N/A" };
+  });
+}
+
 // Função para formatar anamnese em seções com títulos
 function formatAnamneseWithTitles(text: string): Array<{ title: string; content: string }> {
   const sections: Array<{ title: string; content: string }> = [];
@@ -459,8 +504,10 @@ export function Step2Anamnesis({
           ) : (
             /* ── Anamnese formatada com títulos — sempre editável ── */
             <div className="divide-y divide-slate-100">
-              {formatAnamneseWithTitles(anamneseText)
-                .filter((s) => s.title.toUpperCase() !== "ANAMNESE")
+              {ensureAllSections(
+                formatAnamneseWithTitles(normalizeAnamneseText(anamneseText))
+                  .filter((s) => s.title.toUpperCase() !== "ANAMNESE")
+              )
                 .map((section, index) => {
                   const displayContent = section.content || "";
                   const currentContent = sectionEdits[index] !== undefined ? sectionEdits[index] : displayContent;
