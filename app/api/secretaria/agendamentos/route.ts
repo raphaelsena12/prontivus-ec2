@@ -10,6 +10,7 @@ import {
   gerarEmailConfirmacaoAgendamentoTexto,
 } from "@/lib/email";
 import { gerarEmailMedico } from "@/lib/utils";
+import { sendWhatsAppForClinica, gerarMensagemConfirmacaoAgendamento } from "@/lib/whatsapp";
 
 const agendamentoSchema = z.object({
   pacienteId: z.string().uuid(),
@@ -562,6 +563,24 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.log(`Paciente ${consulta.paciente.nome} não possui email cadastrado`);
+    }
+
+    // Enviar WhatsApp de confirmação (se clínica tiver WhatsApp configurado e paciente tiver celular)
+    if (consulta.status === "AGENDADA") {
+      const celular = consulta.paciente.celular || consulta.paciente.telefone;
+      if (celular) {
+        try {
+          const mensagem = gerarMensagemConfirmacaoAgendamento(
+            consulta.paciente.nome,
+            consulta.dataHora,
+            consulta.medico.usuario.nome,
+            consulta.clinica.nome
+          );
+          await sendWhatsAppForClinica(auth.clinicaId!, { to: celular, message: mensagem });
+        } catch (waError) {
+          console.error("Erro ao enviar WhatsApp de confirmação:", waError);
+        }
+      }
     }
 
     return NextResponse.json({ consulta }, { status: 201 });

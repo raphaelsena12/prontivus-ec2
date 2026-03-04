@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
+import { IconCircleCheckFilled, IconLoader, IconBrandWhatsapp } from "@tabler/icons-react";
 import {
   Table,
   TableBody,
@@ -28,6 +28,7 @@ import { NovoAgendamentoModal } from "@/app/(protected)/secretaria/agendamentos/
 import { PageHeader } from "@/components/page-header";
 import { PacienteToggleStatusDialog } from "./components/paciente-toggle-status-dialog";
 import { PacienteDialog } from "./components/paciente-dialog";
+import { WhatsAppDialog } from "./components/whatsapp-dialog";
 
 interface Paciente {
   id: string;
@@ -85,6 +86,8 @@ export function PacientesContent() {
   const [pacienteToToggle, setPacienteToToggle] = useState<Paciente | null>(null);
   const [pacienteDialogOpen, setPacienteDialogOpen] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState<Paciente | null>(null);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [pacienteWhatsapp, setPacienteWhatsapp] = useState<Paciente | null>(null);
 
   const fetchPacientes = useCallback(async () => {
     try {
@@ -233,6 +236,20 @@ export function PacientesContent() {
                       </TableCell>
                       <TableCell className="text-xs py-3 text-right">
                         <div className="flex justify-end gap-2">
+                          {(paciente.celular || paciente.telefone) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-xs h-7 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                              onClick={() => {
+                                setPacienteWhatsapp(paciente);
+                                setWhatsappDialogOpen(true);
+                              }}
+                              title="Enviar WhatsApp"
+                            >
+                              <IconBrandWhatsapp className="h-3 w-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -342,6 +359,17 @@ export function PacientesContent() {
         paciente={editingPaciente}
         onSuccess={handlePacienteSuccess}
       />
+
+      {pacienteWhatsapp && (
+        <WhatsAppDialog
+          open={whatsappDialogOpen}
+          onOpenChange={(open) => {
+            setWhatsappDialogOpen(open);
+            if (!open) setPacienteWhatsapp(null);
+          }}
+          paciente={pacienteWhatsapp}
+        />
+      )}
     </div>
   );
 }

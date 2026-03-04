@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
 
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
-  // Verificar se o token corresponde
   if (mode === "subscribe" && token === verifyToken) {
     console.log("✅ Webhook verificado com sucesso");
     return new NextResponse(challenge, { status: 200 });
@@ -31,22 +30,24 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
-    // O webhook do Meta envia os dados em body.entry
     const entries: WhatsAppWebhookEntry[] = body.entry || [];
 
     for (const entry of entries) {
       for (const change of entry.changes) {
         const value = change.value;
 
-        // Processar mensagens recebidas
+        // Identificar a clínica pelo phoneNumberId do metadata
+        const phoneNumberId = value.metadata?.phone_number_id;
+        const clinicaId = phoneNumberId
+          ? await resolveClinicaByPhoneNumberId(phoneNumberId)
+          : null;
+
         if (value.messages) {
           for (const message of value.messages) {
-            await processIncomingMessage(message, value);
+            await processIncomingMessage(message, value, clinicaId);
           }
         }
 
-        // Processar status de mensagens enviadas
         if (value.statuses) {
           for (const status of value.statuses) {
             await processMessageStatus(status);
@@ -55,7 +56,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Sempre retornar 200 para o Meta
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
     console.error("Erro ao processar webhook WhatsApp:", error);
@@ -65,47 +65,50 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Resolve clinicaId a partir do phoneNumberId configurado no banco
+ */
+async function resolveClinicaByPhoneNumberId(phoneNumberId: string): Promise<string | null> {
+  const clinica = await prisma.tenant.findFirst({
+    where: { whatsappPhoneNumberId: phoneNumberId },
+    select: { id: true },
+  });
+  return clinica?.id ?? null;
+}
+
+/**
  * Processa mensagem recebida
  */
-async function processIncomingMessage(
-  message: any,
-  value: any
-) {
+async function processIncomingMessage(message: any, value: any, clinicaId: string | null) {
   try {
-    const from = message.from; // Número do remetente
+    const from = message.from;
     const messageText = message.text?.body || "";
-    const messageId = message.id;
-    const timestamp = parseInt(message.timestamp);
 
     console.log(`📨 Mensagem recebida de ${from}: ${messageText}`);
 
-    // Buscar paciente pelo telefone
     const telefoneFormatado = from.replace(/\D/g, "");
-    
-    const paciente = await prisma.paciente.findFirst({
-      where: {
-        telefone: {
-          contains: telefoneFormatado.slice(-9), // Últimos 9 dígitos (sem código do país)
-        },
+
+    // Se temos clinicaId resolvido pelo phoneNumberId, filtrar por clínica
+    const whereClause: any = {
+      telefone: {
+        contains: telefoneFormatado.slice(-9),
       },
+    };
+    if (clinicaId) {
+      whereClause.clinicaId = clinicaId;
+    }
+
+    const paciente = await prisma.paciente.findFirst({
+      where: whereClause,
       include: {
         clinica: true,
         consultas: {
           where: {
-            status: {
-              in: ["AGENDADA", "EM_ANDAMENTO"],
-            },
+            status: { in: ["AGENDADA", "EM_ANDAMENTO"] },
           },
           include: {
-            medico: {
-              include: {
-                usuario: true,
-              },
-            },
+            medico: { include: { usuario: true } },
           },
-          orderBy: {
-            dataHora: "desc",
-          },
+          orderBy: { dataHora: "desc" },
           take: 1,
         },
       },
@@ -113,21 +116,15 @@ async function processIncomingMessage(
 
     if (!paciente) {
       console.log(`⚠️ Paciente não encontrado para o número ${from}`);
-      // Aqui você pode implementar lógica para criar um novo contato ou responder automaticamente
       return;
     }
 
-    // Buscar médico da última consulta ou médico padrão da clínica
     const consulta = paciente.consultas[0];
     let medicoId: string | undefined = consulta?.medicoId;
 
     if (!medicoId) {
-      // Buscar primeiro médico ativo da clínica
       const medico = await prisma.medico.findFirst({
-        where: {
-          clinicaId: paciente.clinicaId,
-          ativo: true,
-        },
+        where: { clinicaId: paciente.clinicaId, ativo: true },
       });
       medicoId = medico?.id;
     }
@@ -137,19 +134,18 @@ async function processIncomingMessage(
       return;
     }
 
-    // Salvar mensagem no banco
     await prisma.mensagem.create({
       data: {
         clinicaId: paciente.clinicaId,
         medicoId,
         pacienteId: paciente.id,
         conteudo: messageText,
-        enviadoPorMedico: false, // Mensagem veio do paciente
+        enviadoPorMedico: false,
         lida: false,
       },
     });
 
-    console.log(`✅ Mensagem salva no banco de dados`);
+    console.log("✅ Mensagem salva no banco de dados");
   } catch (error) {
     console.error("Erro ao processar mensagem recebida:", error);
   }
@@ -162,18 +158,7 @@ async function processMessageStatus(status: any) {
   try {
     const messageId = status.id;
     const statusType = status.status; // sent, delivered, read, failed
-    const recipientId = status.recipient_id;
-
     console.log(`📊 Status da mensagem ${messageId}: ${statusType}`);
-
-    // Aqui você pode atualizar o status da mensagem no banco se necessário
-    // Por exemplo, marcar como entregue quando status === "delivered"
-    
-    // Buscar mensagem pelo ID externo (se você armazenar)
-    // await prisma.mensagem.updateMany({
-    //   where: { whatsappMessageId: messageId },
-    //   data: { status: statusType },
-    // });
   } catch (error) {
     console.error("Erro ao processar status da mensagem:", error);
   }

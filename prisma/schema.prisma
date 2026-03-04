@@ -69,6 +69,8 @@ model Tenant {
   pais                     String?       @default("Brasil")
   site                     String?
   logoUrl                  String?       @map("logourl")
+  whatsappPhoneNumberId    String?
+  whatsappAccessToken      String?
 
   // Relations
   plano                       Plano                        @relation(fields: [planoId], references: [id])

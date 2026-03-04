@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { TelemedicineView } from "@/components/atendimento/consultation/TelemedicineView";
+import { useTranscription } from "@/hooks/use-transcription";
+import { ProcessingModal } from "@/components/processing-modal";
+import { MedicalAnalysisResults } from "@/components/medical-analysis-results";
 import {
   AlertCircle,
   Loader2,
@@ -13,8 +16,20 @@ import {
   Thermometer,
   Wind,
   RefreshCw,
+  X,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +77,264 @@ async function initChime(credentials: ChimeCredentials) {
   return new DefaultMeetingSession(configuration, logger, deviceController);
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Diálogo de geração de documentos ────────────────────────────────────────
+
+interface Prescricao {
+  medicamento: string;
+  dosagem: string;
+  posologia: string;
+  duracao: string;
+}
+
+interface DocDialogProps {
+  open: boolean;
+  documentType: string;
+  consultaId: string;
+  onClose: () => void;
+}
+
+function DocumentGeneratorDialog({ open, documentType, consultaId, onClose }: DocDialogProps) {
+  const [generating, setGenerating] = useState(false);
+  // Receita
+  const [prescricoes, setPrescricoes] = useState<Prescricao[]>([
+    { medicamento: "", dosagem: "", posologia: "", duracao: "" }
+  ]);
+  // Atestado
+  const [diasAfastamento, setDiasAfastamento] = useState("1");
+  const [motivoAtestado, setMotivoAtestado] = useState("");
+  // Encaminhamento
+  const [especialidadeEncaminha, setEspecialidadeEncaminha] = useState("");
+  const [motivoEncaminhamento, setMotivoEncaminhamento] = useState("");
+  // Pedido de exame
+  const [exames, setExames] = useState<{ nome: string; tipo: string; justificativa: string }[]>([
+    { nome: "", tipo: "laboratorial", justificativa: "" }
+  ]);
+
+  const titles: Record<string, string> = {
+    "receita-medica": "Receita Médica",
+    "pedido-exames": "Pedido de Exames",
+    "atestado-afastamento": "Atestado de Afastamento",
+    "guia-encaminhamento": "Guia de Encaminhamento",
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      let dados: any = {};
+
+      if (documentType === "receita-medica") {
+        const validas = prescricoes.filter(p => p.medicamento.trim());
+        if (validas.length === 0) {
+          toast.error("Adicione pelo menos um medicamento");
+          return;
+        }
+        dados.prescricoes = validas;
+      } else if (documentType === "atestado-afastamento") {
+        dados.diasAfastamento = parseInt(diasAfastamento) || 1;
+        dados.motivo = motivoAtestado;
+      } else if (documentType === "guia-encaminhamento") {
+        if (!especialidadeEncaminha.trim()) {
+          toast.error("Informe a especialidade de destino");
+          return;
+        }
+        dados.especialidadeDestino = especialidadeEncaminha;
+        dados.motivoEncaminhamento = motivoEncaminhamento;
+      } else if (documentType === "pedido-exames") {
+        const validos = exames.filter(e => e.nome.trim());
+        if (validos.length === 0) {
+          toast.error("Adicione pelo menos um exame");
+          return;
+        }
+        dados.exames = validos;
+      }
+
+      const res = await fetch("/api/medico/documentos/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipoDocumento: documentType, consultaId, dados }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao gerar documento");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      toast.success(`${titles[documentType] || "Documento"} gerado com sucesso!`);
+      onClose();
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao gerar documento");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{titles[documentType] || "Gerar Documento"}</DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-[60vh] pr-4">
+          {/* ── Receita Médica ── */}
+          {documentType === "receita-medica" && (
+            <div className="space-y-3">
+              {prescricoes.map((p, i) => (
+                <div key={i} className="border rounded-lg p-3 space-y-2 relative">
+                  {prescricoes.length > 1 && (
+                    <button
+                      onClick={() => setPrescricoes(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <Input
+                    placeholder="Medicamento *"
+                    value={p.medicamento}
+                    onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, medicamento: e.target.value } : x))}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Dosagem (ex: 500mg)"
+                      value={p.dosagem}
+                      onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, dosagem: e.target.value } : x))}
+                    />
+                    <Input
+                      placeholder="Duração (ex: 7 dias)"
+                      value={p.duracao}
+                      onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, duracao: e.target.value } : x))}
+                    />
+                  </div>
+                  <Input
+                    placeholder="Posologia (ex: 1 comprimido 8/8h)"
+                    value={p.posologia}
+                    onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, posologia: e.target.value } : x))}
+                  />
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPrescricoes(prev => [...prev, { medicamento: "", dosagem: "", posologia: "", duracao: "" }])}
+                className="w-full gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> Adicionar medicamento
+              </Button>
+            </div>
+          )}
+
+          {/* ── Pedido de Exames ── */}
+          {documentType === "pedido-exames" && (
+            <div className="space-y-3">
+              {exames.map((e, i) => (
+                <div key={i} className="border rounded-lg p-3 space-y-2 relative">
+                  {exames.length > 1 && (
+                    <button
+                      onClick={() => setExames(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-2 right-2 text-slate-400 hover:text-red-500"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <Input
+                    placeholder="Nome do exame *"
+                    value={e.nome}
+                    onChange={ev => setExames(prev => prev.map((x, idx) => idx === i ? { ...x, nome: ev.target.value } : x))}
+                  />
+                  <select
+                    value={e.tipo}
+                    onChange={ev => setExames(prev => prev.map((x, idx) => idx === i ? { ...x, tipo: ev.target.value } : x))}
+                    className="w-full border rounded-md px-3 py-1.5 text-sm bg-background"
+                  >
+                    <option value="laboratorial">Laboratorial</option>
+                    <option value="imagem">Imagem</option>
+                    <option value="funcional">Funcional</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                  <Input
+                    placeholder="Justificativa (opcional)"
+                    value={e.justificativa}
+                    onChange={ev => setExames(prev => prev.map((x, idx) => idx === i ? { ...x, justificativa: ev.target.value } : x))}
+                  />
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExames(prev => [...prev, { nome: "", tipo: "laboratorial", justificativa: "" }])}
+                className="w-full gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> Adicionar exame
+              </Button>
+            </div>
+          )}
+
+          {/* ── Atestado ── */}
+          {documentType === "atestado-afastamento" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Dias de afastamento *</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={diasAfastamento}
+                  onChange={e => setDiasAfastamento(e.target.value)}
+                  placeholder="Número de dias"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Motivo (opcional)</label>
+                <Textarea
+                  value={motivoAtestado}
+                  onChange={e => setMotivoAtestado(e.target.value)}
+                  placeholder="Motivo do afastamento..."
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* ── Encaminhamento ── */}
+          {documentType === "guia-encaminhamento" && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Especialidade de destino *</label>
+                <Input
+                  value={especialidadeEncaminha}
+                  onChange={e => setEspecialidadeEncaminha(e.target.value)}
+                  placeholder="Ex: Cardiologia, Ortopedia..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Motivo do encaminhamento</label>
+                <Textarea
+                  value={motivoEncaminhamento}
+                  onChange={e => setMotivoEncaminhamento(e.target.value)}
+                  placeholder="Descreva o motivo..."
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+        </ScrollArea>
+
+        <div className="flex gap-2 justify-end pt-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleGenerate} disabled={generating}>
+            {generating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Gerar e Abrir
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function DoctorTelemedicineSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -74,7 +346,6 @@ export default function DoctorTelemedicineSessionPage() {
   const [error, setError] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState("");
-  const [linkCopied, setLinkCopied] = useState(false);
   const [cameraTestResult, setCameraTestResult] = useState("");
 
   // Controles de vídeo/áudio
@@ -86,10 +357,28 @@ export default function DoctorTelemedicineSessionPage() {
   const [chatMessage, setChatMessage] = useState("");
   const [chatMessages, setChatMessages] = useState<{ id: number; sender: string; text: string; time: string }[]>([]);
 
-  // Transcrição
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [transcription, setTranscription] = useState<{ time: string; speaker: string; text: string; isPartial?: boolean }[]>([]);
+  // Transcrição real via hook
+  const {
+    isTranscribing,
+    isPaused,
+    transcription,
+    startTranscription,
+    pauseTranscription,
+    resumeTranscription,
+    stopTranscription,
+    processTranscription,
+  } = useTranscription();
+
+  // Processamento de IA
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<"processing" | "analyzing" | "generating">("processing");
+  const [analysisResults, setAnalysisResults] = useState<{
+    anamnese: string;
+    cidCodes: Array<{ code: string; description: string; score: number }>;
+    protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
+    exames: Array<{ nome: string; tipo: string; justificativa: string }>;
+    prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string; justificativa?: string }>;
+  } | null>(null);
 
   // Timer
   const [sessionDuration, setSessionDuration] = useState("00:00");
@@ -101,6 +390,10 @@ export default function DoctorTelemedicineSessionPage() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "unstable">("excellent");
+
+  // Documento
+  const [docDialogOpen, setDocDialogOpen] = useState(false);
+  const [docDialogType, setDocDialogType] = useState("receita-medica");
 
   // ─── Carrega dados da sessão ──────────────────────────────────────────────
 
@@ -120,7 +413,6 @@ export default function DoctorTelemedicineSessionPage() {
 
       setSessionData(data);
 
-      // Mostra link do paciente via toast logo ao carregar
       if (data.patientLink) {
         toast.info("Link do paciente disponível — veja o banner verde no topo da página", {
           duration: 8000,
@@ -130,8 +422,6 @@ export default function DoctorTelemedicineSessionPage() {
           },
         });
       }
-
-      connectToRoom();
     } catch {
       setError("Erro ao carregar sessão.");
     } finally {
@@ -139,7 +429,15 @@ export default function DoctorTelemedicineSessionPage() {
     }
   };
 
-  // ─── Teste de câmera nativo (independente do Chime) ───────────────────────
+  // ─── Conecta ao Chime (chamado após a UI estar montada) ───────────────────
+
+  useEffect(() => {
+    if (!loading && !error) {
+      connectToRoom();
+    }
+  }, [loading]);
+
+  // ─── Teste de câmera nativo ───────────────────────────────────────────────
 
   const testCamera = async () => {
     setCameraTestResult("Testando...");
@@ -156,7 +454,7 @@ export default function DoctorTelemedicineSessionPage() {
       const tracks = stream.getTracks();
       const videoLabel = tracks.find(t => t.kind === "video")?.label || "sem nome";
       const audioLabel = tracks.find(t => t.kind === "audio")?.label || "sem nome";
-      tracks.forEach(t => t.stop()); // libera câmera após teste
+      tracks.forEach(t => t.stop());
       setCameraTestResult(`✅ Câmera OK: "${videoLabel}" | Microfone OK: "${audioLabel}"`);
     } catch (err: any) {
       setCameraTestResult(`❌ Erro: ${err?.message || err}`);
@@ -169,7 +467,6 @@ export default function DoctorTelemedicineSessionPage() {
     setConnecting(true);
     setConnectionError("");
 
-    // Verifica contexto seguro antes de qualquer coisa
     if (!window.isSecureContext) {
       setConnectionError("A câmera e o microfone exigem HTTPS. Acesse a aplicação via https:// ou localhost.");
       setConnecting(false);
@@ -177,32 +474,26 @@ export default function DoctorTelemedicineSessionPage() {
     }
 
     try {
-      // 1. Busca credenciais Chime
-      console.log("[Chime] Buscando credenciais...");
       const res = await fetch(`/api/medico/telemedicina/sessoes/${sessionId}/chime-token`);
       const data = await res.json();
 
       if (!res.ok) {
         const msg = data.error || "Erro ao obter credenciais de vídeo.";
-        console.error("[Chime] Erro nas credenciais:", msg, data);
         setConnectionError(`Erro nas credenciais Chime: ${msg}`);
         return;
       }
 
-      console.log("[Chime] Credenciais OK — Meeting:", data?.Meeting?.MeetingId);
-
-      // 2. Inicializa sessão Chime
       const chimeSession = await initChime(data);
       chimeSessionRef.current = chimeSession;
       const audioVideo = chimeSession.audioVideo;
 
-      // 3. Observer para bind de tiles
+      // Observer para tiles local e remoto
       audioVideo.addObserver({
         videoTileDidUpdate: (tileState: any) => {
-          if (tileState.localTile && tileState.tileId && localVideoRef.current) {
+          if (!tileState.tileId) return;
+          if (tileState.localTile && localVideoRef.current) {
             audioVideo.bindVideoElement(tileState.tileId, localVideoRef.current);
-          }
-          if (!tileState.localTile && tileState.tileId && remoteVideoRef.current) {
+          } else if (!tileState.localTile && remoteVideoRef.current) {
             audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
           }
         },
@@ -213,37 +504,25 @@ export default function DoctorTelemedicineSessionPage() {
         },
       });
 
-      // 4. Câmera
-      console.log("[Chime] Listando câmeras...");
       const videoDevices = await audioVideo.listVideoInputDevices();
-      console.log("[Chime] Câmeras:", videoDevices.length, videoDevices.map((d: any) => d.label));
       if (videoDevices.length > 0) {
         await audioVideo.startVideoInput(videoDevices[0].deviceId);
-        console.log("[Chime] Câmera iniciada:", videoDevices[0].label);
       }
 
-      // 5. Microfone
-      console.log("[Chime] Listando microfones...");
       const audioDevices = await audioVideo.listAudioInputDevices();
-      console.log("[Chime] Microfones:", audioDevices.length, audioDevices.map((d: any) => d.label));
       if (audioDevices.length > 0) {
         await audioVideo.startAudioInput(audioDevices[0].deviceId);
-        console.log("[Chime] Microfone iniciado:", audioDevices[0].label);
       }
 
-      // 6. Saída de áudio — não crítico
       try {
         await audioVideo.chooseAudioOutput(null);
       } catch {
-        console.warn("[Chime] chooseAudioOutput não suportado — usando padrão do sistema.");
+        // não crítico
       }
 
-      // 7. Inicia sessão
-      console.log("[Chime] Iniciando audioVideo.start()...");
       audioVideo.start();
       audioVideo.startLocalVideoTile();
 
-      // 8. Subscrição ao chat via canal de dados Chime
       audioVideo.realtimeSubscribeToReceiveDataMessage("chat", (dataMessage: any) => {
         try {
           const payload = JSON.parse(dataMessage.text());
@@ -259,11 +538,8 @@ export default function DoctorTelemedicineSessionPage() {
 
       startTimer();
       toast.success("Câmera e microfone conectados");
-      console.log("[Chime] Sucesso!");
-
     } catch (err: any) {
       const msg = err?.message || String(err) || "Erro desconhecido";
-      console.error("[Chime] ERRO:", err);
       setConnectionError(`Falha ao conectar câmera/microfone: ${msg}`);
     } finally {
       setConnecting(false);
@@ -284,17 +560,6 @@ export default function DoctorTelemedicineSessionPage() {
     }, 1000);
   }, []);
 
-  // Rebinda tile local após TelemedicineView montar (connecting → false)
-  useEffect(() => {
-    if (connecting || !chimeSessionRef.current) return;
-    const av = chimeSessionRef.current.audioVideo;
-    if (!av) return;
-    const localTile = av.getLocalVideoTile();
-    if (localTile && localVideoRef.current) {
-      av.bindVideoElement(localTile.state().tileId!, localVideoRef.current);
-    }
-  }, [connecting]);
-
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -309,8 +574,12 @@ export default function DoctorTelemedicineSessionPage() {
   const handleToggleMic = useCallback((v: boolean) => {
     const av = chimeSessionRef.current?.audioVideo;
     if (av) {
-      if (!v) av.realtimeMuteLocalAudio();
-      else av.realtimeUnmuteLocalAudio();
+      try {
+        if (!v) av.realtimeMuteLocalAudio();
+        else av.realtimeUnmuteLocalAudio();
+      } catch (e) {
+        console.warn("[Mic] Erro ao alternar:", e);
+      }
     }
     setIsMicOn(v);
   }, []);
@@ -318,45 +587,78 @@ export default function DoctorTelemedicineSessionPage() {
   const handleToggleCamera = useCallback(async (v: boolean) => {
     const av = chimeSessionRef.current?.audioVideo;
     if (av) {
-      if (!v) {
-        av.stopLocalVideoTile();
-        await av.stopVideoInput();
-      } else {
-        const devices = await av.listVideoInputDevices();
-        if (devices.length > 0) {
-          await av.startVideoInput(devices[0].deviceId);
-          av.startLocalVideoTile();
+      try {
+        if (!v) {
+          av.stopLocalVideoTile();
+          await av.stopVideoInput();
+        } else {
+          const devices = await av.listVideoInputDevices();
+          if (devices.length > 0) {
+            await av.startVideoInput(devices[0].deviceId);
+            av.startLocalVideoTile();
+          }
         }
+      } catch (e) {
+        console.warn("[Camera] Erro ao alternar:", e);
       }
     }
     setIsCameraOn(v);
   }, []);
 
-  const handleCopyLink = useCallback(() => {
-    const link = sessionData?.patientLink;
-    if (!link) return;
-    navigator.clipboard.writeText(link);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2500);
-  }, [sessionData?.patientLink]);
-
   const handleSendMessage = useCallback((text: string) => {
     const av = chimeSessionRef.current?.audioVideo;
     const time = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-    // Envia pelo canal de dados do Chime para o paciente receber
     if (av) {
       try {
         av.realtimeSendDataMessage("chat", JSON.stringify({ text, sender: "doctor" }), 30000);
       } catch (e) {
-        console.warn("[Chat] Erro ao enviar mensagem Chime:", e);
+        console.warn("[Chat] Erro ao enviar:", e);
       }
     }
-    // Adiciona localmente
     setChatMessages((prev) => [
       ...prev,
       { id: Date.now(), sender: "doctor", text, time },
     ]);
   }, []);
+
+  // ─── Processar transcrição com IA ─────────────────────────────────────────
+
+  const handleProcessTranscription = async () => {
+    if (transcription.length === 0) {
+      toast.error("Nenhuma transcrição disponível para processar");
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessingStage("processing");
+    setAnalysisResults(null);
+
+    try {
+      setTimeout(() => setProcessingStage("analyzing"), 1000);
+      setTimeout(() => setProcessingStage("generating"), 2500);
+
+      const results = await processTranscription();
+      if (results) {
+        setAnalysisResults({
+          anamnese: results.anamnese,
+          cidCodes: results.cidCodes || [],
+          protocolos: (results as any).protocolos || [],
+          exames: results.exames || [],
+          prescricoes: (results as any).prescricoes || [],
+        });
+        toast.success("Análise clínica concluída!");
+      } else {
+        toast.error("Nenhum resultado retornado");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar transcrição");
+    } finally {
+      setIsProcessing(false);
+      setProcessingStage("processing");
+    }
+  };
+
+  // ─── Encerrar sessão ──────────────────────────────────────────────────────
 
   const handleEncerrar = async () => {
     if (!confirm("Deseja encerrar a consulta de telemedicina?")) return;
@@ -365,6 +667,7 @@ export default function DoctorTelemedicineSessionPage() {
       if (res.ok) {
         if (chimeSessionRef.current) chimeSessionRef.current.audioVideo?.stop();
         if (timerRef.current) clearInterval(timerRef.current);
+        stopTranscription();
         toast.success("Consulta encerrada com sucesso");
         router.push("/medico/fila-atendimento");
       } else {
@@ -376,20 +679,20 @@ export default function DoctorTelemedicineSessionPage() {
     }
   };
 
+  // ─── Abrir diálogo de documento ───────────────────────────────────────────
+
+  const handleOpenDocumentType = useCallback((type: string) => {
+    setDocDialogType(type);
+    setDocDialogOpen(true);
+  }, []);
+
   // ─── Renderização condicional ─────────────────────────────────────────────
 
-  if (loading || connecting) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
         <Loader2 className="w-10 h-10 text-blue-600 animate-spin" />
-        <p className="text-slate-600 font-medium">
-          {connecting ? "Conectando câmera e microfone..." : "Carregando sessão..."}
-        </p>
-        {connecting && (
-          <p className="text-xs text-slate-400 max-w-xs text-center">
-            Se o browser pedir permissão de câmera e microfone, clique em <strong>Permitir</strong>.
-          </p>
-        )}
+        <p className="text-slate-600 font-medium">Carregando sessão...</p>
       </div>
     );
   }
@@ -408,6 +711,7 @@ export default function DoctorTelemedicineSessionPage() {
 
   const { sessao } = sessionData;
   const paciente = sessao.consulta.paciente;
+  const consultaId = sessao.consultaId;
   const idade = paciente.dataNascimento
     ? Math.floor((Date.now() - new Date(paciente.dataNascimento).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
     : 0;
@@ -420,65 +724,111 @@ export default function DoctorTelemedicineSessionPage() {
   ];
 
   return (
-    <div className="-mt-4 md:-mt-6 -mb-4 md:-mb-6 overflow-hidden flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
+    <>
+      {/* Modal de processamento IA */}
+      <ProcessingModal
+        isOpen={isProcessing}
+        stage={processingStage}
+      />
 
-      {/* ── Erro de conexão Chime ────────────────────────────────────────── */}
-      {connectionError && (
-        <div className="bg-red-950/60 border-b border-red-500/30 px-4 py-2.5 shrink-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <span className="text-sm font-semibold text-red-300">Erro ao conectar:</span>
-              <span className="text-xs text-red-400 font-mono ml-2">{connectionError}</span>
+      {/* Modal resultados IA */}
+      {analysisResults && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <h2 className="font-bold text-slate-800">Análise Clínica — IA</h2>
+              <Button variant="ghost" size="sm" onClick={() => setAnalysisResults(null)}>
+                <X className="w-4 h-4" />
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={testCamera}>
-                Testar câmera
-              </Button>
-              {cameraTestResult && <span className="text-xs text-slate-400 font-mono">{cameraTestResult}</span>}
-              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={connectToRoom} disabled={connecting}>
-                <RefreshCw className="w-3 h-3" />Reconectar
-              </Button>
+            <div className="flex-1 overflow-y-auto p-5">
+              <MedicalAnalysisResults
+                anamnese={analysisResults.anamnese}
+                cidCodes={analysisResults.cidCodes}
+                exames={analysisResults.exames}
+              />
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-      <TelemedicineView
-        patient={{ name: paciente.nome, age: idade, bloodType: "--" }}
-        vitals={vitals}
-        sessionDuration={sessionDuration}
-        connectionQuality={connectionQuality}
-        isMicOn={isMicOn}
-        setIsMicOn={handleToggleMic}
-        isCameraOn={isCameraOn}
-        setIsCameraOn={(v) => handleToggleCamera(v)}
-        isScreenSharing={isScreenSharing}
-        setIsScreenSharing={setIsScreenSharing}
-        isFullscreen={isFullscreen}
-        setIsFullscreen={setIsFullscreen}
-        isChatOpen={isChatOpen}
-        setIsChatOpen={setIsChatOpen}
-        chatMessage={chatMessage}
-        setChatMessage={setChatMessage}
-        chatMessages={chatMessages}
-        onSendMessage={handleSendMessage}
-        isTranscribing={isTranscribing}
-        isPaused={isPaused}
-        transcription={transcription}
-        startTranscription={async () => setIsTranscribing(true)}
-        pauseTranscription={() => setIsPaused(true)}
-        resumeTranscription={() => setIsPaused(false)}
-        stopTranscription={() => { setIsTranscribing(false); setIsPaused(false); }}
-        handleProcessTranscription={async () => { toast.info("Processando transcrição..."); }}
-        onOpenResumoClinico={() => { window.open(`/medico/pacientes/${paciente.id}`, "_blank"); }}
-        onEncerrar={handleEncerrar}
-        localVideoRef={localVideoRef}
-        remoteVideoRef={remoteVideoRef}
-        patientLink={sessionData.patientLink}
+      {/* Modal de geração de documento */}
+      <DocumentGeneratorDialog
+        open={docDialogOpen}
+        documentType={docDialogType}
+        consultaId={consultaId}
+        onClose={() => setDocDialogOpen(false)}
       />
+
+      <div className="-mt-4 md:-mt-6 -mb-4 md:-mb-6 overflow-hidden flex flex-col" style={{ height: "calc(100vh - 4rem)" }}>
+
+        {/* ── Erro de conexão Chime ── */}
+        {connectionError && (
+          <div className="bg-red-950/60 border-b border-red-500/30 px-4 py-2.5 shrink-0">
+            <div className="flex items-center gap-3 flex-wrap">
+              <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-semibold text-red-300">Erro ao conectar:</span>
+                <span className="text-xs text-red-400 font-mono ml-2">{connectionError}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={testCamera}>
+                  Testar câmera
+                </Button>
+                {cameraTestResult && <span className="text-xs text-slate-400 font-mono">{cameraTestResult}</span>}
+                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={connectToRoom} disabled={connecting}>
+                  <RefreshCw className="w-3 h-3" />Reconectar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Indicador de conexão ── */}
+        {connecting && (
+          <div className="bg-blue-950/40 border-b border-blue-500/20 px-4 py-2 shrink-0 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <span className="text-sm text-blue-300">Conectando câmera e microfone...</span>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <TelemedicineView
+            patient={{ name: paciente.nome, age: idade, bloodType: "--" }}
+            vitals={vitals}
+            sessionDuration={sessionDuration}
+            connectionQuality={connectionQuality}
+            isMicOn={isMicOn}
+            setIsMicOn={handleToggleMic}
+            isCameraOn={isCameraOn}
+            setIsCameraOn={(v) => handleToggleCamera(v)}
+            isScreenSharing={isScreenSharing}
+            setIsScreenSharing={setIsScreenSharing}
+            isFullscreen={isFullscreen}
+            setIsFullscreen={setIsFullscreen}
+            isChatOpen={isChatOpen}
+            setIsChatOpen={setIsChatOpen}
+            chatMessage={chatMessage}
+            setChatMessage={setChatMessage}
+            chatMessages={chatMessages}
+            onSendMessage={handleSendMessage}
+            isTranscribing={isTranscribing}
+            isPaused={isPaused}
+            transcription={transcription}
+            startTranscription={startTranscription}
+            pauseTranscription={pauseTranscription}
+            resumeTranscription={resumeTranscription}
+            stopTranscription={stopTranscription}
+            handleProcessTranscription={handleProcessTranscription}
+            onOpenResumoClinico={() => window.open(`/medico/pacientes/${paciente.id}`, "_blank")}
+            onEncerrar={handleEncerrar}
+            localVideoRef={localVideoRef}
+            remoteVideoRef={remoteVideoRef}
+            patientLink={sessionData.patientLink}
+            onOpenDocumentType={handleOpenDocumentType}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

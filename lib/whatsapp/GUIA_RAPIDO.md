@@ -99,3 +99,56 @@ O token temporário expira em 24h. Para produção:
 2. Configure templates para mensagens fora da janela de 24h
 3. Integre com o sistema de agendamentos
 4. Configure token permanente para produção
+
+
+
+
+
+
+
+
+
+
+1. Criar conta no Meta for Developers
+Acesse developers.facebook.com
+Faça login com sua conta Facebook (pode ser pessoal)
+Clique em "Meus Apps" → "Criar App"
+Tipo: Business
+Associe a um Meta Business Manager (criar em business.facebook.com se não tiver)
+2. Adicionar WhatsApp ao App
+No painel do app, vá em "Adicionar produto" → WhatsApp → Configurar
+Isso cria automaticamente um número de teste (sandbox)
+3. Obter as credenciais (modo sandbox)
+Em WhatsApp → Configuração da API:
+
+Phone Number ID → copiar e colar na página de Configurações do Prontivus
+Access Token temporário → válido por 24h (bom para testes)
+Para token permanente:
+
+Vá em Configurações → Usuários do Sistema → Criar usuário do sistema (Admin)
+Gere um token com permissão whatsapp_business_messaging
+Esse token não expira
+4. Configurar o Webhook
+No painel do app, WhatsApp → Configuração → Webhooks:
+
+URL do callback: https://seudominio.com/api/whatsapp/webhook
+Token de verificação: qualquer string — adicione no .env como WHATSAPP_VERIFY_TOKEN=essa_string
+Assinar os campos: messages
+5. Adicionar número de teste (sandbox)
+Em WhatsApp → Configuração da API, há um botão "Adicionar número de telefone"
+No sandbox, você precisa registrar os números que vão receber as mensagens de teste (até 5 números)
+Envie a mensagem de opt-in para cada número pelo próprio painel
+6. Para produção (sair do sandbox)
+Requisito	Como fazer
+Business Verification	Submeter CNPJ/documentos em business.facebook.com/settings
+Aprovação do app	No painel do app → Revisão do app → solicitar whatsapp_business_messaging
+Número de produção	Adicionar número real da clínica (recebe OTP por SMS/ligação)
+Resumo do que configurar no .env
+
+WHATSAPP_VERIFY_TOKEN=qualquer_string_que_voce_escolher
+# As outras credenciais ficam no banco por clínica (não precisam de .env)
+Tempo estimado:
+
+Sandbox funcionando: ~30 minutos
+Business verification + produção: 3-7 dias úteis (Meta faz revisão manual)
+Quer ajuda para configurar o webhook URL ou o .env?

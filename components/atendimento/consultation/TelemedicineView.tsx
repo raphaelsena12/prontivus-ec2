@@ -94,6 +94,7 @@ interface TelemedicineViewProps {
   localVideoRef?: React.RefObject<HTMLVideoElement | null>;
   remoteVideoRef?: React.RefObject<HTMLVideoElement | null>;
   patientLink?: string;
+  onOpenDocumentType?: (type: string) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -128,6 +129,7 @@ export function TelemedicineView({
   localVideoRef,
   remoteVideoRef,
   patientLink,
+  onOpenDocumentType,
 }: TelemedicineViewProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("chat");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -606,11 +608,11 @@ export function TelemedicineView({
               <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest mb-3">Ações Rápidas</p>
 
               {([
-                { icon: Pill, label: "Receita Médica", desc: "Prescrever medicamentos", color: "blue" },
-                { icon: ClipboardList, label: "Pedido de Exame", desc: "Solicitar exames diagnósticos", color: "purple" },
-                { icon: FilePlus, label: "Atestado Médico", desc: "Gerar atestado de saúde", color: "emerald" },
-                { icon: Stethoscope, label: "Encaminhamento", desc: "Encaminhar para especialista", color: "amber" },
-                { icon: FileText, label: "Prontuário", desc: "Abrir ficha completa do paciente", color: "slate" },
+                { icon: Pill, label: "Receita Médica", desc: "Prescrever medicamentos", color: "blue", type: "receita-medica" },
+                { icon: ClipboardList, label: "Pedido de Exame", desc: "Solicitar exames diagnósticos", color: "purple", type: "pedido-exames" },
+                { icon: FilePlus, label: "Atestado Médico", desc: "Gerar atestado de saúde", color: "emerald", type: "atestado-afastamento" },
+                { icon: Stethoscope, label: "Encaminhamento", desc: "Encaminhar para especialista", color: "amber", type: "guia-encaminhamento" },
+                { icon: FileText, label: "Prontuário", desc: "Abrir ficha completa do paciente", color: "slate", type: "prontuario" },
               ] as const).map((action, i) => {
                 const Icon = action.icon;
                 const colorMap = {
@@ -620,10 +622,17 @@ export function TelemedicineView({
                   amber: "bg-amber-500/15 text-amber-400",
                   slate: "bg-slate-700 text-slate-400",
                 };
+                const handleClick = () => {
+                  if (action.type === "prontuario") {
+                    onOpenResumoClinico();
+                  } else if (onOpenDocumentType) {
+                    onOpenDocumentType(action.type);
+                  }
+                };
                 return (
                   <button
                     key={i}
-                    onClick={action.label === "Prontuário" ? onOpenResumoClinico : undefined}
+                    onClick={handleClick}
                     className="w-full flex items-center gap-3 bg-slate-800/50 hover:bg-slate-800 border border-white/5 hover:border-white/10 rounded-xl p-3 text-left transition-all group"
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${colorMap[action.color]}`}>

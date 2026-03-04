@@ -240,16 +240,19 @@ function TelemedicineAccessContent() {
 
       const audioVideo = chimeSession.audioVideo;
 
-      // Observer para vídeo remoto (médico)
+      // Observer para vídeo local e remoto
       audioVideo.addObserver({
         videoTileDidUpdate: (tileState: any) => {
-          if (!tileState.localTile && tileState.tileId && remoteVideoRef.current) {
+          if (!tileState.tileId) return;
+          if (tileState.localTile && localVideoRef.current) {
+            audioVideo.bindVideoElement(tileState.tileId, localVideoRef.current);
+          } else if (!tileState.localTile && remoteVideoRef.current) {
             audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
           }
         },
       });
 
-      // Bind do vídeo local (paciente)
+      // Dispositivos de vídeo e áudio
       const videoDevices = await audioVideo.listVideoInputDevices();
       if (videoDevices.length > 0) {
         await audioVideo.startVideoInput(videoDevices[0].deviceId);
@@ -262,14 +265,7 @@ function TelemedicineAccessContent() {
 
       try { await audioVideo.chooseAudioOutput(null); } catch {}
       audioVideo.start();
-
-      if (localVideoRef.current) {
-        audioVideo.startLocalVideoTile();
-        const localTile = audioVideo.getLocalVideoTile();
-        if (localTile) {
-          audioVideo.bindVideoElement(localTile.state().tileId!, localVideoRef.current);
-        }
-      }
+      audioVideo.startLocalVideoTile();
 
       // Subscrição ao chat via canal de dados Chime
       audioVideo.realtimeSubscribeToReceiveDataMessage("chat", (dataMessage: any) => {
@@ -299,28 +295,38 @@ function TelemedicineAccessContent() {
 
   const toggleMic = async () => {
     const av = chimeSessionRef.current?.audioVideo;
+    const newState = !isMicOn;
     if (av) {
-      if (isMicOn) av.realtimeMuteLocalAudio();
-      else av.realtimeUnmuteLocalAudio();
+      try {
+        if (isMicOn) av.realtimeMuteLocalAudio();
+        else av.realtimeUnmuteLocalAudio();
+      } catch (e) {
+        console.warn("[Mic] Erro ao alternar microfone:", e);
+      }
     }
-    setIsMicOn(!isMicOn);
+    setIsMicOn(newState);
   };
 
   const toggleCamera = async () => {
     const av = chimeSessionRef.current?.audioVideo;
+    const newState = !isCameraOn;
     if (av) {
-      if (isCameraOn) {
-        av.stopLocalVideoTile();
-        await av.stopVideoInput();
-      } else {
-        const devices = await av.listVideoInputDevices();
-        if (devices.length > 0) {
-          await av.startVideoInput(devices[0].deviceId);
-          av.startLocalVideoTile();
+      try {
+        if (isCameraOn) {
+          av.stopLocalVideoTile();
+          await av.stopVideoInput();
+        } else {
+          const devices = await av.listVideoInputDevices();
+          if (devices.length > 0) {
+            await av.startVideoInput(devices[0].deviceId);
+            av.startLocalVideoTile();
+          }
         }
+      } catch (e) {
+        console.warn("[Camera] Erro ao alternar câmera:", e);
       }
     }
-    setIsCameraOn(!isCameraOn);
+    setIsCameraOn(newState);
   };
 
   const sendChatMessage = () => {

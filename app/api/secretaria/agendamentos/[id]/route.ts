@@ -11,6 +11,11 @@ import {
   gerarEmailAlteracaoAgendamentoTexto,
 } from "@/lib/email";
 import { gerarEmailMedico } from "@/lib/utils";
+import {
+  sendWhatsAppForClinica,
+  gerarMensagemAlteracaoAgendamento,
+  gerarMensagemCancelamentoAgendamento,
+} from "@/lib/whatsapp";
 
 const atualizarAgendamentoSchema = z.object({
   pacienteId: z.string().uuid().optional(),
@@ -459,6 +464,24 @@ export async function PATCH(
       }
     }
 
+    // WhatsApp: avisar alteração de data/hora
+    if (dataHoraAlterada) {
+      const celular = agendamentoAtualizado.paciente.celular || agendamentoAtualizado.paciente.telefone;
+      if (celular) {
+        try {
+          const mensagem = gerarMensagemAlteracaoAgendamento(
+            agendamentoAtualizado.paciente.nome,
+            agendamentoAtual.dataHora,
+            agendamentoAtualizado.dataHora,
+            agendamentoAtualizado.medico.usuario.nome
+          );
+          await sendWhatsAppForClinica(auth.clinicaId!, { to: celular, message: mensagem });
+        } catch (waError) {
+          console.error("Erro ao enviar WhatsApp de alteração:", waError);
+        }
+      }
+    }
+
     return NextResponse.json({ consulta: agendamentoAtualizado }, { status: 200 });
   } catch (error) {
     console.error("Erro ao atualizar agendamento:", error);
@@ -608,6 +631,21 @@ export async function DELETE(
       }
     } else {
       console.log(`Paciente ${agendamentoCancelado.paciente.nome} não possui email cadastrado`);
+    }
+
+    // WhatsApp: avisar cancelamento
+    const celularCanc = agendamentoCancelado.paciente.celular || agendamentoCancelado.paciente.telefone;
+    if (celularCanc) {
+      try {
+        const mensagem = gerarMensagemCancelamentoAgendamento(
+          agendamentoCancelado.paciente.nome,
+          agendamentoCancelado.dataHora,
+          motivoCancelamento
+        );
+        await sendWhatsAppForClinica(auth.clinicaId!, { to: celularCanc, message: mensagem });
+      } catch (waError) {
+        console.error("Erro ao enviar WhatsApp de cancelamento:", waError);
+      }
     }
 
     return NextResponse.json(

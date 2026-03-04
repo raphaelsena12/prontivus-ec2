@@ -27,6 +27,7 @@ import {
   IconFilePlus,
   IconFiles,
   IconStack2,
+  IconSettings,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -194,6 +195,19 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Aceitação TUSS",
           url: "/admin-clinica/tuss-aceitacao",
           icon: IconFileText,
+        },
+      ],
+    });
+
+    categories.push({
+      title: "Configurações",
+      icon: IconSettings,
+      defaultOpen: false,
+      items: [
+        {
+          title: "Integrações",
+          url: "/admin-clinica/configuracoes",
+          icon: IconSettings,
         },
       ],
     });
