@@ -80,8 +80,8 @@ export async function GET(request: NextRequest) {
       }),
       ...(date && {
         dataHora: {
-          gte: new Date(date + "T00:00:00"),
-          lt: new Date(date + "T23:59:59"),
+          gte: new Date(date + "T00:00:00-03:00"),
+          lt: new Date(date + "T23:59:59-03:00"),
         },
       }),
     };

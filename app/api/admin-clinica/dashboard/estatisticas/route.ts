@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { brazilTodayStart, brazilMonthStart } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const hoje = brazilTodayStart();
+    const inicioMes = brazilMonthStart();
 
     // Buscar estatísticas do admin clínica
     const [

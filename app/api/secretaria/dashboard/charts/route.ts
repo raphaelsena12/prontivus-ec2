@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilToday, brazilTodayStart, brazilTodayEnd, brazilMonthStart, brazilNMonthsAgoStart } from "@/lib/timezone-utils";
 
 export async function GET() {
   try {
@@ -13,11 +14,14 @@ export async function GET() {
     const clinicaId = await getUserClinicaId();
     if (!clinicaId) return NextResponse.json({ error: "Clínica não encontrada" }, { status: 403 });
 
-    const hoje = new Date();
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const inicioHoje = new Date(hoje); inicioHoje.setHours(0, 0, 0, 0);
-    const fimHoje = new Date(hoje); fimHoje.setHours(23, 59, 59, 999);
-    const seisMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+    const inicioMes = brazilMonthStart();
+    const inicioHoje = brazilTodayStart();
+    const fimHoje = brazilTodayEnd();
+    const seisMesesAtras = brazilNMonthsAgoStart(5);
+
+    // Referência para labels de mês (ano/mês no fuso Brasil)
+    const [brazilYear, brazilMonth] = brazilToday().split("-").map(Number);
+    const hoje = new Date(brazilYear, brazilMonth - 1, 1);
 
     // Últimos 6 meses para labels
     const meses = Array.from({ length: 6 }, (_, i) => {

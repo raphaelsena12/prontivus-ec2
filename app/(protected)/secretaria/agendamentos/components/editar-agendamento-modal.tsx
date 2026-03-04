@@ -657,7 +657,7 @@ export function EditarAgendamentoModal({
     try {
       setLoading(true);
 
-      const dataHora = `${data.data}T${data.hora}`;
+      const dataHora = new Date(`${data.data}T${data.hora}:00`).toISOString();
 
       const response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
         method: "PATCH",

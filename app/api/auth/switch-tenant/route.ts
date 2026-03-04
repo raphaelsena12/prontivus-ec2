@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { StatusClinica, TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { brazilTodayStart } from "@/lib/timezone-utils";
 
 const switchTenantSchema = z.object({
   tenantId: z.string().uuid("ID de tenant inválido"),
@@ -53,8 +54,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar licença válida (se tiver data de expiração)
     if (tenant.dataExpiracao) {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+      const hoje = brazilTodayStart();
       const dataExpiracao = new Date(tenant.dataExpiracao);
       dataExpiracao.setHours(0, 0, 0, 0);
 

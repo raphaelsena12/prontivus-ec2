@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { brazilToday, brazilTodayStart, brazilTodayEnd, brazilMonthStart, brazilNMonthsAgoStart } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
     if (!auth.authorized) return auth.response;
 
-    const hoje = new Date();
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const inicioMes = brazilMonthStart();
 
     // Últimos 6 meses para gráficos mensais
-    const seisMesesAtras = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+    const seisMesesAtras = brazilNMonthsAgoStart(5);
+
+    // Referência para labels de mês (ano/mês no fuso Brasil)
+    const [brazilYear, brazilMonth] = brazilToday().split("-").map(Number);
+    const hoje = new Date(brazilYear, brazilMonth - 1, 1);
 
     // 1. Consultas presenciais × telemedicina (últimos 6 meses)
     const consultasPorTipo = await prisma.consulta.findMany({
@@ -120,10 +124,8 @@ export async function GET(request: NextRequest) {
     });
 
     // 4. Faturamento particular (dia atual + mês atual)
-    const inicioHoje = new Date(hoje);
-    inicioHoje.setHours(0, 0, 0, 0);
-    const fimHoje = new Date(hoje);
-    fimHoje.setHours(23, 59, 59, 999);
+    const inicioHoje = brazilTodayStart();
+    const fimHoje = brazilTodayEnd();
 
     // Faturamento por dia no mês atual (particular = sem operadora)
     const consultasParticularMes = await prisma.consulta.findMany({

@@ -4,6 +4,7 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma";
 import { TenantInfo } from "@/types/next-auth";
+import { brazilTodayStart } from "@/lib/timezone-utils";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -62,8 +63,7 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          const hoje = new Date();
-          hoje.setHours(0, 0, 0, 0);
+          const hoje = brazilTodayStart();
 
           // Tentar buscar tenants via UsuarioTenant (novo sistema multi-tenant)
           let validTenants: Array<{

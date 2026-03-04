@@ -325,6 +325,7 @@ export async function POST(request: NextRequest) {
         dataHora: dataHoraInicio,
         codigoTussId: codigoTuss.id,
         tipoConsultaId: tipoConsulta?.id || null,
+        modalidade: tipoConsulta ? "TELEMEDICINA" : "PRESENCIAL",
         status: "AGENDADA",
       },
       include: {

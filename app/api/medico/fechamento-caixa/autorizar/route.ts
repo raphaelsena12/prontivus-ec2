@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilDayStart } from "@/lib/timezone-utils";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -83,9 +84,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Converter data para DateTime (início do dia)
-    const dataFechamento = new Date(data);
-    dataFechamento.setHours(0, 0, 0, 0);
+    // Converter data para DateTime (início do dia no Brasil)
+    const dataFechamento = brazilDayStart(data);
 
     // Verificar se já existe autorização para esta data
     const autorizacaoExistente = await prisma.autorizacaoFechamentoCaixa.findUnique({

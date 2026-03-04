@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilDayStart, brazilDayEnd } from "@/lib/timezone-utils";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -67,12 +68,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Converter data para início e fim do dia
-    const data = new Date(dataParam);
-    const inicioDia = new Date(data);
-    inicioDia.setHours(0, 0, 0, 0);
-    const fimDia = new Date(data);
-    fimDia.setHours(23, 59, 59, 999);
+    // Converter data para início e fim do dia no Brasil
+    const inicioDia = brazilDayStart(dataParam);
+    const fimDia = brazilDayEnd(dataParam);
 
     // Buscar consultas do dia
     const whereConsulta: any = {

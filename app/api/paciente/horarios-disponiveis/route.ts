@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilDayStart, brazilDayEnd, brazilDateTime, brazilToday, getBrazilHourMinute } from "@/lib/timezone-utils";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -78,10 +79,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse da data
-    const dataSelecionada = new Date(dataParam + "T00:00:00");
-    const dataInicio = new Date(dataParam + "T08:00:00"); // Início do dia útil: 08:00
-    const dataFim = new Date(dataParam + "T18:00:00"); // Fim do dia útil: 18:00
+    // Parse da data com fuso Brasil
+    const dataSelecionada = brazilDayStart(dataParam);
+    const dataInicio = brazilDateTime(dataParam, "08:00");
+    const dataFim = brazilDateTime(dataParam, "18:00");
 
     // Buscar agendamentos existentes do médico neste dia
     const agendamentos = await prisma.consulta.findMany({
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
         medicoId: medicoId,
         dataHora: {
           gte: dataInicio,
-          lt: new Date(dataParam + "T23:59:59"), // Até o final do dia
+          lt: brazilDayEnd(dataParam),
         },
         status: {
           notIn: ["CANCELADA", "CANCELADO"],
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Buscar bloqueios de agenda que afetam o dia selecionado
-    const dataFimDia = new Date(dataParam + "T23:59:59");
+    const dataFimDia = brazilDayEnd(dataParam);
     const bloqueios = await prisma.bloqueioAgenda.findMany({
       where: {
         clinicaId: auth.clinicaId,
@@ -128,12 +129,10 @@ export async function GET(request: NextRequest) {
     const horariosDisponiveis: string[] = [];
     const horariosOcupados = new Set<string>();
 
-    // Marcar horários ocupados por agendamentos
+    // Marcar horários ocupados por agendamentos (convertido para fuso Brasil)
     agendamentos.forEach((agendamento) => {
-      const dataHora = new Date(agendamento.dataHora);
-      const hora = dataHora.getHours();
-      const minutos = dataHora.getMinutes();
-      const chave = `${hora.toString().padStart(2, "0")}:${minutos.toString().padStart(2, "0")}`;
+      const { hours, minutes } = getBrazilHourMinute(new Date(agendamento.dataHora));
+      const chave = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
       horariosOcupados.add(chave);
     });
 
@@ -207,10 +206,8 @@ export async function GET(request: NextRequest) {
 
     // Gerar lista de horários disponíveis
     const agora = new Date();
-    // Comparar apenas a data (sem hora) para determinar se é hoje
-    const hojeLocal = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-    const dataSelecionadaLocal = new Date(dataParam + "T00:00:00");
-    const eHoje = hojeLocal.getTime() === dataSelecionadaLocal.getTime();
+    // Comparar data no fuso Brasil
+    const eHoje = brazilToday() === dataParam;
 
     console.log(`[Horários Disponíveis] É hoje? ${eHoje}, Agora: ${agora.toISOString()}, Data selecionada: ${dataParam}`);
 
@@ -220,7 +217,7 @@ export async function GET(request: NextRequest) {
         if (!horariosOcupados.has(chave)) {
           // Verificar se não é um horário passado (apenas se for hoje)
           if (eHoje) {
-            const dataHoraHorario = new Date(dataParam + `T${chave}:00`);
+            const dataHoraHorario = brazilDateTime(dataParam, chave);
             
             // Adicionar 10 minutos de margem para evitar problemas de timezone
             const margem = 10 * 60 * 1000; // 10 minutos em milissegundos

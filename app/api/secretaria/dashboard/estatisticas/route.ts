@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilTodayStart, brazilMonthStart } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,9 +23,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const hoje = brazilTodayStart();
+    const inicioMes = brazilMonthStart();
 
     // Buscar estatísticas da secretária
     const [

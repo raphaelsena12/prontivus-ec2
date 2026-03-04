@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { brazilTodayStart } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,8 +35,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const hoje = brazilTodayStart();
 
     // Buscar contas vencidas e pendentes
     const where: any = {

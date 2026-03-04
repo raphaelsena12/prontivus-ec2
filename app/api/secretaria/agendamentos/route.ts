@@ -23,7 +23,6 @@ const agendamentoSchema = z.object({
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().optional().nullable(),
   observacoes: z.string().optional(),
-  modalidade: z.enum(["PRESENCIAL", "TELEMEDICINA"]).optional().default("PRESENCIAL"),
 });
 
 async function checkAuthorization() {
@@ -90,8 +89,8 @@ export async function GET(request: NextRequest) {
       }),
       ...(date && {
         dataHora: {
-          gte: new Date(date + "T00:00:00"),
-          lt: new Date(date + "T23:59:59"),
+          gte: new Date(date + "T00:00:00-03:00"),
+          lt: new Date(date + "T23:59:59-03:00"),
         },
       }),
     };
@@ -463,6 +462,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Derivar modalidade do tipo de consulta selecionado
+    let modalidade = "PRESENCIAL";
+    if (data.tipoConsultaId) {
+      const tipoConsultaModal = await prisma.tipoConsulta.findUnique({
+        where: { id: data.tipoConsultaId },
+        select: { nome: true, codigo: true },
+      });
+      if (tipoConsultaModal) {
+        const check = `${tipoConsultaModal.nome} ${tipoConsultaModal.codigo}`.toLowerCase();
+        if (check.includes("telemedicina")) modalidade = "TELEMEDICINA";
+      }
+    }
+
     const consulta = await prisma.consulta.create({
       data: {
         clinicaId: auth.clinicaId,
@@ -476,7 +488,7 @@ export async function POST(request: NextRequest) {
         planoSaudeId: data.planoSaudeId,
         numeroCarteirinha: data.numeroCarteirinha,
         valorCobrado: data.valorCobrado,
-        modalidade: data.modalidade ?? "PRESENCIAL",
+        modalidade,
         observacoes: motivoAprovacao 
           ? `${data.observacoes || ''}\n\n[Motivo para aprovação: ${motivoAprovacao}]`.trim()
           : data.observacoes,

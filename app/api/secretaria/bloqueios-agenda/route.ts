@@ -212,22 +212,22 @@ export async function GET(request: NextRequest) {
         {
           // Bloqueio que começa dentro do período
           AND: [
-            { dataInicio: { gte: new Date(dataInicio + "T00:00:00") } },
-            { dataInicio: { lte: new Date(dataFim + "T23:59:59") } },
+            { dataInicio: { gte: new Date(dataInicio + "T00:00:00-03:00") } },
+            { dataInicio: { lte: new Date(dataFim + "T23:59:59-03:00") } },
           ],
         },
         {
           // Bloqueio que termina dentro do período
           AND: [
-            { dataFim: { gte: new Date(dataInicio + "T00:00:00") } },
-            { dataFim: { lte: new Date(dataFim + "T23:59:59") } },
+            { dataFim: { gte: new Date(dataInicio + "T00:00:00-03:00") } },
+            { dataFim: { lte: new Date(dataFim + "T23:59:59-03:00") } },
           ],
         },
         {
           // Bloqueio que contém completamente o período
           AND: [
-            { dataInicio: { lte: new Date(dataInicio + "T00:00:00") } },
-            { dataFim: { gte: new Date(dataFim + "T23:59:59") } },
+            { dataInicio: { lte: new Date(dataInicio + "T00:00:00-03:00") } },
+            { dataFim: { gte: new Date(dataFim + "T23:59:59-03:00") } },
           ],
         },
       ];
@@ -236,14 +236,14 @@ export async function GET(request: NextRequest) {
       where.OR = [
         {
           dataInicio: {
-            gte: new Date(data + "T00:00:00"),
-            lt: new Date(data + "T23:59:59"),
+            gte: new Date(data + "T00:00:00-03:00"),
+            lt: new Date(data + "T23:59:59-03:00"),
           },
         },
         {
           dataFim: {
-            gte: new Date(data + "T00:00:00"),
-            lt: new Date(data + "T23:59:59"),
+            gte: new Date(data + "T00:00:00-03:00"),
+            lt: new Date(data + "T23:59:59-03:00"),
           },
         },
       ];

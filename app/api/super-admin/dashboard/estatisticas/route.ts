@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, isSuperAdmin } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { StatusPagamento } from "@/lib/generated/prisma/enums";
+import { brazilTodayStart, brazilMonthStart, brazilNMonthsAgoStart } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +16,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
     }
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const hoje = brazilTodayStart();
+    const inicioMes = brazilMonthStart();
 
     // Buscar estatísticas de pagamentos (similar à página de pagamentos)
     const [
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
           status: StatusPagamento.PAGO,
           mesReferencia: {
             gte: inicioMes,
-            lt: new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1),
+            lt: brazilNMonthsAgoStart(-1),
           },
         },
         _sum: {

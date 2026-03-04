@@ -5,6 +5,7 @@ import { TipoUsuario } from "@/lib/generated/prisma";
 import { uploadPDFToS3 } from "@/lib/s3-service";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { brazilTodayFormatted } from "@/lib/timezone-utils";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -547,8 +548,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (consultaCompleta && prontuario) {
-        const hoje = new Date();
-        const dataEmissao = `${String(hoje.getDate()).padStart(2, "0")}/${String(hoje.getMonth() + 1).padStart(2, "0")}/${hoje.getFullYear()}`;
+        const dataEmissao = brazilTodayFormatted();
         const pdfBuffer = generateProntuarioPDF({
           clinicaNome: consultaCompleta.clinica.nome,
           clinicaCnpj: consultaCompleta.clinica.cnpj || "",

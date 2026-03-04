@@ -316,7 +316,7 @@ export function NovoAgendamentoContent() {
       }
 
       // Combinar data e hora
-      const dataHora = `${data.data}T${data.hora}:00`;
+      const dataHora = new Date(`${data.data}T${data.hora}:00`).toISOString();
 
       // Redirecionar para tela de pagamento
       const params = new URLSearchParams({

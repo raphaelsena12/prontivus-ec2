@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { brazilTodayStart, brazilTomorrowStart } from "@/lib/timezone-utils";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -66,10 +67,8 @@ export async function GET(request: NextRequest) {
       return auth.response;
     }
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const amanha = new Date(hoje);
-    amanha.setDate(amanha.getDate() + 1);
+    const hoje = brazilTodayStart();
+    const amanha = brazilTomorrowStart();
 
     const { searchParams } = new URL(request.url);
     const statusFilter = searchParams.get("status"); // Recebe filtro opcional via query param

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { StatusPagamento, StatusClinica } from "@/lib/generated/prisma/enums";
 import { Prisma } from "@/lib/generated/prisma/client";
+import { brazilTodayStart } from "@/lib/timezone-utils";
 
 /**
  * Registra um novo pagamento mensal para uma clínica
@@ -161,9 +162,8 @@ export async function verificarPagamentoEmDia(tenantId: string): Promise<boolean
   }
 
   // Verificar se a data de expiração é futura
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  
+  const hoje = brazilTodayStart();
+
   const dataExpiracao = new Date(tenant.dataExpiracao);
   dataExpiracao.setHours(0, 0, 0, 0);
 
