@@ -24,7 +24,29 @@ async function main() {
   console.log("");
 
   try {
-    const syncService = new AnvisaSyncService();
+    // Obter clinicaId do argumento da linha de comando ou buscar a primeira clínica
+    const clinicaIdArg = process.argv[2];
+    let clinicaId = clinicaIdArg;
+
+    if (!clinicaId) {
+      // Se não foi fornecido, buscar a primeira clínica disponível
+      const primeiraClinica = await prisma.tenant.findFirst({
+        select: { id: true },
+      });
+
+      if (!primeiraClinica) {
+        console.error("❌ ERRO: Nenhuma clínica encontrada no banco de dados.");
+        console.error("   Por favor, forneça um clinicaId como argumento:");
+        console.error("   npm run sync:anvisa <clinicaId>");
+        process.exit(1);
+      }
+
+      clinicaId = primeiraClinica.id;
+      console.log(`Usando clínica: ${clinicaId}`);
+      console.log("");
+    }
+
+    const syncService = new AnvisaSyncService(clinicaId);
 
     console.log("Iniciando sincronização...");
     console.log("");

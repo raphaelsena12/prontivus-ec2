@@ -29,8 +29,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Obter clinicaId do body da requisição
+    const body = await request.json().catch(() => ({}));
+    const { clinicaId } = body;
+
+    if (!clinicaId || typeof clinicaId !== "string") {
+      return NextResponse.json(
+        { error: "clinicaId é obrigatório no body da requisição" },
+        { status: 400 }
+      );
+    }
+
     // Iniciar sincronização em background
-    const syncService = new AnvisaSyncService();
+    const syncService = new AnvisaSyncService(clinicaId);
 
     // Executar sincronização (pode demorar vários minutos)
     const result = await syncService.sync();

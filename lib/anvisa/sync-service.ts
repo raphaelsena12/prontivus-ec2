@@ -323,10 +323,10 @@ export class AnvisaSyncService {
           numeroRegistro: numeroRegistro.trim(),
           nomeProduto: this.formatTitleCase(nomeProduto.trim()) || nomeProduto.trim(),
           principioAtivo: this.formatTitleCase(
-            this.getColumnValue(columns, columnMap.principioAtivo)?.trim()
+            this.getColumnValue(columns, columnMap.principioAtivo)?.trim() || null
           ),
           empresa: this.formatTitleCase(
-            this.getColumnValue(columns, columnMap.empresa)?.trim()
+            this.getColumnValue(columns, columnMap.empresa)?.trim() || null
           ),
           situacaoRegistro:
             this.getColumnValue(columns, columnMap.situacaoRegistro)?.trim() ||

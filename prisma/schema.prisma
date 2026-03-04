@@ -377,6 +377,27 @@ model Medicamento {
   @@map("medicamentos")
 }
 
+model MedicamentoAnvisa {
+  id                String   @id @default(uuid())
+  numeroRegistro    String   @unique
+  nomeProduto       String
+  principioAtivo    String?
+  empresa           String?
+  situacaoRegistro  String?
+  classeTerapeutica String?
+  apresentacao      String?
+  concentracao      String?
+  data              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([numeroRegistro])
+  @@index([nomeProduto])
+  @@index([principioAtivo])
+  @@index([empresa])
+  @@map("medicamentos_anvisa")
+}
+
 model Insumo {
   id        String   @id @default(uuid())
   clinicaId String

@@ -21,6 +21,7 @@ interface Medicamento {
   laboratorio: string | null;
   concentracao: string | null;
   apresentacao: string | null;
+  controle: string | null;
   unidade: string | null;
   ativo: boolean;
   createdAt: Date;

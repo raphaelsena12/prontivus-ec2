@@ -221,7 +221,8 @@ export async function GET(request: NextRequest) {
               // Filtrar arquivos que contenham o usuarioId no nome
               const arquivosDoUsuario = listAllResult.Contents.filter(c => {
                 const key = c.Key || '';
-                return key.includes(consulta.paciente.usuarioId) && 
+                const usuarioId = consulta.paciente.usuarioId;
+                return usuarioId && key.includes(usuarioId) && 
                        key.match(/\.(jpg|jpeg|png|gif|webp)$/i);
               });
               
