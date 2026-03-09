@@ -27,6 +27,7 @@ import { generateJustificativaPedidosExamesPDF } from "@/lib/pdf/justificativa-e
 import { generateControleDiabetesPDF, generateControleDiabetesAnaliticoPDF } from "@/lib/pdf/controle-diabetes";
 import { generateControlePressaoPDF, generateControlePressaoAnaliticoPDF } from "@/lib/pdf/controle-pressao";
 import { generateFichaAtendimentoPDF } from "@/lib/pdf/ficha-atendimento";
+import { generateGuiaConsultaTISSPDF } from "@/lib/pdf/guia-consulta-tiss";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
@@ -684,6 +685,24 @@ export async function POST(request: NextRequest) {
           prescricoes,
           atestados: dados?.atestados || [],
         });
+        break;
+      }
+
+      // =====================================================
+      // GUIA CONSULTA - TISS
+      // =====================================================
+      case "guia-consulta-tiss": {
+        let iamspeLogoBase64: string | undefined;
+        try {
+          const { readFileSync } = await import("fs");
+          const { join } = await import("path");
+          const logoPath = join(process.cwd(), "public", "iamspe-logo.png");
+          const logoBuffer = readFileSync(logoPath);
+          iamspeLogoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
+        } catch {
+          // Logo não encontrado — usa desenho vetorial como fallback
+        }
+        pdfBuffer = generateGuiaConsultaTISSPDF({ ...baseData }, iamspeLogoBase64);
         break;
       }
 

@@ -463,7 +463,7 @@ export function AISidebar({
         {/* Contexto da IA — não é colapsável */}
         <div className="px-3 pt-3 pb-2.5">
           <p className="text-[10px] font-semibold text-[#1E40AF] uppercase tracking-widest mb-2.5">
-            Selecione informações desejadas para análise:
+            Selecione para analisar com Inteligência Artificial:
           </p>
           <div className="space-y-2">
             {/* Itens fixos: anamnese, alergias, medicamentos */}

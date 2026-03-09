@@ -2,7 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
-import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma";
+import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma/enums";
 import { TenantInfo } from "@/types/next-auth";
 import { brazilTodayStart } from "@/lib/timezone-utils";
 

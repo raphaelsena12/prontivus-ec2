@@ -82,6 +82,7 @@ const documentModels: DocumentModel[] = [
   { id: "laudo-medico", nome: "Laudo Médico", descricao: "Laudo médico detalhado com diagnóstico e parecer técnico", categoria: "laudos", icon: ScrollText },
   { id: "risco-cirurgico-cardiaco", nome: "Risco Cirúrgico Cardíaco", descricao: "Avaliação de risco cirúrgico cardíaco pré-operatório", categoria: "laudos", icon: Heart },
   { id: "guia-encaminhamento", nome: "Guia de Encaminhamento", descricao: "Guia para encaminhamento a outro especialista ou serviço", categoria: "laudos", icon: Stethoscope },
+  { id: "guia-consulta-tiss", nome: "Guia Consulta - TISS", descricao: "Guia de consulta padrão TISS para planos de saúde (ANS) — A4 paisagem", categoria: "laudos", icon: ClipboardList },
   { id: "controle-diabetes-analitico", nome: "Controle de Diabetes Analítico", descricao: "Ficha analítica de acompanhamento de diabetes com gráficos e métricas", categoria: "outros", icon: Activity },
   { id: "controle-diabetes", nome: "Controle de Diabetes", descricao: "Ficha de controle e acompanhamento de diabetes", categoria: "outros", icon: Activity },
   { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico", descricao: "Ficha analítica de acompanhamento de pressão arterial com métricas", categoria: "outros", icon: Heart },

@@ -1601,6 +1601,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     { id: "laudo-medico", nome: "Laudo Médico" },
     { id: "risco-cirurgico-cardiaco", nome: "Risco Cirúrgico Cardíaco" },
     { id: "guia-encaminhamento", nome: "Guia de Encaminhamento" },
+    { id: "guia-consulta-tiss", nome: "Guia Consulta - TISS" },
     { id: "controle-diabetes-analitico", nome: "Controle de Diabetes Analítico" },
     { id: "controle-diabetes", nome: "Controle de Diabetes" },
     { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico" },
