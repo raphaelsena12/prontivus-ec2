@@ -137,6 +137,37 @@ function dbox(
 
 // ─── Logo IAMSPE ──────────────────────────────────────────────────────
 
+/**
+ * Calcula as dimensões proporcionais da imagem para caber no espaço disponível
+ * mantendo a proporção original
+ */
+function calculateImageDimensions(
+  doc: jsPDF,
+  imageBase64: string,
+  maxWidth: number,
+  maxHeight: number
+): { width: number; height: number } {
+  // Obter propriedades da imagem
+  const imgProps = doc.getImageProperties(imageBase64);
+  const imgWidth = imgProps.width;
+  const imgHeight = imgProps.height;
+  
+  // Calcular proporção original
+  const aspectRatio = imgWidth / imgHeight;
+  
+  // Calcular dimensões mantendo proporção
+  let width = maxWidth;
+  let height = maxWidth / aspectRatio;
+  
+  // Se a altura calculada exceder o máximo, ajustar pela altura
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = maxHeight * aspectRatio;
+  }
+  
+  return { width, height };
+}
+
 function drawIamspe(doc: jsPDF, x: number, y: number, _areaW: number, areaH: number): void {
   doc.setFillColor(...TEAL);
 
@@ -171,30 +202,35 @@ export function generateGuiaConsultaTISSPDF(_data: BaseDocumentData, logoBase64?
   let y = M;
 
   // ===================================================================
-  // CABEÇALHO: Logo | Título | 2-Nº
+  // CABEÇALHO: Logo (esquerda) | Título (centro) | 2-Nº (direita)
   // ===================================================================
   const HDR_H = 10;
-  const LOGO_W  = 42;
-  const F2_W    = 48;
-  const TITLE_W = CW - LOGO_W - F2_W; // ~197 mm
+  const LOGO_W  = 50; // logo aumentado
+  const F2_W    = 48; // espaço para 2-Nº à direita
+  const TITLE_W = CW - LOGO_W - F2_W; // espaço para o título no meio
 
-  // borda geral
+  // borda geral (sem separadores verticais)
   doc.setDrawColor(...TEAL);
   doc.setLineWidth(0.25);
   doc.rect(M, y, CW, HDR_H, "S");
 
-  // separadores verticais
-  doc.line(M + LOGO_W,            y, M + LOGO_W,            y + HDR_H);
-  doc.line(M + LOGO_W + TITLE_W,  y, M + LOGO_W + TITLE_W,  y + HDR_H);
-
-  // ── Logo ──
+  // ── Logo à esquerda (com padding interno) ──
+  const LOGO_PADDING = 0.8; // padding interno para não encostar na borda
   if (logoBase64) {
-    doc.addImage(logoBase64, "PNG", M + 1, y + 0.5, LOGO_W - 2, HDR_H - 1);
+    const maxLogoWidth = LOGO_W - 2 * LOGO_PADDING;
+    const maxLogoHeight = HDR_H - 2 * LOGO_PADDING;
+    const imgDims = calculateImageDimensions(doc, logoBase64, maxLogoWidth, maxLogoHeight);
+    
+    // Com padding interno
+    const logoX = M + LOGO_PADDING;
+    const logoY = y + LOGO_PADDING;
+    
+    doc.addImage(logoBase64, "PNG", logoX, logoY, imgDims.width, imgDims.height);
   } else {
-    drawIamspe(doc, M + 1, y + 0.5, LOGO_W - 2, HDR_H - 1);
+    drawIamspe(doc, M + LOGO_PADDING, y + LOGO_PADDING, LOGO_W - 2 * LOGO_PADDING, HDR_H - 2 * LOGO_PADDING);
   }
 
-  // ── Título centralizado ──
+  // ── Título no centro ──
   {
     const titleTxt = "GUIA DE SERVIÇO PROFISSIONAL / SERVIÇO AUXILIAR DE DIAGNÓSTICO E TERAPIA - SP/SADT";
     let tfs = 10;
@@ -205,19 +241,19 @@ export function generateGuiaConsultaTISSPDF(_data: BaseDocumentData, logoBase64?
       doc.setFontSize(tfs);
     }
     doc.setTextColor(...TEAL);
-    doc.text(titleTxt, M + LOGO_W + TITLE_W / 2, y + HDR_H / 2 + tfs * 0.18, { align: "center" });
+    const titleY = y + HDR_H / 2 + tfs * 0.18;
+    doc.text(titleTxt, M + LOGO_W + TITLE_W / 2, titleY, { align: "center" });
   }
 
-  // ── Campo 2 – Nº (célula própria à direita) ──
+  // ── Campo 2 – Nº (à direita, centralizado verticalmente) ──
   {
     const f2x = M + LOGO_W + TITLE_W + 1;
-    // label "2- Nº" grande
+    // label "2- Nº" grande, centralizado verticalmente com o título
     doc.setFont(_font, "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(11);
     doc.setTextColor(...TEAL);
-    doc.text("2- Nº", f2x, y + 4.5);
-    // caixinhas alinhadas ao centro-base
-    dbox(doc, f2x, y + 5.5, "##########", 2.3, 2.0);
+    const f2Y = y + HDR_H / 2 + 11 * 0.18; // centralizado verticalmente
+    doc.text("2- Nº", f2x, f2Y);
   }
 
   y += HDR_H;
