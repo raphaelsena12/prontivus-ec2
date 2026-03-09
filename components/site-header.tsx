@@ -657,7 +657,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                 className="relative hover:bg-muted text-foreground transition-all duration-200"
                 onClick={() => setIsOpen(!isOpen)}
               >
-                <IconMessage className="h-5 w-5" />
+                <IconMessage className="h-6 w-6" />
                 {mensagensNaoLidas > 0 && (
                   <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
                 )}

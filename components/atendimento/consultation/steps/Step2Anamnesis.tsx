@@ -99,6 +99,8 @@ function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
   for (const line of lines) {
     const t = line.trim();
     const upper = t.toUpperCase();
+    
+    // Verificar se é o título da seção que estamos procurando
     if (
       upper === upperTitle ||
       upper.startsWith(upperTitle + ":") ||
@@ -106,17 +108,65 @@ function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
     ) {
       capturing = true;
       const afterColon = t.includes(":") ? t.slice(t.indexOf(":") + 1).trim() : "";
-      if (afterColon) result.push(afterColon);
+      if (afterColon && afterColon.toUpperCase() !== "N/A") {
+        result.push(afterColon);
+      }
       continue;
     }
+    
     if (capturing) {
-      const isNewSection =
-        t.length > 0 && t === t.toUpperCase() && t.length < 80;
-      if (isNewSection && result.length > 0) break;
-      if (t) result.push(t);
+      // Verificar se encontramos uma nova seção conhecida
+      let isNewSection = false;
+      
+      // Verificar se a linha contém um título conhecido (com ou sem dois pontos)
+      for (const knownTitle of knownTitles) {
+        const upperKnownTitle = knownTitle.toUpperCase();
+        // Verificar se a linha é exatamente o título ou começa com o título seguido de ":"
+        if (
+          upper === upperKnownTitle ||
+          upper.startsWith(upperKnownTitle + ":") ||
+          (upper.includes(":") && upper.substring(0, upper.indexOf(":")).trim() === upperKnownTitle)
+        ) {
+          // Se não for a seção atual, é uma nova seção
+          if (upperKnownTitle !== upperTitle) {
+            isNewSection = true;
+            break;
+          }
+        }
+      }
+      
+      // Também verificar padrão genérico de título (tudo maiúsculas, sem dois pontos no meio do texto)
+      if (!isNewSection && t.length > 0 && t === t.toUpperCase() && t.length < 80 && !t.includes(":") && !t.match(/^[a-z]/)) {
+        // Verificar se parece um título conhecido
+        const looksLikeTitle = knownTitles.some(title => 
+          upper.includes(title.toUpperCase()) || title.toUpperCase().includes(upper)
+        );
+        if (looksLikeTitle && upper !== upperTitle) {
+          isNewSection = true;
+        }
+      }
+      
+      if (isNewSection && result.length > 0) {
+        break;
+      }
+      
+      // Adicionar linha ao resultado, mas filtrar "N/A" se já houver conteúdo
+      if (t) {
+        // Se a linha contém apenas "N/A" e já temos conteúdo, não adicionar
+        if (t.toUpperCase() === "N/A" && result.length > 0) {
+          continue;
+        }
+        result.push(t);
+      }
     }
   }
-  return result.join("\n") || "";
+  
+  const content = result.join("\n").trim();
+  // Se o conteúdo for apenas "N/A", retornar string vazia
+  if (content.toUpperCase() === "N/A" || content.toUpperCase() === "N/A\n") {
+    return "";
+  }
+  return content;
 }
 
 function combineSections(values: Record<string, string>): string {
@@ -158,7 +208,7 @@ function ensureAllSections(
       (s) => s.title.toUpperCase() === section.label.toUpperCase()
     );
     if (!exists) {
-      result.push({ title: section.label, content: "N/A" });
+      result.push({ title: section.label, content: "" });
     }
   }
   // Reordena para seguir a ordem de ANAMNESE_SECTIONS
@@ -166,7 +216,15 @@ function ensureAllSections(
     const found = result.find(
       (r) => r.title.toUpperCase() === s.label.toUpperCase()
     );
-    return found ?? { title: s.label, content: "N/A" };
+    if (found) {
+      // Limpar conteúdo que é apenas "N/A"
+      const content = found.content.trim();
+      if (content.toUpperCase() === "N/A") {
+        return { title: found.title, content: "" };
+      }
+      return found;
+    }
+    return { title: s.label, content: "" };
   });
 }
 
@@ -190,17 +248,23 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
 
     let titleMatch: { title: string; content: string } | null = null;
 
+    // Verificar se a linha contém um título conhecido
     if (trimmed.includes(":")) {
       const colonIndex = trimmed.indexOf(":");
       const beforeColon = trimmed.substring(0, colonIndex).trim();
       const afterColon = trimmed.substring(colonIndex + 1).trim();
       const upperBefore = beforeColon.toUpperCase();
 
-      const isKnownTitle = knownTitles.some(title =>
-        upperBefore === title ||
-        upperBefore.startsWith(title) ||
-        title.startsWith(upperBefore)
-      );
+      const isKnownTitle = knownTitles.some(title => {
+        const upperTitle = title.toUpperCase();
+        return (
+          upperBefore === upperTitle ||
+          upperBefore.startsWith(upperTitle) ||
+          upperTitle.startsWith(upperBefore) ||
+          upperBefore.includes(upperTitle) ||
+          upperTitle.includes(upperBefore)
+        );
+      });
 
       const looksLikeTitle =
         beforeColon === upperBefore &&
@@ -215,13 +279,18 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
       }
     }
 
+    // Verificar se a linha inteira é um título conhecido (sem dois pontos)
     if (!titleMatch) {
       const upperTrimmed = trimmed.toUpperCase();
-      const isKnownTitle = knownTitles.some(title =>
-        upperTrimmed === title ||
-        upperTrimmed.startsWith(title + " ") ||
-        title.startsWith(upperTrimmed)
-      );
+      const isKnownTitle = knownTitles.some(title => {
+        const upperTitle = title.toUpperCase();
+        return (
+          upperTrimmed === upperTitle ||
+          upperTrimmed.startsWith(upperTitle + " ") ||
+          upperTitle.startsWith(upperTrimmed) ||
+          (trimmed === upperTrimmed && trimmed.length < 80)
+        );
+      });
 
       if (isKnownTitle && trimmed === upperTrimmed && trimmed.length < 80) {
         titleMatch = {
@@ -232,8 +301,50 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
     }
 
     if (titleMatch) {
+      // Salvar a seção anterior antes de começar uma nova
       if (currentTitle || currentContent.length > 0) {
-        const content = currentContent.join("\n").trim();
+        let content = currentContent.join("\n").trim();
+        
+        // Limpar "N/A" se for o único conteúdo
+        if (content.toUpperCase() === "N/A") {
+          content = "";
+        }
+        
+        // Remover linhas que são títulos de outras seções do conteúdo
+        const cleanedContent: string[] = [];
+        const contentLines = content.split("\n");
+        for (const contentLine of contentLines) {
+          const contentTrimmed = contentLine.trim();
+          const contentUpper = contentTrimmed.toUpperCase();
+          
+          // Verificar se esta linha é um título conhecido de outra seção
+          let isOtherSectionTitle = false;
+          if (currentTitle) {
+            for (const knownTitle of knownTitles) {
+              const upperKnownTitle = knownTitle.toUpperCase();
+              const currentTitleUpper = currentTitle.toUpperCase();
+              
+              // Se não for o título atual e for um título conhecido
+              if (
+                upperKnownTitle !== currentTitleUpper &&
+                (contentUpper === upperKnownTitle ||
+                 contentUpper.startsWith(upperKnownTitle + ":") ||
+                 (contentTrimmed.includes(":") && 
+                  contentTrimmed.substring(0, contentTrimmed.indexOf(":")).trim().toUpperCase() === upperKnownTitle))
+              ) {
+                isOtherSectionTitle = true;
+                break;
+              }
+            }
+          }
+          
+          if (!isOtherSectionTitle) {
+            cleanedContent.push(contentLine);
+          }
+        }
+        
+        content = cleanedContent.join("\n").trim();
+        
         if (currentTitle || content) {
           sections.push({
             title: currentTitle,
@@ -244,18 +355,71 @@ function formatAnamneseWithTitles(text: string): Array<{ title: string; content:
       currentTitle = titleMatch.title;
       currentContent = titleMatch.content ? [titleMatch.content] : [];
     } else {
-      if (currentTitle || currentContent.length > 0) {
-        currentContent.push(trimmed);
+      // Verificar se a linha atual é um título conhecido que não foi detectado antes
+      const upperTrimmed = trimmed.toUpperCase();
+      let isOtherSectionTitle = false;
+      
+      if (currentTitle) {
+        for (const knownTitle of knownTitles) {
+          const upperKnownTitle = knownTitle.toUpperCase();
+          const currentTitleUpper = currentTitle.toUpperCase();
+          
+          if (
+            upperKnownTitle !== currentTitleUpper &&
+            (upperTrimmed === upperKnownTitle ||
+             upperTrimmed.startsWith(upperKnownTitle + ":") ||
+             (trimmed.includes(":") && 
+              trimmed.substring(0, trimmed.indexOf(":")).trim().toUpperCase() === upperKnownTitle))
+          ) {
+            isOtherSectionTitle = true;
+            break;
+          }
+        }
+      }
+      
+      if (isOtherSectionTitle) {
+        // Esta linha é um título de outra seção, parar de capturar
+        if (currentTitle || currentContent.length > 0) {
+          let content = currentContent.join("\n").trim();
+          if (content.toUpperCase() === "N/A") {
+            content = "";
+          }
+          if (currentTitle || content) {
+            sections.push({
+              title: currentTitle,
+              content: content,
+            });
+          }
+        }
+        // Processar esta linha como um novo título na próxima iteração
+        // Mas primeiro, vamos processá-la agora
+        const colonIndex = trimmed.indexOf(":");
+        if (colonIndex > 0) {
+          const beforeColon = trimmed.substring(0, colonIndex).trim();
+          const afterColon = trimmed.substring(colonIndex + 1).trim();
+          currentTitle = beforeColon;
+          currentContent = afterColon ? [afterColon] : [];
+        } else {
+          currentTitle = trimmed;
+          currentContent = [];
+        }
       } else {
-        if (sections.length === 0) {
+        if (currentTitle || currentContent.length > 0) {
           currentContent.push(trimmed);
+        } else {
+          if (sections.length === 0) {
+            currentContent.push(trimmed);
+          }
         }
       }
     }
   }
 
   if (currentTitle || currentContent.length > 0) {
-    const content = currentContent.join("\n").trim();
+    let content = currentContent.join("\n").trim();
+    if (content.toUpperCase() === "N/A") {
+      content = "";
+    }
     if (currentTitle || content) {
       sections.push({
         title: currentTitle,

@@ -31,6 +31,9 @@ interface Estatisticas {
   pagamentosVencidos: number;
   receitaMesAtual: number;
   receitaTotal: number;
+  receitaParticular: number;
+  receitaConvenios: number;
+  retornos: number;
 }
 
 interface ChartsData {

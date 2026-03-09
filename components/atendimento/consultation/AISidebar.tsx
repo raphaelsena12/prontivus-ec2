@@ -414,8 +414,11 @@ export function AISidebar({
 
       {/* ── Box 1: IA Clínica ── */}
       <div
-        className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col w-full min-w-0"
-        style={{ backgroundColor: isProcessing ? "#EEF3FF" : "#F5F8FF" }}
+        className="border border-slate-200 rounded-lg overflow-hidden flex flex-col w-full min-w-0"
+        style={{ 
+          backgroundColor: isProcessing ? "#EEF3FF" : "#F5F8FF",
+          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)"
+        }}
       >
 
         {/* Cabeçalho azul — título do box */}

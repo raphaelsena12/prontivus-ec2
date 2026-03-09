@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
-import { brazilTodayStart, brazilMonthStart } from "@/lib/timezone-utils";
+import { brazilTodayStart, brazilMonthStart, getDateRangeFromFilter } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
     if (!auth.authorized) return auth.response;
 
+    // Obter filtro de data da query string (default: mensal)
+    const { searchParams } = new URL(request.url);
+    const dateFilter = (searchParams.get("filter") || "mensal") as "diario" | "mensal" | "anual";
+    const { start: dataInicio, end: dataFim } = getDateRangeFromFilter(dateFilter);
+
     const hoje = brazilTodayStart();
-    const inicioMes = brazilMonthStart();
 
     // Buscar estatísticas do médico
     const [
@@ -57,14 +61,15 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      // Receita do mês atual
+      // Receita do período filtrado
       prisma.consulta.aggregate({
         where: {
           medicoId: auth.medicoId,
           clinicaId: auth.clinicaId,
           status: "REALIZADA",
           dataHora: {
-            gte: inicioMes,
+            gte: dataInicio,
+            lte: dataFim,
           },
         },
         _sum: {

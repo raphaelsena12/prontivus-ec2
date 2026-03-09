@@ -257,7 +257,13 @@ function drawIamspe(doc: jsPDF, x: number, y: number, _areaW: number, areaH: num
 // =====================================================================
 // GERADOR PRINCIPAL
 // =====================================================================
-export function generateGuiaConsultaTISSPDF(_data: BaseDocumentData, logoBase64?: string): ArrayBuffer {
+interface ExameSolicitado { nome: string; tipo?: string; justificativa?: string; }
+
+export function generateGuiaConsultaTISSPDF(
+  _data: BaseDocumentData,
+  logoBase64?: string,
+  examesSolicitados: ExameSolicitado[] = [],
+): ArrayBuffer {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   initFont(doc);
 
@@ -509,17 +515,17 @@ export function generateGuiaConsultaTISSPDF(_data: BaseDocumentData, logoBase64?
     for (const c of pCols) { fc(doc, cx, y, c.w, THH, c.n, c.l); cx += c.w; }
     y += THH;
 
-    // Dados de teste para procedimentos
-    const procedimentosData = [
-      { tabela: "TUSS", codigo: "31001013", descricao: "Consulta médica em consultório", qtSolic: "1", qtAutoriz: "1" },
-      { tabela: "TUSS", codigo: "40301012", descricao: "Hemograma completo", qtSolic: "1", qtAutoriz: "1" },
-      { tabela: "", codigo: "", descricao: "", qtSolic: "", qtAutoriz: "" },
-      { tabela: "", codigo: "", descricao: "", qtSolic: "", qtAutoriz: "" },
-      { tabela: "", codigo: "", descricao: "", qtSolic: "", qtAutoriz: "" },
-    ];
+    // Divide o texto do campo 27 pelas 5 linhas existentes da tabela
+    const descricaoExames = examesSolicitados.map((e) => e.nome).join(", ");
+    const f27w = pCols.find((c) => c.n === "27")!.w;
+    doc.setFontSize(5);
+    doc.setFont(_font, "normal");
+    const f27Lines: string[] = descricaoExames
+      ? (doc.splitTextToSize(descricaoExames, f27w - 2) as string[])
+      : [];
 
     for (let r = 0; r < 5; r++) {
-      const procData = procedimentosData[r] || {};
+      const descricaoLinha = f27Lines[r] ?? "";
       cx = M;
       for (const c of pCols) {
         doc.setFillColor(...WHITE);
@@ -529,30 +535,21 @@ export function generateGuiaConsultaTISSPDF(_data: BaseDocumentData, logoBase64?
         if (c.n === "25") {
           tealText(doc, String(r + 1), cx + 0.8, y + 2.5, 4);
           dbox(doc, cx + 3.5, y + 1.0, "XXXX", 2.0, 2.0);
-          if (procData.tabela) {
-            fillDbox(doc, cx + 3.5, y + 1.0, "XXXX", procData.tabela, 2.0, 2.0);
-          }
         }
         if (c.n === "26") {
-          dbox(doc, cx + 1,   y + 1.0, "XXXXXXXX",  2.0, 2.0);
-          if (procData.codigo) {
-            fillDbox(doc, cx + 1, y + 1.0, "XXXXXXXX", procData.codigo, 2.0, 2.0);
-          }
+          dbox(doc, cx + 1, y + 1.0, "XXXXXXXX", 2.0, 2.0);
         }
-        if (c.n === "27" && procData.descricao) {
-          renderFieldValue(doc, procData.descricao, cx, y - 1, c.w, 3.5);
+        if (c.n === "27" && descricaoLinha) {
+          doc.setFontSize(5);
+          doc.setFont(_font, "normal");
+          doc.setTextColor(...TEAL);
+          doc.text(descricaoLinha, cx + 1, y + 3);
         }
         if (c.n === "28") {
-          dbox(doc, cx + 1,   y + 1.0, "XXXX",      2.0, 2.0);
-          if (procData.qtSolic) {
-            fillDbox(doc, cx + 1, y + 1.0, "XXXX", procData.qtSolic, 2.0, 2.0);
-          }
+          dbox(doc, cx + 1, y + 1.0, "XXXX", 2.0, 2.0);
         }
         if (c.n === "29") {
-          dbox(doc, cx + 1,   y + 1.0, "XXXX",      2.0, 2.0);
-          if (procData.qtAutoriz) {
-            fillDbox(doc, cx + 1, y + 1.0, "XXXX", procData.qtAutoriz, 2.0, 2.0);
-          }
+          dbox(doc, cx + 1, y + 1.0, "XXXX", 2.0, 2.0);
         }
         cx += c.w;
       }

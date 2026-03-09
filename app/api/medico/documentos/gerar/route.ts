@@ -702,7 +702,11 @@ export async function POST(request: NextRequest) {
         } catch {
           // Logo não encontrado — usa desenho vetorial como fallback
         }
-        pdfBuffer = generateGuiaConsultaTISSPDF({ ...baseData }, iamspeLogoBase64);
+        pdfBuffer = generateGuiaConsultaTISSPDF(
+          { ...baseData },
+          iamspeLogoBase64,
+          dados?.examesSolicitados ?? [],
+        );
         break;
       }
 

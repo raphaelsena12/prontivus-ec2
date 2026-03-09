@@ -69,6 +69,7 @@ import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
 import { MicrophoneSelectorModal } from '@/components/microphone-selector-modal';
 import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialog';
+import { GuiaTissExamesModal, type ExameSolicitado } from '@/components/guia-tiss-exames-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -199,6 +200,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   };
   const [documentosGerados, setDocumentosGerados] = useState<DocumentoGeradoLocal[]>([]);
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
+  const [tissModalOpen, setTissModalOpen] = useState(false);
+  const [tissGerandoGuia, setTissGerandoGuia] = useState(false);
   const [selectedConsultaForDocumentos, setSelectedConsultaForDocumentos] = useState<string | null>(null);
   const [selectedConsultaDataForDocumentos, setSelectedConsultaDataForDocumentos] = useState<string | null>(null);
   const [selectedAIModel] = useState<'openai'>('openai');
@@ -1621,7 +1624,13 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   }, [documentoSearch, documentModels]);
 
-  const handleGenerateDocument = async (modelId: string) => {
+  const handleGenerateDocument = async (modelId: string, examesSolicitados?: ExameSolicitado[]) => {
+    // Guia TISS: abrir modal primeiro para coletar exames
+    if (modelId === "guia-consulta-tiss" && !examesSolicitados) {
+      setTissModalOpen(true);
+      return;
+    }
+
     const documentModel = documentModels.find((m) => m.id === modelId);
     const nomeDocumento = documentModel?.nome || modelId;
 
@@ -1650,6 +1659,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         requestData.dados.cidDescricao = selectedCidsList[0].description;
       }
 
+      // Adicionar exames solicitados (Guia TISS)
+      if (modelId === "guia-consulta-tiss" && examesSolicitados && examesSolicitados.length > 0) {
+        requestData.dados.examesSolicitados = examesSolicitados;
+      }
+
       // Chamar API para gerar o PDF
       const response = await fetch("/api/medico/documentos/gerar", {
         method: "POST",
@@ -1671,17 +1685,27 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         tipoDocumento: modelId,
         nomeDocumento,
         createdAt: new Date().toISOString(),
-        pdfBlob, // Armazenar o blob para visualização posterior
+        pdfBlob,
         assinado: false,
       };
 
       setDocumentosGerados([...documentosGerados, novoDocumento]);
-      setDocumentoSearch(""); // Limpar o input após adicionar
+      setDocumentoSearch("");
       setDocumentoSuggestions([]);
       toast.success("Documento adicionado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar documento:", error);
       toast.error(error.message || "Erro ao gerar documento");
+    }
+  };
+
+  const handleTissConfirm = async (exames: ExameSolicitado[]) => {
+    setTissModalOpen(false);
+    setTissGerandoGuia(true);
+    try {
+      await handleGenerateDocument("guia-consulta-tiss", exames);
+    } finally {
+      setTissGerandoGuia(false);
     }
   };
 
@@ -2247,6 +2271,16 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         }}
         consultaId={selectedConsultaForDocumentos || ""}
         consultaData={selectedConsultaDataForDocumentos || undefined}
+      />
+
+      {/* Modal Guia Consulta TISS — coleta exames antes de gerar */}
+      <GuiaTissExamesModal
+        key={tissModalOpen ? "tiss-open" : "tiss-closed"}
+        isOpen={tissModalOpen}
+        onClose={() => setTissModalOpen(false)}
+        onConfirm={handleTissConfirm}
+        isLoading={tissGerandoGuia}
+        examesSugeridos={analysisResults?.exames ?? []}
       />
       <MicrophoneSelectorModal
         isOpen={isMicrophoneSelectorOpen}

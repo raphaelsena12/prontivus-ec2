@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { Loader2, TrendingUp, TrendingDown, DollarSign, Clock } from "lucide-react";
 import { PagamentosCards } from "@/components/pagamentos-cards";
+import { DateFilterBadges } from "@/components/date-filter-badges";
+import { DateFilter } from "@/lib/timezone-utils";
 import {
   Bar,
   BarChart,
@@ -85,15 +87,19 @@ export function MedicoContent({ nome }: MedicoContentProps) {
   const [chartData, setChartData] = useState<ChartData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("mensal");
 
-  useEffect(() => {
-    fetch("/api/medico/dashboard/estatisticas")
+  const fetchData = (filter: DateFilter) => {
+    setLoading(true);
+    setLoadingCharts(true);
+
+    fetch(`/api/medico/dashboard/estatisticas?filter=${filter}`)
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then(setEstatisticas)
       .catch((e) => console.error("Erro estatísticas:", e))
       .finally(() => setLoading(false));
 
-    fetch("/api/medico/dashboard/charts")
+    fetch(`/api/medico/dashboard/charts?filter=${filter}`)
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((json) => setChartData({
         presencialVsTele: json.presencialVsTele ?? [],
@@ -103,7 +109,15 @@ export function MedicoContent({ nome }: MedicoContentProps) {
       }))
       .catch((e) => console.error("Erro charts:", e))
       .finally(() => setLoadingCharts(false));
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchData(dateFilter);
+  }, [dateFilter]);
+
+  const handleFilterChange = (filter: DateFilter) => {
+    setDateFilter(filter);
+  };
 
   const primeiroNome = nome.split(" ")[0];
 
@@ -112,6 +126,9 @@ export function MedicoContent({ nome }: MedicoContentProps) {
       <div className="flex flex-col">
         {/* Cards */}
         <div className="pt-2 px-4 lg:px-6">
+          {/* Filtros de Data */}
+          <DateFilterBadges selectedFilter={dateFilter} onFilterChange={handleFilterChange} />
+          
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-slate-400" />

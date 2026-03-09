@@ -75,3 +75,38 @@ export function brazilNMonthsAgoStart(n: number): Date {
 export function brazilTodayFormatted(): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: BRAZIL_TZ, day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 }
+
+export type DateFilter = "diario" | "mensal" | "anual";
+
+/** Retorna o range de datas baseado no filtro selecionado */
+export function getDateRangeFromFilter(filter: DateFilter): { start: Date; end: Date } {
+  const hoje = brazilToday();
+  const [year, month, day] = hoje.split("-").map(Number);
+  const hojeDate = new Date(Date.UTC(year, month - 1, day));
+  
+  let start: Date;
+  let end: Date = brazilTodayEnd();
+
+  switch (filter) {
+    case "diario": {
+      // Apenas hoje
+      start = brazilTodayStart();
+      break;
+    }
+    case "mensal": {
+      // Mês atual
+      start = brazilMonthStart();
+      break;
+    }
+    case "anual": {
+      // Ano atual (desde 1º de janeiro)
+      start = brazilDayStart(`${year}-01-01`);
+      break;
+    }
+    default: {
+      start = brazilMonthStart();
+    }
+  }
+
+  return { start, end };
+}

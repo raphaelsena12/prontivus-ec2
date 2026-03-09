@@ -26,6 +26,14 @@ export async function GET(request: NextRequest) {
     const hoje = brazilTodayStart();
     const inicioMes = brazilMonthStart();
 
+    // Buscar tipo de consulta "Retorno"
+    const tipoRetorno = await prisma.tipoConsulta.findFirst({
+      where: {
+        codigo: "RETORNO",
+        ativo: true,
+      },
+    });
+
     // Buscar estatísticas da secretária
     const [
       totalAgendamentos,
@@ -34,6 +42,9 @@ export async function GET(request: NextRequest) {
       agendamentosVencidos,
       receitaMesAtual,
       receitaTotal,
+      receitaParticular,
+      receitaConvenios,
+      retornos,
     ] = await Promise.all([
       // Total de agendamentos
       prisma.consulta.count({
@@ -91,6 +102,36 @@ export async function GET(request: NextRequest) {
           valorCobrado: true,
         },
       }),
+      // Receita Particular (sem operadora)
+      prisma.consulta.aggregate({
+        where: {
+          clinicaId,
+          status: "REALIZADA",
+          operadoraId: null,
+        },
+        _sum: {
+          valorCobrado: true,
+        },
+      }),
+      // Receita Convênios (com operadora)
+      prisma.consulta.aggregate({
+        where: {
+          clinicaId,
+          status: "REALIZADA",
+          operadoraId: { not: null },
+        },
+        _sum: {
+          valorCobrado: true,
+        },
+      }),
+      // Retornos (consultas do tipo Retorno realizadas)
+      prisma.consulta.count({
+        where: {
+          clinicaId,
+          status: "REALIZADA",
+          tipoConsultaId: tipoRetorno?.id,
+        },
+      }),
     ]);
 
     return NextResponse.json({
@@ -100,6 +141,9 @@ export async function GET(request: NextRequest) {
       pagamentosVencidos: agendamentosVencidos,
       receitaMesAtual: Number(receitaMesAtual._sum.valorCobrado || 0),
       receitaTotal: Number(receitaTotal._sum.valorCobrado || 0),
+      receitaParticular: Number(receitaParticular._sum.valorCobrado || 0),
+      receitaConvenios: Number(receitaConvenios._sum.valorCobrado || 0),
+      retornos: retornos,
     });
   } catch (error) {
     console.error("Erro ao buscar estatísticas da secretária:", error);
