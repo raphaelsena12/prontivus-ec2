@@ -155,7 +155,7 @@ async function main() {
   // Médico
   const medico = await prisma.usuario.upsert({
     where: { email: "medico@clinicaexemplo.com.br" },
-    update: {},
+    update: { avatar: "https://randomuser.me/api/portraits/men/1.jpg" },
     create: {
       email: "medico@clinicaexemplo.com.br",
       senha: senhaPadrao,
@@ -165,6 +165,7 @@ async function main() {
       clinicaId: clinicaExemplo.id,
       ativo: true,
       primeiroAcesso: false,
+      avatar: "https://randomuser.me/api/portraits/men/1.jpg",
     },
   });
 
@@ -226,22 +227,23 @@ async function main() {
 
   const medico2 = await prisma.usuario.upsert({
     where: { email: "medico2@clinicaexemplo.com.br" },
-    update: {},
+    update: { avatar: "https://randomuser.me/api/portraits/women/2.jpg" },
     create: {
       email: "medico2@clinicaexemplo.com.br",
       senha: senhaPadrao,
-      nome: "Dr. Maria Santos",
+      nome: "Dra. Maria Santos",
       cpf: "55555555555",
       tipo: TipoUsuario.MEDICO,
       clinicaId: clinicaExemplo.id,
       ativo: true,
       primeiroAcesso: false,
+      avatar: "https://randomuser.me/api/portraits/women/2.jpg",
     },
   });
 
   const medico3 = await prisma.usuario.upsert({
     where: { email: "medico3@clinicaexemplo.com.br" },
-    update: {},
+    update: { avatar: "https://randomuser.me/api/portraits/men/3.jpg" },
     create: {
       email: "medico3@clinicaexemplo.com.br",
       senha: senhaPadrao,
@@ -251,6 +253,7 @@ async function main() {
       clinicaId: clinicaExemplo.id,
       ativo: true,
       primeiroAcesso: false,
+      avatar: "https://randomuser.me/api/portraits/men/3.jpg",
     },
   });
 
@@ -1740,6 +1743,275 @@ async function main() {
 
   console.log("✅ Regras de aceitação TUSS criadas:", { total: tussOperadoras.length });
 
+  // ============================================
+  // 24. Criar Médicos Adicionais com Avatar
+  // ============================================
+  console.log("👨‍⚕️ Criando médicos adicionais com avatar...");
+
+  const dadosMedicosExtras = [
+    {
+      usuario: {
+        email: "camila.rocha@clinicaexemplo.com.br",
+        nome: "Dra. Camila Rocha",
+        cpf: "20200000001",
+        avatar: "https://randomuser.me/api/portraits/women/10.jpg",
+      },
+      medico: { crm: "CRM-SP 456789", especialidade: "Dermatologia" },
+      codigoTussIdx: 4, // Dermatologia (20101014)
+    },
+    {
+      usuario: {
+        email: "ricardo.fonseca@clinicaexemplo.com.br",
+        nome: "Dr. Ricardo Fonseca",
+        cpf: "20200000002",
+        avatar: "https://randomuser.me/api/portraits/men/10.jpg",
+      },
+      medico: { crm: "CRM-SP 567890", especialidade: "Ortopedia e Traumatologia" },
+      codigoTussIdx: 3, // Ortopedia (20101013)
+    },
+    {
+      usuario: {
+        email: "beatriz.mendonca@clinicaexemplo.com.br",
+        nome: "Dra. Beatriz Mendonça",
+        cpf: "20200000003",
+        avatar: "https://randomuser.me/api/portraits/women/20.jpg",
+      },
+      medico: { crm: "CRM-SP 678901", especialidade: "Ginecologia e Obstetrícia" },
+      codigoTussIdx: 5, // Ginecologia (20101015)
+    },
+    {
+      usuario: {
+        email: "augusto.silveira@clinicaexemplo.com.br",
+        nome: "Dr. Augusto Silveira",
+        cpf: "20200000004",
+        avatar: "https://randomuser.me/api/portraits/men/20.jpg",
+      },
+      medico: { crm: "CRM-SP 789012", especialidade: "Neurologia" },
+      codigoTussIdx: 0, // Clínica Geral como fallback
+    },
+    {
+      usuario: {
+        email: "fernanda.leal@clinicaexemplo.com.br",
+        nome: "Dra. Fernanda Leal",
+        cpf: "20200000005",
+        avatar: "https://randomuser.me/api/portraits/women/30.jpg",
+      },
+      medico: { crm: "CRM-SP 890123", especialidade: "Psiquiatria" },
+      codigoTussIdx: 0, // Clínica Geral como fallback
+    },
+    {
+      usuario: {
+        email: "leonardo.machado@clinicaexemplo.com.br",
+        nome: "Dr. Leonardo Machado",
+        cpf: "20200000006",
+        avatar: "https://randomuser.me/api/portraits/men/30.jpg",
+      },
+      medico: { crm: "CRM-SP 901234", especialidade: "Oftalmologia" },
+      codigoTussIdx: 0, // Clínica Geral como fallback
+    },
+    {
+      usuario: {
+        email: "isabela.torres@clinicaexemplo.com.br",
+        nome: "Dra. Isabela Torres",
+        cpf: "20200000007",
+        avatar: "https://randomuser.me/api/portraits/women/40.jpg",
+      },
+      medico: { crm: "CRM-SP 012345", especialidade: "Otorrinolaringologia" },
+      codigoTussIdx: 0, // Clínica Geral como fallback
+    },
+  ];
+
+  const medicosExtrasRegistros: { medico: { id: string }, codigoTussIdx: number }[] = [];
+
+  for (const dados of dadosMedicosExtras) {
+    const usuarioMedico = await prisma.usuario.upsert({
+      where: { email: dados.usuario.email },
+      update: { avatar: dados.usuario.avatar },
+      create: {
+        email: dados.usuario.email,
+        senha: senhaPadrao,
+        nome: dados.usuario.nome,
+        cpf: dados.usuario.cpf,
+        tipo: TipoUsuario.MEDICO,
+        clinicaId: clinicaExemplo.id,
+        ativo: true,
+        primeiroAcesso: false,
+        avatar: dados.usuario.avatar,
+      },
+    });
+
+    const medicoReg = await prisma.medico.upsert({
+      where: {
+        clinicaId_usuarioId: {
+          clinicaId: clinicaExemplo.id,
+          usuarioId: usuarioMedico.id,
+        },
+      },
+      update: {},
+      create: {
+        clinicaId: clinicaExemplo.id,
+        usuarioId: usuarioMedico.id,
+        crm: dados.medico.crm,
+        especialidade: dados.medico.especialidade,
+        ativo: true,
+      },
+    });
+
+    medicosExtrasRegistros.push({ medico: medicoReg, codigoTussIdx: dados.codigoTussIdx });
+  }
+
+  console.log("✅ Médicos extras criados:", { total: medicosExtrasRegistros.length });
+
+  // ============================================
+  // 25. Criar Muitos Pacientes Adicionais (50 pacientes)
+  // ============================================
+  console.log("👥 Criando pacientes adicionais (50 pacientes)...");
+
+  const dadosPacientesAdicionais = [
+    // Masculinos
+    { nome: "Lucas Rodrigues Silva",      cpf: "10100000001", sexo: "M", dataNascimento: new Date("1990-03-15"), email: "lucas.rodrigues@email.com",    celular: "11991110001", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Analista de Sistemas" },
+    { nome: "Felipe Carvalho Santos",     cpf: "10100000002", sexo: "M", dataNascimento: new Date("1985-07-22"), email: "felipe.carvalho@email.com",    celular: "11991110002", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Contador" },
+    { nome: "Gabriel Nascimento Lima",    cpf: "10100000003", sexo: "M", dataNascimento: new Date("1995-11-08"), email: "gabriel.nascimento@email.com", celular: "11991110003", cidade: "Guarulhos",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estudante" },
+    { nome: "Mateus Oliveira Costa",      cpf: "10100000004", sexo: "M", dataNascimento: new Date("1988-04-30"), email: "mateus.oliveira@email.com",    celular: "11991110004", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Professor" },
+    { nome: "Guilherme Souza Ferreira",   cpf: "10100000005", sexo: "M", dataNascimento: new Date("1975-09-12"), email: "guilherme.souza@email.com",    celular: "11991110005", cidade: "Santo André",    estado: "SP", estadoCivil: "DIVORCIADO",  profissao: "Empresário" },
+    { nome: "Rafael Barbosa Alves",       cpf: "10100000006", sexo: "M", dataNascimento: new Date("1992-01-25"), email: "rafael.barbosa@email.com",     celular: "11991110006", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Designer" },
+    { nome: "Diego Santos Pereira",       cpf: "10100000007", sexo: "M", dataNascimento: new Date("1983-06-18"), email: "diego.santos@email.com",       celular: "11991110007", cidade: "Osasco",         estado: "SP", estadoCivil: "CASADO",       profissao: "Motorista" },
+    { nome: "Bruno Costa Ribeiro",        cpf: "10100000008", sexo: "M", dataNascimento: new Date("1997-12-05"), email: "bruno.costa@email.com",        celular: "11991110008", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estagiário" },
+    { nome: "Eduardo Lima Martins",       cpf: "10100000009", sexo: "M", dataNascimento: new Date("1970-08-14"), email: "eduardo.lima@email.com",       celular: "11991110009", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Engenheiro" },
+    { nome: "Thiago Alves Gomes",         cpf: "10100000010", sexo: "M", dataNascimento: new Date("1993-02-27"), email: "thiago.alves@email.com",       celular: "11991110010", cidade: "Campinas",       estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Arquiteto" },
+    { nome: "Rodrigo Pereira Nunes",      cpf: "10100000011", sexo: "M", dataNascimento: new Date("1980-05-19"), email: "rodrigo.pereira@email.com",    celular: "11991110011", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Advogado" },
+    { nome: "Vinicius Martins Rocha",     cpf: "10100000012", sexo: "M", dataNascimento: new Date("1998-10-03"), email: "vinicius.martins@email.com",   celular: "11991110012", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Universitário" },
+    { nome: "Leandro Gomes Freitas",      cpf: "10100000013", sexo: "M", dataNascimento: new Date("1986-03-29"), email: "leandro.gomes@email.com",      celular: "11991110013", cidade: "Barueri",        estado: "SP", estadoCivil: "CASADO",       profissao: "Gerente Comercial" },
+    { nome: "Anderson Ribeiro Dias",      cpf: "10100000014", sexo: "M", dataNascimento: new Date("1979-07-11"), email: "anderson.ribeiro@email.com",   celular: "11991110014", cidade: "São Paulo",      estado: "SP", estadoCivil: "SEPARADO",    profissao: "Técnico em TI" },
+    { nome: "Marcelo Freitas Lopes",      cpf: "10100000015", sexo: "M", dataNascimento: new Date("1965-12-20"), email: "marcelo.freitas@email.com",    celular: "11991110015", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Aposentado" },
+    { nome: "Caio Dias Machado",          cpf: "10100000016", sexo: "M", dataNascimento: new Date("2000-04-08"), email: "caio.dias@email.com",          celular: "11991110016", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estudante" },
+    { nome: "Renato Lopes Mendes",        cpf: "10100000017", sexo: "M", dataNascimento: new Date("1977-09-16"), email: "renato.lopes@email.com",       celular: "11991110017", cidade: "São Bernardo",   estado: "SP", estadoCivil: "CASADO",       profissao: "Supervisor de Produção" },
+    { nome: "Alex Machado Cardoso",       cpf: "10100000018", sexo: "M", dataNascimento: new Date("1991-01-07"), email: "alex.machado@email.com",       celular: "11991110018", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Programador" },
+    { nome: "Henrique Mendes Teixeira",   cpf: "10100000019", sexo: "M", dataNascimento: new Date("1968-06-25"), email: "henrique.mendes@email.com",    celular: "11991110019", cidade: "São Paulo",      estado: "SP", estadoCivil: "VIUVO",       profissao: "Dentista" },
+    { nome: "Fábio Cardoso Cruz",         cpf: "10100000020", sexo: "M", dataNascimento: new Date("1984-11-13"), email: "fabio.cardoso@email.com",      celular: "11991110020", cidade: "Mogi das Cruzes",estado: "SP", estadoCivil: "CASADO",       profissao: "Farmacêutico" },
+    { nome: "Paulo Cruz Moreira",         cpf: "10100000021", sexo: "M", dataNascimento: new Date("1973-02-04"), email: "paulo.cruz@email.com",         celular: "11991110021", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Engenheiro Civil" },
+    { nome: "Jorge Moreira Correia",      cpf: "10100000022", sexo: "M", dataNascimento: new Date("1960-08-28"), email: "jorge.moreira@email.com",      celular: "11991110022", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Aposentado" },
+    { nome: "Márcio Correia Monteiro",    cpf: "10100000023", sexo: "M", dataNascimento: new Date("1989-05-17"), email: "marcio.correia@email.com",     celular: "11991110023", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Nutricionista" },
+    { nome: "Adriano Monteiro Pinto",     cpf: "10100000024", sexo: "M", dataNascimento: new Date("1994-10-09"), email: "adriano.monteiro@email.com",   celular: "11991110024", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Personal Trainer" },
+    { nome: "Cristiano Pinto Cavalcanti", cpf: "10100000025", sexo: "M", dataNascimento: new Date("1982-03-21"), email: "cristiano.pinto@email.com",    celular: "11991110025", cidade: "Guarulhos",      estado: "SP", estadoCivil: "CASADO",       profissao: "Arquiteto" },
+    // Femininas
+    { nome: "Mariana Silva Rodrigues",    cpf: "10100000026", sexo: "F", dataNascimento: new Date("1992-04-14"), email: "mariana.silva@email.com",      celular: "11991110026", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Designer Gráfico" },
+    { nome: "Fernanda Santos Carvalho",   cpf: "10100000027", sexo: "F", dataNascimento: new Date("1987-08-03"), email: "fernanda.santos@email.com",    celular: "11991110027", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Professora" },
+    { nome: "Camila Lima Nascimento",     cpf: "10100000028", sexo: "F", dataNascimento: new Date("1996-01-19"), email: "camila.lima@email.com",        celular: "11991110028", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Nutricionista" },
+    { nome: "Larissa Costa Oliveira",     cpf: "10100000029", sexo: "F", dataNascimento: new Date("1990-06-07"), email: "larissa.costa@email.com",      celular: "11991110029", cidade: "Campinas",       estado: "SP", estadoCivil: "CASADO",       profissao: "Psicóloga" },
+    { nome: "Patrícia Ferreira Souza",    cpf: "10100000030", sexo: "F", dataNascimento: new Date("1978-11-22"), email: "patricia.ferreira@email.com",  celular: "11991110030", cidade: "São Paulo",      estado: "SP", estadoCivil: "DIVORCIADO",  profissao: "Assistente Social" },
+    { nome: "Aline Alves Barbosa",        cpf: "10100000031", sexo: "F", dataNascimento: new Date("1994-03-10"), email: "aline.alves@email.com",        celular: "11991110031", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Enfermeira" },
+    { nome: "Vanessa Pereira Santos",     cpf: "10100000032", sexo: "F", dataNascimento: new Date("1983-07-28"), email: "vanessa.pereira@email.com",    celular: "11991110032", cidade: "Santo André",    estado: "SP", estadoCivil: "CASADO",       profissao: "Advogada" },
+    { nome: "Natalia Ribeiro Costa",      cpf: "10100000033", sexo: "F", dataNascimento: new Date("1999-12-05"), email: "natalia.ribeiro@email.com",    celular: "11991110033", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estudante" },
+    { nome: "Isabela Martins Lima",       cpf: "10100000034", sexo: "F", dataNascimento: new Date("1988-05-16"), email: "isabela.martins@email.com",    celular: "11991110034", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Farmacêutica" },
+    { nome: "Beatriz Gomes Alves",        cpf: "10100000035", sexo: "F", dataNascimento: new Date("1993-09-02"), email: "beatriz.gomes@email.com",      celular: "11991110035", cidade: "Osasco",         estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Bióloga" },
+    { nome: "Priscila Nunes Pereira",     cpf: "10100000036", sexo: "F", dataNascimento: new Date("1981-02-14"), email: "priscila.nunes@email.com",     celular: "11991110036", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Contadora" },
+    { nome: "Juliana Rocha Martins",      cpf: "10100000037", sexo: "F", dataNascimento: new Date("1995-07-23"), email: "juliana.rocha@email.com",      celular: "11991110037", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Fisioterapeuta" },
+    { nome: "Carla Freitas Gomes",        cpf: "10100000038", sexo: "F", dataNascimento: new Date("1976-04-11"), email: "carla.freitas@email.com",      celular: "11991110038", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Secretária Executiva" },
+    { nome: "Simone Dias Ribeiro",        cpf: "10100000039", sexo: "F", dataNascimento: new Date("1969-10-30"), email: "simone.dias@email.com",        celular: "11991110039", cidade: "São Paulo",      estado: "SP", estadoCivil: "VIUVO",       profissao: "Aposentada" },
+    { nome: "Amanda Lopes Freitas",       cpf: "10100000040", sexo: "F", dataNascimento: new Date("1997-08-17"), email: "amanda.lopes@email.com",       celular: "11991110040", cidade: "Barueri",        estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estagiária" },
+    { nome: "Leticia Machado Dias",       cpf: "10100000041", sexo: "F", dataNascimento: new Date("2001-03-26"), email: "leticia.machado@email.com",    celular: "11991110041", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Estudante" },
+    { nome: "Andressa Mendes Lopes",      cpf: "10100000042", sexo: "F", dataNascimento: new Date("1986-06-08"), email: "andressa.mendes@email.com",    celular: "11991110042", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Médica" },
+    { nome: "Raquel Cardoso Machado",     cpf: "10100000043", sexo: "F", dataNascimento: new Date("1991-11-20"), email: "raquel.cardoso@email.com",     celular: "11991110043", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Jornalista" },
+    { nome: "Débora Teixeira Mendes",     cpf: "10100000044", sexo: "F", dataNascimento: new Date("1984-01-15"), email: "debora.teixeira@email.com",    celular: "11991110044", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Vendedora" },
+    { nome: "Eliane Cruz Cardoso",        cpf: "10100000045", sexo: "F", dataNascimento: new Date("1972-09-04"), email: "eliane.cruz@email.com",        celular: "11991110045", cidade: "Guarulhos",      estado: "SP", estadoCivil: "CASADO",       profissao: "Dentista" },
+    { nome: "Tatiana Moreira Cruz",       cpf: "10100000046", sexo: "F", dataNascimento: new Date("1989-05-27"), email: "tatiana.moreira@email.com",    celular: "11991110046", cidade: "São Paulo",      estado: "SP", estadoCivil: "SOLTEIRO",    profissao: "Publicitária" },
+    { nome: "Viviane Correia Moreira",    cpf: "10100000047", sexo: "F", dataNascimento: new Date("1980-02-18"), email: "viviane.correia@email.com",    celular: "11991110047", cidade: "São Paulo",      estado: "SP", estadoCivil: "DIVORCIADO",  profissao: "Gerente de RH" },
+    { nome: "Sandra Monteiro Correia",    cpf: "10100000048", sexo: "F", dataNascimento: new Date("1967-12-09"), email: "sandra.monteiro@email.com",    celular: "11991110048", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Enfermeira" },
+    { nome: "Célia Pinto Monteiro",       cpf: "10100000049", sexo: "F", dataNascimento: new Date("1975-04-21"), email: "celia.pinto@email.com",        celular: "11991110049", cidade: "São Paulo",      estado: "SP", estadoCivil: "CASADO",       profissao: "Fisioterapeuta" },
+    { nome: "Vera Cavalcanti Pinto",      cpf: "10100000050", sexo: "F", dataNascimento: new Date("1963-08-13"), email: "vera.cavalcanti@email.com",    celular: "11991110050", cidade: "São Paulo",      estado: "SP", estadoCivil: "VIUVO",       profissao: "Aposentada" },
+  ];
+
+  const pacientesAdicionais: { id: string }[] = [];
+  for (const dados of dadosPacientesAdicionais) {
+    const p = await prisma.paciente.create({
+      data: { clinicaId: clinicaExemplo.id, ativo: true, ...dados },
+    });
+    pacientesAdicionais.push(p);
+  }
+
+  console.log("✅ Pacientes adicionais criados:", { total: pacientesAdicionais.length });
+
+  // ============================================
+  // 25. Criar Agendamentos para os Próximos Dias
+  // ============================================
+  console.log("📅 Criando agendamentos para os próximos 7 dias úteis...");
+
+  const getProximosDiasUteis = (quantidade: number): Date[] => {
+    const dias: Date[] = [];
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    let offset = 1;
+    while (dias.length < quantidade) {
+      const d = new Date(base);
+      d.setDate(base.getDate() + offset);
+      const dow = d.getDay();
+      if (dow !== 0 && dow !== 6) dias.push(d);
+      offset++;
+    }
+    return dias;
+  };
+
+  const diasUteis = getProximosDiasUteis(7);
+  const horariosAgenda = [8, 9, 10, 11, 14, 15, 16, 17];
+  const statusRotacao = ["AGENDADA", "AGENDADA", "CONFIRMADA", "AGENDADA", "CONFIRMADA"];
+
+  const medicosAgenda = [
+    { medico: medicoRegistro1, codigoTuss: codigosTuss[0], tipoConsulta: tiposConsulta[0] }, // Clínica Geral
+    { medico: medicoRegistro2, codigoTuss: codigosTuss[1], tipoConsulta: tiposConsulta[0] }, // Cardiologia
+    { medico: medicoRegistro3, codigoTuss: codigosTuss[2], tipoConsulta: tiposConsulta[0] }, // Pediatria
+    ...medicosExtrasRegistros.map(({ medico, codigoTussIdx }) => ({
+      medico,
+      codigoTuss: codigosTuss[codigoTussIdx],
+      tipoConsulta: tiposConsulta[0],
+    })),
+  ];
+
+  const todosPacientesPool = [...pacientes, ...pacientesAdicionais];
+
+  const consultasData: {
+    clinicaId: string;
+    pacienteId: string;
+    medicoId: string;
+    dataHora: Date;
+    status: string;
+    codigoTussId: string;
+    tipoConsultaId: string;
+    modalidade: string;
+    valorCobrado: number;
+  }[] = [];
+
+  let pIdx = 0;
+  for (const dia of diasUteis) {
+    for (const { medico, codigoTuss, tipoConsulta } of medicosAgenda) {
+      for (const hora of horariosAgenda) {
+        const dataHora = new Date(dia);
+        dataHora.setHours(hora, 0, 0, 0);
+
+        consultasData.push({
+          clinicaId: clinicaExemplo.id,
+          pacienteId: todosPacientesPool[pIdx % todosPacientesPool.length].id,
+          medicoId: medico.id,
+          dataHora,
+          status: statusRotacao[pIdx % statusRotacao.length],
+          codigoTussId: codigoTuss.id,
+          tipoConsultaId: tipoConsulta.id,
+          modalidade: "PRESENCIAL",
+          valorCobrado: 180.0,
+        });
+
+        pIdx++;
+      }
+    }
+  }
+
+  const resultConsultas = await prisma.consulta.createMany({
+    data: consultasData,
+    skipDuplicates: true,
+  });
+
+  console.log("✅ Agendamentos criados:", { total: resultConsultas.count });
+
   console.log("\n📋 Credenciais de acesso:");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("Super Admin:");
@@ -1761,12 +2033,12 @@ async function main() {
 
   console.log("\n📊 Resumo dos dados criados:");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log(`✅ Médicos: ${3}`);
+  console.log(`✅ Médicos: ${3 + medicosExtrasRegistros.length} (3 base + ${medicosExtrasRegistros.length} com avatar)`);
   console.log(`✅ Exames: ${exames.length}`);
   console.log(`✅ Medicamentos: ${medicamentos.length}`);
   console.log(`✅ Procedimentos: ${procedimentos.length}`);
   console.log(`✅ Formas de Pagamento: ${formasPagamento.length}`);
-  console.log(`✅ Pacientes: ${pacientes.length}`);
+  console.log(`✅ Pacientes: ${pacientes.length + pacientesAdicionais.length} (${pacientes.length} base + ${pacientesAdicionais.length} adicionais)`);
   console.log(`✅ Contas a Pagar: ${contasPagar.length}`);
   console.log(`✅ Contas a Receber: ${contasReceber.length}`);
   console.log(`✅ Fluxo de Caixa: ${fluxoCaixa.length}`);
@@ -1780,6 +2052,7 @@ async function main() {
   console.log(`✅ Vínculos TUSS-Especialidade: ${tussEspecialidades.length}`);
   console.log(`✅ Valores TUSS: ${valoresTuss.length}`);
   console.log(`✅ Regras de Aceitação TUSS: ${tussOperadoras.length}`);
+  console.log(`✅ Agendamentos (próximos 7 dias úteis): ${resultConsultas.count}`);
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
   console.log("\n🎉 Seed concluído com sucesso!");

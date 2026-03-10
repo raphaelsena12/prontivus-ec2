@@ -4,7 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Eye, Edit, Users, Calendar, Ban, CheckCircle, FileText } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Plus, Search, Eye, Edit, Users, Calendar, Ban, CheckCircle, FileText, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -55,6 +63,21 @@ interface Paciente {
   observacoes: string | null;
   ativo: boolean;
 }
+
+const getInitials = (nome: string) =>
+  nome
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
+
+const getAvatarUrl = (nome: string, sexo: string) => {
+  const hash = nome.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const num = (hash % 70) + 1;
+  const genero = sexo === "F" ? "women" : "men";
+  return `https://randomuser.me/api/portraits/${genero}/${num}.jpg`;
+};
 
 const getStatusBadge = (ativo: boolean) => {
   if (ativo) {
@@ -218,8 +241,20 @@ export function PacientesContent() {
                       <TableCell className="text-xs py-3 font-semibold text-primary">
                         {paciente.numeroProntuario || "-"}
                       </TableCell>
-                      <TableCell className="text-xs py-3 font-medium">
-                        {paciente.nome}
+                      <TableCell className="text-xs py-3">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8 shrink-0">
+                            <AvatarImage
+                              src={getAvatarUrl(paciente.nome, paciente.sexo)}
+                              alt={paciente.nome}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-[10px] font-bold bg-muted">
+                              {getInitials(paciente.nome)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{paciente.nome}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-xs py-3">{formatCPF(paciente.cpf)}</TableCell>
                       <TableCell className="text-xs py-3 text-muted-foreground">
@@ -235,82 +270,66 @@ export function PacientesContent() {
                         {getStatusBadge(paciente.ativo)}
                       </TableCell>
                       <TableCell className="text-xs py-3 text-right">
-                        <div className="flex justify-end gap-2">
-                          {(paciente.celular || paciente.telefone) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs h-7 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
-                              onClick={() => {
-                                setPacienteWhatsapp(paciente);
-                                setWhatsappDialogOpen(true);
-                              }}
-                              title="Enviar WhatsApp"
-                            >
-                              <IconBrandWhatsapp className="h-3 w-3" />
-                            </Button>
-                          )}
+                        <div className="flex justify-end items-center gap-1">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-xs h-7"
-                            onClick={() => {
-                              setPacienteParaAgendar(paciente.id);
-                              setNovoAgendamentoModalOpen(true);
-                            }}
-                          >
-                            <Calendar className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs h-7 gap-1.5"
-                            onClick={() =>
-                              router.push(`/prontuario-paciente/${paciente.id}`)
-                            }
+                            className="h-7 gap-1.5 text-xs px-2 shadow-sm"
+                            onClick={() => router.push(`/prontuario-paciente/${paciente.id}`)}
                           >
                             <FileText className="h-3 w-3" />
                             Prontuário
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7"
-                            onClick={() =>
-                              router.push(`/secretaria/pacientes/${paciente.id}`)
-                            }
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-7"
-                            onClick={() =>
-                              router.push(`/secretaria/pacientes/editar/${paciente.id}`)
-                            }
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Button>
-                          {paciente.ativo ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs h-7 text-amber-500 hover:text-amber-600 hover:border-amber-300"
-                              onClick={() => handleToggleStatusClick(paciente)}
-                            >
-                              <Ban className="h-3 w-3" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs h-7 text-emerald-500 hover:text-emerald-600 hover:border-emerald-300"
-                              onClick={() => handleToggleStatusClick(paciente)}
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                            </Button>
-                          )}
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm" className="h-7 w-7 p-0 shadow-sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => router.push(`/secretaria/pacientes/${paciente.id}`)}>
+                                <Eye className="mr-2 h-3.5 w-3.5 text-blue-500" />
+                                Visualizar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/secretaria/pacientes/editar/${paciente.id}`)}>
+                                <Edit className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setPacienteParaAgendar(paciente.id);
+                                  setNovoAgendamentoModalOpen(true);
+                                }}
+                              >
+                                <Calendar className="mr-2 h-3.5 w-3.5 text-violet-500" />
+                                Agendar consulta
+                              </DropdownMenuItem>
+                              {(paciente.celular || paciente.telefone) && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setPacienteWhatsapp(paciente);
+                                    setWhatsappDialogOpen(true);
+                                  }}
+                                >
+                                  <IconBrandWhatsapp className="mr-2 h-3.5 w-3.5 text-green-500" />
+                                  WhatsApp
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              {paciente.ativo ? (
+                                <DropdownMenuItem onClick={() => handleToggleStatusClick(paciente)}>
+                                  <Ban className="mr-2 h-3.5 w-3.5 text-amber-500" />
+                                  Inativar paciente
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleToggleStatusClick(paciente)}>
+                                  <CheckCircle className="mr-2 h-3.5 w-3.5 text-emerald-500" />
+                                  Reativar paciente
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>

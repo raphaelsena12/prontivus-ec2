@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { IconBell, IconLogout, IconUserCircle, IconMessage } from "@tabler/icons-react";
+import { IconBell, IconLogout, IconUserCircle, IconMessage, IconPhoneCall } from "@tabler/icons-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -180,6 +180,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
   const { data: session } = useSession();
   const [autorizacoes, setAutorizacoes] = useState<AutorizacaoFechamento[]>([]);
   const [loadingAutorizacoes, setLoadingAutorizacoes] = useState(false);
+  const [clinicaInfo, setClinicaInfo] = useState<{ nome: string | null; logoUrl: string | null }>({ nome: null, logoUrl: null });
   const chatContext = useContext(ChatContext);
   const isOpen = chatContext?.isOpen ?? false;
   const setIsOpen = chatContext?.setIsOpen ?? (() => {});
@@ -188,6 +189,14 @@ export function SiteHeader({ user }: SiteHeaderProps) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.clinicaId) return;
+    fetch("/api/auth/clinica-info")
+      .then((r) => r.json())
+      .then((data) => setClinicaInfo({ nome: data.clinicaNome || null, logoUrl: data.clinicaLogoUrl || null }))
+      .catch(() => {});
+  }, [session?.user?.clinicaId]);
 
   // Buscar autorizações de fechamento de caixa se for secretária
   useEffect(() => {
@@ -606,36 +615,33 @@ export function SiteHeader({ user }: SiteHeaderProps) {
     >
       <div className="relative z-10 flex w-full items-center gap-3 px-4 lg:gap-4 lg:px-6 text-foreground overflow-x-hidden">
         <SidebarTrigger className="-ml-1 hover:bg-muted text-foreground transition-all duration-200 hover:scale-105 active:scale-95" />
-        
-        <Separator
-          orientation="vertical"
-          className="h-6 bg-border"
-        />
-        
-        <div className="flex-1">
-          {pathname === "/super-admin" && user ? (
-            <h1 className="text-base font-semibold tracking-tight text-foreground">
-              Bem-vindo, {user.name}.
-            </h1>
-          ) : (
-            <Breadcrumb>
-              <BreadcrumbList>
-                {getBreadcrumbItems(pathname).map((item, index) => (
-                  <React.Fragment key={item.href}>
-                    <BreadcrumbItem>
-                      {item.isLast ? (
-                        <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink href={item.href}>{item.label}</BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
-                    {!item.isLast && <BreadcrumbSeparator />}
-                  </React.Fragment>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
-          )}
-        </div>
+
+        {/* Logo da Clínica */}
+        {clinicaInfo.nome && (
+          <>
+            <Separator orientation="vertical" className="h-6 bg-border" />
+            <div className="flex items-center gap-2 shrink-0">
+              <Avatar className="h-7 w-7 rounded-md ring-1 ring-border">
+                {clinicaInfo.logoUrl ? (
+                  <AvatarImage src={clinicaInfo.logoUrl} alt={clinicaInfo.nome} className="object-cover" />
+                ) : null}
+                <AvatarFallback className="rounded-md bg-primary/10 text-primary text-[10px] font-bold">
+                  {clinicaInfo.nome
+                    .split(" ")
+                    .slice(0, 2)
+                    .map((w) => w[0])
+                    .join("")
+                    .toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <span className="hidden text-sm font-medium text-foreground md:inline-block max-w-[180px] truncate">
+                {clinicaInfo.nome}
+              </span>
+            </div>
+          </>
+        )}
+
+        <div className="flex-1" />
 
         {user && (
           <div className="flex items-center gap-2">
@@ -803,13 +809,22 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => router.push("/perfil")}
                       className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
                     >
                       <IconUserCircle className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
                       Perfil
                     </DropdownMenuItem>
+                    {session?.user?.tipo === TipoUsuario.SECRETARIA && (
+                      <DropdownMenuItem
+                        onClick={() => router.push("/secretaria/painel-chamadas")}
+                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                      >
+                        <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
+                        Painel de Chamadas
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 

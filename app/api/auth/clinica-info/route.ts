@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       where: { id: session.user.clinicaId },
       select: {
         nome: true,
+        logoUrl: true,
       },
     });
 
@@ -30,6 +31,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       clinicaNome: tenant?.nome || null,
+      clinicaLogoUrl: tenant?.logoUrl || null,
       avatar: usuario?.avatar || null,
     });
   } catch (error) {

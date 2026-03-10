@@ -347,11 +347,7 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       url: "/secretaria/check-in",
       icon: IconCheck,
     });
-    items.push({
-      title: "Painel de Chamadas",
-      url: "/secretaria/painel-chamadas",
-      icon: IconPhoneCall,
-    });
+
     items.push({
       title: "Procedimentos",
       url: "/secretaria/executar-procedimento",
