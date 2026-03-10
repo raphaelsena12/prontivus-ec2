@@ -2,28 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/page-header';
 import {
   User,
   Calendar,
-  Phone,
-  Mail,
   ArrowLeft,
   Loader2,
   Pill,
   ClipboardList,
-  Stethoscope,
-  MapPin,
   FileText,
-  Building2,
-  FileText as FileDoc,
   ChevronDown,
   ChevronUp,
+  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate, formatCPF, formatTime } from '@/lib/utils';
+import { formatDate, formatCPF } from '@/lib/utils';
+
+/* ── Interfaces ─────────────────────────────────────────────────────────── */
 
 interface ProntuarioCompleto {
   paciente: {
@@ -55,11 +52,23 @@ interface ProntuarioCompleto {
     id: string;
     dataHora: string;
     status: string;
+    observacoes: string | null;
+    modalidade: string | null;
     tipoConsulta: { nome: string } | null;
     medico: { usuario: { nome: string } };
     codigoTuss: { codigoTuss: string; descricao: string } | null;
+    operadora: { nomeFantasia: string } | null;
+    planoSaude: { nome: string } | null;
     valorCobrado: number | string | null;
-    prontuarios?: Array<{ id: string; diagnostico: string | null; createdAt: string }>;
+    prontuarios?: Array<{
+      id: string;
+      anamnese: string | null;
+      exameFisico: string | null;
+      diagnostico: string | null;
+      conduta: string | null;
+      evolucao: string | null;
+      createdAt: string;
+    }>;
   }>;
   prontuarios: any[];
   solicitacoesExames: Array<{
@@ -91,28 +100,27 @@ interface ProntuarioCompleto {
   mensagens: any[];
 }
 
-type TimelineItem =
-  | { kind: 'consulta'; date: Date; raw: ProntuarioCompleto['consultas'][0] }
-  | { kind: 'exame'; date: Date; raw: ProntuarioCompleto['solicitacoesExames'][0] }
-  | { kind: 'prescricao'; date: Date; raw: ProntuarioCompleto['prescricoes'][0] };
-
 interface ProntuarioPacienteContentProps {
   pacienteId: string;
 }
 
-const CONSULTA_STATUS: Record<string, { label: string; color: string }> = {
-  AGENDADA:       { label: 'Agendada',        color: 'bg-slate-100 text-slate-700 border-slate-300' },
-  CONFIRMADA:     { label: 'Confirmada',       color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  EM_ATENDIMENTO: { label: 'Em Atendimento',   color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  REALIZADA:      { label: 'Realizada',        color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  CANCELADA:      { label: 'Cancelada',        color: 'bg-red-50 text-red-700 border-red-200' },
+/* ── Lookup de status ───────────────────────────────────────────────────── */
+
+const CONSULTA_STATUS: Record<string, { label: string; border: string; dot: string; badge: string }> = {
+  AGENDADA:       { label: 'Agendada',       border: 'border-l-slate-300',   dot: 'bg-slate-400',   badge: 'bg-slate-100 text-slate-600' },
+  CONFIRMADA:     { label: 'Confirmada',     border: 'border-l-blue-400',    dot: 'bg-blue-400',    badge: 'bg-blue-50 text-blue-700' },
+  EM_ATENDIMENTO: { label: 'Em Atendimento', border: 'border-l-amber-400',   dot: 'bg-amber-400',   badge: 'bg-amber-50 text-amber-700' },
+  REALIZADA:      { label: 'Realizada',      border: 'border-l-emerald-400', dot: 'bg-emerald-400', badge: 'bg-emerald-50 text-emerald-700' },
+  CANCELADA:      { label: 'Cancelada',      border: 'border-l-red-300',     dot: 'bg-red-300',     badge: 'bg-red-50 text-red-600' },
 };
 
-const EXAME_STATUS: Record<string, { label: string; color: string }> = {
-  SOLICITADO: { label: 'Solicitado', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  REALIZADO:  { label: 'Realizado',  color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  CANCELADO:  { label: 'Cancelado',  color: 'bg-red-50 text-red-700 border-red-200' },
+const EXAME_STATUS: Record<string, { label: string; badge: string }> = {
+  SOLICITADO: { label: 'Solicitado', badge: 'bg-amber-50 text-amber-700' },
+  REALIZADO:  { label: 'Realizado',  badge: 'bg-emerald-50 text-emerald-700' },
+  CANCELADO:  { label: 'Cancelado',  badge: 'bg-red-50 text-red-600' },
 };
+
+/* ── Componente principal ───────────────────────────────────────────────── */
 
 export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteContentProps) {
   const router = useRouter();
@@ -123,9 +131,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   const [examesOpen, setExamesOpen] = useState(true);
   const [histOpen, setHistOpen] = useState(true);
 
-  useEffect(() => {
-    fetchProntuarioCompleto();
-  }, [pacienteId]);
+  useEffect(() => { fetchProntuarioCompleto(); }, [pacienteId]);
 
   const fetchProntuarioCompleto = async () => {
     try {
@@ -138,7 +144,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
       setData(await response.json());
     } catch (error: any) {
       toast.error(error.message || 'Erro ao carregar prontuário');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -160,7 +165,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      toast.success('Ficha de atendimento gerada');
+      toast.success('Ficha gerada com sucesso');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao abrir ficha');
     } finally {
@@ -171,10 +176,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <p className="text-sm text-slate-600">Carregando prontuário...</p>
-        </div>
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
       </div>
     );
   }
@@ -182,9 +184,9 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   if (!data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-slate-800 mb-2">Prontuário não encontrado</p>
-          <Button onClick={() => router.back()} variant="outline">
+        <div className="text-center space-y-3">
+          <p className="text-slate-600">Prontuário não encontrado</p>
+          <Button onClick={() => router.back()} variant="outline" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
         </div>
@@ -205,537 +207,475 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
 
   const idade = calcularIdade(paciente.dataNascimento);
 
-  // ── Montar timeline unificada ──────────────────────────────────────────────
-  const timeline: TimelineItem[] = [
-    ...data.consultas.map((c) => ({
-      kind: 'consulta' as const,
-      date: new Date(c.dataHora),
-      raw: c,
-    })),
-    ...data.solicitacoesExames.map((e) => ({
-      kind: 'exame' as const,
-      date: new Date(e.dataSolicitacao),
-      raw: e,
-    })),
-    ...data.prescricoes.map((p) => ({
-      kind: 'prescricao' as const,
-      date: new Date(p.createdAt),
-      raw: p,
-    })),
-  ].sort((a, b) => b.date.getTime() - a.date.getTime());
+  // Consultas agrupadas por mês
+  const consultasOrdenadas = [...data.consultas].sort(
+    (a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime()
+  );
 
-  // ── Endereço formatado ─────────────────────────────────────────────────────
+  const consultasPorMes = consultasOrdenadas.reduce<
+    Array<{ mesLabel: string; consultas: typeof data.consultas }>
+  >((acc, c) => {
+    const d = new Date(c.dataHora);
+    const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const ultimo = acc[acc.length - 1];
+    if (ultimo?.mesLabel === label) {
+      ultimo.consultas.push(c);
+    } else {
+      acc.push({ mesLabel: label, consultas: [c] });
+    }
+    return acc;
+  }, []);
+
   const enderecoFormatado = [
     paciente.endereco,
     paciente.numero && `Nº ${paciente.numero}`,
     paciente.complemento,
     paciente.bairro,
-    paciente.cidade && paciente.estado ? `${paciente.cidade}/${paciente.estado}` : paciente.cidade || paciente.estado,
+    paciente.cidade && paciente.estado
+      ? `${paciente.cidade}/${paciente.estado}`
+      : paciente.cidade || paciente.estado,
     paciente.cep && `CEP ${paciente.cep}`,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  ].filter(Boolean).join(', ');
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
 
-      {/* ── Sticky top bar ── */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-[1100px] mx-auto px-6 py-2.5 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="text-slate-500 hover:text-slate-800 -ml-2 shrink-0"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Voltar
-          </Button>
-          <div className="w-px h-5 bg-slate-200" />
-          <span className="text-sm font-semibold text-slate-800 truncate">{paciente.nome}</span>
-          <Badge className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 font-medium shrink-0">
-            Prontuário
-          </Badge>
-        </div>
-      </header>
+      <PageHeader
+        icon={BookOpen}
+        title="Prontuário"
+        subtitle={paciente.nome}
+      />
 
-      <div className="max-w-[1100px] mx-auto px-6 py-6 space-y-6 pb-24">
+      <div className="space-y-5 pb-24">
 
-        {/* ══ Cabeçalho completo do paciente ══ */}
-        <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
-          {/* Faixa de identidade */}
-          <div className="border-b border-slate-100 px-6 py-4 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
-              <User className="w-5 h-5 text-slate-500" />
+        {/* ══ Dados do Paciente ══ */}
+        <Card className="border-slate-200 shadow-sm bg-white">
+          <div className="px-5 py-4 flex items-start gap-4">
+
+            {/* Avatar */}
+            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+              <User className="w-4 h-4 text-slate-400" />
             </div>
+
+            {/* Bloco principal */}
             <div className="flex-1 min-w-0">
-              <h1 className="text-base font-bold text-slate-900 leading-tight">{paciente.nome}</h1>
-              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-0.5">
-                <span className="text-sm text-slate-500">{idade} anos · {paciente.sexo}</span>
-                {paciente.numeroProntuario && (
-                  <span className="text-xs font-mono text-slate-400">Prontuário Nº {paciente.numeroProntuario}</span>
-                )}
-              </div>
-            </div>
-            {/* Contadores */}
-            <div className="flex items-center gap-6 shrink-0">
-              {[
-                { label: 'Consultas', n: data.consultas.length },
-                { label: 'Exames', n: data.solicitacoesExames.length },
-                { label: 'Prescrições', n: data.prescricoes.length },
-              ].map(({ label, n }) => (
-                <div key={label} className="text-center">
-                  <p className="text-xl font-bold text-slate-800">{n}</p>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</p>
+
+              {/* Nome + prontuário + contadores */}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h1 className="text-sm font-semibold text-slate-900 leading-tight">{paciente.nome}</h1>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {idade} anos · {paciente.sexo}
+                    {paciente.numeroProntuario && <span className="ml-2 font-mono">Nº {paciente.numeroProntuario}</span>}
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <CardContent className="p-6">
-            <div className="grid grid-cols-3 gap-x-8 gap-y-5">
-
-              {/* ── Identificação ── */}
-              <InfoGroup title="Identificação">
-                <InfoRow label="CPF" value={formatCPF(paciente.cpf)} />
-                {paciente.rg && <InfoRow label="RG" value={paciente.rg} />}
-                <InfoRow
-                  label="Data de Nascimento"
-                  value={`${formatDate(new Date(paciente.dataNascimento))} (${idade} anos)`}
-                />
-                {paciente.estadoCivil && <InfoRow label="Estado Civil" value={paciente.estadoCivil} />}
-                {paciente.profissao && <InfoRow label="Profissão" value={paciente.profissao} />}
-              </InfoGroup>
-
-              {/* ── Contato ── */}
-              <InfoGroup title="Contato">
-                {paciente.celular && <InfoRow label="Celular" value={paciente.celular} icon={Phone} />}
-                {paciente.telefone && <InfoRow label="Telefone" value={paciente.telefone} icon={Phone} />}
-                {paciente.email && <InfoRow label="E-mail" value={paciente.email} icon={Mail} />}
-                {enderecoFormatado && <InfoRow label="Endereço" value={enderecoFormatado} icon={MapPin} />}
-              </InfoGroup>
-
-              {/* ── Filiação + Planos ── */}
-              <div className="space-y-5">
-                {(paciente.nomeMae || paciente.nomePai) && (
-                  <InfoGroup title="Filiação">
-                    {paciente.nomeMae && <InfoRow label="Mãe" value={paciente.nomeMae} />}
-                    {paciente.nomePai && <InfoRow label="Pai" value={paciente.nomePai} />}
-                  </InfoGroup>
-                )}
-
-                {data.planosSaude.length > 0 && (
-                  <InfoGroup title="Planos de Saúde">
-                    {data.planosSaude.map((plano: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-sm text-slate-700 font-medium">
-                          {plano.planoSaude?.nome || plano.nome || '—'}
-                        </span>
-                        {plano.numeroCarteirinha && (
-                          <span className="text-xs text-slate-500 font-mono">· {plano.numeroCarteirinha}</span>
-                        )}
-                      </div>
-                    ))}
-                  </InfoGroup>
-                )}
-              </div>
-            </div>
-
-            {paciente.observacoes && (
-              <div className="mt-5 pt-5 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Observações</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{paciente.observacoes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ══ Medicamentos em Uso ══ */}
-        <div>
-          <button
-            onClick={() => setMedsOpen((v) => !v)}
-            className="w-full flex items-center gap-2.5 mb-4 group"
-          >
-            <Pill className="w-4 h-4 text-emerald-500 shrink-0" />
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Medicamentos em Uso</h2>
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400 mr-1">{data.prescricoes.length} item(s)</span>
-            {medsOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-          </button>
-
-          {medsOpen && (
-            data.prescricoes.length === 0 ? (
-              <Card className="border-dashed border-slate-200">
-                <CardContent className="py-8 text-center text-sm text-slate-400">
-                  Nenhuma prescrição registrada.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {data.prescricoes.map((p) => (
-                  <Card key={p.id} className="border-slate-200 shadow-sm bg-white">
-                    <CardContent className="px-4 py-3">
-                      <div className="flex items-start gap-2">
-                        <Pill className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 leading-tight">{p.medicamento.nome}</p>
-                          {p.medicamento.principioAtivo && (
-                            <p className="text-xs text-slate-500 mt-0.5">{p.medicamento.principioAtivo}</p>
-                          )}
-                          <p className="text-xs text-slate-600 mt-1.5">
-                            <span className="font-medium">Posologia:</span> {p.posologia}
-                          </p>
-                          {p.medicamento.apresentacao && (
-                            <p className="text-xs text-slate-500">{p.medicamento.apresentacao}</p>
-                          )}
-                          <p className="text-[10px] text-slate-400 mt-1.5">
-                            {p.consulta.medico.usuario.nome} · {formatDate(new Date(p.consulta.dataHora))}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* ══ Exames Realizados ══ */}
-        <div>
-          <button
-            onClick={() => setExamesOpen((v) => !v)}
-            className="w-full flex items-center gap-2.5 mb-4 group"
-          >
-            <ClipboardList className="w-4 h-4 text-violet-500 shrink-0" />
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Exames Realizados</h2>
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400 mr-1">{data.solicitacoesExames.length} item(s)</span>
-            {examesOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-          </button>
-
-          {examesOpen && (
-            data.solicitacoesExames.length === 0 ? (
-              <Card className="border-dashed border-slate-200">
-                <CardContent className="py-8 text-center text-sm text-slate-400">
-                  Nenhum exame registrado.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {data.solicitacoesExames.map((e) => {
-                  const status = EXAME_STATUS[e.status] ?? { label: e.status, color: 'bg-slate-100 text-slate-700 border-slate-300' };
-                  return (
-                    <Card key={e.id} className="border-slate-200 shadow-sm bg-white">
-                      <CardContent className="px-4 py-3">
-                        <div className="flex items-start gap-2">
-                          <ClipboardList className="w-3.5 h-3.5 text-violet-500 mt-0.5 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm font-semibold text-slate-800 leading-tight">{e.exame.nome}</p>
-                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${status.color}`}>
-                                {status.label}
-                              </span>
-                            </div>
-                            {e.exame.tipo && (
-                              <p className="text-xs text-slate-500 mt-0.5">{e.exame.tipo}</p>
-                            )}
-                            <p className="text-xs text-slate-600 mt-1.5">
-                              <span className="font-medium">Solicitado em:</span> {formatDate(new Date(e.dataSolicitacao))}
-                            </p>
-                            {e.dataRealizacao && (
-                              <p className="text-xs text-slate-600">
-                                <span className="font-medium">Realizado em:</span> {formatDate(new Date(e.dataRealizacao))}
-                              </p>
-                            )}
-                            {e.resultado && (
-                              <p className="text-xs text-slate-600 mt-1">
-                                <span className="font-medium">Resultado:</span> {e.resultado}
-                              </p>
-                            )}
-                            <p className="text-[10px] text-slate-400 mt-1.5">
-                              {e.consulta.medico.usuario.nome}
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* ══ Histórico de Consultas ══ */}
-        <div>
-          <button
-            onClick={() => setHistOpen((v) => !v)}
-            className="w-full flex items-center gap-2.5 mb-5 group"
-          >
-            <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Histórico de Consultas</h2>
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400 mr-1">{timeline.length} registro(s)</span>
-            {histOpen ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-          </button>
-
-          {histOpen && (
-            timeline.length === 0 ? (
-              <Card className="border-dashed border-slate-200">
-                <CardContent className="py-12 text-center text-sm text-slate-500">
-                  Nenhum registro encontrado.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="relative">
-                {/* Linha vertical */}
-                <div className="absolute left-[7.5rem] top-0 bottom-0 w-px bg-slate-200 pointer-events-none" />
-
-                <div className="space-y-4">
-                  {timeline.map((item, idx) => (
-                    <div key={idx} className="flex gap-0">
-                      {/* Data */}
-                      <div className="w-[7.5rem] shrink-0 pt-3.5 pr-4 text-right">
-                        <p className="text-xs font-semibold text-slate-700 leading-tight">
-                          {item.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-                        </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {item.date.getFullYear()}
-                        </p>
-                      </div>
-
-                      {/* Marcador */}
-                      <div className="shrink-0 flex flex-col items-center">
-                        <div
-                          className={`mt-3 w-4 h-4 rounded-full border-2 bg-white shrink-0 z-10 ${
-                            item.kind === 'consulta'
-                              ? 'border-blue-500'
-                              : item.kind === 'exame'
-                              ? 'border-violet-500'
-                              : 'border-emerald-500'
-                          }`}
-                        />
-                      </div>
-
-                      {/* Card do evento */}
-                      <div className="flex-1 pl-4 pb-2">
-                        {item.kind === 'consulta' && (
-                          <ConsultaCard consulta={item.raw} onAbrirFicha={handleAbrirFichaAtendimento} loadingFicha={loadingFicha} />
-                        )}
-                        {item.kind === 'exame' && <ExameCard exame={item.raw} />}
-                        {item.kind === 'prescricao' && <PrescricaoCard prescricao={item.raw} />}
-                      </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  {[
+                    { label: 'Consultas',   n: data.consultas.length },
+                    { label: 'Exames',      n: data.solicitacoesExames.length },
+                    { label: 'Prescrições', n: data.prescricoes.length },
+                  ].map(({ label, n }) => (
+                    <div key={label} className="text-center">
+                      <p className="text-base font-bold text-slate-800 leading-none">{n}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
               </div>
-            )
+
+              {/* Grid de campos — tudo junto, fluindo */}
+              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-4 gap-x-6 gap-y-2.5">
+                <Field label="CPF"          value={formatCPF(paciente.cpf)} />
+                {paciente.rg              && <Field label="RG"            value={paciente.rg} />}
+                <Field label="Nascimento"   value={`${formatDate(new Date(paciente.dataNascimento))} · ${idade}a`} />
+                {paciente.estadoCivil     && <Field label="Estado Civil"  value={paciente.estadoCivil} />}
+                {paciente.profissao       && <Field label="Profissão"     value={paciente.profissao} />}
+                {paciente.celular         && <Field label="Celular"        value={paciente.celular} />}
+                {paciente.telefone        && <Field label="Telefone"       value={paciente.telefone} />}
+                {paciente.email           && <Field label="E-mail"         value={paciente.email} span />}
+                {enderecoFormatado        && <Field label="Endereço"       value={enderecoFormatado} span />}
+                {paciente.nomeMae         && <Field label="Mãe"            value={paciente.nomeMae} />}
+                {paciente.nomePai         && <Field label="Pai"            value={paciente.nomePai} />}
+                {data.planosSaude.map((pl: any, i: number) => (
+                  <Field
+                    key={i}
+                    label="Plano de Saúde"
+                    value={[pl.planoSaude?.nome || pl.nome, pl.numeroCarteirinha].filter(Boolean).join(' · ')}
+                  />
+                ))}
+              </div>
+
+              {paciente.observacoes && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  <p className="text-[10px] text-slate-400 mb-0.5">Observações</p>
+                  <p className="text-xs text-slate-600">{paciente.observacoes}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* ══ Medicamentos em Uso ══ */}
+        <Section
+          icon={Pill}
+          iconColor="text-emerald-500"
+          title="Medicamentos em Uso"
+          count={data.prescricoes.length}
+          open={medsOpen}
+          onToggle={() => setMedsOpen(v => !v)}
+        >
+          {data.prescricoes.length === 0 ? (
+            <EmptyState message="Nenhum medicamento registrado." />
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {data.prescricoes.map((p) => (
+                <div key={p.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex gap-3">
+                  <div className="w-1 rounded-full bg-emerald-400 shrink-0 self-stretch" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800 leading-snug">{p.medicamento.nome}</p>
+                    {p.medicamento.principioAtivo && (
+                      <p className="text-xs text-slate-500 mt-0.5">{p.medicamento.principioAtivo}</p>
+                    )}
+                    <div className="mt-2 space-y-0.5">
+                      <p className="text-xs text-slate-600"><span className="font-medium">Posologia:</span> {p.posologia}</p>
+                      {p.medicamento.apresentacao && (
+                        <p className="text-xs text-slate-500">{p.medicamento.apresentacao} · {p.quantidade} un.</p>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-2">
+                      {p.consulta.medico.usuario.nome} · {formatDate(new Date(p.consulta.dataHora))}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        </div>
+        </Section>
+
+        {/* ══ Exames Realizados ══ */}
+        <Section
+          icon={ClipboardList}
+          iconColor="text-violet-500"
+          title="Exames Realizados"
+          count={data.solicitacoesExames.length}
+          open={examesOpen}
+          onToggle={() => setExamesOpen(v => !v)}
+        >
+          {data.solicitacoesExames.length === 0 ? (
+            <EmptyState message="Nenhum exame registrado." />
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {data.solicitacoesExames.map((e) => {
+                const st = EXAME_STATUS[e.status] ?? { label: e.status, badge: 'bg-slate-100 text-slate-600' };
+                const barColor =
+                  e.status === 'REALIZADO' ? 'bg-emerald-400' :
+                  e.status === 'CANCELADO' ? 'bg-red-300' : 'bg-amber-400';
+                return (
+                  <div key={e.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex gap-3">
+                    <div className={`w-1 rounded-full ${barColor} shrink-0 self-stretch`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-800 leading-snug">{e.exame.nome}</p>
+                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 ${st.badge}`}>
+                          {st.label}
+                        </span>
+                      </div>
+                      {e.exame.tipo && (
+                        <p className="text-xs text-slate-500 mt-0.5">{e.exame.tipo}</p>
+                      )}
+                      <div className="mt-2 space-y-0.5 text-xs text-slate-600">
+                        <p><span className="font-medium">Solicitado:</span> {formatDate(new Date(e.dataSolicitacao))}</p>
+                        {e.dataRealizacao && (
+                          <p><span className="font-medium">Realizado:</span> {formatDate(new Date(e.dataRealizacao))}</p>
+                        )}
+                      </div>
+                      {e.resultado && (
+                        <p className="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-100">
+                          <span className="font-medium">Resultado:</span> {e.resultado}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400 mt-2">{e.consulta.medico.usuario.nome}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
+        {/* ══ Histórico de Consultas ══ */}
+        <Section
+          icon={Calendar}
+          iconColor="text-blue-500"
+          title="Histórico de Consultas"
+          count={data.consultas.length}
+          open={histOpen}
+          onToggle={() => setHistOpen(v => !v)}
+        >
+          {data.consultas.length === 0 ? (
+            <EmptyState message="Nenhuma consulta registrada." />
+          ) : (
+            <div className="space-y-6">
+              {consultasPorMes.map(({ mesLabel, consultas }) => (
+                <div key={mesLabel}>
+                  {/* Separador de mês */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-xs font-semibold text-slate-500 capitalize">{mesLabel}</span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+
+                  <div className="space-y-2">
+                    {consultas.map((consulta) => (
+                      <ConsultaRow
+                        key={consulta.id}
+                        consulta={consulta}
+                        exames={data.solicitacoesExames.filter(e => e.consulta.id === consulta.id)}
+                        prescricoes={data.prescricoes.filter(p => p.consulta.id === consulta.id)}
+                        loadingFicha={loadingFicha}
+                        onAbrirFicha={handleAbrirFichaAtendimento}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
       </div>
     </div>
   );
 }
 
-/* ── Cards da timeline ── */
+/* ── ConsultaRow ────────────────────────────────────────────────────────── */
 
-function ConsultaCard({
+function ConsultaRow({
   consulta,
-  onAbrirFicha,
+  exames,
+  prescricoes,
   loadingFicha,
+  onAbrirFicha,
 }: {
   consulta: ProntuarioCompleto['consultas'][0];
-  onAbrirFicha: (id: string) => void;
+  exames: ProntuarioCompleto['solicitacoesExames'];
+  prescricoes: ProntuarioCompleto['prescricoes'];
   loadingFicha: string | null;
+  onAbrirFicha: (id: string) => void;
 }) {
-  const status = CONSULTA_STATUS[consulta.status] ?? { label: consulta.status, color: 'bg-slate-100 text-slate-700 border-slate-300' };
+  const [open, setOpen] = useState(false);
+
+  const st = CONSULTA_STATUS[consulta.status] ?? {
+    label: consulta.status,
+    border: 'border-l-slate-300',
+    dot: 'bg-slate-400',
+    badge: 'bg-slate-100 text-slate-600',
+  };
   const prontuario = consulta.prontuarios?.[0];
-  const hora = formatTime(consulta.dataHora);
 
   return (
-    <Card className="border-slate-200 shadow-sm bg-white">
-      <CardContent className="px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
+    <div className={`bg-white border border-slate-200 border-l-4 ${st.border} rounded-r-xl rounded-l-sm`}>
+
+      {/* ── Linha principal (layout inalterado) ── */}
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-slate-50/60 transition-colors"
+      >
+        {/* Data */}
+        <div className="shrink-0 text-center w-10">
+          <p className="text-base font-bold text-slate-800 leading-none">
+            {new Date(consulta.dataHora).getDate().toString().padStart(2, '0')}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5 capitalize">
+            {new Date(consulta.dataHora).toLocaleDateString('pt-BR', { month: 'short' })}
+          </p>
+        </div>
+
+        <div className="w-px h-8 bg-slate-100 shrink-0" />
+
+        {/* Tipo + Status */}
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <Stethoscope className="w-3.5 h-3.5 text-blue-500" />
-              <span className="text-sm font-semibold text-slate-800">Consulta</span>
-            </div>
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${status.color}`}>
-              {status.label}
+            <p className="text-sm font-semibold text-slate-800">
+              {consulta.tipoConsulta?.nome ?? 'Consulta'}
+            </p>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${st.badge}`}>
+              {st.label}
             </span>
-            {consulta.tipoConsulta && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600">
-                {consulta.tipoConsulta.nome}
-              </span>
+          </div>
+          {prontuario?.diagnostico && (
+            <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
+              {prontuario.diagnostico}
+            </p>
+          )}
+        </div>
+
+        {/* Ficha */}
+        <span
+          role="button"
+          onClick={(e) => { e.stopPropagation(); onAbrirFicha(consulta.id); }}
+          className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+        >
+          {loadingFicha === consulta.id
+            ? <Loader2 className="w-3 h-3 animate-spin" />
+            : <><FileText className="w-3 h-3" />Ficha de Atendimento</>}
+        </span>
+
+        <ChevronDown className={`w-3.5 h-3.5 text-slate-300 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* ── Painel expandido ── */}
+      {open && (
+        <div className="px-4 pb-5 pt-4 border-t border-slate-100 space-y-5">
+
+          {/* Informações da consulta */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <Detail label="Médico" value={consulta.medico.usuario.nome} />
+            {consulta.tipoConsulta && <Detail label="Tipo de Consulta" value={consulta.tipoConsulta.nome} />}
+            {consulta.codigoTuss && (
+              <Detail
+                label="Procedimento (TUSS)"
+                value={`${consulta.codigoTuss.codigoTuss} · ${consulta.codigoTuss.descricao}`}
+              />
             )}
+            {consulta.modalidade && <Detail label="Modalidade" value={consulta.modalidade === 'TELEMEDICINA' ? 'Telemedicina' : 'Presencial'} />}
+            {consulta.planoSaude && <Detail label="Plano de Saúde" value={consulta.planoSaude.nome} />}
+            {consulta.operadora && <Detail label="Operadora" value={consulta.operadora.nomeFantasia} />}
+            {consulta.valorCobrado != null && (
+              <Detail label="Valor Cobrado" value={`R$ ${Number(consulta.valorCobrado).toFixed(2).replace('.', ',')}`} />
+            )}
+            {consulta.observacoes && <Detail label="Observações da Consulta" value={consulta.observacoes} full />}
           </div>
-          {hora && <span className="text-xs text-slate-400 shrink-0">{hora}</span>}
-        </div>
 
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-          <User className="w-3 h-3" />
-          <span>{consulta.medico.usuario.nome}</span>
-        </div>
+          {/* Prontuário / Registro clínico */}
+          {prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.evolucao) && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Registro Clínico</p>
+              <div className="space-y-3">
+                {prontuario.anamnese && <Detail label="Anamnese" value={prontuario.anamnese} full />}
+                {prontuario.exameFisico && <Detail label="Exame Físico" value={prontuario.exameFisico} full />}
+                {prontuario.diagnostico && <Detail label="Diagnóstico" value={prontuario.diagnostico} full />}
+                {prontuario.conduta && <Detail label="Conduta" value={prontuario.conduta} full />}
+                {prontuario.evolucao && <Detail label="Evolução" value={prontuario.evolucao} full />}
+              </div>
+            </div>
+          )}
 
-        {consulta.codigoTuss && (
-          <p className="mt-1.5 text-xs text-slate-400">
-            {consulta.codigoTuss.codigoTuss} · {consulta.codigoTuss.descricao}
-          </p>
-        )}
+          {/* Exames solicitados nesta consulta */}
+          {exames.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Exames Solicitados</p>
+              <div className="space-y-2">
+                {exames.map(e => {
+                  const exSt = EXAME_STATUS[e.status] ?? { label: e.status, badge: 'bg-slate-100 text-slate-600' };
+                  return (
+                    <div key={e.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-xs font-semibold text-slate-700">{e.exame.nome}</p>
+                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${exSt.badge}`}>{exSt.label}</span>
+                        </div>
+                        {e.exame.tipo && <p className="text-[10px] text-slate-400 mt-0.5">{e.exame.tipo}</p>}
+                        {e.resultado && <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Resultado:</span> {e.resultado}</p>}
+                        {e.observacoes && <p className="text-xs text-slate-500 mt-1">{e.observacoes}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-        {prontuario?.diagnostico && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Diagnóstico</p>
-            <p className="text-sm text-slate-700">{prontuario.diagnostico}</p>
-          </div>
-        )}
+          {/* Prescrições desta consulta */}
+          {prescricoes.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Prescrições</p>
+              <div className="space-y-2">
+                {prescricoes.map(p => (
+                  <div key={p.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700">{p.medicamento.nome}</p>
+                      {p.medicamento.principioAtivo && <p className="text-[10px] text-slate-400 mt-0.5">{p.medicamento.principioAtivo}</p>}
+                      <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Posologia:</span> {p.posologia}</p>
+                      <p className="text-xs text-slate-600"><span className="font-medium">Quantidade:</span> {p.quantidade} unidade(s)</p>
+                      {p.observacoes && <p className="text-xs text-slate-500 mt-1">{p.observacoes}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-        {consulta.status === 'REALIZADA' && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onAbrirFicha(consulta.id)}
-              disabled={loadingFicha === consulta.id}
-              className="h-7 text-xs px-3"
-            >
-              {loadingFicha === consulta.id ? (
-                <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Gerando...</>
-              ) : (
-                <><FileDoc className="w-3 h-3 mr-1.5" />Ficha de Atendimento</>
-              )}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ExameCard({ exame }: { exame: ProntuarioCompleto['solicitacoesExames'][0] }) {
-  const status = EXAME_STATUS[exame.status] ?? { label: exame.status, color: 'bg-slate-100 text-slate-700 border-slate-300' };
-
-  return (
-    <Card className="border-slate-200 shadow-sm bg-white">
-      <CardContent className="px-4 py-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <ClipboardList className="w-3.5 h-3.5 text-violet-500" />
-            <span className="text-sm font-semibold text-slate-800">{exame.exame.nome}</span>
-          </div>
-          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${status.color}`}>
-            {status.label}
-          </span>
-          {exame.exame.tipo && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50 text-slate-600">
-              {exame.exame.tipo}
-            </span>
+          {/* Fallback */}
+          {!prontuario && exames.length === 0 && prescricoes.length === 0 &&
+            !consulta.codigoTuss && consulta.valorCobrado == null && !consulta.observacoes && (
+            <p className="text-xs text-slate-400">Sem informações adicionais.</p>
           )}
         </div>
-
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-          <User className="w-3 h-3" />
-          <span>{exame.consulta.medico.usuario.nome}</span>
-        </div>
-
-        {exame.dataRealizacao && (
-          <p className="mt-1 text-xs text-slate-400">
-            Realizado em {formatDate(new Date(exame.dataRealizacao))}
-          </p>
-        )}
-
-        {exame.resultado && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Resultado</p>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">{exame.resultado}</p>
-          </div>
-        )}
-
-        {exame.observacoes && (
-          <div className="mt-2">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Observações</p>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">{exame.observacoes}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function PrescricaoCard({ prescricao }: { prescricao: ProntuarioCompleto['prescricoes'][0] }) {
-  return (
-    <Card className="border-slate-200 shadow-sm bg-white">
-      <CardContent className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Pill className="w-3.5 h-3.5 text-emerald-500" />
-          <span className="text-sm font-semibold text-slate-800">{prescricao.medicamento.nome}</span>
-        </div>
-
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-          <User className="w-3 h-3" />
-          <span>{prescricao.consulta.medico.usuario.nome}</span>
-        </div>
-
-        <div className="mt-2.5 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
-          {prescricao.medicamento.principioAtivo && (
-            <span className="text-slate-500">
-              <span className="font-medium text-slate-600">Princípio ativo:</span> {prescricao.medicamento.principioAtivo}
-            </span>
-          )}
-          {prescricao.medicamento.apresentacao && (
-            <span className="text-slate-500">
-              <span className="font-medium text-slate-600">Apresentação:</span> {prescricao.medicamento.apresentacao}
-            </span>
-          )}
-          <span className="text-slate-500">
-            <span className="font-medium text-slate-600">Posologia:</span> {prescricao.posologia}
-          </span>
-          <span className="text-slate-500">
-            <span className="font-medium text-slate-600">Qtd.:</span> {prescricao.quantidade} un.
-          </span>
-        </div>
-
-        {prescricao.observacoes && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Observações</p>
-            <p className="text-sm text-slate-700 whitespace-pre-wrap">{prescricao.observacoes}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ── Auxiliares do cabeçalho ── */
-
-function InfoGroup({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">{title}</p>
-      <div className="space-y-2">{children}</div>
+      )}
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  value,
+function Detail({ label, value, full }: { label: string; value: string; full?: boolean }) {
+  return (
+    <div className={full ? 'col-span-2' : ''}>
+      <p className="text-[10px] text-slate-400 mb-0.5">{label}</p>
+      <p className="text-sm text-slate-700 whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
+/* ── Componentes de layout ──────────────────────────────────────────────── */
+
+function Section({
   icon: Icon,
+  iconColor,
+  title,
+  count,
+  open,
+  onToggle,
+  children,
 }: {
-  label: string;
-  value: string;
-  icon?: React.ElementType;
+  icon: React.ElementType;
+  iconColor: string;
+  title: string;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-start gap-2 min-w-0">
-      {Icon && <Icon className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />}
-      <div className="min-w-0">
-        <p className="text-[10px] text-slate-400">{label}</p>
-        <p className="text-sm text-slate-800 font-medium break-words">{value}</p>
-      </div>
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 mb-3 group py-1 hover:opacity-80 transition-opacity"
+      >
+        <Icon className={`w-4 h-4 shrink-0 ${iconColor}`} />
+        <span className="text-sm font-semibold text-slate-700">{title}</span>
+        <span className="text-xs text-slate-400 font-normal">· {count}</span>
+        <div className="flex-1 h-px bg-slate-200 mx-1" />
+        {open
+          ? <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          : <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl py-8 text-center">
+      <p className="text-sm text-slate-400">{message}</p>
+    </div>
+  );
+}
+
+function Field({ label, value, span }: { label: string; value: string; span?: boolean }) {
+  return (
+    <div className={span ? 'col-span-2' : ''}>
+      <p className="text-[10px] text-slate-400 leading-none mb-0.5">{label}</p>
+      <p className="text-xs font-medium text-slate-700 break-words leading-snug">{value}</p>
     </div>
   );
 }
