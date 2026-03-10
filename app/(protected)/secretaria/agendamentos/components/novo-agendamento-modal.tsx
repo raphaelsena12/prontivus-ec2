@@ -106,11 +106,13 @@ function PacienteSearchInput({
   onChange,
   onSelect,
   error,
+  selectedPaciente: externalSelectedPaciente,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSelect: (paciente: Paciente) => void;
   error?: string;
+  selectedPaciente?: Paciente | null;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
@@ -131,6 +133,25 @@ function PacienteSearchInput({
     onChange(paciente.nome);
     onSelect(paciente);
   }, [onChange, onSelect]);
+
+  // Sincronizar com paciente selecionado externamente
+  useEffect(() => {
+    if (externalSelectedPaciente) {
+      setSelectedPaciente(externalSelectedPaciente);
+      setSearchTerm(externalSelectedPaciente.nome);
+    }
+  }, [externalSelectedPaciente]);
+
+  // Sincronizar searchTerm com value quando mudar externamente
+  useEffect(() => {
+    if (value && value !== searchTerm) {
+      setSearchTerm(value);
+    } else if (!value && searchTerm) {
+      // Se o value foi limpo, limpar também o searchTerm
+      setSearchTerm("");
+      setSelectedPaciente(null);
+    }
+  }, [value]);
 
   // Buscar pacientes quando o termo de busca mudar
   useEffect(() => {
@@ -384,6 +405,16 @@ export function NovoAgendamentoModal({
           if (operadorasRes.ok) {
             const data = await operadorasRes.json();
             setOperadoras(data.operadoras || []);
+          }
+
+          // Definir data se fornecida no initialData
+          if (initialData?.data) {
+            form.setValue("data", initialData.data);
+          }
+
+          // Definir hora se fornecida no initialData
+          if (initialData?.hora) {
+            form.setValue("hora", initialData.hora);
           }
 
           // Carregar paciente se pacienteId foi fornecido
@@ -766,6 +797,7 @@ export function NovoAgendamentoModal({
                               }}
                               onSelect={handlePacienteSelect}
                               error={form.formState.errors.pacienteId?.message}
+                              selectedPaciente={pacienteSelecionado}
                             />
                           </FormControl>
                           <FormMessage className="text-xs" />

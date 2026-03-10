@@ -293,6 +293,9 @@ export function PacientesContent() {
                             size="sm"
                             className="h-7 gap-1.5 text-xs px-2 shadow-sm"
                             onClick={() => {
+                              // Formatar data de hoje no formato YYYY-MM-DD
+                              const hoje = new Date();
+                              const dataFormatada = hoje.toISOString().split('T')[0];
                               setPacienteParaAgendar(paciente.id);
                               setNovoAgendamentoModalOpen(true);
                             }}
@@ -362,7 +365,10 @@ export function PacientesContent() {
         onSuccess={() => {
           // Opcional: recarregar pacientes se necessário
         }}
-        initialData={pacienteParaAgendar ? { pacienteId: pacienteParaAgendar } : undefined}
+        initialData={pacienteParaAgendar ? { 
+          pacienteId: pacienteParaAgendar,
+          data: new Date().toISOString().split('T')[0] // Data de hoje no formato YYYY-MM-DD
+        } : undefined}
       />
 
       <PacienteToggleStatusDialog
