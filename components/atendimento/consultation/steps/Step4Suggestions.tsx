@@ -208,7 +208,7 @@ export function Step4Suggestions({
                   >
                     {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-500 w-12 flex-shrink-0">
+                  <span className="text-xs font-bold text-slate-500 w-12 flex-shrink-0">
                     {cid.code}
                   </span>
                   <span className={`text-sm flex-1 ${selected ? "text-[#1E40AF] font-medium" : "text-slate-700"}`}>

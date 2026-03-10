@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Clock, User, Calendar, ChevronRight, Play } from "lucide-react";
+import {
+  Loader2, Clock, User, Calendar, ChevronRight, Play,
+  Stethoscope, CheckCircle2, Timer, Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import { PagamentosCards } from "@/components/pagamentos-cards";
 import { DateFilterBadges } from "@/components/date-filter-badges";
@@ -60,6 +63,36 @@ const receitaComparativaConfig: ChartConfig = {
 const receitaConvenioConfig: ChartConfig = {
   total: { label: "Receita", color: "#38bdf8" },
 };
+
+const AVATAR_GRADIENTS = [
+  "from-violet-500 to-purple-600",
+  "from-blue-500 to-indigo-600",
+  "from-emerald-500 to-teal-600",
+  "from-rose-500 to-pink-600",
+  "from-amber-500 to-orange-500",
+  "from-cyan-500 to-sky-600",
+];
+
+const AVATAR_SHADOWS = [
+  "shadow-violet-500/30",
+  "shadow-blue-500/30",
+  "shadow-emerald-500/30",
+  "shadow-rose-500/30",
+  "shadow-amber-500/30",
+  "shadow-cyan-500/30",
+];
+
+function getInitials(nome: string): string {
+  const parts = nome.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getAvatarStyle(nome: string) {
+  const idx = (nome.charCodeAt(0) + (nome.charCodeAt(1) || 0)) % AVATAR_GRADIENTS.length;
+  return { gradient: AVATAR_GRADIENTS[idx], shadow: AVATAR_SHADOWS[idx] };
+}
 
 export function MedicoContent({ nome }: MedicoContentProps) {
   const router = useRouter();
@@ -130,14 +163,15 @@ export function MedicoContent({ nome }: MedicoContentProps) {
   };
 
   const statusBadge = (status: string) => {
-    const map: Record<string, { label: string; className: string }> = {
-      CONFIRMADA:     { label: "Aguardando",    className: "bg-amber-100 text-amber-700" },
-      EM_ATENDIMENTO: { label: "Em Atendimento", className: "bg-blue-100 text-blue-700" },
-      REALIZADA:      { label: "Realizado",      className: "bg-emerald-100 text-emerald-700" },
+    const map: Record<string, { label: string; cls: string; dot: string; pulse: boolean }> = {
+      CONFIRMADA:     { label: "Aguardando",     cls: "bg-amber-50 text-amber-700 border border-amber-200",   dot: "bg-amber-400",  pulse: false },
+      EM_ATENDIMENTO: { label: "Em Atendimento", cls: "bg-blue-50 text-blue-700 border border-blue-200",      dot: "bg-blue-500",   pulse: true  },
+      REALIZADA:      { label: "Realizado",       cls: "bg-emerald-50 text-emerald-700 border border-emerald-200", dot: "bg-emerald-500", pulse: false },
     };
-    const s = map[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
+    const s = map[status] ?? { label: status, cls: "bg-slate-100 text-slate-600 border border-slate-200", dot: "bg-slate-400", pulse: false };
     return (
-      <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${s.className}`}>
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-semibold ${s.cls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot} ${s.pulse ? "animate-pulse" : ""}`} />
         {s.label}
       </span>
     );
@@ -148,6 +182,14 @@ export function MedicoContent({ nome }: MedicoContentProps) {
 
   const formatCurrency = (value: number) =>
     `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+  const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+  const hojeCap = hoje.charAt(0).toUpperCase() + hoje.slice(1);
+
+  const confirmados = agendaData?.agendamentosHoje.filter((a) => a.status === "CONFIRMADA") ?? [];
+  const realizados = agendaData?.agendamentosHoje.filter((a) => a.status === "REALIZADA") ?? [];
+  const total = agendaData?.agendamentosHoje.length ?? 0;
+  const progressPct = total > 0 ? Math.round((realizados.length / total) * 100) : 0;
 
   return (
     <div className="@container/main flex flex-1 flex-col">
@@ -215,82 +257,142 @@ export function MedicoContent({ nome }: MedicoContentProps) {
               </div>
             )}
 
-            {/* Row 1 — Box 2: Próximo Atendimento */}
+            {/* Row 1 — Box 2: Próximo Atendimento ── REDESIGNED */}
             {loadingAgenda ? (
-              <div className="rounded-lg border border-border/50 bg-card p-3 h-[290px] animate-pulse" />
+              <div className="rounded-xl border border-border/50 bg-card p-4 h-[290px] animate-pulse" />
             ) : (
-              <div className="rounded-lg border border-border/50 bg-card p-3">
-                <div className="mb-3">
-                  <h3 className="text-xs font-semibold text-slate-800">Próximo Atendimento</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Próximo paciente com check-in realizado</p>
-                </div>
-                {agendaData?.proximoAtendimento ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                        <User className="h-6 w-6 text-slate-400" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {agendaData.proximoAtendimento.paciente.nome}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {agendaData.proximoAtendimento.tipoConsulta?.nome || "Consulta"}
-                        </p>
-                      </div>
-                    </div>
+              <div className="rounded-xl border border-border/50 bg-gradient-to-br from-white via-white to-slate-50/60 p-4 relative overflow-hidden shadow-sm">
+                {/* Subtle background shimmer */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none animate-shimmer"
+                  style={{ backgroundSize: "200% 100%" }}
+                />
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="rounded-md bg-slate-50 px-3 py-2">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Horário</p>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-slate-500" />
-                          <p className="text-xs font-semibold text-slate-700">
-                            {formatTime(agendaData.proximoAtendimento.dataHora)}
-                          </p>
-                        </div>
+                <div className="relative">
+                  {/* Header */}
+                  <div className="mb-4 flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          {agendaData?.proximoAtendimento ? (
+                            <>
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                            </>
+                          ) : (
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-300" />
+                          )}
+                        </span>
+                        <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">
+                          Próximo Atendimento
+                        </h3>
                       </div>
-                      <div className="rounded-md bg-slate-50 px-3 py-2">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Pagamento</p>
-                        <p className="text-xs font-semibold text-slate-700 truncate">
-                          {agendaData.proximoAtendimento.operadora
-                            ? agendaData.proximoAtendimento.operadora.nomeFantasia ||
-                              agendaData.proximoAtendimento.operadora.razaoSocial
-                            : "Particular"}
-                        </p>
-                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5 ml-4">
+                        {agendaData?.proximoAtendimento
+                          ? "Paciente aguardando na fila"
+                          : "Fila vazia no momento"}
+                      </p>
                     </div>
-
-                    {agendaData.agendamentosHoje.length > 1 && (
-                      <div className="rounded-md bg-blue-50 border border-blue-100 px-3 py-2 flex items-center justify-between">
-                        <p className="text-xs text-blue-700">
-                          +{agendaData.agendamentosHoje.length - 1} paciente
-                          {agendaData.agendamentosHoje.length - 1 > 1 ? "s" : ""} aguardando
-                        </p>
-                        <ChevronRight className="h-3 w-3 text-blue-400" />
+                    {confirmados.length > 0 && (
+                      <div className="flex items-center gap-1 rounded-full bg-amber-50 border border-amber-100 px-2 py-1">
+                        <Users className="h-3 w-3 text-amber-500" />
+                        <span className="text-[10px] font-bold text-amber-700">{confirmados.length}</span>
                       </div>
                     )}
+                  </div>
 
-                    {agendaData?.proximoAtendimento && (
-                      <div className="flex justify-end">
+                  {agendaData?.proximoAtendimento ? (() => {
+                    const av = getAvatarStyle(agendaData.proximoAtendimento.paciente.nome);
+                    return (
+                      <div className="flex flex-col gap-3">
+                        {/* Patient avatar + info */}
+                        <div className="flex items-center gap-4">
+                          <div className="relative flex-shrink-0">
+                            <div
+                              className={`h-[60px] w-[60px] rounded-2xl bg-gradient-to-br ${av.gradient} flex items-center justify-center shadow-lg ${av.shadow} animate-glow-pulse`}
+                            >
+                              <span className="text-xl font-black text-white tracking-tight">
+                                {getInitials(agendaData.proximoAtendimento.paciente.nome)}
+                              </span>
+                            </div>
+                            {/* Glow halo */}
+                            <div
+                              className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${av.gradient} opacity-20 blur-lg -z-10 scale-110`}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-800 leading-tight truncate">
+                              {agendaData.proximoAtendimento.paciente.nome}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Stethoscope className="h-3 w-3 text-slate-400" />
+                              <p className="text-[10px] text-slate-500">
+                                {agendaData.proximoAtendimento.tipoConsulta?.nome || "Consulta"}
+                              </p>
+                            </div>
+                            <div className="mt-1.5">
+                              {statusBadge(agendaData.proximoAtendimento.status)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Info chips */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Horário</p>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5 text-blue-500" />
+                              <p className="text-sm font-bold text-slate-700">
+                                {formatTime(agendaData.proximoAtendimento.dataHora)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                            <p className="text-[9px] text-slate-400 uppercase tracking-widest mb-1">Pagamento</p>
+                            <p className="text-xs font-bold text-slate-700 truncate leading-tight mt-1">
+                              {agendaData.proximoAtendimento.operadora
+                                ? agendaData.proximoAtendimento.operadora.nomeFantasia ||
+                                  agendaData.proximoAtendimento.operadora.razaoSocial
+                                : "Particular"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Queue indicator */}
+                        {confirmados.length > 1 && (
+                          <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-3 py-2 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Timer className="h-3.5 w-3.5 text-indigo-400" />
+                              <p className="text-[11px] text-indigo-700 font-medium">
+                                +{confirmados.length - 1} paciente{confirmados.length - 1 > 1 ? "s" : ""} na fila
+                              </p>
+                            </div>
+                            <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />
+                          </div>
+                        )}
+
+                        {/* CTA Button */}
                         <button
                           onClick={() => handleIniciarAtendimento(agendaData.proximoAtendimento!.id)}
-                          className="flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 transition-colors"
+                          className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/35 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
                         >
-                          <Play className="h-3 w-3 fill-white" />
+                          <Play className="h-3.5 w-3.5 fill-white" />
                           Iniciar Atendimento
                         </button>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="h-[220px] flex flex-col items-center justify-center gap-2">
-                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
-                      <User className="h-6 w-6 text-slate-300" />
+                    );
+                  })() : (
+                    <div className="h-[200px] flex flex-col items-center justify-center gap-3">
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                        <User className="h-7 w-7 text-slate-300" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-semibold text-slate-400">Nenhum paciente aguardando</p>
+                        <p className="text-[11px] text-slate-300 mt-0.5">A fila está vazia no momento</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-400">Nenhum paciente aguardando</p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
@@ -344,58 +446,118 @@ export function MedicoContent({ nome }: MedicoContentProps) {
               </div>
             )}
 
-            {/* Row 2 — Box 4: Agendamento Diário */}
+            {/* Row 2 — Box 4: Agendamento Diário ── REDESIGNED */}
             {loadingAgenda ? (
-              <div className="rounded-lg border border-border/50 bg-card p-3 h-[290px] animate-pulse" />
+              <div className="rounded-xl border border-border/50 bg-card p-4 h-[290px] animate-pulse" />
             ) : (
-              <div className="rounded-lg border border-border/50 bg-card p-3">
-                <div className="mb-3 flex items-center justify-between">
+              <div className="rounded-xl border border-border/50 bg-gradient-to-br from-white via-white to-slate-50/60 p-4 shadow-sm">
+                {/* Header */}
+                <div className="mb-3 flex items-start justify-between">
                   <div>
-                    <h3 className="text-xs font-semibold text-slate-800">Agendamento Diário</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Pacientes com check-in hoje</p>
+                    <h3 className="text-[10px] font-bold text-slate-700 uppercase tracking-widest">
+                      Agendamento Diário
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{hojeCap}</p>
                   </div>
-                  {agendaData && agendaData.agendamentosHoje.length > 0 && (
-                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                      {agendaData.agendamentosHoje.length}
-                    </span>
+                  {total > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-slate-700">{realizados.length}/{total}</div>
+                        <div className="text-[9px] text-slate-400">realizados</div>
+                      </div>
+                      <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+                        <span className="text-xs font-black text-white">{total}</span>
+                      </div>
+                    </div>
                   )}
                 </div>
-                {agendaData && agendaData.agendamentosHoje.length > 0 ? (
-                  <div className="flex flex-col gap-1 max-h-[220px] overflow-y-auto pr-1">
-                    {agendaData.agendamentosHoje.map((ag, idx) => (
-                      <div
-                        key={ag.id}
-                        className="flex items-center gap-2.5 rounded-md p-2 hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                          <span className="text-[10px] font-semibold text-slate-500">{idx + 1}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-700 truncate">
-                            {ag.paciente.nome}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {ag.operadora
-                              ? ag.operadora.nomeFantasia || ag.operadora.razaoSocial
-                              : "Particular"}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                          {statusBadge(ag.status)}
-                          <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                            <Clock className="h-2.5 w-2.5" />
-                            {formatTime(ag.dataHora)}
+
+                {/* Progress bar */}
+                {total > 0 && (
+                  <div className="mb-3 h-1 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                )}
+
+                {/* Stats row */}
+                {total > 0 && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                      <span className="text-[10px] text-slate-500">{confirmados.length} aguardando</span>
+                    </div>
+                    <span className="text-slate-200">·</span>
+                    <div className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      <span className="text-[10px] text-slate-500">{realizados.length} realizados</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Patient list */}
+                {agendaData && total > 0 ? (
+                  <div className="flex flex-col gap-1.5 max-h-[180px] overflow-y-auto pr-0.5">
+                    {agendaData.agendamentosHoje.map((ag, idx) => {
+                      const av = getAvatarStyle(ag.paciente.nome);
+                      const isActive = ag.status === "EM_ATENDIMENTO";
+                      const isDone = ag.status === "REALIZADA";
+                      return (
+                        <div
+                          key={ag.id}
+                          className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition-all duration-200 animate-slide-up ${
+                            isActive
+                              ? "border-blue-200 bg-blue-50/50 shadow-sm shadow-blue-100"
+                              : isDone
+                              ? "border-transparent bg-slate-50/50 opacity-55"
+                              : "border-transparent bg-white/70 hover:bg-slate-50 hover:border-slate-100"
+                          }`}
+                          style={{ animationDelay: `${idx * 40}ms` }}
+                        >
+                          {/* Avatar */}
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br ${av.gradient} flex items-center justify-center shadow-sm`}
+                          >
+                            <span className="text-[11px] font-black text-white">
+                              {getInitials(ag.paciente.nome)}
+                            </span>
+                          </div>
+
+                          {/* Patient info */}
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold truncate ${isDone ? "text-slate-400 line-through decoration-slate-300" : "text-slate-700"}`}>
+                              {ag.paciente.nome}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {ag.operadora
+                                ? ag.operadora.nomeFantasia || ag.operadora.razaoSocial
+                                : "Particular"}
+                            </p>
+                          </div>
+
+                          {/* Status + time */}
+                          <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                            {statusBadge(ag.status)}
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                              <Clock className="h-2.5 w-2.5" />
+                              {formatTime(ag.dataHora)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="h-[220px] flex flex-col items-center justify-center gap-2">
-                    <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center">
-                      <Calendar className="h-6 w-6 text-slate-300" />
+                  <div className="h-[200px] flex flex-col items-center justify-center gap-3">
+                    <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <Calendar className="h-7 w-7 text-slate-300" />
                     </div>
-                    <p className="text-xs text-slate-400">Sem agendamentos confirmados hoje</p>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-slate-400">Sem agendamentos hoje</p>
+                      <p className="text-[11px] text-slate-300 mt-0.5">Nenhum check-in realizado</p>
+                    </div>
                   </div>
                 )}
               </div>

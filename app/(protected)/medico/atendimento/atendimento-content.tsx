@@ -1882,7 +1882,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                       <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-75" />
                     </div>
                     <Clock className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                    <span className="text-sm font-mono font-bold text-slate-800 tabular-nums whitespace-nowrap tracking-tight">
+                    <span className="text-sm font-bold text-slate-800 tabular-nums whitespace-nowrap tracking-tight">
                       {sessionDuration}
                     </span>
                   </div>
@@ -2661,7 +2661,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                 value={novoCidCode}
                 onChange={(e) => setNovoCidCode(e.target.value.toUpperCase())}
                 placeholder="Ex: J11.1"
-                className="font-mono"
+                className="uppercase"
               />
             </div>
             <div>

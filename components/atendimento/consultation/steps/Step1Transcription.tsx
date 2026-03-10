@@ -120,7 +120,7 @@ export function Step1Transcription({
             )}
 
             {isTranscribing && (
-              <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+              <span className="text-xs tabular-nums text-slate-400 bg-slate-50 px-2 py-1 rounded border border-slate-100">
                 {sessionDuration}
               </span>
             )}
@@ -234,7 +234,7 @@ export function Step1Transcription({
               const totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1] || "0");
               return (
                 <div key={idx} className="flex gap-3 group">
-                  <span className="text-slate-400 font-mono text-xs mt-0.5 flex-shrink-0 w-16 text-right">
+                  <span className="text-slate-400 tabular-nums text-xs mt-0.5 flex-shrink-0 w-16 text-right">
                     {formatTranscriptionTime(entry.time)}
                   </span>
                   <div className="flex-1 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 group-hover:bg-slate-100 transition-colors">

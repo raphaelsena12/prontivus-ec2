@@ -62,7 +62,7 @@ export function TranscriptionBar({
         </div>
 
         {/* Timer */}
-        <span className="font-mono text-sm text-slate-300 tabular-nums">{sessionDuration}</span>
+        <span className="text-sm text-slate-300 tabular-nums">{sessionDuration}</span>
 
         <div className={`w-px h-4 ${isPaused ? "bg-amber-800" : "bg-slate-700"}`} />
 

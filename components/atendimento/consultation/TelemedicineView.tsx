@@ -195,7 +195,7 @@ export function TelemedicineView({
         {/* Timer */}
         <div className="flex items-center gap-1.5 bg-slate-800 rounded-lg px-3 py-1.5 shrink-0 border border-white/5">
           <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-          <span className="text-white font-mono font-bold text-sm tabular-nums">{sessionDuration}</span>
+          <span className="text-white font-bold text-sm tabular-nums">{sessionDuration}</span>
         </div>
 
         {/* Connection quality */}
@@ -501,7 +501,7 @@ export function TelemedicineView({
                         }`}>
                           {entry.speaker}
                         </span>
-                        <span className="text-[10px] text-slate-600 font-mono">{entry.time}</span>
+                        <span className="text-[10px] text-slate-600 tabular-nums">{entry.time}</span>
                         {entry.isPartial && <span className="text-[10px] text-blue-500">(digitando...)</span>}
                       </div>
                       <p className={`text-xs text-slate-300 leading-relaxed pl-2 border-l ${
