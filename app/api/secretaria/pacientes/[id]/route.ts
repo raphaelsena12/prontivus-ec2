@@ -48,6 +48,43 @@ async function checkAuthorization() {
   return { authorized: true, clinicaId };
 }
 
+// GET /api/secretaria/pacientes/[id]
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await checkAuthorization();
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
+    const { id } = await params;
+
+    const paciente = await prisma.paciente.findFirst({
+      where: {
+        id,
+        clinicaId: auth.clinicaId,
+      },
+    });
+
+    if (!paciente) {
+      return NextResponse.json(
+        { error: "Paciente não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ paciente });
+  } catch (error) {
+    console.error("Erro ao buscar paciente:", error);
+    return NextResponse.json(
+      { error: "Erro ao buscar paciente" },
+      { status: 500 }
+    );
+  }
+}
+
 // PATCH /api/secretaria/pacientes/[id]
 export async function PATCH(
   request: NextRequest,

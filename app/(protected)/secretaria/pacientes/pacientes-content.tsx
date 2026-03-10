@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Search, Eye, Edit, Users, Calendar, Ban, CheckCircle, FileText, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Eye, Edit, Users, Calendar, Ban, CheckCircle, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,7 +97,6 @@ const getStatusBadge = (ativo: boolean) => {
 };
 
 export function PacientesContent() {
-  const router = useRouter();
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -162,6 +160,22 @@ export function PacientesContent() {
     fetchPacientes();
     setPacienteDialogOpen(false);
     setEditingPaciente(null);
+  };
+
+  const handleViewPaciente = async (pacienteId: string) => {
+    try {
+      // Buscar dados completos do paciente
+      const response = await fetch(`/api/secretaria/pacientes/${pacienteId}`);
+      if (!response.ok) {
+        throw new Error("Erro ao carregar paciente");
+      }
+      const data = await response.json();
+      setEditingPaciente(data.paciente);
+      setPacienteDialogOpen(true);
+    } catch (error) {
+      toast.error("Erro ao carregar dados do paciente");
+      console.error(error);
+    }
   };
 
   return (
@@ -242,7 +256,10 @@ export function PacientesContent() {
                         {paciente.numeroProntuario || "-"}
                       </TableCell>
                       <TableCell className="text-xs py-3">
-                        <div className="flex items-center gap-2">
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer hover:opacity-80"
+                          onClick={() => handleViewPaciente(paciente.id)}
+                        >
                           <Avatar className="h-8 w-8 shrink-0">
                             <AvatarImage
                               src={getAvatarUrl(paciente.nome, paciente.sexo)}
@@ -275,12 +292,14 @@ export function PacientesContent() {
                             variant="outline"
                             size="sm"
                             className="h-7 gap-1.5 text-xs px-2 shadow-sm"
-                            onClick={() => router.push(`/prontuario-paciente/${paciente.id}`)}
+                            onClick={() => {
+                              setPacienteParaAgendar(paciente.id);
+                              setNovoAgendamentoModalOpen(true);
+                            }}
                           >
-                            <FileText className="h-3 w-3" />
-                            Prontuário
+                            <Calendar className="h-3 w-3" />
+                            Agendar
                           </Button>
-
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="outline" size="sm" className="h-7 w-7 p-0 shadow-sm">
@@ -288,22 +307,13 @@ export function PacientesContent() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => router.push(`/secretaria/pacientes/${paciente.id}`)}>
+                              <DropdownMenuItem onClick={() => handleViewPaciente(paciente.id)}>
                                 <Eye className="mr-2 h-3.5 w-3.5 text-blue-500" />
                                 Visualizar
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/secretaria/pacientes/editar/${paciente.id}`)}>
+                              <DropdownMenuItem onClick={() => handleViewPaciente(paciente.id)}>
                                 <Edit className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
                                 Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setPacienteParaAgendar(paciente.id);
-                                  setNovoAgendamentoModalOpen(true);
-                                }}
-                              >
-                                <Calendar className="mr-2 h-3.5 w-3.5 text-violet-500" />
-                                Agendar consulta
                               </DropdownMenuItem>
                               {(paciente.celular || paciente.telefone) && (
                                 <DropdownMenuItem
