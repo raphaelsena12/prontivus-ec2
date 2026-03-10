@@ -232,10 +232,11 @@ export function ProntuariosContent() {
               variant="outline"
               size="sm"
               onClick={() => handleViewProntuario(row.original.id)}
-              title="Ver Prontuário"
-              className="h-7 text-xs w-7 p-0"
+              title="Abrir Prontuário"
+              className="h-7 text-xs px-2 gap-1"
             >
               <ExternalLink className="h-3 w-3" />
+              Abrir Prontuário
             </Button>
           </div>
         ),

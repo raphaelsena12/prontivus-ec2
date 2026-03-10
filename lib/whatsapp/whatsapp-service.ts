@@ -232,6 +232,12 @@ export async function sendWhatsAppForClinica(
     return await service.sendTextMessage(options);
   } catch (error: any) {
     console.error("❌ Erro ao enviar WhatsApp para clínica:", error.message);
+    
+    // Se o erro for de número não autorizado, relançar com mensagem mais clara
+    if (error.message?.includes("not in allowed list") || error.message?.includes("131030") || error.message?.includes("Recipient phone number not in allowed list")) {
+      throw new Error("Número de telefone não autorizado. No modo sandbox, você precisa adicionar o número na lista de permissões do Meta e fazer opt-in.");
+    }
+    
     return null;
   }
 }

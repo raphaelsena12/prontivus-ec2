@@ -10,12 +10,12 @@ import {
   Calendar,
   ArrowLeft,
   Loader2,
-  Pill,
-  ClipboardList,
   FileText,
   ChevronDown,
   ChevronUp,
   BookOpen,
+  Paperclip,
+  ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDate, formatCPF } from '@/lib/utils';
@@ -96,7 +96,16 @@ interface ProntuarioCompleto {
     createdAt: string;
   }>;
   pagamentos: any[];
-  documentos: any[];
+  documentos: Array<{
+    id: string;
+    numero: number;
+    tipoDocumento: string;
+    nomeDocumento: string;
+    s3Key: string | null;
+    createdAt: string;
+    consulta: { id: string; dataHora: string };
+    medico: { usuario: { nome: string } };
+  }>;
   mensagens: any[];
 }
 
@@ -127,8 +136,6 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ProntuarioCompleto | null>(null);
   const [loadingFicha, setLoadingFicha] = useState<string | null>(null);
-  const [medsOpen, setMedsOpen] = useState(true);
-  const [examesOpen, setExamesOpen] = useState(true);
   const [histOpen, setHistOpen] = useState(true);
 
   useEffect(() => { fetchProntuarioCompleto(); }, [pacienteId]);
@@ -149,23 +156,16 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
     }
   };
 
-  const handleAbrirFichaAtendimento = async (consultaId: string) => {
+  const handleAbrirFichaAtendimento = async (documentoId: string) => {
     try {
-      setLoadingFicha(consultaId);
-      const response = await fetch('/api/medico/documentos/gerar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipoDocumento: 'ficha-atendimento', consultaId, dados: {} }),
-      });
+      setLoadingFicha(documentoId);
+      const response = await fetch(`/api/medico/documentos/${documentoId}/url`);
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Erro ao gerar ficha');
+        throw new Error(err.error || 'Erro ao obter ficha');
       }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const { url } = await response.json();
       window.open(url, '_blank');
-      setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      toast.success('Ficha gerada com sucesso');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao abrir ficha');
     } finally {
@@ -243,7 +243,9 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
       <PageHeader
         icon={BookOpen}
         title="Prontuário"
-        subtitle={paciente.nome}
+        subtitle={paciente.numeroProntuario
+          ? `N: ${String(paciente.numeroProntuario).padStart(6, '0')}`
+          : `N: —`}
       />
 
       <div className="space-y-5 pb-24">
@@ -286,122 +288,34 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
               {/* Grid de campos — tudo junto, fluindo */}
               <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-4 gap-x-6 gap-y-2.5">
                 <Field label="CPF"          value={formatCPF(paciente.cpf)} />
-                {paciente.rg              && <Field label="RG"            value={paciente.rg} />}
+                <Field label="RG"           value={paciente.rg || '—'} />
                 <Field label="Nascimento"   value={`${formatDate(new Date(paciente.dataNascimento))} · ${idade}a`} />
-                {paciente.estadoCivil     && <Field label="Estado Civil"  value={paciente.estadoCivil} />}
-                {paciente.profissao       && <Field label="Profissão"     value={paciente.profissao} />}
-                {paciente.celular         && <Field label="Celular"        value={paciente.celular} />}
-                {paciente.telefone        && <Field label="Telefone"       value={paciente.telefone} />}
-                {paciente.email           && <Field label="E-mail"         value={paciente.email} span />}
-                {enderecoFormatado        && <Field label="Endereço"       value={enderecoFormatado} span />}
-                {paciente.nomeMae         && <Field label="Mãe"            value={paciente.nomeMae} />}
-                {paciente.nomePai         && <Field label="Pai"            value={paciente.nomePai} />}
-                {data.planosSaude.map((pl: any, i: number) => (
-                  <Field
-                    key={i}
-                    label="Plano de Saúde"
-                    value={[pl.planoSaude?.nome || pl.nome, pl.numeroCarteirinha].filter(Boolean).join(' · ')}
-                  />
-                ))}
+                <Field label="Estado Civil" value={paciente.estadoCivil || '—'} />
+                <Field label="Profissão"    value={paciente.profissao || '—'} />
+                <Field label="Celular"      value={paciente.celular || '—'} />
+                <Field label="Telefone"     value={paciente.telefone || '—'} />
+                <Field label="E-mail"       value={paciente.email || '—'} span />
+                <Field label="Endereço"     value={enderecoFormatado || '—'} span />
+                <Field label="Mãe"          value={paciente.nomeMae || '—'} />
+                <Field label="Pai"          value={paciente.nomePai || '—'} />
+                {data.planosSaude.length > 0
+                  ? data.planosSaude.map((pl: any, i: number) => (
+                      <Field
+                        key={i}
+                        label="Plano de Saúde"
+                        value={[pl.planoSaude?.nome || pl.nome, pl.numeroCarteirinha].filter(Boolean).join(' · ')}
+                      />
+                    ))
+                  : <Field label="Plano de Saúde" value="—" />}
               </div>
 
-              {paciente.observacoes && (
-                <div className="mt-3 pt-3 border-t border-slate-100">
-                  <p className="text-[10px] text-slate-400 mb-0.5">Observações</p>
-                  <p className="text-xs text-slate-600">{paciente.observacoes}</p>
-                </div>
-              )}
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <p className="text-[10px] text-slate-400 mb-0.5">Observações</p>
+                <p className="text-xs text-slate-600">{paciente.observacoes || '—'}</p>
+              </div>
             </div>
           </div>
         </Card>
-
-        {/* ══ Medicamentos em Uso ══ */}
-        <Section
-          icon={Pill}
-          iconColor="text-emerald-500"
-          title="Medicamentos em Uso"
-          count={data.prescricoes.length}
-          open={medsOpen}
-          onToggle={() => setMedsOpen(v => !v)}
-        >
-          {data.prescricoes.length === 0 ? (
-            <EmptyState message="Nenhum medicamento registrado." />
-          ) : (
-            <div className="grid grid-cols-2 gap-2.5">
-              {data.prescricoes.map((p) => (
-                <div key={p.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex gap-3">
-                  <div className="w-1 rounded-full bg-emerald-400 shrink-0 self-stretch" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-slate-800 leading-snug">{p.medicamento.nome}</p>
-                    {p.medicamento.principioAtivo && (
-                      <p className="text-xs text-slate-500 mt-0.5">{p.medicamento.principioAtivo}</p>
-                    )}
-                    <div className="mt-2 space-y-0.5">
-                      <p className="text-xs text-slate-600"><span className="font-medium">Posologia:</span> {p.posologia}</p>
-                      {p.medicamento.apresentacao && (
-                        <p className="text-xs text-slate-500">{p.medicamento.apresentacao} · {p.quantidade} un.</p>
-                      )}
-                    </div>
-                    <p className="text-[10px] text-slate-400 mt-2">
-                      {p.consulta.medico.usuario.nome} · {formatDate(new Date(p.consulta.dataHora))}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Section>
-
-        {/* ══ Exames Realizados ══ */}
-        <Section
-          icon={ClipboardList}
-          iconColor="text-violet-500"
-          title="Exames Realizados"
-          count={data.solicitacoesExames.length}
-          open={examesOpen}
-          onToggle={() => setExamesOpen(v => !v)}
-        >
-          {data.solicitacoesExames.length === 0 ? (
-            <EmptyState message="Nenhum exame registrado." />
-          ) : (
-            <div className="grid grid-cols-2 gap-2.5">
-              {data.solicitacoesExames.map((e) => {
-                const st = EXAME_STATUS[e.status] ?? { label: e.status, badge: 'bg-slate-100 text-slate-600' };
-                const barColor =
-                  e.status === 'REALIZADO' ? 'bg-emerald-400' :
-                  e.status === 'CANCELADO' ? 'bg-red-300' : 'bg-amber-400';
-                return (
-                  <div key={e.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex gap-3">
-                    <div className={`w-1 rounded-full ${barColor} shrink-0 self-stretch`} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-800 leading-snug">{e.exame.nome}</p>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md shrink-0 ${st.badge}`}>
-                          {st.label}
-                        </span>
-                      </div>
-                      {e.exame.tipo && (
-                        <p className="text-xs text-slate-500 mt-0.5">{e.exame.tipo}</p>
-                      )}
-                      <div className="mt-2 space-y-0.5 text-xs text-slate-600">
-                        <p><span className="font-medium">Solicitado:</span> {formatDate(new Date(e.dataSolicitacao))}</p>
-                        {e.dataRealizacao && (
-                          <p><span className="font-medium">Realizado:</span> {formatDate(new Date(e.dataRealizacao))}</p>
-                        )}
-                      </div>
-                      {e.resultado && (
-                        <p className="text-xs text-slate-600 mt-2 pt-2 border-t border-slate-100">
-                          <span className="font-medium">Resultado:</span> {e.resultado}
-                        </p>
-                      )}
-                      <p className="text-[10px] text-slate-400 mt-2">{e.consulta.medico.usuario.nome}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Section>
 
         {/* ══ Histórico de Consultas ══ */}
         <Section
@@ -431,6 +345,8 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                         consulta={consulta}
                         exames={data.solicitacoesExames.filter(e => e.consulta.id === consulta.id)}
                         prescricoes={data.prescricoes.filter(p => p.consulta.id === consulta.id)}
+                        fichaDocumento={data.documentos.find(d => d.consulta.id === consulta.id && d.tipoDocumento === 'ficha-atendimento') ?? null}
+                        examesAnexados={data.documentos.filter(d => d.consulta.id === consulta.id && (d.tipoDocumento === 'exame-imagem' || d.tipoDocumento === 'exame-pdf'))}
                         loadingFicha={loadingFicha}
                         onAbrirFicha={handleAbrirFichaAtendimento}
                       />
@@ -453,12 +369,16 @@ function ConsultaRow({
   consulta,
   exames,
   prescricoes,
+  fichaDocumento,
+  examesAnexados,
   loadingFicha,
   onAbrirFicha,
 }: {
   consulta: ProntuarioCompleto['consultas'][0];
   exames: ProntuarioCompleto['solicitacoesExames'];
   prescricoes: ProntuarioCompleto['prescricoes'];
+  fichaDocumento: ProntuarioCompleto['documentos'][0] | null;
+  examesAnexados: ProntuarioCompleto['documentos'];
   loadingFicha: string | null;
   onAbrirFicha: (id: string) => void;
 }) {
@@ -508,17 +428,6 @@ function ConsultaRow({
             </p>
           )}
         </div>
-
-        {/* Ficha */}
-        <span
-          role="button"
-          onClick={(e) => { e.stopPropagation(); onAbrirFicha(consulta.id); }}
-          className="shrink-0 inline-flex items-center gap-1 h-7 px-2.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-        >
-          {loadingFicha === consulta.id
-            ? <Loader2 className="w-3 h-3 animate-spin" />
-            : <><FileText className="w-3 h-3" />Ficha de Atendimento</>}
-        </span>
 
         <ChevronDown className={`w-3.5 h-3.5 text-slate-300 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -605,10 +514,61 @@ function ConsultaRow({
             </div>
           )}
 
+          {/* Exames Anexados */}
+          <div>
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Exames Anexados</p>
+            {examesAnexados.length === 0 ? (
+              <p className="text-xs text-slate-300">Nenhum exame anexado.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {examesAnexados.map(doc => {
+                  const isImage = doc.tipoDocumento === 'exame-imagem';
+                  return (
+                    <button
+                      key={doc.id}
+                      onClick={() => onAbrirFicha(doc.id)}
+                      disabled={loadingFicha === doc.id}
+                      className="inline-flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-left transition-colors disabled:opacity-50"
+                    >
+                      {loadingFicha === doc.id
+                        ? <Loader2 className="w-3 h-3 animate-spin text-slate-400 shrink-0" />
+                        : isImage
+                          ? <ImageIcon className="w-3 h-3 text-violet-400 shrink-0" />
+                          : <Paperclip className="w-3 h-3 text-blue-400 shrink-0" />}
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-700 truncate max-w-[140px]">{doc.nomeDocumento}</p>
+                        <p className="text-[10px] text-slate-400 leading-none mt-0.5">{isImage ? 'Imagem' : 'PDF'} · {formatDate(new Date(doc.createdAt))}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Fallback */}
-          {!prontuario && exames.length === 0 && prescricoes.length === 0 &&
+          {!prontuario && exames.length === 0 && prescricoes.length === 0 && examesAnexados.length === 0 &&
             !consulta.codigoTuss && consulta.valorCobrado == null && !consulta.observacoes && (
             <p className="text-xs text-slate-400">Sem informações adicionais.</p>
+          )}
+
+          {/* Ficha de Atendimento — rodapé direito */}
+          {fichaDocumento && (
+            <div className="flex items-end justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="text-right">
+                <p className="text-[10px] text-slate-400 leading-none">Ficha de Atendimento</p>
+                <p className="text-[10px] font-mono text-slate-500 mt-0.5">#{String(fichaDocumento.numero).padStart(7, '0')}</p>
+              </div>
+              <button
+                onClick={() => onAbrirFicha(fichaDocumento.id)}
+                disabled={loadingFicha === fichaDocumento.id}
+                className="inline-flex items-center gap-1.5 h-7 px-3 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 border border-blue-200 rounded-md transition-colors disabled:opacity-50 shrink-0"
+              >
+                {loadingFicha === fichaDocumento.id
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <><FileText className="w-3 h-3" />Ficha de Atendimento</>}
+              </button>
+            </div>
           )}
         </div>
       )}

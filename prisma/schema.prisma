@@ -1203,6 +1203,7 @@ model GrupoExameItem {
 
 model DocumentoGerado {
   id            String   @id @default(uuid())
+  numero        Int      @default(autoincrement())
   clinicaId     String
   consultaId    String
   medicoId      String
