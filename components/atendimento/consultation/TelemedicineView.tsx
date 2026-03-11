@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -134,6 +134,33 @@ export function TelemedicineView({
   const [activeTab, setActiveTab] = useState<SidebarTab>("chat");
   const [linkCopied, setLinkCopied] = useState(false);
   const [isProcessingAi, setIsProcessingAi] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sincroniza isFullscreen com o estado real do browser
+  useEffect(() => {
+    const onChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [setIsFullscreen]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      try {
+        await containerRef.current?.requestFullscreen();
+      } catch {
+        // Browser não suporta fullscreen (ex: iOS Safari — usa fallback visual)
+        setIsFullscreen(true);
+      }
+    } else {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        setIsFullscreen(false);
+      }
+    }
+  }, [setIsFullscreen]);
 
   const initials = patient.name
     .split(" ")
@@ -164,7 +191,12 @@ export function TelemedicineView({
   ];
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 rounded-xl overflow-hidden shadow-2xl shadow-black/40">
+    <div
+      ref={containerRef}
+      className={`flex flex-col bg-slate-950 overflow-hidden shadow-2xl shadow-black/40 ${
+        isFullscreen ? "fixed inset-0 z-[9999] rounded-none" : "h-full rounded-xl"
+      }`}
+    >
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-900/90 backdrop-blur-sm border-b border-white/5 shrink-0">
@@ -318,7 +350,7 @@ export function TelemedicineView({
                 activeIcon={isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 inactiveIcon={<Maximize2 className="w-4 h-4" />}
                 label={isFullscreen ? "Sair tela cheia" : "Tela cheia"}
-                onClick={() => setIsFullscreen(!isFullscreen)}
+                onClick={handleToggleFullscreen}
               />
             </div>
 

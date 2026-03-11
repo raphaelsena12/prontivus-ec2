@@ -85,6 +85,7 @@ function TelemedicineAccessContent() {
   const [chatMessages, setChatMessages] = useState<{ id: number; text: string; time: string; mine: boolean }[]>([]);
   const [chatMsg, setChatMsg] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [sessionDuration, setSessionDuration] = useState("00:00");
   const sessionStartRef = useRef<Date | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -150,6 +151,24 @@ function TelemedicineAccessContent() {
       }
     };
   }, []);
+
+  // Detecta altura do teclado virtual (iOS/Android) via visualViewport
+  useEffect(() => {
+    if (!chatOpen) { setKeyboardHeight(0); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const kbH = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardHeight(kbH);
+    };
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    onResize();
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+    };
+  }, [chatOpen]);
 
   // ─── Validar CPF ─────────────────────────────────────────────────────────
 
@@ -243,13 +262,16 @@ function TelemedicineAccessContent() {
 
       const audioVideo = chimeSession.audioVideo;
 
-      // Observer para vídeo local e remoto
+      // Observer para vídeo local, remoto e screen share do médico
       audioVideo.addObserver({
         videoTileDidUpdate: (tileState: any) => {
           if (!tileState.tileId) return;
-          if (tileState.localTile && localVideoRef.current) {
+          if (tileState.localTile && !tileState.isContent && localVideoRef.current) {
+            // Câmera local do paciente → PiP
             audioVideo.bindVideoElement(tileState.tileId, localVideoRef.current);
           } else if (!tileState.localTile && remoteVideoRef.current) {
+            // Câmera do médico OU screen share do médico → vídeo principal
+            // O content tile (isContent=true) tem prioridade e sobrescreve a câmera
             audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
           }
         },
@@ -313,8 +335,18 @@ function TelemedicineAccessContent() {
     const newState = !isMicOn;
     if (av) {
       try {
-        if (isMicOn) av.realtimeMuteLocalAudio();
-        else av.realtimeUnmuteLocalAudio();
+        if (isMicOn) {
+          // Para o input do microfone completamente (mais confiável que realtimeMute no iOS)
+          av.realtimeMuteLocalAudio();
+          await av.stopAudioInput();
+        } else {
+          // Reinicia o microfone e desmuta
+          const devices = await av.listAudioInputDevices();
+          if (devices.length > 0) {
+            await av.startAudioInput(devices[0].deviceId);
+          }
+          av.realtimeUnmuteLocalAudio();
+        }
       } catch (e) {
         console.warn("[Mic] Erro ao alternar microfone:", e);
       }
@@ -772,31 +804,34 @@ function TelemedicineAccessContent() {
             </div>
           </div>
 
-          {/* Chat overlay — apenas mobile, abre sobre o vídeo */}
+          {/* Chat overlay — apenas mobile, cobre toda a tela incluindo controles */}
           {chatOpen && (
-            <div className="md:hidden absolute inset-0 z-20 flex flex-col bg-slate-900/95">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
+            <div
+              className="md:hidden fixed inset-0 z-50 flex flex-col bg-slate-900"
+              style={{ paddingBottom: keyboardHeight }}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800 shrink-0">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-slate-400" />
                   <span className="text-white text-sm font-semibold">Chat</span>
                 </div>
                 <button
                   onClick={() => setChatOpen(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                  className="text-slate-400 hover:text-white p-2 rounded-lg"
                   aria-label="Fechar chat"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <ScrollArea className="flex-1 p-3">
+              <ScrollArea className="flex-1 p-3 min-h-0">
                 {chatMessages.length === 0 ? (
-                  <p className="text-slate-500 text-xs text-center mt-4">Nenhuma mensagem ainda</p>
+                  <p className="text-slate-500 text-sm text-center mt-8">Nenhuma mensagem ainda</p>
                 ) : (
                   <div className="space-y-2">
                     {chatMessages.map((msg) => (
                       <div key={msg.id} className={`flex ${msg.mine ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] rounded-lg p-2 ${msg.mine ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-200"}`}>
-                          <p className="text-xs">{msg.text}</p>
+                        <div className={`max-w-[80%] rounded-xl px-3 py-2 ${msg.mine ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-200"}`}>
+                          <p className="text-sm">{msg.text}</p>
                           <span className="text-xs opacity-60 mt-0.5 block">{msg.time}</span>
                         </div>
                       </div>
@@ -804,22 +839,21 @@ function TelemedicineAccessContent() {
                   </div>
                 )}
               </ScrollArea>
-              <div className="p-3 border-t border-slate-700 bg-slate-800">
-                <div className="flex gap-1.5">
+              <div className="shrink-0 p-3 border-t border-slate-700 bg-slate-800">
+                <div className="flex gap-2 items-center">
                   <input
                     type="text"
                     value={chatMsg}
                     onChange={(e) => setChatMsg(e.target.value)}
                     placeholder="Mensagem..."
-                    className="flex-1 bg-slate-700 text-white placeholder-slate-400 text-sm px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500"
+                    className="flex-1 bg-slate-700 text-white placeholder-slate-400 text-base px-4 py-3 rounded-xl border border-slate-600 focus:outline-none focus:border-blue-500"
                     onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
                   />
                   <Button
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 px-3"
+                    className="bg-blue-600 hover:bg-blue-700 w-12 h-12 rounded-xl shrink-0 p-0"
                     onClick={sendChatMessage}
                   >
-                    <Send className="w-4 h-4" />
+                    <Send className="w-5 h-5" />
                   </Button>
                 </div>
               </div>

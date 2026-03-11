@@ -488,13 +488,14 @@ export default function DoctorTelemedicineSessionPage() {
       chimeSessionRef.current = chimeSession;
       const audioVideo = chimeSession.audioVideo;
 
-      // Observer para tiles local e remoto
+      // Observer para tiles local, remoto e content share
       audioVideo.addObserver({
         videoTileDidUpdate: (tileState: any) => {
           if (!tileState.tileId) return;
-          if (tileState.localTile && localVideoRef.current) {
+          if (tileState.localTile && !tileState.isContent && localVideoRef.current) {
             audioVideo.bindVideoElement(tileState.tileId, localVideoRef.current);
           } else if (!tileState.localTile && remoteVideoRef.current) {
+            // Camera do paciente e screen share remoto vão para remoteVideoRef
             audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
           }
         },
@@ -503,6 +504,12 @@ export default function DoctorTelemedicineSessionPage() {
         audioVideoDidStop: (status: any) => {
           console.log("[Chime] Sessão encerrada, status code:", status?.statusCode?.());
         },
+      });
+
+      // Observer de compartilhamento de tela — sincroniza estado com eventos do Chime
+      audioVideo.addContentShareObserver({
+        contentShareDidStart: () => setIsScreenSharing(true),
+        contentShareDidStop: () => setIsScreenSharing(false),
       });
 
       const videoDevices = await audioVideo.listVideoInputDevices();
@@ -581,17 +588,42 @@ export default function DoctorTelemedicineSessionPage() {
 
   // ─── Controles ───────────────────────────────────────────────────────────
 
-  const handleToggleMic = useCallback((v: boolean) => {
+  const handleToggleMic = useCallback(async (v: boolean) => {
     const av = chimeSessionRef.current?.audioVideo;
     if (av) {
       try {
-        if (!v) av.realtimeMuteLocalAudio();
-        else av.realtimeUnmuteLocalAudio();
+        if (!v) {
+          av.realtimeMuteLocalAudio();
+          await av.stopAudioInput();
+        } else {
+          const devices = await av.listAudioInputDevices();
+          if (devices.length > 0) {
+            await av.startAudioInput(devices[0].deviceId);
+          }
+          av.realtimeUnmuteLocalAudio();
+        }
       } catch (e) {
         console.warn("[Mic] Erro ao alternar:", e);
       }
     }
     setIsMicOn(v);
+  }, []);
+
+  const handleToggleScreenSharing = useCallback(async (v: boolean) => {
+    const av = chimeSessionRef.current?.audioVideo;
+    if (!av) return;
+    try {
+      if (v) {
+        await av.startContentShareFromScreenCapture();
+        // contentShareDidStart observer atualiza setIsScreenSharing(true)
+      } else {
+        await av.stopContentShare();
+        // contentShareDidStop observer atualiza setIsScreenSharing(false)
+      }
+    } catch (e: any) {
+      // Usuário cancelou o seletor de tela ou permissão negada — não altera o estado
+      console.warn("[ScreenShare] Erro ou cancelamento:", e?.message || e);
+    }
   }, []);
 
   const handleToggleCamera = useCallback(async (v: boolean) => {
@@ -816,7 +848,7 @@ export default function DoctorTelemedicineSessionPage() {
             isCameraOn={isCameraOn}
             setIsCameraOn={(v) => handleToggleCamera(v)}
             isScreenSharing={isScreenSharing}
-            setIsScreenSharing={setIsScreenSharing}
+            setIsScreenSharing={handleToggleScreenSharing}
             isFullscreen={isFullscreen}
             setIsFullscreen={setIsFullscreen}
             isChatOpen={isChatOpen}
