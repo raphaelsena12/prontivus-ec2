@@ -389,6 +389,7 @@ export default function DoctorTelemedicineSessionPage() {
   const chimeSessionRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "unstable">("excellent");
 
   // Documento
@@ -514,8 +515,17 @@ export default function DoctorTelemedicineSessionPage() {
         await audioVideo.startAudioInput(audioDevices[0].deviceId);
       }
 
+      // Vincula o elemento <audio> para reproduzir o áudio remoto (paciente)
+      if (remoteAudioRef.current) {
+        audioVideo.bindAudioElement(remoteAudioRef.current);
+      }
+
+      // Seleciona saída de áudio (não suportado em todos os browsers — ignora erro)
       try {
-        await audioVideo.chooseAudioOutput(null);
+        const outputDevices = await audioVideo.listAudioOutputDevices();
+        if (outputDevices.length > 0) {
+          await audioVideo.chooseAudioOutput(outputDevices[0].deviceId);
+        }
       } catch {
         // não crítico
       }
@@ -791,6 +801,9 @@ export default function DoctorTelemedicineSessionPage() {
             <span className="text-sm text-blue-300">Conectando câmera e microfone...</span>
           </div>
         )}
+
+        {/* Elemento de áudio sempre no DOM — necessário para bindAudioElement() do Chime */}
+        <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />
 
         <div className="flex-1 min-h-0 overflow-hidden">
           <TelemedicineView
