@@ -22,6 +22,7 @@ import {
   Stethoscope,
   MessageSquare,
   Send,
+  X,
 } from "lucide-react";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -83,10 +84,12 @@ function TelemedicineAccessContent() {
   const [loading, setLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ id: number; text: string; time: string; mine: boolean }[]>([]);
   const [chatMsg, setChatMsg] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
   const [sessionDuration, setSessionDuration] = useState("00:00");
   const sessionStartRef = useRef<Date | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const chimeSessionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -263,7 +266,19 @@ function TelemedicineAccessContent() {
         await audioVideo.startAudioInput(audioDevices[0].deviceId);
       }
 
-      try { await audioVideo.chooseAudioOutput(null); } catch {}
+      // Vincula o elemento <audio> para reproduzir o áudio remoto (médico)
+      if (remoteAudioRef.current) {
+        audioVideo.bindAudioElement(remoteAudioRef.current);
+      }
+
+      // Seleciona saída de áudio (não suportado em todos os browsers/mobile — ignora erro)
+      try {
+        const outputDevices = await audioVideo.listAudioOutputDevices();
+        if (outputDevices.length > 0) {
+          await audioVideo.chooseAudioOutput(outputDevices[0].deviceId);
+        }
+      } catch {}
+
       audioVideo.start();
       audioVideo.startLocalVideoTile();
 
@@ -354,6 +369,10 @@ function TelemedicineAccessContent() {
   };
 
   // ─── Renderização ─────────────────────────────────────────────────────────
+
+  // Elemento de áudio sempre montado no DOM para que remoteAudioRef.current
+  // esteja disponível antes de connectToRoom() chamar bindAudioElement()
+  const hiddenAudio = <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: "none" }} />;
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -528,6 +547,8 @@ function TelemedicineAccessContent() {
 
   if (step === "consent") {
     return (
+      <>
+      {hiddenAudio}
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-5 text-white text-center">
@@ -606,6 +627,7 @@ function TelemedicineAccessContent() {
           </div>
         </div>
       </div>
+      </>
     );
   }
 
@@ -613,6 +635,8 @@ function TelemedicineAccessContent() {
 
   if (step === "connecting") {
     return (
+      <>
+      {hiddenAudio}
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-20 h-20 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4 animate-pulse">
@@ -622,6 +646,7 @@ function TelemedicineAccessContent() {
           <p className="text-slate-400 text-sm">Aguarde enquanto preparamos sua consulta</p>
         </div>
       </div>
+      </>
     );
   }
 
@@ -631,24 +656,27 @@ function TelemedicineAccessContent() {
     const isWaiting = sessionInfo.status === "waiting";
 
     return (
+      <>
+      {hiddenAudio}
       <div className="min-h-screen bg-slate-900 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-slate-800 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Video className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between px-3 py-2 sm:px-4 sm:py-3 bg-slate-800 border-b border-slate-700">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
-            <div>
-              <p className="text-white text-sm font-semibold">Dr(a). {sessionInfo.doctorName}</p>
+            <div className="min-w-0">
+              <p className="text-white text-xs sm:text-sm font-semibold truncate">Dr(a). {sessionInfo.doctorName}</p>
               {sessionInfo.specialty && (
-                <p className="text-slate-400 text-xs">{sessionInfo.specialty}</p>
+                <p className="text-slate-400 text-xs truncate hidden sm:block">{sessionInfo.specialty}</p>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {isWaiting ? (
               <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-xs">
-                Aguardando médico...
+                <span className="hidden sm:inline">Aguardando médico...</span>
+                <span className="sm:hidden">Aguardando</span>
               </Badge>
             ) : (
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs">
@@ -660,17 +688,17 @@ function TelemedicineAccessContent() {
         </div>
 
         {/* Área principal */}
-        <div className="flex-1 flex gap-0">
+        <div className="flex-1 flex relative overflow-hidden">
           {/* Vídeo principal */}
           <div className="flex-1 relative bg-slate-900">
             {/* Vídeo do médico (remoto) */}
             {isWaiting ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center mb-4 animate-pulse">
-                  <Stethoscope className="w-12 h-12 text-slate-400" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-slate-700 flex items-center justify-center mb-4 animate-pulse">
+                  <Stethoscope className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400" />
                 </div>
-                <p className="text-slate-300 font-semibold">Aguardando o médico entrar...</p>
-                <p className="text-slate-500 text-sm mt-1">Você será conectado automaticamente</p>
+                <p className="text-slate-300 font-semibold text-sm sm:text-base text-center">Aguardando o médico entrar...</p>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 text-center">Você será conectado automaticamente</p>
               </div>
             ) : (
               <video
@@ -682,7 +710,7 @@ function TelemedicineAccessContent() {
             )}
 
             {/* PiP do paciente */}
-            <div className="absolute bottom-4 right-4 w-36 h-28 bg-slate-800 rounded-xl overflow-hidden border-2 border-white/20 shadow-xl">
+            <div className="absolute bottom-4 right-4 w-24 h-[4.5rem] sm:w-36 sm:h-28 bg-slate-800 rounded-xl overflow-hidden border-2 border-white/20 shadow-xl">
               <video
                 ref={localVideoRef}
                 className="w-full h-full object-cover mirror"
@@ -692,7 +720,7 @@ function TelemedicineAccessContent() {
               />
               {!isCameraOn && (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
-                  <User className="w-8 h-8 text-slate-400" />
+                  <User className="w-6 h-6 sm:w-8 sm:h-8 text-slate-400" />
                 </div>
               )}
               <div className="absolute bottom-1 left-1 right-1">
@@ -701,8 +729,8 @@ function TelemedicineAccessContent() {
             </div>
           </div>
 
-          {/* Chat lateral */}
-          <div className="w-72 bg-slate-800 border-l border-slate-700 flex flex-col">
+          {/* Chat lateral — visível apenas em desktop (md+) */}
+          <div className="hidden md:flex w-72 bg-slate-800 border-l border-slate-700 flex-col">
             <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-slate-400" />
               <span className="text-white text-sm font-semibold">Chat</span>
@@ -743,31 +771,99 @@ function TelemedicineAccessContent() {
               </div>
             </div>
           </div>
+
+          {/* Chat overlay — apenas mobile, abre sobre o vídeo */}
+          {chatOpen && (
+            <div className="md:hidden absolute inset-0 z-20 flex flex-col bg-slate-900/95">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-slate-400" />
+                  <span className="text-white text-sm font-semibold">Chat</span>
+                </div>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-lg"
+                  aria-label="Fechar chat"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <ScrollArea className="flex-1 p-3">
+                {chatMessages.length === 0 ? (
+                  <p className="text-slate-500 text-xs text-center mt-4">Nenhuma mensagem ainda</p>
+                ) : (
+                  <div className="space-y-2">
+                    {chatMessages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.mine ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[85%] rounded-lg p-2 ${msg.mine ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-200"}`}>
+                          <p className="text-xs">{msg.text}</p>
+                          <span className="text-xs opacity-60 mt-0.5 block">{msg.time}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+              <div className="p-3 border-t border-slate-700 bg-slate-800">
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={chatMsg}
+                    onChange={(e) => setChatMsg(e.target.value)}
+                    placeholder="Mensagem..."
+                    className="flex-1 bg-slate-700 text-white placeholder-slate-400 text-sm px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:border-blue-500"
+                    onKeyDown={(e) => { if (e.key === "Enter") sendChatMessage(); }}
+                  />
+                  <Button
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 px-3"
+                    onClick={sendChatMessage}
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Controles */}
-        <div className="bg-slate-800 border-t border-slate-700 px-6 py-4">
-          <div className="flex items-center justify-center gap-4">
+        <div className="bg-slate-800 border-t border-slate-700 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center justify-center gap-3 sm:gap-4">
             <Button
               size="sm"
               onClick={toggleMic}
-              className={`rounded-full w-12 h-12 ${isMicOn ? "bg-slate-600 hover:bg-slate-500" : "bg-red-600 hover:bg-red-700"}`}
+              className={`rounded-full w-11 h-11 sm:w-12 sm:h-12 ${isMicOn ? "bg-slate-600 hover:bg-slate-500" : "bg-red-600 hover:bg-red-700"}`}
             >
-              {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              {isMicOn ? <Mic className="w-4 h-4 sm:w-5 sm:h-5" /> : <MicOff className="w-4 h-4 sm:w-5 sm:h-5" />}
             </Button>
             <Button
               size="sm"
               onClick={toggleCamera}
-              className={`rounded-full w-12 h-12 ${isCameraOn ? "bg-slate-600 hover:bg-slate-500" : "bg-red-600 hover:bg-red-700"}`}
+              className={`rounded-full w-11 h-11 sm:w-12 sm:h-12 ${isCameraOn ? "bg-slate-600 hover:bg-slate-500" : "bg-red-600 hover:bg-red-700"}`}
             >
-              {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              {isCameraOn ? <Video className="w-4 h-4 sm:w-5 sm:h-5" /> : <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" />}
             </Button>
             <Button
               size="sm"
               onClick={handleLeave}
               className="rounded-full w-14 h-14 bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30"
             >
-              <Phone className="w-6 h-6 rotate-[135deg]" />
+              <Phone className="w-5 h-5 sm:w-6 sm:h-6 rotate-[135deg]" />
+            </Button>
+            {/* Botão de chat — apenas mobile */}
+            <Button
+              size="sm"
+              onClick={() => setChatOpen(true)}
+              className="md:hidden rounded-full w-11 h-11 bg-slate-600 hover:bg-slate-500 relative"
+              aria-label="Abrir chat"
+            >
+              <MessageSquare className="w-4 h-4" />
+              {chatMessages.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold">
+                  {chatMessages.length > 9 ? "9+" : chatMessages.length}
+                </span>
+              )}
             </Button>
           </div>
           <p className="text-slate-500 text-xs text-center mt-2">
@@ -775,6 +871,7 @@ function TelemedicineAccessContent() {
           </p>
         </div>
       </div>
+      </>
     );
   }
 
