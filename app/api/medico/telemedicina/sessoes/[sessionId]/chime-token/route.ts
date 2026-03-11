@@ -35,25 +35,44 @@ export async function GET(
       return NextResponse.json({ error: "Esta sessão já foi encerrada" }, { status: 410 });
     }
 
+    // Helper: (re)cria reunião Chime e persiste no banco
+    const createAndPersistMeeting = async (token: string) => {
+      const meeting = await createChimeMeeting(sessao.id, token);
+      await prisma.telemedicineSession.update({
+        where: { id: sessao.id },
+        data: { meetingId: meeting.MeetingId, meetingData: meeting as any },
+      });
+      return meeting;
+    };
+
     // Se não tem reunião Chime ainda, cria agora
     let meetingData = sessao.meetingData as any;
     if (!meetingData || !meetingData.MeetingId) {
-      const meeting = await createChimeMeeting(sessao.id);
-      meetingData = meeting;
-      await prisma.telemedicineSession.update({
-        where: { id: sessao.id },
-        data: {
-          meetingId: meeting.MeetingId,
-          meetingData: meeting as any,
-        },
-      });
+      meetingData = await createAndPersistMeeting(sessao.id);
     }
 
-    // Cria o attendee do médico no Chime
-    const attendee = await createChimeAttendee(
-      meetingData.MeetingId,
-      `DOCTOR_${auth.medicoId}`
-    );
+    // Tenta criar o attendee; se a reunião expirou no AWS (NotFoundException),
+    // recria automaticamente com um novo token e tenta novamente.
+    let attendee: Awaited<ReturnType<typeof createChimeAttendee>>;
+    try {
+      attendee = await createChimeAttendee(meetingData.MeetingId, `DOCTOR_${auth.medicoId}`);
+    } catch (err: any) {
+      const isNotFound =
+        err?.name === "NotFoundException" ||
+        err?.$metadata?.httpStatusCode === 404 ||
+        err?.message?.toLowerCase().includes("not found");
+
+      if (!isNotFound) throw err; // outro erro → propaga normalmente
+
+      console.warn("[Chime] Reunião expirada, recriando automaticamente...", {
+        sessionId,
+        oldMeetingId: meetingData.MeetingId,
+      });
+
+      // Gera novo ClientRequestToken (token antigo ainda está ativo 7 dias)
+      meetingData = await createAndPersistMeeting(`${sessao.id}_${Date.now()}`);
+      attendee = await createChimeAttendee(meetingData.MeetingId, `DOCTOR_${auth.medicoId}`);
+    }
 
     // Atualiza o participante médico com os dados do attendee
     await prisma.telemedicineParticipant.updateMany({

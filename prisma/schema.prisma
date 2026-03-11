@@ -113,6 +113,7 @@ model Tenant {
   consultaPrescricoes         ConsultaPrescricao[]
   lotesTiss                   LoteTiss[]
   guiaTissProcedimentos       GuiaTissProcedimento[]
+  medicosTelemedicina         MedicoTelemedicina[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -300,12 +301,46 @@ model Medico {
   certificadoDigital          MedicoCertificadoDigital?
   listasEspera                ListaEspera[]
   autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
+  telemedicina                MedicoTelemedicina?
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
   @@index([crm])
   @@index([usuarioId])
   @@map("medicos")
+}
+
+model MedicoTelemedicina {
+  id               String   @id @default(uuid())
+  medicoId         String   @unique
+  clinicaId        String
+
+  // Status de disponibilidade
+  status           String   @default("OFFLINE") // OFFLINE | ONLINE | EM_ATENDIMENTO
+
+  // Configuração de horário
+  inicioImediato   Boolean  @default(true)
+  horaInicio       String?  // "08:00"
+  horaFim          String?  // "18:00"
+  diasSemana       String[] @default(["SEG", "TER", "QUA", "QUI", "SEX"])
+
+  // Informações exibidas ao paciente
+  valorConsulta    Decimal  @default(0) @db.Decimal(10, 2)
+  tempoConsultaMin Int      @default(30)
+  bio              String?
+  tags             String[] @default([])
+  fotoUrl          String?
+
+  // Controle
+  onlineSince      DateTime?
+  updatedAt        DateTime @updatedAt
+
+  medico  Medico  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+  clinica Tenant  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([clinicaId])
+  @@map("medico_telemedicina")
 }
 
 model MedicoCertificadoDigital {

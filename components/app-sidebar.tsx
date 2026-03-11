@@ -368,6 +368,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       icon: IconDashboard,
     });
     items.push({
+      title: "Telemedicina",
+      url: "/paciente/telemedicina",
+      icon: IconPhoneCall,
+    });
+    items.push({
       title: "Novo Agendamento",
       url: "/paciente/novo-agendamento",
       icon: IconCalendar,
@@ -381,6 +386,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       title: "Histórico de Prescrições",
       url: "/paciente/historico-prescricoes",
       icon: IconFileText,
+    });
+    items.push({
+      title: "Histórico de Pagamentos",
+      url: "/paciente/historico-pagamentos",
+      icon: IconCreditCard,
     });
   }
 
@@ -407,6 +417,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       { title: "Prontuários", url: "/medico/prontuarios", icon: IconFileText },
       { title: "Fórmulas Manipuladas", url: "/medico/manipulados", icon: IconFlask },
       { title: "Grupos de Exames", url: "/medico/grupos-exames", icon: IconFileText },
+      { title: "Telemedicina", url: "/medico/telemedicina", icon: IconPhoneCall },
     ];
   } else if (user.tipo === TipoUsuario.SECRETARIA && hasCategories) {
     // Para secretária, os itens principais ficam no topo e TISS fica colapsável

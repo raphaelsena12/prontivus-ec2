@@ -1,130 +1,182 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, History, FileText, Plus, CreditCard } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
+import {
+  Calendar,
+  History,
+  Plus,
+  CreditCard,
+  Video,
+  Pill,
+  ChevronRight,
+  LayoutDashboard,
+} from "lucide-react";
 import Link from "next/link";
 
 interface PacienteContentProps {
   nome: string;
 }
 
+function getGreeting(firstName: string) {
+  const hour = new Date().getHours();
+  if (hour < 12) return `Bom dia, ${firstName}`;
+  if (hour < 18) return `Boa tarde, ${firstName}`;
+  return `Boa noite, ${firstName}`;
+}
+
+function getFormattedDate() {
+  return new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+const quickActions = [
+  {
+    href: "/paciente/novo-agendamento",
+    icon: Calendar,
+    label: "Novo Agendamento",
+    description: "Agende uma nova consulta",
+    iconBg: "bg-primary/10 text-primary",
+  },
+  {
+    href: "/paciente/telemedicina",
+    icon: Video,
+    label: "Telemedicina",
+    description: "Consulta por videochamada",
+    iconBg: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+    badge: "online",
+  },
+  {
+    href: "/paciente/historico-consultas",
+    icon: History,
+    label: "Hist. de Consultas",
+    description: "Suas consultas realizadas",
+    iconBg: "bg-primary/10 text-primary",
+  },
+  {
+    href: "/paciente/historico-prescricoes",
+    icon: Pill,
+    label: "Prescrições",
+    description: "Receitas e medicamentos",
+    iconBg: "bg-primary/10 text-primary",
+  },
+  {
+    href: "/paciente/historico-pagamentos",
+    icon: CreditCard,
+    label: "Pagamentos",
+    description: "Histórico financeiro",
+    iconBg: "bg-primary/10 text-primary",
+  },
+];
+
 export function PacienteContent({ nome }: PacienteContentProps) {
+  const firstName = nome.split(" ")[0];
+
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col">
-        {/* Botões de ação alinhados à direita */}
-        <div className="flex items-center justify-end px-4 lg:px-6 pt-2 pb-4">
+    <div className="@container/main flex flex-1 flex-col gap-0">
+      <div className="px-6 lg:px-8 pt-6">
+        <PageHeader
+          icon={LayoutDashboard}
+          title={getGreeting(firstName)}
+          subtitle={`${getFormattedDate()} · Portal do Paciente`}
+        >
           <Link href="/paciente/novo-agendamento">
-            <Button className="text-xs">
-              <Plus className="mr-2 h-3.5 w-3.5" />
+            <Button size="sm" className="gap-1.5">
+              <Plus className="h-4 w-4" />
               Novo Agendamento
             </Button>
           </Link>
-        </div>
+        </PageHeader>
+      </div>
 
-        {/* Conteúdo com margens laterais */}
-        <div className="px-4 lg:px-6">
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <Link href="/paciente/novo-agendamento">
-              <Card className="p-3 hover:bg-accent transition-colors cursor-pointer">
-                <CardHeader className="p-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
-                      <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+      <div className="px-6 lg:px-8 pb-6 flex flex-col gap-6">
+        {/* Grid de ações rápidas */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+            Acesso rápido
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {quickActions.map((action) => (
+              <Link key={action.href} href={action.href} className="group">
+                <Card className="border hover:border-primary/30 hover:shadow-sm transition-all duration-150 cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-start justify-between">
+                        <div
+                          className={`flex h-9 w-9 items-center justify-center rounded-lg ${action.iconBg}`}
+                        >
+                          <action.icon style={{ width: 18, height: 18 }} />
+                        </div>
+                        {action.badge === "online" ? (
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-transparent text-[10px] px-1.5 py-0 h-4 font-medium">
+                            <span className="mr-1 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                            Online
+                          </Badge>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 group-hover:translate-x-0.5 transition-all" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground leading-tight">
+                          {action.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
+                          {action.description}
+                        </p>
+                      </div>
                     </div>
-                    <CardTitle className="text-xl">Novo Agendamento</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <CardDescription className="text-xs">
-                    Agende uma nova consulta médica
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/paciente/historico-consultas">
-              <Card className="p-3 hover:bg-accent transition-colors cursor-pointer">
-                <CardHeader className="p-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
-                      <History className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </div>
-                    <CardTitle className="text-xl">Histórico de Consultas</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <CardDescription className="text-xs">
-                    Visualize todas as suas consultas realizadas
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/paciente/historico-prescricoes">
-              <Card className="p-3 hover:bg-accent transition-colors cursor-pointer">
-                <CardHeader className="p-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-950">
-                      <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <CardTitle className="text-xl">Histórico de Prescrições</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <CardDescription className="text-xs">
-                    Acesse suas receitas e prescrições médicas
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/paciente/historico-pagamentos">
-              <Card className="p-3 hover:bg-accent transition-colors cursor-pointer">
-                <CardHeader className="p-0 pb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-950">
-                      <CreditCard className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    <CardTitle className="text-xl">Histórico de Pagamentos</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <CardDescription className="text-xs">
-                    Visualize todos os seus pagamentos realizados
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </Link>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
-
-          <Card className="mt-4 p-3">
-            <CardHeader className="p-0 pb-2">
-              <CardTitle className="text-xl">Bem-vindo, {nome}!</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <CardDescription className="text-xs">
-                Gerencie seus agendamentos, visualize seu histórico de consultas e acesse suas prescrições médicas.
-              </CardDescription>
-            </CardContent>
-          </Card>
         </div>
+
+        {/* Banner telemedicina */}
+        <Card className="border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/40">
+                  <Video
+                    style={{ width: 18, height: 18 }}
+                    className="text-emerald-600 dark:text-emerald-400"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      Telemedicina disponível
+                    </p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Ao vivo
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Médicos online para atendimento imediato por videochamada
+                  </p>
+                </div>
+              </div>
+              <Link href="/paciente/telemedicina" className="shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 gap-1.5"
+                >
+                  Ver médicos online
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

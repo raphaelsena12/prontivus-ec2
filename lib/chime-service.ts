@@ -24,10 +24,12 @@ const chimeClient = new ChimeSDKMeetingsClient({
  * Cria uma reunião Chime vinculada ao sessionId da telemedicina.
  * - Control plane: us-east-1 (único endpoint suportado na nossa conta)
  * - MediaRegion: sa-east-1 (servidor de mídia em São Paulo — menor latência para BR)
+ * - clientToken: token de idempotência (default: sessionId). Passe um token diferente
+ *   para forçar uma nova reunião quando a anterior expirou e o token de 7 dias ainda está ativo.
  */
-export async function createChimeMeeting(sessionId: string) {
+export async function createChimeMeeting(sessionId: string, clientToken?: string) {
   const command = new CreateMeetingCommand({
-    ClientRequestToken: sessionId,
+    ClientRequestToken: clientToken ?? sessionId,
     ExternalMeetingId: sessionId,
     MediaRegion: CHIME_MEDIA_REGION,
     MeetingFeatures: {

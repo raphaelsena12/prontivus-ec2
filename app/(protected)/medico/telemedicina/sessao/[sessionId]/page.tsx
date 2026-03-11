@@ -6,8 +6,6 @@ import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 import { TelemedicineView } from "@/components/atendimento/consultation/TelemedicineView";
 import { useTranscription } from "@/hooks/use-transcription";
-import { ProcessingModal } from "@/components/processing-modal";
-import { MedicalAnalysisResults } from "@/components/medical-analysis-results";
 import {
   AlertCircle,
   Loader2,
@@ -16,7 +14,6 @@ import {
   Thermometer,
   Wind,
   RefreshCw,
-  X,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -369,16 +366,7 @@ export default function DoctorTelemedicineSessionPage() {
     processTranscription,
   } = useTranscription();
 
-  // Processamento de IA
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStage, setProcessingStage] = useState<"processing" | "analyzing" | "generating">("processing");
-  const [analysisResults, setAnalysisResults] = useState<{
-    anamnese: string;
-    cidCodes: Array<{ code: string; description: string; score: number }>;
-    protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
-    exames: Array<{ nome: string; tipo: string; justificativa: string }>;
-    prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string; justificativa?: string }>;
-  } | null>(null);
+  // Processamento de IA — resultados exibidos na aba IA do sidebar (sem modal)
 
   // Timer
   const [sessionDuration, setSessionDuration] = useState("00:00");
@@ -665,38 +653,24 @@ export default function DoctorTelemedicineSessionPage() {
 
   // ─── Processar transcrição com IA ─────────────────────────────────────────
 
+  // Retorna os resultados para o TelemedicineView exibir na aba IA (sem modal)
   const handleProcessTranscription = async () => {
-    if (transcription.length === 0) {
-      toast.error("Nenhuma transcrição disponível para processar");
-      return;
-    }
-
-    setIsProcessing(true);
-    setProcessingStage("processing");
-    setAnalysisResults(null);
-
+    if (transcription.length === 0) return null;
     try {
-      setTimeout(() => setProcessingStage("analyzing"), 1000);
-      setTimeout(() => setProcessingStage("generating"), 2500);
-
       const results = await processTranscription();
       if (results) {
-        setAnalysisResults({
+        toast.success("Análise clínica concluída!");
+        return {
           anamnese: results.anamnese,
           cidCodes: results.cidCodes || [],
-          protocolos: (results as any).protocolos || [],
           exames: results.exames || [],
           prescricoes: (results as any).prescricoes || [],
-        });
-        toast.success("Análise clínica concluída!");
-      } else {
-        toast.error("Nenhum resultado retornado");
+        };
       }
+      return null;
     } catch (err: any) {
       toast.error(err.message || "Erro ao processar transcrição");
-    } finally {
-      setIsProcessing(false);
-      setProcessingStage("processing");
+      return null;
     }
   };
 
@@ -767,33 +741,6 @@ export default function DoctorTelemedicineSessionPage() {
 
   return (
     <>
-      {/* Modal de processamento IA */}
-      <ProcessingModal
-        isOpen={isProcessing}
-        stage={processingStage}
-      />
-
-      {/* Modal resultados IA */}
-      {analysisResults && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-5 py-3 border-b">
-              <h2 className="font-bold text-slate-800">Análise Clínica — IA</h2>
-              <Button variant="ghost" size="sm" onClick={() => setAnalysisResults(null)}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              <MedicalAnalysisResults
-                anamnese={analysisResults.anamnese}
-                cidCodes={analysisResults.cidCodes}
-                exames={analysisResults.exames}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal de geração de documento */}
       <DocumentGeneratorDialog
         open={docDialogOpen}

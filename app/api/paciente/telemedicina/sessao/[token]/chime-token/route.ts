@@ -55,10 +55,32 @@ export async function GET(
     }
 
     // Cria attendee do paciente no Chime
-    const attendee = await createChimeAttendee(
-      sessao.meetingId,
-      `PATIENT_${sessao.consulta.pacienteId}`
-    );
+    // Se a reunião expirou no AWS (NotFoundException), retorna 503 para o paciente aguardar
+    // o médico reentrar (que recriará a reunião automaticamente).
+    let attendee: Awaited<ReturnType<typeof createChimeAttendee>>;
+    try {
+      attendee = await createChimeAttendee(
+        sessao.meetingId,
+        `PATIENT_${sessao.consulta.pacienteId}`
+      );
+    } catch (err: any) {
+      const isNotFound =
+        err?.name === "NotFoundException" ||
+        err?.$metadata?.httpStatusCode === 404 ||
+        err?.message?.toLowerCase().includes("not found");
+
+      if (isNotFound) {
+        console.warn("[Chime/Paciente] Reunião expirada, médico precisa reconectar.", {
+          sessionId: sessao.id,
+          meetingId: sessao.meetingId,
+        });
+        return NextResponse.json(
+          { error: "Sala de vídeo expirou. Aguarde o médico reconectar." },
+          { status: 503 }
+        );
+      }
+      throw err;
+    }
 
     // Atualiza participante paciente
     await prisma.telemedicineParticipant.updateMany({
