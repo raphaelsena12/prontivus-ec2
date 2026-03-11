@@ -22,7 +22,6 @@ import {
   Search,
   Trash2,
   History,
-  ChevronDown,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -79,6 +78,7 @@ interface AISidebarProps {
   selectedExamesAI: Set<number>;
   setSelectedExamesAI: (s: Set<number>) => void;
   examesManuais: Array<{ nome: string; tipo: string }>;
+  setExamesManuais: (e: Array<{ nome: string; tipo: string }>) => void;
   setExameDialogOpen: (v: boolean) => void;
   setExameSearchDialogOpen: (v: boolean) => void;
   // Prescrições
@@ -129,6 +129,7 @@ interface AISidebarProps {
   documentoSuggestions?: Array<{ id: string; nome: string }>;
 }
 
+
 export function AISidebar({
   isProcessing,
   analysisResults,
@@ -142,6 +143,7 @@ export function AISidebar({
   selectedExamesAI,
   setSelectedExamesAI,
   examesManuais,
+  setExamesManuais,
   setExameDialogOpen,
   setExameSearchDialogOpen,
   prescricoes,
@@ -749,23 +751,29 @@ export function AISidebar({
                 {analysisResults?.exames?.map((exame, i) => (
                   <div
                     key={i}
-                    onClick={() => toggleExame(i)}
-                    className={`px-3 py-2.5 flex items-center gap-2.5 cursor-pointer transition-colors animate-in fade-in duration-300 ${
+                    className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
                       selectedExamesAI.has(i) ? "bg-blue-50/40" : "hover:bg-slate-50"
                     }`}
                   >
-                    {selectedExamesAI.has(i) ? (
-                      <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                    ) : (
-                      <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
-                    )}
-                    <span className="text-xs font-medium text-slate-600">{exame.nome}</span>
+                    <div
+                      className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                      onClick={() => toggleExame(i)}
+                    >
+                      {selectedExamesAI.has(i) ? (
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
+                      )}
+                      <span className="text-xs font-medium text-slate-600">{exame.nome}</span>
+                    </div>
                   </div>
                 ))}
                 {examesManuais.map((e, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300">
-                    <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
-                    <span className="text-xs text-slate-600">{e.nome}</span>
+                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                      <span className="text-xs text-slate-600">{e.nome}</span>
+                    </div>
                   </div>
                 ))}
               </>

@@ -639,34 +639,40 @@ export async function POST(request: NextRequest) {
         // Buscar prescrições - primeiro dos dados fornecidos, senão buscar do banco
         let prescricoes = dados?.prescricoes || [];
         if (prescricoes.length === 0) {
-          // Buscar prescrições da consulta
-          const prescricoesMedicamentos = await prisma.prescricaoMedicamento.findMany({
-            where: {
-              consultaId,
+          // Buscar prescrições salvas via consultaPrescricao
+          const consultaPrescricoes = await prisma.consultaPrescricao.findMany({
+            where: { consultaId, clinicaId },
+            orderBy: { createdAt: "asc" },
+          });
+          prescricoes = consultaPrescricoes.map(cp => ({
+            medicamento: cp.medicamento,
+            dosagem: cp.dosagem || "",
+            posologia: cp.posologia,
+            duracao: cp.duracao || "",
+          }));
+        }
+
+        // Buscar ou criar DocumentoGerado para obter número sequencial da ficha
+        let fichaNumero: string | undefined;
+        const docExistente = await prisma.documentoGerado.findFirst({
+          where: { consultaId, clinicaId, tipoDocumento: "ficha-atendimento" },
+          orderBy: { createdAt: "desc" },
+          select: { numero: true },
+        });
+        if (docExistente) {
+          fichaNumero = String(docExistente.numero).padStart(6, "0");
+        } else {
+          const docNovo = await prisma.documentoGerado.create({
+            data: {
               clinicaId,
+              consultaId,
+              medicoId: consulta.medicoId,
+              tipoDocumento: "ficha-atendimento",
+              nomeDocumento: "Ficha de Atendimento",
             },
-            include: {
-              medicamento: {
-                select: {
-                  nome: true,
-                  apresentacao: true,
-                  concentracao: true,
-                  unidade: true,
-                },
-              },
-            },
+            select: { numero: true },
           });
-          prescricoes = prescricoesMedicamentos.map(pm => {
-            const dosagem = pm.medicamento.concentracao && pm.medicamento.unidade
-              ? `${pm.medicamento.concentracao}${pm.medicamento.unidade}`
-              : pm.medicamento.apresentacao || "";
-            return {
-              medicamento: pm.medicamento.nome,
-              dosagem,
-              posologia: pm.posologia,
-              duracao: pm.observacoes || (pm.quantidade ? `${pm.quantidade} unidades` : ""),
-            };
-          });
+          fichaNumero = String(docNovo.numero).padStart(6, "0");
         }
 
         // Formatar data e hora da consulta
@@ -676,6 +682,7 @@ export async function POST(request: NextRequest) {
 
         pdfBuffer = generateFichaAtendimentoPDF({
           ...baseData,
+          fichaNumero,
           dataConsulta: dataConsultaFormatada,
           horaConsulta: horaConsultaFormatada,
           anamnese: prontuario?.anamnese || dados?.anamnese || "",

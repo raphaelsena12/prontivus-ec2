@@ -1319,10 +1319,40 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
       if (!response.ok) throw new Error("Erro ao gerar ficha de atendimento");
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const pdfBlob = await response.blob();
+
+      // Assinar digitalmente de forma automática
+      let finalBlob = pdfBlob;
+      try {
+        const formData = new FormData();
+        formData.append("consultaId", consultaId);
+        formData.append("tipoDocumento", "ficha-atendimento");
+        formData.append("nomeDocumento", "Ficha de Atendimento");
+        formData.append("pdfFile", pdfBlob, "ficha-atendimento.pdf");
+
+        const signRes = await fetch("/api/medico/documentos/assinar", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (signRes.ok) {
+          finalBlob = await signRes.blob();
+        } else {
+          const err = await signRes.json().catch(() => ({}));
+          if (err.type === "MissingCertificate") {
+            toast.warning("Certificado digital não configurado — abrindo sem assinatura.");
+          } else if (err.type === "CertificateExpired") {
+            toast.warning("Certificado digital expirado — abrindo sem assinatura.");
+          } else {
+            toast.warning("Não foi possível assinar digitalmente — abrindo sem assinatura.");
+          }
+        }
+      } catch {
+        toast.warning("Erro ao assinar digitalmente — abrindo sem assinatura.");
+      }
+
+      const url = URL.createObjectURL(finalBlob);
       window.open(url, "_blank");
-      // Revogar após 60s (tempo suficiente para o browser carregar o PDF)
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e: any) {
       toast.error(e?.message || "Erro ao gerar ficha de atendimento");
@@ -1386,7 +1416,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           ],
           exames: [
             ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || []),
-            ...examesManuais,
+            ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo })),
           ],
           prescricoes,
         }),
@@ -1404,8 +1434,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         // Preparar dados para a ficha de atendimento
         const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
         const selectedExamesList = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || [];
-        const examesManuaisList = examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }));
-        const allExames = [...selectedExamesList, ...examesManuaisList];
+        const allExames = [...selectedExamesList, ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }))];
         
         const selectedProtocolosList = analysisResults?.protocolos?.filter((_, i) => selectedProtocolosAI.has(i)).map(p => ({ nome: p.nome, descricao: p.descricao })) || [];
         const protocolosManuaisList = protocolosManuais.map(p => ({ nome: p.nome, descricao: p.descricao }));
@@ -2037,6 +2066,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   selectedExamesAI={selectedExamesAI}
                   setSelectedExamesAI={setSelectedExamesAI}
                   examesManuais={examesManuais}
+                  setExamesManuais={setExamesManuais}
                   setExameDialogOpen={setExameDialogOpen}
                   setExameSearchDialogOpen={setExameSearchDialogOpen}
                   prescricoes={prescricoes}
@@ -2073,23 +2103,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           <button
             onClick={handlePreviewFicha}
             disabled={loadingFichaPreview}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium rounded-lg border border-slate-300 bg-white text-slate-600 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-800 transition-all disabled:opacity-50 shadow-sm"
           >
-            {loadingFichaPreview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5" />}
+            {loadingFichaPreview ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ClipboardList className="w-3.5 h-3.5 text-slate-500" />}
             Ficha de Atendimento
           </button>
 
-          <div className="w-px h-5 bg-slate-200" />
-
-          <button
-            onClick={() => toast.info("Para assinar, use o ícone de assinatura na lista de documentos (na lateral).")}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 text-xs text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors font-medium"
-          >
-            <FileCheck className="w-3.5 h-3.5" />
-            Assinar Documento
-          </button>
-
-          <div className="w-px h-5 bg-slate-200" />
 
           <button
             onClick={handleFinalizarAtendimento}
@@ -2767,16 +2786,16 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           <DialogHeader>
             <DialogTitle>Selecionar Exame</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-3">
             <Tabs value={activeExameTab} onValueChange={(value) => {
               setActiveExameTab(value as "exames" | "grupos");
               setExameSearch("");
-            }}>
-              <TabsList className="grid w-full grid-cols-2">
+            }} className="flex flex-col flex-1 min-h-0">
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                 <TabsTrigger value="exames">Exames</TabsTrigger>
                 <TabsTrigger value="grupos">Grupos de Exames</TabsTrigger>
               </TabsList>
-              <div className="relative flex-shrink-0 mt-4">
+              <div className="relative flex-shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
                   placeholder={activeExameTab === "exames" ? "Buscar exame por nome ou descrição..." : "Buscar grupo de exames por nome ou descrição..."}
@@ -2792,8 +2811,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   className="pl-9"
                 />
               </div>
-              <TabsContent value="exames" className="mt-0 flex-1 min-h-0 flex flex-col">
-                <ScrollArea className="flex-1 border rounded-lg min-h-0">
+              <TabsContent value="exames" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
                   {loadingExamesCadastrados ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -2834,8 +2853,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   )}
                 </ScrollArea>
               </TabsContent>
-              <TabsContent value="grupos" className="mt-0 flex-1 min-h-0 flex flex-col">
-                <ScrollArea className="flex-1 border rounded-lg min-h-0">
+              <TabsContent value="grupos" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
                   {loadingGruposExames ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />

@@ -9,6 +9,7 @@ import {
 // INTERFACE
 // =====================================================
 interface FichaAtendimentoData extends BaseDocumentData {
+  fichaNumero?: string;
   dataConsulta: string;
   horaConsulta?: string;
   anamnese?: string;
@@ -99,14 +100,14 @@ function drawSectionTitle(
   doc: ReturnType<typeof createDoc>,
   title: string,
   y: number,
-  fontSize = 10,
+  fontSize = 8.5,
 ): number {
-  y = checkPageBreak(doc, y, 14);
+  y = checkPageBreak(doc, y, 12);
   doc.setFontSize(fontSize);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text(title, MARGIN, y);
-  return y + 6;
+  return y + 5;
 }
 
 function drawSubsectionTitle(
@@ -114,12 +115,12 @@ function drawSubsectionTitle(
   title: string,
   y: number,
 ): number {
-  y = checkPageBreak(doc, y, 10);
-  doc.setFontSize(9);
+  y = checkPageBreak(doc, y, 8);
+  doc.setFontSize(7.5);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate600);
   doc.text(title.toUpperCase(), MARGIN + 2, y);
-  return y + 5;
+  return y + 4;
 }
 
 // =====================================================
@@ -134,20 +135,27 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
   y = drawPatientCard(doc, data, y);
 
   // ── Título ──
-  doc.setFontSize(14);
+  doc.setFontSize(11);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("FICHA DE ATENDIMENTO", MARGIN, y);
-  y += 6;
+  if (data.fichaNumero) {
+    doc.setFontSize(8);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate600);
+    const numWidth = doc.getTextWidth(`Nº ${data.fichaNumero}`);
+    doc.text(`Nº ${data.fichaNumero}`, PAGE_WIDTH - MARGIN - numWidth, y);
+  }
+  y += 5;
 
   // ── Data e Hora ──
-  doc.setFontSize(9);
+  doc.setFontSize(7.5);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
   let dataHoraTexto = `Data: ${data.dataConsulta}`;
   if (data.horaConsulta) dataHoraTexto += ` | Hora: ${data.horaConsulta}`;
   doc.text(dataHoraTexto, MARGIN, y);
-  y += 8;
+  y += 6;
 
   // =====================================================
   // SEÇÃO 1: ANAMNESE
@@ -160,26 +168,26 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
     for (const section of anamneseSections) {
       // Sub-título da seção (ex: "QUEIXA PRINCIPAL")
       if (section.title) {
-        y = checkPageBreak(doc, y, 8);
-        doc.setFontSize(8);
+        y = checkPageBreak(doc, y, 7);
+        doc.setFontSize(7);
         doc.setFont(PDF_FONT, "bold");
         doc.setTextColor(...COLORS.slate600);
         doc.text(section.title, MARGIN + 2, y);
-        y += 5;
+        y += 4;
       }
       // Conteúdo
       if (section.content) {
-        doc.setFontSize(9);
+        doc.setFontSize(8);
         doc.setFont(PDF_FONT, "normal");
         doc.setTextColor(...COLORS.slate800);
         const wrapped = doc.splitTextToSize(section.content, CONTENT_WIDTH - 4);
         for (const line of wrapped) {
-          y = checkPageBreak(doc, y, 5);
+          y = checkPageBreak(doc, y, 4);
           doc.text(line, MARGIN + 2, y);
-          y += 5;
+          y += 4;
         }
       }
-      y += 3;
+      y += 2;
     }
     y += 2;
   }
@@ -190,16 +198,16 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
   if (data.cidCodes && data.cidCodes.length > 0) {
     y = drawSectionTitle(doc, "HIPÓTESE DIAGNÓSTICO E CID", y);
 
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate800);
 
     for (const cid of data.cidCodes) {
-      y = checkPageBreak(doc, y, 5);
+      y = checkPageBreak(doc, y, 4);
       doc.text(`• ${cid.code} — ${cid.description}`, MARGIN + 4, y);
-      y += 5;
+      y += 4;
     }
-    y += 4;
+    y += 3;
   }
 
   // =====================================================
@@ -216,34 +224,34 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
     // ── Exames ──
     if (hasExames) {
       y = drawSubsectionTitle(doc, "Exames", y);
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont(PDF_FONT, "normal");
       doc.setTextColor(...COLORS.slate800);
 
       for (const exame of data.exames!) {
-        y = checkPageBreak(doc, y, 5);
+        y = checkPageBreak(doc, y, 4);
         const exameText = exame.tipo ? `${exame.nome} (${exame.tipo})` : exame.nome;
         doc.text(`• ${exameText}`, MARGIN + 4, y);
-        y += 5;
+        y += 4;
       }
-      y += 5;
+      y += 4;
     }
 
     // ── Prescrições ──
     if (hasPrescricoes) {
       y = drawSubsectionTitle(doc, "Prescrições", y);
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont(PDF_FONT, "normal");
       doc.setTextColor(...COLORS.slate800);
 
       data.prescricoes!.forEach((presc, index) => {
-        y = checkPageBreak(doc, y, 10);
+        y = checkPageBreak(doc, y, 8);
         // Linha 1: número + medicamento + dosagem
         let linha1 = `${index + 1}. ${presc.medicamento}`;
         if (presc.dosagem) linha1 += ` ${presc.dosagem}`;
         doc.setFont(PDF_FONT, "bold");
         doc.text(linha1, MARGIN + 4, y);
-        y += 5;
+        y += 4;
 
         // Linha 2: posologia + duração
         if (presc.posologia || presc.duracao) {
@@ -255,30 +263,30 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
           const linha2 = linha2Parts.join(" — ");
           const linhaWrapped = doc.splitTextToSize(linha2, CONTENT_WIDTH - 12);
           for (const l of linhaWrapped) {
-            y = checkPageBreak(doc, y, 5);
+            y = checkPageBreak(doc, y, 4);
             doc.text(l, MARGIN + 8, y);
-            y += 5;
+            y += 4;
           }
           doc.setTextColor(...COLORS.slate800);
         }
         y += 2;
       });
-      y += 3;
+      y += 2;
     }
 
     // ── Atestados e Declarações ──
     if (hasAtestados) {
       y = drawSubsectionTitle(doc, "Atestados e Declarações", y);
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont(PDF_FONT, "normal");
       doc.setTextColor(...COLORS.slate800);
 
       for (const atestado of data.atestados!) {
-        y = checkPageBreak(doc, y, 5);
+        y = checkPageBreak(doc, y, 4);
         doc.text(`• ${atestado.nome}`, MARGIN + 4, y);
-        y += 5;
+        y += 4;
       }
-      y += 4;
+      y += 3;
     }
   }
 
