@@ -10,7 +10,21 @@ const nextConfig: NextConfig = {
 
   // Forçar uso do webpack ao invés do Turbopack
   webpack: (config, { isServer }) => {
+    // Ignorar a pasta mobile (projeto React Native separado)
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: [
+        ...(Array.isArray(config.watchOptions?.ignored) ? config.watchOptions.ignored : []),
+        "**/mobile/**",
+      ],
+    };
+    
     return config;
+  },
+  
+  // Ignorar erros de TypeScript na pasta mobile (projeto React Native separado)
+  typescript: {
+    ignoreBuildErrors: false, // Manter verificação de tipos, mas excluir mobile via tsconfig
   },
 
   images: {
