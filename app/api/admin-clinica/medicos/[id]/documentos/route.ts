@@ -71,9 +71,9 @@ export async function POST(
     }
 
     // Obter dados do FormData
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const tipoDocumento = formData.get("tipoDocumento") as string;
+    const formData = (await request.formData()) as any;
+    const file = formData.get("file") as File | null;
+    const tipoDocumento = formData.get("tipoDocumento") as string | null;
 
     if (!file) {
       return NextResponse.json(

@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       return auth.response;
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const file = formData.get("file") as File;
 
     if (!file) {

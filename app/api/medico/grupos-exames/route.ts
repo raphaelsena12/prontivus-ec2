@@ -48,6 +48,14 @@ export async function GET(request: NextRequest) {
                   nome: true,
                   tipo: true,
                   descricao: true,
+                  codigoTuss: {
+                    select: {
+                      id: true,
+                      codigoTuss: true,
+                      descricao: true,
+                      categoriaExame: true,
+                    },
+                  },
                 },
               },
             },

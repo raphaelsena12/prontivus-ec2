@@ -1,97 +1,376 @@
 "use client";
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  FileText,
+  FlaskConical,
+  ScanLine,
+  Microscope,
+  Activity,
+  Dna,
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Zap,
+  CheckCheck,
+} from "lucide-react";
 
 export interface ExameSolicitado {
   nome: string;
   tipo?: string;
   justificativa?: string;
+  codigoTussId?: string | null;
+  codigoTuss?: string | null;
 }
+
+export type PrioridadeTISS = "eletiva" | "urgencia";
 
 interface GuiaTissExamesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (exames: ExameSolicitado[]) => void;
-  examesSugeridos: ExameSolicitado[];
+  onConfirm: (exames: ExameSolicitado[], prioridade: PrioridadeTISS) => void;
+  examesDisponiveis: ExameSolicitado[];
   isLoading?: boolean;
+}
+
+const CATEGORIA_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; border: string }> = {
+  LABORATORIAL:      { icon: FlaskConical, color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-200" },
+  IMAGEM:            { icon: ScanLine,     color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
+  ANATOMOPATOLOGICO: { icon: Microscope,   color: "text-rose-600",   bg: "bg-rose-50",   border: "border-rose-200" },
+  FUNCIONAL:         { icon: Activity,     color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200" },
+  GENETICO:          { icon: Dna,          color: "text-teal-600",   bg: "bg-teal-50",   border: "border-teal-200" },
+  OUTROS:            { icon: MoreHorizontal, color: "text-slate-500", bg: "bg-slate-50", border: "border-slate-200" },
+};
+
+function getCategoriaConfig(tipo: string) {
+  return CATEGORIA_CONFIG[tipo.toUpperCase()] ?? CATEGORIA_CONFIG["OUTROS"];
 }
 
 export function GuiaTissExamesModal({
   isOpen,
   onClose,
   onConfirm,
-  examesSugeridos,
+  examesDisponiveis,
   isLoading = false,
 }: GuiaTissExamesModalProps) {
-  // Inicializado direto da prop — funciona porque o componente é remontado via key
-  const [texto, setTexto] = useState(() =>
-    examesSugeridos.map((e) => e.nome).join(", ")
+  const [prioridade, setPrioridade] = useState<PrioridadeTISS>("eletiva");
+  const [selected, setSelected] = useState<Set<number>>(() =>
+    new Set(examesDisponiveis.map((_, i) => i))
   );
+  const [justificativas, setJustificativas] = useState<Record<number, string>>({});
+  const [expandedJustificativas, setExpandedJustificativas] = useState<Set<number>>(new Set());
 
-  const handleConfirm = () => {
-    const exames: ExameSolicitado[] = texto
-      .split(",")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((nome) => ({ nome }));
-    onConfirm(exames);
+  const grupos = useMemo(() => {
+    const map: Record<string, number[]> = {};
+    examesDisponiveis.forEach((exame, i) => {
+      const tipo = exame.tipo || "OUTROS";
+      if (!map[tipo]) map[tipo] = [];
+      map[tipo].push(i);
+    });
+    return map;
+  }, [examesDisponiveis]);
+
+  const toggleExame = (idx: number) => {
+    const next = new Set(selected);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setSelected(next);
   };
 
-  const totalExames = texto.split(",").map((l) => l.trim()).filter(Boolean).length;
+  const toggleCategoria = (indices: number[]) => {
+    const allSelected = indices.every((i) => selected.has(i));
+    const next = new Set(selected);
+    if (allSelected) indices.forEach((i) => next.delete(i));
+    else indices.forEach((i) => next.add(i));
+    setSelected(next);
+  };
+
+  const toggleJustificativa = (idx: number) => {
+    const next = new Set(expandedJustificativas);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setExpandedJustificativas(next);
+  };
+
+  const handleConfirm = () => {
+    const exames: ExameSolicitado[] = Array.from(selected).map((idx) => ({
+      nome: examesDisponiveis[idx].nome,
+      tipo: examesDisponiveis[idx].tipo,
+      justificativa: justificativas[idx]?.trim() || undefined,
+      codigoTussId: examesDisponiveis[idx].codigoTussId,
+      codigoTuss: examesDisponiveis[idx].codigoTuss,
+    }));
+    onConfirm(exames, prioridade);
+  };
+
+  const totalSelecionados = selected.size;
+  const total = examesDisponiveis.length;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <FileText className="h-4 w-4 text-[#306953]" />
-            Guia Consulta TISS — Exames Solicitados
+      <DialogContent className="max-w-xl sm:max-w-xl max-h-[88vh] flex flex-col p-0 gap-0 overflow-hidden rounded-xl">
+
+        {/* Header */}
+        <DialogHeader className="flex-shrink-0 px-5 pt-5 pb-4 border-b border-slate-100">
+          <DialogTitle className="flex items-center gap-2.5 text-sm font-semibold text-slate-800">
+            <div className="h-7 w-7 rounded-lg bg-[#306953]/10 flex items-center justify-center flex-shrink-0">
+              <FileText className="h-3.5 w-3.5 text-[#306953]" />
+            </div>
+            Guia Consulta TISS
+            <span className="text-slate-400 font-normal">—</span>
+            <span className="text-slate-500 font-normal">Seleção de Exames</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3">
-          {examesSugeridos.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              Sugestões da IA pré-preenchidas. Edite conforme necessário.
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
+
+          {/* Prioridade */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prioridade</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPrioridade("eletiva")}
+                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                  prioridade === "eletiva"
+                    ? "bg-[#306953]/5 border-[#306953]/30 text-[#306953]"
+                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                  prioridade === "eletiva" ? "bg-[#306953] text-white" : "bg-slate-100 text-slate-500"
+                }`}>
+                  E
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-semibold leading-tight">Eletiva</div>
+                  <div className="text-[10px] text-slate-400 leading-tight">Procedimento programado</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPrioridade("urgencia")}
+                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                  prioridade === "urgencia"
+                    ? "bg-amber-50 border-amber-300 text-amber-700"
+                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
+                  prioridade === "urgencia" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"
+                }`}>
+                  U
+                </div>
+                <div className="text-left">
+                  <div className="text-xs font-semibold leading-tight">Urgência</div>
+                  <div className="text-[10px] text-slate-400 leading-tight">Urgência / Emergência</div>
+                </div>
+              </button>
             </div>
-          )}
+          </div>
 
-          <Textarea
-            placeholder="Hemograma completo, Glicemia em jejum, Colesterol total"
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            maxLength={1000}
-            rows={4}
-            className="text-sm"
-          />
-          <p className="text-right text-xs text-muted-foreground -mt-1">
-            {texto.length}/1000
-          </p>
+          {/* Divider */}
+          <div className="border-t border-slate-100" />
 
-          <p className="text-xs text-muted-foreground">
-            {totalExames === 0
-              ? "Nenhum exame informado."
-              : totalExames === 1
-                ? "1 exame será incluído na guia."
-                : `${totalExames} exames serão incluídos na guia.`}
-          </p>
+          {/* Exames */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Exames</p>
+              {total > 0 && (
+                <span className="text-[10px] text-slate-400">
+                  {totalSelecionados}/{total} selecionados
+                </span>
+              )}
+            </div>
+
+            {examesDisponiveis.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                  <FlaskConical className="h-5 w-5 text-slate-300" />
+                </div>
+                <p className="text-sm font-medium text-slate-500">Nenhum exame disponível</p>
+                <p className="text-xs text-slate-400 mt-1">Adicione exames na etapa anterior.</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {Object.entries(grupos).map(([tipo, indices]) => {
+                  const allChecked = indices.every((i) => selected.has(i));
+                  const someChecked = indices.some((i) => selected.has(i));
+                  const cfg = getCategoriaConfig(tipo);
+                  const CatIcon = cfg.icon;
+                  const countSelected = indices.filter((i) => selected.has(i)).length;
+
+                  return (
+                    <div key={tipo} className={`rounded-xl border overflow-hidden ${cfg.border}`}>
+                      {/* Categoria header */}
+                      <div
+                        className={`flex items-center gap-2.5 px-3.5 py-2.5 ${cfg.bg} cursor-pointer select-none`}
+                        onClick={() => toggleCategoria(indices)}
+                      >
+                        <Checkbox
+                          id={`cat-${tipo}`}
+                          checked={allChecked ? true : someChecked ? "indeterminate" : false}
+                          onCheckedChange={() => toggleCategoria(indices)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="data-[state=checked]:bg-[#306953] data-[state=checked]:border-[#306953]"
+                        />
+                        <div className={`h-5 w-5 rounded-md flex items-center justify-center flex-shrink-0 ${cfg.bg}`}>
+                          <CatIcon className={`h-3.5 w-3.5 ${cfg.color}`} />
+                        </div>
+                        <label
+                          htmlFor={`cat-${tipo}`}
+                          className={`text-[11px] font-semibold uppercase tracking-wider cursor-pointer flex-1 ${cfg.color}`}
+                        >
+                          {tipo}
+                        </label>
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] h-4 px-1.5 font-medium ${
+                            countSelected === indices.length
+                              ? "bg-[#306953]/10 text-[#306953]"
+                              : countSelected === 0
+                              ? "bg-slate-100 text-slate-400"
+                              : "bg-amber-50 text-amber-600"
+                          }`}
+                        >
+                          {countSelected}/{indices.length}
+                        </Badge>
+                      </div>
+
+                      {/* Exames da categoria */}
+                      <div className="bg-white divide-y divide-slate-50">
+                        {indices.map((idx) => {
+                          const exame = examesDisponiveis[idx];
+                          const isChecked = selected.has(idx);
+                          const justifExpanded = expandedJustificativas.has(idx);
+
+                          return (
+                            <div key={idx} className={`px-3.5 py-2.5 transition-colors ${isChecked ? "bg-white hover:bg-slate-50/50" : "bg-slate-50/40"}`}>
+                              <div className="flex items-center gap-2.5">
+                                <Checkbox
+                                  id={`exame-${idx}`}
+                                  checked={isChecked}
+                                  onCheckedChange={() => toggleExame(idx)}
+                                  className="data-[state=checked]:bg-[#306953] data-[state=checked]:border-[#306953] flex-shrink-0"
+                                />
+                                <label
+                                  htmlFor={`exame-${idx}`}
+                                  className={`text-sm flex-1 cursor-pointer leading-tight transition-colors ${
+                                    isChecked ? "text-slate-800 font-medium" : "text-slate-400"
+                                  }`}
+                                >
+                                  {exame.nome}
+                                  {exame.codigoTuss && (
+                                    <span className={`ml-2 text-[10px] font-mono px-1.5 py-0.5 rounded-md inline-flex items-center align-middle ${
+                                      isChecked ? "bg-slate-100 text-slate-500" : "bg-slate-100 text-slate-300"
+                                    }`}>
+                                      {exame.codigoTuss}
+                                    </span>
+                                  )}
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleJustificativa(idx)}
+                                  className={`flex items-center gap-1 text-[11px] rounded-md px-2 py-1 transition-all flex-shrink-0 ${
+                                    justifExpanded
+                                      ? "bg-[#306953]/10 text-[#306953]"
+                                      : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                                  }`}
+                                  title="Justificativa clínica (opcional)"
+                                >
+                                  {justifExpanded ? (
+                                    <ChevronUp className="h-3 w-3" />
+                                  ) : (
+                                    <ChevronDown className="h-3 w-3" />
+                                  )}
+                                  <span>Justificativa</span>
+                                </button>
+                              </div>
+                              {justifExpanded && (
+                                <div className="mt-2 ml-7">
+                                  <Textarea
+                                    placeholder="Descreva a justificativa clínica para este exame..."
+                                    value={justificativas[idx] ?? ""}
+                                    onChange={(e) =>
+                                      setJustificativas((prev) => ({ ...prev, [idx]: e.target.value }))
+                                    }
+                                    rows={2}
+                                    className="text-xs resize-none border-slate-200 focus-visible:ring-[#306953]/30 focus-visible:border-[#306953]/50"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+        {/* Footer */}
+        <DialogFooter className="flex-shrink-0 px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex items-center gap-3">
+          {/* Status badge */}
+          <div className="flex-1">
+            {totalSelecionados === 0 ? (
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                Nenhum exame selecionado
+              </div>
+            ) : prioridade === "urgencia" ? (
+              <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+                <Zap className="h-3.5 w-3.5" />
+                {totalSelecionados} exame{totalSelecionados !== 1 ? "s" : ""} · Urgência
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-[#306953] font-medium">
+                <CheckCheck className="h-3.5 w-3.5" />
+                {totalSelecionados} exame{totalSelecionados !== 1 ? "s" : ""} na guia
+              </div>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isLoading}
+            className="h-8 text-xs px-3.5"
+          >
             Cancelar
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isLoading || totalExames === 0}
-            className="bg-[#306953] hover:bg-[#306953]/90 text-white"
+            disabled={isLoading || totalSelecionados === 0}
+            className="h-8 text-xs px-4 bg-[#306953] hover:bg-[#306953]/90 text-white shadow-sm"
           >
-            {isLoading ? "Gerando..." : "Gerar Guia"}
+            {isLoading ? (
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Gerando...
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Gerar Guia
+              </span>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

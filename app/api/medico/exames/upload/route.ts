@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Clínica ou médico não encontrado" }, { status: 403 });
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const consultaId = formData.get("consultaId") as string;
     const nomeExame = formData.get("nomeExame") as string;
     const file = formData.get("file") as File | null;

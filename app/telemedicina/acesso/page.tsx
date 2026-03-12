@@ -92,7 +92,7 @@ function TelemedicineAccessContent() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const chimeSessionRef = useRef<any>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ─── Carrega info da sessão ───────────────────────────────────────────────
 

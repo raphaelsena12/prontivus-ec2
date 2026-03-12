@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 10.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_VARIANT": "development",
+        "API_BASE_URL": "http://SEU_IP_LOCAL:3000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_VARIANT": "development",
+        "API_BASE_URL": "https://SEU_DOMINIO.com.br"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "env": {
+        "APP_VARIANT": "production",
+        "API_BASE_URL": "https://SEU_DOMINIO.com.br"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "SEU_EMAIL@apple.com",
+        "ascAppId": "SEU_APP_STORE_CONNECT_ID",
+        "appleTeamId": "SEU_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
+      }
+    }
+  }
+}

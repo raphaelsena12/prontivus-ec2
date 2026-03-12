@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     let anexosFiles: File[] = [];
 
     if (contentType.includes("multipart/form-data")) {
-      const formData = await request.formData();
+      const formData = (await request.formData()) as any;
       body = {
         medicoId: formData.get("medicoId") as string,
         dataHora: formData.get("dataHora") as string,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       };
       // Coletar anexos
       const anexosFormData = formData.getAll("anexos");
-      anexosFiles = anexosFormData.filter((item): item is File => item instanceof File);
+      anexosFiles = anexosFormData.filter((item: any): item is File => item instanceof File);
     } else {
       body = await request.json();
     }

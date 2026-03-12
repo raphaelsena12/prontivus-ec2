@@ -69,7 +69,7 @@ import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
 import { MicrophoneSelectorModal } from '@/components/microphone-selector-modal';
 import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialog';
-import { GuiaTissExamesModal, type ExameSolicitado } from '@/components/guia-tiss-exames-modal';
+import { GuiaTissExamesModal, type ExameSolicitado, type PrioridadeTISS } from '@/components/guia-tiss-exames-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -225,7 +225,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [arquivoExame, setArquivoExame] = useState<File | null>(null);
   const [cidsManuais, setCidsManuais] = useState<Array<{ code: string; description: string }>>([]);
   const [protocolosManuais, setProtocolosManuais] = useState<Array<{ nome: string; descricao: string }>>([]);
-  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string }>>([]);
+  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string; codigoTussId?: string | null; codigoTuss?: string | null }>>([]);
   const [cidDialogOpen, setCidDialogOpen] = useState(false);
   const [protocoloDialogOpen, setProtocoloDialogOpen] = useState(false);
   const [exameDialogOpen, setExameDialogOpen] = useState(false);
@@ -244,9 +244,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [resumoClinico, setResumoClinico] = useState<string | null>(null);
   const [medicamentosEmUso, setMedicamentosEmUso] = useState<Array<{ nome: string; posologia: string; dataPrescricao: string }>>([]);
   const [loadingMedicamentosEmUso, setLoadingMedicamentosEmUso] = useState(false);
-  const [examesCadastrados, setExamesCadastrados] = useState<Array<{ id: string; nome: string; descricao: string; tipo: string }>>([]);
+  const [examesCadastrados, setExamesCadastrados] = useState<Array<{ id: string; nome: string; descricao: string; tipo: string; codigoTuss: { id: string; codigoTuss: string; descricao: string; categoriaExame: string | null } | null }>>([]);
   const [loadingExamesCadastrados, setLoadingExamesCadastrados] = useState(false);
-  const [gruposExames, setGruposExames] = useState<Array<{ id: string; nome: string; descricao: string | null; exames: Array<{ exame: { id: string; nome: string; tipo: string | null; descricao: string | null } }> }>>([]);
+  const [gruposExames, setGruposExames] = useState<Array<{ id: string; nome: string; descricao: string | null; exames: Array<{ exame: { id: string; nome: string; tipo: string | null; descricao: string | null; codigoTuss: { id: string; codigoTuss: string; descricao: string; categoriaExame: string | null } | null } }> }>>([]);
   const [loadingGruposExames, setLoadingGruposExames] = useState(false);
   const [activeExameTab, setActiveExameTab] = useState<"exames" | "grupos">("exames");
 
@@ -580,7 +580,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   };
 
   const handleSelectExame = (exame: typeof examesCadastrados[0]) => {
-    setExamesManuais([...examesManuais, { nome: exame.nome, tipo: exame.tipo }]);
+    setExamesManuais([...examesManuais, {
+      nome: exame.nome,
+      tipo: exame.tipo,
+      codigoTussId: exame.codigoTuss?.id ?? null,
+      codigoTuss: exame.codigoTuss?.codigoTuss ?? null,
+    }]);
     setExameSearchDialogOpen(false);
     setExameSearch("");
   };
@@ -590,6 +595,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     const novosExames = grupoExame.exames.map((item) => ({
       nome: item.exame.nome,
       tipo: item.exame.tipo || "Não especificado",
+      codigoTussId: item.exame.codigoTuss?.id ?? null,
+      codigoTuss: item.exame.codigoTuss?.codigoTuss ?? null,
     }));
     setExamesManuais([...examesManuais, ...novosExames]);
     setExameSearchDialogOpen(false);
@@ -1653,7 +1660,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   }, [documentoSearch, documentModels]);
 
-  const handleGenerateDocument = async (modelId: string, examesSolicitados?: ExameSolicitado[]) => {
+  const handleGenerateDocument = async (modelId: string, examesSolicitados?: ExameSolicitado[], prioridade?: PrioridadeTISS) => {
     // Guia TISS: abrir modal primeiro para coletar exames
     if (modelId === "guia-consulta-tiss" && !examesSolicitados) {
       setTissModalOpen(true);
@@ -1693,6 +1700,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         requestData.dados.examesSolicitados = examesSolicitados;
       }
 
+      // Adicionar prioridade (Guia TISS)
+      if (modelId === "guia-consulta-tiss" && prioridade) {
+        requestData.dados.prioridade = prioridade;
+      }
+
       // Chamar API para gerar o PDF
       const response = await fetch("/api/medico/documentos/gerar", {
         method: "POST",
@@ -1728,11 +1740,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  const handleTissConfirm = async (exames: ExameSolicitado[]) => {
+  const handleTissConfirm = async (exames: ExameSolicitado[], prioridade: PrioridadeTISS) => {
     setTissModalOpen(false);
     setTissGerandoGuia(true);
     try {
-      await handleGenerateDocument("guia-consulta-tiss", exames);
+      await handleGenerateDocument("guia-consulta-tiss", exames, prioridade);
     } finally {
       setTissGerandoGuia(false);
     }
@@ -2299,7 +2311,16 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         onClose={() => setTissModalOpen(false)}
         onConfirm={handleTissConfirm}
         isLoading={tissGerandoGuia}
-        examesSugeridos={analysisResults?.exames ?? []}
+        examesDisponiveis={[
+          ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)) ?? []),
+          ...examesManuais.map((e) => ({
+            nome: e.nome,
+            tipo: e.tipo || "Outros",
+            justificativa: "",
+            codigoTussId: e.codigoTussId,
+            codigoTuss: e.codigoTuss,
+          })),
+        ]}
       />
       <MicrophoneSelectorModal
         isOpen={isMicrophoneSelectorOpen}

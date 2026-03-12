@@ -46,12 +46,22 @@ import {
 import { Edit, Trash2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+const CATEGORIA_EXAME_LABELS: Record<string, string> = {
+  LABORATORIAL: "Laboratorial",
+  IMAGEM: "Imagem",
+  ANATOMOPATOLOGICO: "Anatomopatológico",
+  FUNCIONAL: "Funcional",
+  GENETICO: "Genético",
+  OUTROS: "Outros",
+};
+
 interface CodigoTuss {
   id: string;
   codigoTuss: string;
   descricao: string;
   descricaoDetalhada: string | null;
   tipoProcedimento: string;
+  categoriaExame: string | null;
   dataVigenciaInicio: Date | string;
   dataVigenciaFim: Date | string | null;
   ativo: boolean;
@@ -138,6 +148,20 @@ export function CodigosTussTable({
             {row.original.tipoProcedimento}
           </Badge>
         ),
+      },
+      {
+        accessorKey: "categoriaExame",
+        header: "Categoria",
+        cell: ({ row }) => {
+          if (row.original.tipoProcedimento !== "EXAME") return <span className="text-muted-foreground">—</span>;
+          const cat = row.original.categoriaExame;
+          if (!cat) return <span className="text-muted-foreground text-[10px]">Não definida</span>;
+          return (
+            <Badge variant="secondary" className="text-[10px] py-0.5 px-1.5 leading-tight">
+              {CATEGORIA_EXAME_LABELS[cat] ?? cat}
+            </Badge>
+          );
+        },
       },
       {
         accessorKey: "dataVigenciaInicio",

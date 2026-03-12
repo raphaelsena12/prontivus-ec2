@@ -371,7 +371,7 @@ export default function DoctorTelemedicineSessionPage() {
   // Timer
   const [sessionDuration, setSessionDuration] = useState("00:00");
   const sessionStartRef = useRef<Date | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Chime
   const chimeSessionRef = useRef<any>(null);

@@ -16,6 +16,17 @@ const updateCodigoTussSchema = z.object({
       "OUTROS",
     ])
     .optional(),
+  categoriaExame: z
+    .enum([
+      "LABORATORIAL",
+      "IMAGEM",
+      "ANATOMOPATOLOGICO",
+      "FUNCIONAL",
+      "GENETICO",
+      "OUTROS",
+    ])
+    .optional()
+    .nullable(),
   grupoId: z.string().uuid().optional().nullable(),
   dataVigenciaInicio: z.string().transform((str) => new Date(str)).optional(),
   dataVigenciaFim: z
@@ -108,6 +119,10 @@ export async function PATCH(
       updateData.descricaoDetalhada = data.descricaoDetalhada;
     if (data.tipoProcedimento !== undefined)
       updateData.tipoProcedimento = data.tipoProcedimento;
+    if (data.categoriaExame !== undefined || data.tipoProcedimento !== undefined) {
+      const tipo = data.tipoProcedimento ?? codigoTussExistente.tipoProcedimento;
+      updateData.categoriaExame = tipo === "EXAME" ? (data.categoriaExame ?? null) : null;
+    }
     if (data.grupoId !== undefined) updateData.grupoId = data.grupoId;
     if (data.dataVigenciaInicio !== undefined)
       updateData.dataVigenciaInicio = data.dataVigenciaInicio;

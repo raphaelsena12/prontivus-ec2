@@ -81,7 +81,7 @@ export class AnvisaSyncService {
         const url = new URL(ANVISA_CSV_URL);
         
         const csvText = await new Promise<string>((resolve, reject) => {
-          let timeoutId: NodeJS.Timeout | null = null;
+          let timeoutId: ReturnType<typeof setTimeout> | null = null;
           
           const req = https.request(
             {

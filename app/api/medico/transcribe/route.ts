@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const audioFile = formData.get("audio") as File;
 
     if (!audioFile) {

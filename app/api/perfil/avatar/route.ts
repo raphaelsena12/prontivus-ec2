@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Receber arquivo via FormData
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const file = formData.get("file") as File;
 
     if (!file) {

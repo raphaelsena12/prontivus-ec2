@@ -15,6 +15,7 @@ interface CodigoTuss {
   descricao: string;
   descricaoDetalhada: string | null;
   tipoProcedimento: string;
+  categoriaExame: string | null;
   dataVigenciaInicio: Date | string;
   dataVigenciaFim: Date | string | null;
   ativo: boolean;
@@ -119,16 +120,12 @@ export function CodigosTussContent({ clinicaId }: CodigosTussContentProps) {
                 <p className="text-sm text-muted-foreground">Carregando códigos TUSS...</p>
               </div>
             </div>
-          ) : codigosTuss.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-6">
-              <p className="text-muted-foreground text-center">Nenhum código TUSS encontrado</p>
-            </div>
           ) : (
-            <CodigosTussTable 
-            data={codigosTuss} 
-            onDelete={handleDeleteClick}
-            newButtonUrl="/admin-clinica/codigos-tuss/novo"
-          />
+            <CodigosTussTable
+              data={codigosTuss}
+              onDelete={handleDeleteClick}
+              newButtonUrl="/admin-clinica/codigos-tuss/novo"
+            />
           )}
         </CardContent>
       </Card>

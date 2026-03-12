@@ -263,6 +263,7 @@ export function generateGuiaConsultaTISSPDF(
   _data: BaseDocumentData,
   logoBase64?: string,
   examesSolicitados: ExameSolicitado[] = [],
+  prioridade: "eletiva" | "urgencia" = "eletiva",
 ): ArrayBuffer {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   initFont(doc);
@@ -485,8 +486,12 @@ export function generateGuiaConsultaTISSPDF(
     tealText(doc, "E - Eletiva",             f22x + 5.4,  cbY);
     cbox(doc, f22x + 33, cbY, checkboxSize);
     tealText(doc, "U - Urgência/Emergência", f22x + 36.4, cbY);
-    // Marcar checkbox E (Eletiva)
-    markCheckbox(doc, checkboxX1, cbY, checkboxSize);
+    // Marcar checkbox conforme prioridade
+    if (prioridade === "urgencia") {
+      markCheckbox(doc, f22x + 33, cbY, checkboxSize);
+    } else {
+      markCheckbox(doc, checkboxX1, cbY, checkboxSize);
+    }
 
     // Campo 23 - CID 10
     const field23Value = field21_24.find(f => f.n === "23")?.value;
@@ -930,7 +935,13 @@ export function generateGuiaConsultaTISSPDF(
   // ===================================================================
   {
     const F64H = 5;
-    const field64 = { x: M, w: CW, n: "64", l: "Observação", value: "Paciente compareceu ao atendimento conforme agendado." };
+    const justificativasParts = examesSolicitados
+      .filter((e) => e.justificativa)
+      .map((e) => `${e.nome}: ${e.justificativa}`);
+    const obs64 = justificativasParts.length > 0
+      ? justificativasParts.join(" | ")
+      : "Paciente compareceu ao atendimento conforme agendado.";
+    const field64 = { x: M, w: CW, n: "64", l: "Observação", value: obs64 };
     fc(doc, field64.x, y, field64.w, F64H, field64.n, field64.l);
     if (field64.value) {
       renderFieldValue(doc, field64.value, field64.x, y, field64.w, 4);

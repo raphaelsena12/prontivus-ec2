@@ -713,6 +713,7 @@ export async function POST(request: NextRequest) {
           { ...baseData },
           iamspeLogoBase64,
           dados?.examesSolicitados ?? [],
+          dados?.prioridade ?? "eletiva",
         );
         break;
       }

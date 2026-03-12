@@ -71,6 +71,14 @@ export async function GET(request: NextRequest) {
         nome: true,
         descricao: true,
         tipo: true,
+        codigoTuss: {
+          select: {
+            id: true,
+            codigoTuss: true,
+            descricao: true,
+            categoriaExame: true,
+          },
+        },
       },
     });
 

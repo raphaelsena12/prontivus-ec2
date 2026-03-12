@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const file = formData.get("file") as File;
     const clinicaId = formData.get("clinicaId") as string;
 

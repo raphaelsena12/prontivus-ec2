@@ -850,6 +850,7 @@ model CodigoTuss {
   descricao          String    @db.VarChar(500)
   descricaoDetalhada String?
   tipoProcedimento   String
+  categoriaExame     String?
   grupoId            String?
   dataVigenciaInicio DateTime
   dataVigenciaFim    DateTime?
@@ -868,6 +869,7 @@ model CodigoTuss {
 
   @@index([codigoTuss])
   @@index([tipoProcedimento])
+  @@index([categoriaExame])
   @@index([grupoId])
   @@index([dataVigenciaInicio, dataVigenciaFim])
   @@index([ativo])

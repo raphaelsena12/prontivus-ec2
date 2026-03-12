@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    const formData = (await request.formData()) as any;
     const consultaId = (formData.get("consultaId") as string | null) || undefined;
     const tipoDocumento = (formData.get("tipoDocumento") as string | null) || undefined;
     const nomeDocumento = (formData.get("nomeDocumento") as string | null) || undefined;
