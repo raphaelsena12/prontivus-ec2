@@ -22,6 +22,7 @@ import {
   Search,
   Trash2,
   History,
+  Check,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -302,11 +303,10 @@ export function AISidebar({
     setSelectedExamesAI(next);
   };
 
-  const acceptPrescricao = (rx: AnalysisResults["prescricoes"][0], i: number) => {
+  const togglePrescricaoAI = (i: number) => {
     const next = new Set(selectedPrescricoesAI);
-    next.add(i);
+    next.has(i) ? next.delete(i) : next.add(i);
     setSelectedPrescricoesAI(next);
-    setPrescricoes([...prescricoes, rx]);
   };
 
   const hasAllergyConflict = (med: string) =>
@@ -663,19 +663,21 @@ export function AISidebar({
                   >
                     <button
                       onClick={() => toggleCid(i)}
-                      className="flex items-center gap-2.5 flex-1 text-left"
+                      className="flex items-center gap-2.5 flex-1 text-left cursor-pointer"
                     >
                       {selectedCids.has(i) ? (
-                        <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
+                          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                        </div>
                       ) : (
-                        <div className="w-4 h-4 rounded-full border-2 border-slate-300 flex-shrink-0" />
+                        <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
                       )}
                       <div>
                         <p className="text-xs font-medium text-slate-600 leading-none">{cid.code}</p>
                         <p className="text-xs text-slate-400 leading-tight mt-0.5">{cid.description}</p>
                       </div>
                     </button>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
                       <span
                         className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600"
                         style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
@@ -690,8 +692,10 @@ export function AISidebar({
                   </div>
                 ))}
                 {cidsManuais.map((cid, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300">
-                    <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300 bg-blue-50/40">
+                    <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-slate-600">{cid.code}</p>
                       <p className="text-xs text-slate-400">{cid.description}</p>
@@ -773,11 +777,18 @@ export function AISidebar({
                       onClick={() => toggleExame(i)}
                     >
                       {selectedExamesAI.has(i) ? (
-                        <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                        <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
+                          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                        </div>
                       ) : (
                         <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
                       )}
-                      <span className="text-xs font-medium text-slate-600 truncate">{exame.nome}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-600 truncate">{exame.nome}</p>
+                        {exame.justificativa && (
+                          <p className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-2">{exame.justificativa}</p>
+                        )}
+                      </div>
                     </div>
                     <span
                       className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600 flex-shrink-0"
@@ -792,9 +803,11 @@ export function AISidebar({
                   </div>
                 ))}
                 {examesManuais.map((e, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300">
+                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 bg-blue-50/40">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
+                      <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
+                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      </div>
                       <span className="text-xs text-slate-600">{e.nome}</span>
                     </div>
                     <button
@@ -865,69 +878,89 @@ export function AISidebar({
               </div>
             ) : (
               <>
-                {prescricoes.map((rx, i) => {
+                {/* Prescrições da IA — toggle igual Exames */}
+                {analysisResults?.prescricoes?.map((rx, i) => {
+                  const selected = selectedPrescricoesAI.has(i);
                   const conflict = hasAllergyConflict(rx.medicamento);
                   return (
-                    <div key={`rx-${i}`} className={`px-3 py-2.5 animate-in fade-in duration-300 ${conflict ? "bg-red-50/60" : ""}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-start gap-1.5 flex-1">
-                          {conflict && (
-                            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                          )}
-                          <div>
-                            <p className="text-xs font-medium text-slate-600">{rx.medicamento}</p>
-                            <p className="text-xs text-slate-400">
-                              {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
-                            </p>
-                            {conflict && (
-                              <p className="text-xs text-red-600 font-medium mt-0.5">
-                                Atenção: possível conflito com alergia
-                              </p>
-                            )}
+                    <div
+                      key={`ai-rx-${i}`}
+                      className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
+                        conflict ? "bg-red-50/60" : selected ? "bg-blue-50/40" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
+                        onClick={() => !conflict && togglePrescricaoAI(i)}
+                      >
+                        {selected && !conflict ? (
+                          <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
+                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                           </div>
+                        ) : conflict ? (
+                          <div className="w-4 h-4 rounded border-2 bg-red-100 border-red-300 flex items-center justify-center flex-shrink-0">
+                            <X className="w-2.5 h-2.5 text-red-400" strokeWidth={3} />
+                          </div>
+                        ) : (
+                          <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-600 truncate">{rx.medicamento}</p>
+                          <p className="text-xs text-slate-400">
+                            {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
+                          </p>
+                          {conflict && (
+                            <p className="text-xs text-red-600 font-medium mt-0.5">Conflito de alergia</p>
+                          )}
                         </div>
-                        <button
-                          onClick={() => setPrescricoes(prescricoes.filter((_, idx) => idx !== i))}
-                          className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5 transition-colors flex-shrink-0 mt-0.5"
-                          title="Remover prescrição"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
+                      <span
+                        className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600 flex-shrink-0"
+                        style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
+                      >
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
+                          style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
+                        />
+                        <span className="relative z-10">✦ IA</span>
+                      </span>
                     </div>
                   );
                 })}
 
-                {analysisResults?.prescricoes
-                  ?.filter(
-                    (rx, i) =>
-                      !selectedPrescricoesAI.has(i) &&
-                      !prescricoes.find((p) => p.medicamento === rx.medicamento)
-                  )
-                  .map((rx, i) => (
-                    <div key={`ai-rx-${i}`} className="px-3 py-2.5 bg-blue-50/30 animate-in fade-in duration-300">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-slate-600">{rx.medicamento}</p>
+                {/* Prescrições adicionadas manualmente */}
+                {prescricoes.map((rx, i) => {
+                  const conflict = hasAllergyConflict(rx.medicamento);
+                  return (
+                    <div key={`rx-${i}`} className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 bg-blue-50/40 ${conflict ? "bg-red-50/60" : ""}`}>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${conflict ? "bg-red-100 border-red-300" : "bg-blue-600 border-blue-600"}`}>
+                          {conflict
+                            ? <X className="w-2.5 h-2.5 text-red-400" strokeWidth={3} />
+                            : <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-600 truncate">{rx.medicamento}</p>
                           <p className="text-xs text-slate-400">
                             {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
                           </p>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span
-                            className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600"
-                            style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
-                          >
-                            <div
-                              className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
-                              style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
-                            />
-                            <span className="relative z-10">✦ IA</span>
-                          </span>
+                          {conflict && (
+                            <p className="text-xs text-red-600 font-medium mt-0.5">Conflito de alergia</p>
+                          )}
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setPrescricoes(prescricoes.filter((_, idx) => idx !== i))}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5 transition-colors flex-shrink-0"
+                        title="Remover prescrição"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  ))}
+                  );
+                })}
               </>
             )}
             <div className="px-3 py-2">

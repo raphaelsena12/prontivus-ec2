@@ -252,11 +252,11 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
 
         {/* ══ Dados do Paciente ══ */}
         <Card className="border-slate-200 shadow-sm bg-white">
-          <div className="px-5 py-4 flex items-start gap-4">
+          <div className="px-4 py-2.5 flex items-start gap-3">
 
             {/* Avatar */}
-            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-              <User className="w-4 h-4 text-slate-400" />
+            <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+              <User className="w-3.5 h-3.5 text-slate-400" />
             </div>
 
             {/* Bloco principal */}
@@ -278,15 +278,15 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                     { label: 'Prescrições', n: data.prescricoes.length },
                   ].map(({ label, n }) => (
                     <div key={label} className="text-center">
-                      <p className="text-base font-bold text-slate-800 leading-none">{n}</p>
+                      <p className="text-sm font-bold text-slate-800 leading-none">{n}</p>
                       <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Grid de campos — tudo junto, fluindo */}
-              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-4 gap-x-6 gap-y-2.5">
+              {/* Grid de campos — 6 colunas */}
+              <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-6 gap-x-5 gap-y-1.5">
                 <Field label="CPF"          value={formatCPF(paciente.cpf)} />
                 <Field label="RG"           value={paciente.rg || '—'} />
                 <Field label="Nascimento"   value={`${formatDate(new Date(paciente.dataNascimento))} · ${idade}a`} />
@@ -294,8 +294,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                 <Field label="Profissão"    value={paciente.profissao || '—'} />
                 <Field label="Celular"      value={paciente.celular || '—'} />
                 <Field label="Telefone"     value={paciente.telefone || '—'} />
-                <Field label="E-mail"       value={paciente.email || '—'} span />
-                <Field label="Endereço"     value={enderecoFormatado || '—'} span />
+                <Field label="E-mail"       value={paciente.email || '—'} span={2} />
                 <Field label="Mãe"          value={paciente.nomeMae || '—'} />
                 <Field label="Pai"          value={paciente.nomePai || '—'} />
                 {data.planosSaude.length > 0
@@ -307,11 +306,8 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                       />
                     ))
                   : <Field label="Plano de Saúde" value="—" />}
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-[10px] text-slate-400 mb-0.5">Observações</p>
-                <p className="text-xs text-slate-600">{paciente.observacoes || '—'}</p>
+                <Field label="Endereço"     value={enderecoFormatado || '—'} span={3} />
+                <Field label="Observações"  value={paciente.observacoes || '—'} span={3} />
               </div>
             </div>
           </div>
@@ -631,9 +627,10 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function Field({ label, value, span }: { label: string; value: string; span?: boolean }) {
+function Field({ label, value, span }: { label: string; value: string; span?: number }) {
+  const spanClass = span === 2 ? 'col-span-2' : span === 3 ? 'col-span-3' : span === 6 ? 'col-span-6' : '';
   return (
-    <div className={span ? 'col-span-2' : ''}>
+    <div className={spanClass}>
       <p className="text-[10px] text-slate-400 leading-none mb-0.5">{label}</p>
       <p className="text-xs font-medium text-slate-700 break-words leading-snug">{value}</p>
     </div>

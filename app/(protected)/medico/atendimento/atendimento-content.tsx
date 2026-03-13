@@ -202,6 +202,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [tissModalOpen, setTissModalOpen] = useState(false);
   const [tissGerandoGuia, setTissGerandoGuia] = useState(false);
+  const [examesPrioridade, setExamesPrioridade] = useState<PrioridadeTISS>("eletiva");
   const [selectedConsultaForDocumentos, setSelectedConsultaForDocumentos] = useState<string | null>(null);
   const [selectedConsultaDataForDocumentos, setSelectedConsultaDataForDocumentos] = useState<string | null>(null);
   const [selectedAIModel] = useState<'openai'>('openai');
@@ -1372,7 +1373,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             cidCodes: selectedCidsList,
             exames: allExames,
             protocolos: allProtocolos,
-            prescricoes,
+            prescricoes: [
+              ...prescricoes,
+              ...(analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [])
+                .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+            ],
             atestados,
           },
         }),
@@ -1479,7 +1484,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || []),
             ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo })),
           ],
-          prescricoes,
+          prescricoes: [
+            ...prescricoes,
+            ...(analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [])
+              .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+          ],
         }),
       });
 
@@ -1794,11 +1803,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  const handleTissConfirm = async (exames: ExameSolicitado[], prioridade: PrioridadeTISS) => {
+  const handleTissConfirm = async (exames: ExameSolicitado[]) => {
     setTissModalOpen(false);
     setTissGerandoGuia(true);
     try {
-      await handleGenerateDocument("guia-consulta-tiss", exames, prioridade);
+      await handleGenerateDocument("guia-consulta-tiss", exames, examesPrioridade);
     } finally {
       setTissGerandoGuia(false);
     }
@@ -2866,6 +2875,17 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             <DialogTitle>Selecionar Exame</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <label className="text-sm font-medium text-slate-700 whitespace-nowrap">Prioridade</label>
+              <select
+                value={examesPrioridade}
+                onChange={(e) => setExamesPrioridade(e.target.value as PrioridadeTISS)}
+                className="flex-1 h-9 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-0"
+              >
+                <option value="eletiva">Eletiva — Procedimento programado</option>
+                <option value="urgencia">Urgência / Emergência</option>
+              </select>
+            </div>
             <Tabs value={activeExameTab} onValueChange={(value) => {
               setActiveExameTab(value as "exames" | "grupos");
               setExameSearch("");

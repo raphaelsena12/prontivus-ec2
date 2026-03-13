@@ -72,8 +72,19 @@ const knownTitles = [
   "EXAMES REALIZADOS",
 ];
 
+// Insere \n antes de cada título de seção quando estão inline (sem quebra de linha)
+function normalizeInlineSections(text: string): string {
+  let result = text;
+  for (const title of knownTitles) {
+    // Insere newline antes do título se não estiver já no início de uma linha
+    const pattern = new RegExp(`(?<!\n)(${title.toUpperCase()}:)`, "g");
+    result = result.replace(pattern, "\n$1");
+  }
+  return result;
+}
+
 function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
-  const trimmed = anamnese.trim();
+  const trimmed = normalizeInlineSections(anamnese.trim());
   const upperTitle = sectionTitle.toUpperCase();
 
   // ── Formato JSON ──────────────────────────────────────

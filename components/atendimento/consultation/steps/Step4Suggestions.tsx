@@ -167,6 +167,13 @@ export function Step4Suggestions({
     setSelectedExamesAI(next);
   };
 
+  const togglePrescricao = (i: number) => {
+    const next = new Set(selectedPrescricoesAI);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    setSelectedPrescricoesAI(next);
+  };
+
   const removePrescricao = (idx: number) => {
     const next = [...prescricoes];
     next.splice(idx, 1);
@@ -221,9 +228,14 @@ export function Step4Suggestions({
                     {cid.description}
                   </span>
                   {cid.score > 0 && (
-                    <Badge variant="outline" className={`text-xs flex-shrink-0 ${rel.className}`}>
-                      {rel.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <Badge variant="outline" className={`text-xs ${rel.className}`}>
+                        {rel.label}
+                      </Badge>
+                      <span className={`text-xs font-semibold tabular-nums ${rel.className.includes("red") ? "text-red-600" : rel.className.includes("amber") ? "text-amber-600" : "text-slate-500"}`}>
+                        {Math.round(cid.score * 100)}%
+                      </span>
+                    </div>
                   )}
                 </label>
               );
@@ -341,24 +353,44 @@ export function Step4Suggestions({
           ) : (
             prescricoes.map((p, i) => {
               const conflict = detectAllergyConflict(p.medicamento, allergies);
+              const selected = selectedPrescricoesAI.has(i);
               return (
                 <div
                   key={i}
                   className={`p-3 rounded-xl border transition-colors ${
                     conflict
                       ? "bg-[#FEF2F2] border-[#FECACA]"
-                      : selectedPrescricaoIndex === i
+                      : selected
                       ? "bg-[var(--clinical-cobalt-light)] border-[var(--clinical-cobalt-border)]"
                       : "bg-white border-slate-200"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => togglePrescricao(i)}
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                        conflict
+                          ? "border-red-300 bg-red-50 cursor-not-allowed"
+                          : selected
+                          ? "bg-[#1E40AF] border-[#1E40AF]"
+                          : "border-slate-300 hover:border-[#1E40AF]"
+                      }`}
+                      disabled={!!conflict}
+                      title={conflict ? "Prescrição bloqueada por alergia" : selected ? "Desmarcar" : "Selecionar"}
+                    >
+                      {selected && !conflict && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                      {conflict && <X className="w-2.5 h-2.5 text-red-400" strokeWidth={3} />}
+                    </button>
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         {conflict && (
                           <AlertTriangle className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
                         )}
-                        <span className="text-sm font-semibold text-slate-800">{p.medicamento}</span>
+                        <span className={`text-sm font-semibold ${selected && !conflict ? "text-[#1E40AF]" : "text-slate-800"}`}>
+                          {p.medicamento}
+                        </span>
                         {p.dosagem && (
                           <span className="text-xs text-slate-500">{p.dosagem}</span>
                         )}

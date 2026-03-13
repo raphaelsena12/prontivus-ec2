@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   FileText,
   FlaskConical,
@@ -24,7 +23,6 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Zap,
   CheckCheck,
 } from "lucide-react";
 
@@ -41,7 +39,7 @@ export type PrioridadeTISS = "eletiva" | "urgencia";
 interface GuiaTissExamesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (exames: ExameSolicitado[], prioridade: PrioridadeTISS) => void;
+  onConfirm: (exames: ExameSolicitado[]) => void;
   examesDisponiveis: ExameSolicitado[];
   isLoading?: boolean;
 }
@@ -66,7 +64,6 @@ export function GuiaTissExamesModal({
   examesDisponiveis,
   isLoading = false,
 }: GuiaTissExamesModalProps) {
-  const [prioridade, setPrioridade] = useState<PrioridadeTISS>("eletiva");
   const [selected, setSelected] = useState<Set<number>>(() =>
     new Set(examesDisponiveis.map((_, i) => i))
   );
@@ -113,7 +110,7 @@ export function GuiaTissExamesModal({
       codigoTussId: examesDisponiveis[idx].codigoTussId,
       codigoTuss: examesDisponiveis[idx].codigoTuss,
     }));
-    onConfirm(exames, prioridade);
+    onConfirm(exames);
   };
 
   const totalSelecionados = selected.size;
@@ -136,55 +133,6 @@ export function GuiaTissExamesModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
-
-          {/* Prioridade */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prioridade</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPrioridade("eletiva")}
-                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  prioridade === "eletiva"
-                    ? "bg-[#306953]/5 border-[#306953]/30 text-[#306953]"
-                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
-                  prioridade === "eletiva" ? "bg-[#306953] text-white" : "bg-slate-100 text-slate-500"
-                }`}>
-                  E
-                </div>
-                <div className="text-left">
-                  <div className="text-xs font-semibold leading-tight">Eletiva</div>
-                  <div className="text-[10px] text-slate-400 leading-tight">Procedimento programado</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPrioridade("urgencia")}
-                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  prioridade === "urgencia"
-                    ? "bg-amber-50 border-amber-300 text-amber-700"
-                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${
-                  prioridade === "urgencia" ? "bg-amber-500 text-white" : "bg-slate-100 text-slate-500"
-                }`}>
-                  U
-                </div>
-                <div className="text-left">
-                  <div className="text-xs font-semibold leading-tight">Urgência</div>
-                  <div className="text-[10px] text-slate-400 leading-tight">Urgência / Emergência</div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-slate-100" />
 
           {/* Exames */}
           <div className="space-y-2">
@@ -333,11 +281,6 @@ export function GuiaTissExamesModal({
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                 Nenhum exame selecionado
-              </div>
-            ) : prioridade === "urgencia" ? (
-              <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-                <Zap className="h-3.5 w-3.5" />
-                {totalSelecionados} exame{totalSelecionados !== 1 ? "s" : ""} · Urgência
               </div>
             ) : (
               <div className="flex items-center gap-1.5 text-xs text-[#306953] font-medium">

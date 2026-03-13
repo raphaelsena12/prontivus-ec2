@@ -85,6 +85,11 @@ IMPORTANTE — EXAMES E PRESCRIÇÕES (baseados em protocolos por CID):
 - Verifique alergias e interações medicamentosas antes de sugerir prescrições
 - Retorne APENAS um JSON válido, sem texto adicional
 
+REGRAS DE QUANTIDADE OBRIGATÓRIAS:
+- cidCodes: retorne no MÍNIMO 2 e no MÁXIMO 5 códigos (inclua diagnósticos diferenciais relevantes com score ≥ 0.3 se necessário para completar o mínimo)
+- exames: retorne no MÍNIMO 2 e no MÁXIMO 5 exames
+- prescricoes: retorne no MÍNIMO 2 e no MÁXIMO 5 prescrições
+
 Formato JSON esperado:
 {
   "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...\\n\\nEXAMES FÍSICOS:\\n...",
@@ -451,7 +456,8 @@ Com base na anamnese e no contexto clínico fornecido, siga este raciocínio em 
 
 ETAPA 1 — CID-10:
 - Identifique os diagnósticos mais prováveis e atribua códigos CID-10 válidos e específicos com scores de confiança (0 a 1).
-- Inclua apenas códigos com score acima de 0.5.
+- Inclua diagnósticos diferenciais relevantes para atingir o mínimo obrigatório.
+- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 códigos CID-10.
 
 ETAPA 2 — Protocolos vigentes por CID:
 - Para cada CID identificado, determine o protocolo de tratamento mais recente e baseado em evidências disponível (ex: Diretriz SBC 2024 para HAS, Diretriz SBD 2024 para DM2, PCDT CONITEC para DPOC, etc.).
@@ -460,12 +466,14 @@ ETAPA 2 — Protocolos vigentes por CID:
 ETAPA 3 — Exames (baseados nos protocolos):
 - Sugira os exames complementares preconizados pelas diretrizes vigentes para cada CID: avaliação inicial, rastreamento de complicações ou monitorização de tratamento.
 - Inclua tipo (Laboratorial, Imagem, Funcional) e justificativa referenciando o protocolo.
+- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 exames.
 
 ETAPA 4 — Prescrições (baseadas nos protocolos):
 - Prescreva medicamentos de primeira linha conforme as diretrizes vigentes para cada CID.
 - Verifique conflitos com as alergias listadas — NUNCA prescreva medicamento ao qual o paciente é alérgico.
 - Verifique interações relevantes com medicamentos em uso atual.
 - Use nomes genéricos ou comerciais comuns no Brasil; dosagem em formato padrão (ex: "50mg", "500mg"); posologia clara (ex: "1 comprimido 1x ao dia", "1 cp 8/8h"); duração precisa (ex: "7 dias", "30 dias", "uso contínuo").
+- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 prescrições.
 
 Retorne APENAS um JSON válido no seguinte formato:
 {
@@ -483,7 +491,7 @@ Retorne APENAS um JSON válido no seguinte formato:
     ],
     response_format: { type: "json_object" },
     temperature: 0.3,
-    max_tokens: 1500,
+    max_tokens: 2500,
   });
 
   const responseContent = completion.choices[0]?.message?.content;
@@ -503,7 +511,8 @@ Retorne APENAS um JSON válido no seguinte formato:
         description: cid.description || "",
         score: typeof cid.score === "number" ? Math.max(0, Math.min(1, cid.score)) : 0.7,
       }))
-      .filter((cid: any) => cid.code && cid.description && cid.score > 0.5),
+      .filter((cid: any) => cid.code && cid.description && cid.score >= 0.3)
+      .slice(0, 5),
     protocolos: (data.protocolos || [])
       .map((p: any) => ({
         nome: p.nome || "",
@@ -513,7 +522,8 @@ Retorne APENAS um JSON válido no seguinte formato:
       .filter((p: any) => p.nome),
     exames: (data.exames || [])
       .map((e: any) => ({ nome: e.nome || "", tipo: e.tipo || "Laboratorial", justificativa: e.justificativa || "" }))
-      .filter((e: any) => e.nome),
+      .filter((e: any) => e.nome)
+      .slice(0, 5),
     prescricoes: (data.prescricoes || [])
       .map((p: any) => ({
         medicamento: p.medicamento || "",
@@ -522,6 +532,7 @@ Retorne APENAS um JSON válido no seguinte formato:
         duracao: p.duracao || "",
         justificativa: p.justificativa || "",
       }))
-      .filter((p: any) => p.medicamento),
+      .filter((p: any) => p.medicamento)
+      .slice(0, 5),
   };
 }
