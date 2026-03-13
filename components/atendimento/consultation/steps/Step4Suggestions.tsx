@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Pencil,
   Check,
+  X,
 } from "lucide-react";
 
 interface CidCode {
@@ -50,6 +51,7 @@ interface Step4SuggestionsProps {
   analysisResults: AnalysisResults | null;
   cidsManuais: Array<{ code: string; description: string }>;
   examesManuais: Array<{ nome: string; tipo: string }>;
+  setExamesManuais: (exames: Array<{ nome: string; tipo: string }>) => void;
   prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string }>;
   selectedCids: Set<number>;
   setSelectedCids: (s: Set<number>) => void;
@@ -127,6 +129,7 @@ export function Step4Suggestions({
   analysisResults,
   cidsManuais,
   examesManuais,
+  setExamesManuais,
   prescricoes,
   selectedCids,
   setSelectedCids,
@@ -145,7 +148,10 @@ export function Step4Suggestions({
   onAdvance,
 }: Step4SuggestionsProps) {
   const allCids = [...(analysisResults?.cidCodes || []), ...cidsManuais.map((c) => ({ ...c, score: 0 }))];
-  const allExames = [...(analysisResults?.exames || []), ...examesManuais.map((e) => ({ ...e, justificativa: "" }))];
+  const allExames = [
+    ...(analysisResults?.exames || []).map((e) => ({ ...e, isManual: false, manualIndex: -1 })),
+    ...examesManuais.map((e, i) => ({ ...e, justificativa: "", isManual: true, manualIndex: i })),
+  ];
 
   const toggleCid = (i: number) => {
     const next = new Set(selectedCids);
@@ -255,27 +261,44 @@ export function Step4Suggestions({
                       const globalIdx = allExames.indexOf(exame);
                       const selected = selectedExamesAI.has(globalIdx);
                       return (
-                        <label
-                          key={j}
-                          onClick={() => toggleExame(globalIdx)}
-                          className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors text-sm ${
-                            selected
-                              ? "bg-[var(--clinical-cobalt-light)] border-[var(--clinical-cobalt-border)] text-[#1E40AF]"
-                              : "bg-white border-slate-200 hover:border-slate-300 text-slate-700"
-                          }`}
-                        >
-                          <div
-                            className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                              selected ? "bg-[#1E40AF] border-[#1E40AF]" : "border-slate-300"
+                        <div key={j} className="flex items-center gap-1">
+                          <label
+                            onClick={() => !exame.isManual && toggleExame(globalIdx)}
+                            className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors text-sm flex-1 ${
+                              exame.isManual
+                                ? "bg-white border-slate-200 text-slate-700 cursor-default"
+                                : selected
+                                  ? "bg-[var(--clinical-cobalt-light)] border-[var(--clinical-cobalt-border)] text-[#1E40AF] cursor-pointer"
+                                  : "bg-white border-slate-200 hover:border-slate-300 text-slate-700 cursor-pointer"
                             }`}
                           >
-                            {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
-                          </div>
-                          <span className="flex-1 font-medium">{exame.nome}</span>
-                          {exame.justificativa && (
-                            <span className="text-xs text-slate-400 italic">{exame.justificativa}</span>
+                            {!exame.isManual && (
+                              <div
+                                className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                  selected ? "bg-[#1E40AF] border-[#1E40AF]" : "border-slate-300"
+                                }`}
+                              >
+                                {selected && <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />}
+                              </div>
+                            )}
+                            <span className="flex-1 font-medium">{exame.nome}</span>
+                            {exame.justificativa && (
+                              <span className="text-xs text-slate-400 italic">{exame.justificativa}</span>
+                            )}
+                          </label>
+                          {exame.isManual && (
+                            <button
+                              onClick={() => {
+                                const updated = examesManuais.filter((_, i) => i !== exame.manualIndex);
+                                setExamesManuais(updated);
+                              }}
+                              className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+                              title="Remover exame"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           )}
-                        </label>
+                        </div>
                       );
                     })}
                   </div>

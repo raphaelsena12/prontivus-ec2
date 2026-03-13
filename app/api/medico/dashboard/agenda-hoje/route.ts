@@ -15,7 +15,7 @@ export async function GET() {
       where: {
         medicoId: auth.medicoId,
         clinicaId: auth.clinicaId,
-        status: { in: ["CONFIRMADA", "EM_ATENDIMENTO", "REALIZADA"] },
+        status: { in: ["AGENDADA", "CONFIRMADA", "EM_ATENDIMENTO", "REALIZADA"] },
         dataHora: { gte: inicioHoje, lte: fimHoje },
       },
       select: {
@@ -29,15 +29,10 @@ export async function GET() {
       orderBy: { dataHora: "asc" },
     });
 
-    const now = new Date();
-    const confirmados = agendamentos.filter((a) => a.status === "CONFIRMADA");
-    const proximos = confirmados.filter((a) => new Date(a.dataHora) >= now);
-    const proximoAtendimento =
-      proximos.length > 0
-        ? proximos[0]
-        : confirmados.length > 0
-        ? confirmados[0]
-        : null;
+    const aguardando = agendamentos.filter((a) =>
+      ["AGENDADA", "CONFIRMADA"].includes(a.status)
+    );
+    const proximoAtendimento = aguardando.length > 0 ? aguardando[0] : null;
 
     return NextResponse.json({
       proximoAtendimento,

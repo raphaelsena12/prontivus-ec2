@@ -64,6 +64,7 @@ const knownTitles = [
   "HISTÓRIA DA DOENÇA ATUAL",
   "ANTECEDENTES PESSOAIS PATOLÓGICOS",
   "ANTECEDENTES FAMILIARES",
+  "HÁBITOS DE VIDA / HISTÓRIA SOCIAL",
   "HÁBITOS DE VIDA",
   "HISTÓRIA SOCIAL",
   "MEDICAMENTOS EM USO ATUAL",
@@ -146,7 +147,7 @@ function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
         }
       }
       
-      if (isNewSection && result.length > 0) {
+      if (isNewSection) {
         break;
       }
       
@@ -622,7 +623,7 @@ export function Step2Anamnesis({
               ))}
             </div>
           ) : isTranscribing && transcriptionText ? (
-            /* ── Mostrar transcrição durante gravação ── */
+            /* ── Mostrar transcrição durante gravação (aba IA) ── */
             <div className="space-y-3">
               <div className="flex items-center gap-2 mb-3">
                 <Radio className="w-4 h-4 text-red-500 animate-pulse" />
@@ -641,8 +642,9 @@ export function Step2Anamnesis({
                 A anamnese será gerada automaticamente ao encerrar a gravação.
               </p>
             </div>
-          ) : !anamneseText ? (
-            /* ── Empty state ── */
+          ) : (
+            /* ── Aba IA: sempre mostra botão Iniciar Gravação ── */
+            /* A anamnese gerada é exibida apenas nos inputs da aba Manual */
             <div className="flex flex-col items-center justify-center py-10 px-6 text-center select-none">
               <div className="relative mb-5">
                 <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
@@ -651,82 +653,30 @@ export function Step2Anamnesis({
                   </div>
                 </div>
               </div>
-              <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
-              <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
-                Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
-              </p>
+              {anamneseText ? (
+                <>
+                  <p className="text-base font-semibold text-slate-700 mb-2">Anamnese gerada</p>
+                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
+                    Os campos foram preenchidos na aba <strong>Manual</strong>. Você pode gravar novamente para atualizar.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
+                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
+                    Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
+                  </p>
+                </>
+              )}
               {startTranscription && (
                 <Button
                   onClick={startTranscription}
                   className="h-10 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200 font-semibold rounded-xl"
                 >
                   <Mic className="w-4 h-4" />
-                  Iniciar Gravação
+                  {anamneseText ? "Gravar Novamente" : "Iniciar Gravação"}
                 </Button>
               )}
-            </div>
-          ) : (
-            /* ── Anamnese formatada com títulos — sempre editável ── */
-            <div className="divide-y divide-slate-100">
-              {ensureAllSections(
-                formatAnamneseWithTitles(normalizeAnamneseText(anamneseText))
-                  .filter((s) => s.title.toUpperCase() !== "ANAMNESE")
-              )
-                .map((section, index) => {
-                  const displayContent = section.content || "";
-                  const currentContent = sectionEdits[index] !== undefined ? sectionEdits[index] : displayContent;
-
-                  const handleContentChange = (newContent: string) => {
-                    setSectionEdits((prev) => ({ ...prev, [index]: newContent }));
-
-                    const allSections = formatAnamneseWithTitles(anamneseText);
-                    allSections[index].content = newContent;
-
-                    Object.keys(sectionEdits).forEach((key) => {
-                      const editIndex = parseInt(key);
-                      if (editIndex !== index && allSections[editIndex]) {
-                        allSections[editIndex].content = sectionEdits[editIndex];
-                      }
-                    });
-
-                    const newAnamnese = allSections
-                      .map((s) => {
-                        if (s.title) {
-                          return `${s.title}:\n${s.content}`;
-                        }
-                        return s.content;
-                      })
-                      .join("\n\n");
-
-                    setEditedAnamnese(newAnamnese);
-                    setIsAnamneseEdited(true);
-                    if (prontuario) {
-                      setProntuario({ ...prontuario, anamnese: newAnamnese } as Prontuario);
-                    }
-                  };
-
-                  return (
-                    <div key={index} className="space-y-1.5 pt-4 first:pt-0">
-                      {section.title && (
-                        <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                          {section.title}
-                        </h3>
-                      )}
-                      <Textarea
-                        value={currentContent}
-                        onChange={(e) => handleContentChange(e.target.value)}
-                        placeholder={displayContent ? undefined : "Sem informações"}
-                        className="text-xs min-h-[60px] resize-none bg-white border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed w-full overflow-x-hidden p-0"
-                        style={{
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                          overflowX: 'hidden',
-                          overflowY: 'visible'
-                        }}
-                      />
-                    </div>
-                  );
-                })}
             </div>
           )}
         </div>

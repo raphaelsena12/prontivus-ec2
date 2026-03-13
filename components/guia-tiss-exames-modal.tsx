@@ -129,7 +129,7 @@ export function GuiaTissExamesModal({
             <div className="h-7 w-7 rounded-lg bg-[#306953]/10 flex items-center justify-center flex-shrink-0">
               <FileText className="h-3.5 w-3.5 text-[#306953]" />
             </div>
-            Guia Consulta TISS
+            Guia Consulta - SADT
             <span className="text-slate-400 font-normal">—</span>
             <span className="text-slate-500 font-normal">Seleção de Exames</span>
           </DialogTitle>

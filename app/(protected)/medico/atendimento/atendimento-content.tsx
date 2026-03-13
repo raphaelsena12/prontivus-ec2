@@ -225,7 +225,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [arquivoExame, setArquivoExame] = useState<File | null>(null);
   const [cidsManuais, setCidsManuais] = useState<Array<{ code: string; description: string }>>([]);
   const [protocolosManuais, setProtocolosManuais] = useState<Array<{ nome: string; descricao: string }>>([]);
-  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string; codigoTussId?: string | null; codigoTuss?: string | null }>>([]);
+  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string; codigoTussId?: string | null; codigoTuss?: string | null; exameId?: string | null; grupoId?: string | null }>>([]);
   const [cidDialogOpen, setCidDialogOpen] = useState(false);
   const [protocoloDialogOpen, setProtocoloDialogOpen] = useState(false);
   const [exameDialogOpen, setExameDialogOpen] = useState(false);
@@ -249,6 +249,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [gruposExames, setGruposExames] = useState<Array<{ id: string; nome: string; descricao: string | null; exames: Array<{ exame: { id: string; nome: string; tipo: string | null; descricao: string | null; codigoTuss: { id: string; codigoTuss: string; descricao: string; categoriaExame: string | null } | null } }> }>>([]);
   const [loadingGruposExames, setLoadingGruposExames] = useState(false);
   const [activeExameTab, setActiveExameTab] = useState<"exames" | "grupos">("exames");
+  const [selectedExamesIds, setSelectedExamesIds] = useState<Set<string>>(new Set());
+  const [selectedGruposIds, setSelectedGruposIds] = useState<Set<string>>(new Set());
 
   // ─── UI states do redesign (não afetam lógica de negócio) ─────────────────
   const [currentStep, setCurrentStep] = useState<1|2|3|4|5>(1);
@@ -486,6 +488,17 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   }, [medicamentoSearch, medicamentoDialogOpen, activeMedicamentoTab]);
 
+  // Pré-selecionar exames já adicionados ao reabrir o dialog
+  useEffect(() => {
+    if (exameSearchDialogOpen) {
+      const preExames = new Set(examesManuais.filter(e => e.exameId).map(e => e.exameId!));
+      setSelectedExamesIds(preExames);
+      const preGrupos = new Set(examesManuais.filter(e => e.grupoId).map(e => e.grupoId!));
+      setSelectedGruposIds(preGrupos);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exameSearchDialogOpen]);
+
   // Buscar exames quando o dialog abrir
   useEffect(() => {
     if (exameSearchDialogOpen) {
@@ -579,26 +592,63 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  const handleSelectExame = (exame: typeof examesCadastrados[0]) => {
-    setExamesManuais([...examesManuais, {
-      nome: exame.nome,
-      tipo: exame.tipo,
-      codigoTussId: exame.codigoTuss?.id ?? null,
-      codigoTuss: exame.codigoTuss?.codigoTuss ?? null,
-    }]);
+  const handleToggleExame = (id: string) => {
+    setSelectedExamesIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleToggleGrupo = (id: string) => {
+    setSelectedGruposIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirmarExames = () => {
+    // Preservar apenas exames digitados manualmente (sem vínculo com catálogo)
+    const examesDigitados = examesManuais.filter(e => !e.exameId && !e.grupoId);
+    const novosExames: typeof examesManuais = [];
+
+    examesCadastrados
+      .filter(e => selectedExamesIds.has(e.id))
+      .forEach(exame => {
+        novosExames.push({
+          nome: exame.nome,
+          tipo: exame.tipo,
+          codigoTussId: exame.codigoTuss?.id ?? null,
+          codigoTuss: exame.codigoTuss?.codigoTuss ?? null,
+          exameId: exame.id,
+        });
+      });
+
+    gruposExames
+      .filter(g => selectedGruposIds.has(g.id))
+      .forEach(grupoExame => {
+        grupoExame.exames.forEach(item => {
+          novosExames.push({
+            nome: item.exame.nome,
+            tipo: item.exame.tipo || "Não especificado",
+            codigoTussId: item.exame.codigoTuss?.id ?? null,
+            codigoTuss: item.exame.codigoTuss?.codigoTuss ?? null,
+            grupoId: grupoExame.id,
+          });
+        });
+      });
+
+    setExamesManuais([...examesDigitados, ...novosExames]);
+    setSelectedExamesIds(new Set());
+    setSelectedGruposIds(new Set());
     setExameSearchDialogOpen(false);
     setExameSearch("");
   };
 
-  const handleSelectGrupoExame = (grupoExame: typeof gruposExames[0]) => {
-    // Expandir o grupo de exames em exames individuais
-    const novosExames = grupoExame.exames.map((item) => ({
-      nome: item.exame.nome,
-      tipo: item.exame.tipo || "Não especificado",
-      codigoTussId: item.exame.codigoTuss?.id ?? null,
-      codigoTuss: item.exame.codigoTuss?.codigoTuss ?? null,
-    }));
-    setExamesManuais([...examesManuais, ...novosExames]);
+  const handleCancelarExames = () => {
+    setSelectedExamesIds(new Set());
+    setSelectedGruposIds(new Set());
     setExameSearchDialogOpen(false);
     setExameSearch("");
   };
@@ -691,6 +741,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       setIsEditingAnamnese(true); // Sempre deixar em modo de edição
       // Resetar flag de transcrição finalizada para permitir nova gravação
       setTranscricaoFinalizada(false);
+      // Mudar para aba Manual para exibir os campos preenchidos
+      setConsultationMode('manual');
       toast.success("Anamnese gerada com sucesso!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao gerar anamnese");
@@ -1260,6 +1312,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           exames: results.exames || [],
           prescricoes: (results as any).prescricoes || [],
         });
+        // Mudar para aba Manual para exibir os campos preenchidos
+        setConsultationMode('manual');
         // Atualizar prontuário com a anamnese gerada
         setProntuario((prev) => ({
           ...prev,
@@ -1640,7 +1694,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     { id: "laudo-medico", nome: "Laudo Médico" },
     { id: "risco-cirurgico-cardiaco", nome: "Risco Cirúrgico Cardíaco" },
     { id: "guia-encaminhamento", nome: "Guia de Encaminhamento" },
-    { id: "guia-consulta-tiss", nome: "Guia Consulta - TISS" },
+    { id: "guia-consulta-tiss", nome: "Guia Consulta - SADT" },
     { id: "controle-diabetes-analitico", nome: "Controle de Diabetes Analítico" },
     { id: "controle-diabetes", nome: "Controle de Diabetes" },
     { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico" },
@@ -2074,6 +2128,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   selectedCids={selectedCids}
                   setSelectedCids={setSelectedCids}
                   cidsManuais={cidsManuais}
+                  setCidsManuais={setCidsManuais}
                   setCidDialogOpen={setCidDialogOpen}
                   selectedExamesAI={selectedExamesAI}
                   setSelectedExamesAI={setSelectedExamesAI}
@@ -2802,8 +2857,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
 
       {/* Dialog de Busca de Exames */}
-      <Dialog open={exameSearchDialogOpen} onOpenChange={setExameSearchDialogOpen}>
-        <DialogContent className="max-w-2xl h-[600px] flex flex-col">
+      <Dialog open={exameSearchDialogOpen} onOpenChange={(open) => {
+        if (!open) handleCancelarExames();
+        else setExameSearchDialogOpen(true);
+      }}>
+        <DialogContent className="max-w-2xl h-[640px] flex flex-col">
           <DialogHeader>
             <DialogTitle>Selecionar Exame</DialogTitle>
           </DialogHeader>
@@ -2848,28 +2906,33 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                     </div>
                   ) : (
                     <div className="p-2 space-y-1">
-                      {examesCadastrados.map((exame) => (
-                        <button
-                          key={exame.id}
-                          onClick={() => handleSelectExame(exame)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-slate-800 truncate">{exame.nome}</p>
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
-                                  {exame.tipo}
-                                </Badge>
-                                {exame.descricao && (
-                                  <span className="text-xs text-slate-500">{exame.descricao}</span>
-                                )}
+                      {examesCadastrados.map((exame) => {
+                        const isSelected = selectedExamesIds.has(exame.id);
+                        return (
+                          <button
+                            key={exame.id}
+                            onClick={() => handleToggleExame(exame.id)}
+                            className={`w-full text-left p-3 rounded-lg border transition-colors ${isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-400 hover:bg-slate-50"}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500" : "border-slate-300"}`}>
+                                {isSelected && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{exame.nome}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
+                                    {exame.tipo}
+                                  </Badge>
+                                  {exame.descricao && (
+                                    <span className="text-xs text-slate-500">{exame.descricao}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </ScrollArea>
@@ -2890,33 +2953,54 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                     </div>
                   ) : (
                     <div className="p-2 space-y-1">
-                      {gruposExames.map((grupoExame) => (
-                        <button
-                          key={grupoExame.id}
-                          onClick={() => handleSelectGrupoExame(grupoExame)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-slate-800 truncate">{grupoExame.nome}</p>
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
-                                  {grupoExame.exames.length} {grupoExame.exames.length === 1 ? "exame" : "exames"}
-                                </Badge>
-                                {grupoExame.descricao && (
-                                  <span className="text-xs text-slate-500">{grupoExame.descricao}</span>
-                                )}
+                      {gruposExames.map((grupoExame) => {
+                        const isSelected = selectedGruposIds.has(grupoExame.id);
+                        return (
+                          <button
+                            key={grupoExame.id}
+                            onClick={() => handleToggleGrupo(grupoExame.id)}
+                            className={`w-full text-left p-3 rounded-lg border transition-colors ${isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-400 hover:bg-slate-50"}`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500" : "border-slate-300"}`}>
+                                {isSelected && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{grupoExame.nome}</p>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  <Badge variant="outline" className="text-xs text-slate-500 border-slate-200">
+                                    {grupoExame.exames.length} {grupoExame.exames.length === 1 ? "exame" : "exames"}
+                                  </Badge>
+                                  {grupoExame.descricao && (
+                                    <span className="text-xs text-slate-500">{grupoExame.descricao}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </ScrollArea>
               </TabsContent>
             </Tabs>
+          </div>
+          <div className="flex items-center justify-between pt-3 border-t border-slate-200 flex-shrink-0">
+            <span className="text-sm text-slate-500">
+              {(selectedExamesIds.size + selectedGruposIds.size) > 0
+                ? `${selectedExamesIds.size + selectedGruposIds.size} selecionado${(selectedExamesIds.size + selectedGruposIds.size) > 1 ? "s" : ""}`
+                : "Nenhum selecionado"}
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCancelarExames}>Cancelar</Button>
+              <Button
+                onClick={handleConfirmarExames}
+                disabled={(selectedExamesIds.size + selectedGruposIds.size) === 0}
+              >
+                Confirmar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -73,6 +73,7 @@ interface AISidebarProps {
   selectedCids: Set<number>;
   setSelectedCids: (s: Set<number>) => void;
   cidsManuais: Array<{ code: string; description: string }>;
+  setCidsManuais: (cids: Array<{ code: string; description: string }>) => void;
   setCidDialogOpen: (v: boolean) => void;
   // Exames AI
   selectedExamesAI: Set<number>;
@@ -139,6 +140,7 @@ export function AISidebar({
   selectedCids,
   setSelectedCids,
   cidsManuais,
+  setCidsManuais,
   setCidDialogOpen,
   selectedExamesAI,
   setSelectedExamesAI,
@@ -168,7 +170,7 @@ export function AISidebar({
     anamnese: true,
     alergias: true,
     examesIds: [],
-    medicamentos: false,
+    medicamentos: true,
   });
 
   const toggleExameContexto = (id: string) => {
@@ -632,7 +634,7 @@ export function AISidebar({
               className="flex-shrink-0 ai-icon-highlight"
               style={{ width: "14px", height: "14px", color: "#FBBF24" }}
             />
-            <span className="text-xs font-semibold text-white">CID 10 Sugerido por IA</span>
+            <span className="text-xs font-semibold text-white">CID-10</span>
             {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
               <span className="ml-auto text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
                 {analysisResults!.cidCodes.length}
@@ -673,23 +675,34 @@ export function AISidebar({
                         <p className="text-xs text-slate-400 leading-tight mt-0.5">{cid.description}</p>
                       </div>
                     </button>
-                    {!selectedCids.has(i) && (
-                      <button
-                        onClick={() => toggleCid(i)}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded flex-shrink-0 transition-colors"
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span
+                        className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600"
+                        style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
                       >
-                        Aceitar
-                      </button>
-                    )}
+                        <div
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
+                          style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
+                        />
+                        <span className="relative z-10">✦ IA</span>
+                      </span>
+                    </div>
                   </div>
                 ))}
                 {cidsManuais.map((cid, i) => (
                   <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300">
                     <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-slate-600">{cid.code}</p>
                       <p className="text-xs text-slate-400">{cid.description}</p>
                     </div>
+                    <button
+                      onClick={() => setCidsManuais(cidsManuais.filter((_, idx) => idx !== i))}
+                      className="p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+                      title="Remover CID"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </>
@@ -712,7 +725,7 @@ export function AISidebar({
               className="flex-shrink-0 ai-icon-highlight"
               style={{ width: "14px", height: "14px", color: "#FBBF24" }}
             />
-            <span className="text-xs font-semibold text-white">Exames Sugeridos por IA</span>
+            <span className="text-xs font-semibold text-white">Exames</span>
             <div className="ml-auto flex items-center gap-2">
               {(analysisResults?.exames?.length ?? 0) > 0 && (
                 <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
@@ -764,8 +777,18 @@ export function AISidebar({
                       ) : (
                         <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
                       )}
-                      <span className="text-xs font-medium text-slate-600">{exame.nome}</span>
+                      <span className="text-xs font-medium text-slate-600 truncate">{exame.nome}</span>
                     </div>
+                    <span
+                      className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600 flex-shrink-0"
+                      style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
+                    >
+                      <div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
+                        style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
+                      />
+                      <span className="relative z-10">✦ IA</span>
+                    </span>
                   </div>
                 ))}
                 {examesManuais.map((e, i) => (
@@ -774,6 +797,13 @@ export function AISidebar({
                       <CheckCircle2 className="w-4 h-4 text-blue-300 flex-shrink-0" />
                       <span className="text-xs text-slate-600">{e.nome}</span>
                     </div>
+                    <button
+                      onClick={() => setExamesManuais(examesManuais.filter((_, idx) => idx !== i))}
+                      className="p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
+                      title="Remover exame"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </>
@@ -796,7 +826,7 @@ export function AISidebar({
               className="flex-shrink-0 ai-icon-highlight"
               style={{ width: "14px", height: "14px", color: "#FBBF24" }}
             />
-            <span className="text-xs font-semibold text-white">Prescrições Sugeridas por IA</span>
+            <span className="text-xs font-semibold text-white">Prescrições</span>
             <div className="ml-auto flex items-center gap-2">
               {prescricoes.length > 0 && (
                 <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
@@ -858,9 +888,10 @@ export function AISidebar({
                         </div>
                         <button
                           onClick={() => setPrescricoes(prescricoes.filter((_, idx) => idx !== i))}
-                          className="text-slate-200 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+                          className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5 transition-colors flex-shrink-0 mt-0.5"
+                          title="Remover prescrição"
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -876,18 +907,24 @@ export function AISidebar({
                   .map((rx, i) => (
                     <div key={`ai-rx-${i}`} className="px-3 py-2.5 bg-blue-50/30 animate-in fade-in duration-300">
                       <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-slate-600">{rx.medicamento}</p>
                           <p className="text-xs text-slate-400">
                             {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
                           </p>
                         </div>
-                        <button
-                          onClick={() => acceptPrescricao(rx, i)}
-                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded flex-shrink-0 transition-colors"
-                        >
-                          Aceitar
-                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span
+                            className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600"
+                            style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
+                          >
+                            <div
+                              className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
+                              style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
+                            />
+                            <span className="relative z-10">✦ IA</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
