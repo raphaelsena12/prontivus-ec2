@@ -27,7 +27,8 @@ const agendamentoSchema = z.object({
   pacienteId: z.string().uuid("Paciente é obrigatório"),
   medicoId: z.string().uuid("Médico é obrigatório"),
   data: z.string().min(1, "Data é obrigatória"),
-  hora: z.string().min(1, "Hora é obrigatória"),
+  hora: z.string().min(1, "Hora início é obrigatória"),
+  horaFim: z.string().min(1, "Hora fim é obrigatória"),
   codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
@@ -95,6 +96,7 @@ interface NovoAgendamentoModalProps {
   initialData?: {
     data?: string;
     hora?: string;
+    horaFim?: string;
     medicoId?: string;
     pacienteId?: string;
   };
@@ -350,6 +352,7 @@ export function NovoAgendamentoModal({
       medicoId: initialData?.medicoId || "",
       data: initialData?.data || "",
       hora: initialData?.hora || "",
+      horaFim: initialData?.horaFim || "",
       codigoTussId: "",
       tipoConsultaId: "",
       procedimentoId: null,
@@ -415,6 +418,9 @@ export function NovoAgendamentoModal({
           // Definir hora se fornecida no initialData
           if (initialData?.hora) {
             form.setValue("hora", initialData.hora);
+          }
+          if (initialData?.horaFim) {
+            form.setValue("horaFim", initialData.horaFim);
           }
 
           // Carregar paciente se pacienteId foi fornecido
@@ -606,6 +612,7 @@ export function NovoAgendamentoModal({
       setLoading(true);
 
       const dataHora = new Date(`${data.data}T${data.hora}:00`).toISOString();
+      const dataHoraFim = new Date(`${data.data}T${data.horaFim}:00`).toISOString();
 
       const response = await fetch("/api/secretaria/agendamentos", {
         method: "POST",
@@ -615,6 +622,7 @@ export function NovoAgendamentoModal({
         body: JSON.stringify({
           ...data,
           dataHora,
+          dataHoraFim,
           procedimentoId: data.procedimentoId || null,
           operadoraId: data.operadoraId || null,
           planoSaudeId: data.planoSaudeId || null,
@@ -829,11 +837,30 @@ export function NovoAgendamentoModal({
                       name="hora"
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
-                          <FormLabel className="text-xs font-medium">Hora *</FormLabel>
+                          <FormLabel className="text-xs font-medium">Hora Início *</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
-                              {...field} 
+                            <Input
+                              type="time"
+                              {...field}
+                              value={field.value || ""}
+                              className="h-8 text-xs"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="horaFim"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[120px]">
+                          <FormLabel className="text-xs font-medium">Hora Fim *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
                               value={field.value || ""}
                               className="h-8 text-xs"
                             />

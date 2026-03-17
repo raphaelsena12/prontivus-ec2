@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
     // Criar admin da clínica
     const senhaHash = await bcrypt.hash("Clinica@123", 10);
     const emailAdmin = `admin@${cnpjLimpo}.clinica.com`;
-    const cpfAdmin = `000${cnpjLimpo.slice(-9)}`;
+    const cpfAdmin = `000${cnpjLimpo.slice(-8)}`;
 
     await prisma.usuario.create({
       data: {

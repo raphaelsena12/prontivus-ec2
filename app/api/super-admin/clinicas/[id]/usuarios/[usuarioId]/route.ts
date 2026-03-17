@@ -9,7 +9,8 @@ import bcrypt from "bcryptjs";
 const updateUsuarioSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres").optional(),
   email: z.string().email("Email inválido").optional(),
-  telefone: z.string().optional(),
+  cpf: z.string().optional(),
+  telefone: z.string().nullable().optional(),
   tipo: z.nativeEnum(TipoUsuario).optional(),
   senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").optional(),
   ativo: z.boolean().optional(),
@@ -110,6 +111,7 @@ export async function PUT(
     const updateData: {
       nome?: string;
       email?: string;
+      cpf?: string;
       telefone?: string | null;
       tipo?: TipoUsuario;
       senha?: string;
@@ -129,6 +131,22 @@ export async function PUT(
         );
       }
       updateData.email = data.email;
+    }
+
+    // Verificar se CPF já existe (se mudou)
+    if (data.cpf && data.cpf !== usuarioExistente.cpf) {
+      const cpfLimpo = data.cpf.replace(/\D/g, "");
+      const cpfExistente = await prisma.usuario.findUnique({
+        where: { cpf: cpfLimpo },
+      });
+
+      if (cpfExistente) {
+        return NextResponse.json(
+          { error: "CPF já cadastrado" },
+          { status: 409 }
+        );
+      }
+      updateData.cpf = cpfLimpo;
     }
 
     // Atualizar outros campos

@@ -1,33 +1,77 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { TenantInfo } from "@/types/next-auth";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Building2, ChevronDown } from "lucide-react";
+import { Building2, ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface TenantSelectorProps {
   className?: string;
   showLabel?: boolean;
 }
 
-export function TenantSelector({
-  className,
-  showLabel = false,
-}: TenantSelectorProps) {
+function ClinicaAvatar({
+  nome,
+  logoUrl,
+  size = "sm",
+}: {
+  nome: string;
+  logoUrl?: string | null;
+  size?: "sm" | "md";
+}) {
+  const [imgError, setImgError] = useState(false);
+  const initials = nome
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+  const dim = size === "sm" ? 28 : 36;
+
+  if (logoUrl && !imgError) {
+    return (
+      <div
+        className={cn(
+          "rounded-lg overflow-hidden flex-shrink-0 bg-primary/10",
+          size === "sm" ? "w-7 h-7" : "w-9 h-9"
+        )}
+      >
+        <Image
+          src={logoUrl}
+          alt={nome}
+          width={dim}
+          height={dim}
+          className="w-full h-full object-cover"
+          unoptimized
+          onError={() => setImgError(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg flex items-center justify-center flex-shrink-0 font-semibold text-white bg-primary",
+        size === "sm" ? "w-7 h-7 text-[10px]" : "w-9 h-9 text-xs"
+      )}
+    >
+      {initials}
+    </div>
+  );
+}
+
+export function TenantSelector({ className }: TenantSelectorProps) {
   const { data: session, update } = useSession();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [tenants, setTenants] = useState<TenantInfo[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(true);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchTenants = async () => {
@@ -44,33 +88,43 @@ export function TenantSelector({
       }
     };
 
-    if (session) {
-      fetchTenants();
-    }
+    if (session) fetchTenants();
   }, [session]);
 
-  // Não exibir se não tiver sessão ou se tiver apenas 1 tenant
-  if (!session || loadingTenants || tenants.length <= 1) {
-    // Se tiver apenas 1 tenant, mostrar apenas o nome
-    if (session?.user?.clinicaNome) {
-      return (
-        <div className={cn("flex items-center gap-2 text-sm", className)}>
-          <Building2 className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            {session.user.clinicaNome}
-          </span>
-        </div>
-      );
-    }
-    return null;
+  // Fechar ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  if (!session || loadingTenants) return null;
+
+  const currentTenant = tenants.find((t) => t.id === session.user.clinicaId);
+  const clinicaNome =
+    currentTenant?.nome || session.user.clinicaNome || "Clínica";
+
+  // Apenas 1 clínica — exibir sem dropdown
+  if (tenants.length <= 1) {
+    return (
+      <div className={cn("flex items-center gap-2 text-sm", className)}>
+        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <span className="font-medium text-sm truncate max-w-[160px]">
+          {clinicaNome}
+        </span>
+      </div>
+    );
   }
 
   const handleTenantChange = async (tenantId: string) => {
-    if (tenantId === session.user.clinicaId) return;
-
+    if (tenantId === session.user.clinicaId || isLoading) return;
+    setOpen(false);
     setIsLoading(true);
     try {
-      // Validar no servidor
       const response = await fetch("/api/auth/switch-tenant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,9 +132,7 @@ export function TenantSelector({
       });
 
       if (response.ok) {
-        // Atualizar sessão com novo tenant
         await update({ switchTenant: tenantId });
-        // Redirecionar para dashboard para aplicar novo contexto
         router.push("/dashboard");
         router.refresh();
       } else {
@@ -95,43 +147,95 @@ export function TenantSelector({
   };
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      {showLabel && (
-        <span className="text-sm text-muted-foreground">Clínica:</span>
-      )}
-      <Select
-        value={session.user.clinicaId || ""}
-        onValueChange={handleTenantChange}
+    <div ref={ref} className={cn("relative", className)}>
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen((v) => !v)}
         disabled={isLoading}
+        className={cn(
+          "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all w-72",
+          "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20",
+          "focus:outline-none focus:ring-2 focus:ring-primary/30",
+          isLoading && "opacity-60 cursor-wait"
+        )}
       >
-        <SelectTrigger
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <ClinicaAvatar
+            nome={clinicaNome}
+            logoUrl={currentTenant?.logoUrl}
+            size="sm"
+          />
+        )}
+        <span className="truncate flex-1 text-left hidden sm:block">
+          {clinicaNome}
+        </span>
+        <ChevronDown
           className={cn(
-            "w-[200px] border-none bg-transparent shadow-none hover:bg-accent",
-            isLoading && "opacity-50 cursor-wait"
+            "h-3.5 w-3.5 opacity-60 transition-transform duration-200 flex-shrink-0",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className={cn(
+            "absolute right-0 top-full mt-2 z-50",
+            "w-72 rounded-xl shadow-xl border border-border/60 bg-background",
+            "overflow-hidden",
+            "animate-in fade-in-0 zoom-in-95 duration-150"
           )}
         >
-          <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-          <SelectValue placeholder="Selecione a clínica">
-            {session.user.clinicaNome || "Selecione"}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {tenants.map((tenant) => (
-            <SelectItem
-              key={tenant.id}
-              value={tenant.id}
-              className="cursor-pointer"
-            >
-              <div className="flex flex-col">
-                <span>{tenant.nome}</span>
-                <span className="text-xs text-muted-foreground">
-                  {tenant.tipo}
-                </span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          {/* Lista */}
+          <div className="py-1.5 max-h-72 overflow-y-auto">
+            {tenants.map((tenant) => {
+              const isActive = tenant.id === session.user.clinicaId;
+              return (
+                <button
+                  key={tenant.id}
+                  onClick={() => handleTenantChange(tenant.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors",
+                    "hover:bg-primary/8 focus:outline-none focus:bg-primary/8",
+                    isActive && "bg-primary/10"
+                  )}
+                >
+                  <ClinicaAvatar
+                    nome={tenant.nome}
+                    logoUrl={tenant.logoUrl}
+                    size="md"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={cn(
+                        "text-sm font-medium truncate",
+                        isActive ? "text-primary" : "text-foreground"
+                      )}
+                    >
+                      {tenant.nome}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {tenant.tipo === "ADMIN_CLINICA"
+                        ? "Administrador"
+                        : tenant.tipo === "MEDICO"
+                          ? "Médico"
+                          : tenant.tipo === "SECRETARIA"
+                            ? "Secretaria"
+                            : tenant.tipo}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

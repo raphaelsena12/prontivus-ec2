@@ -7,6 +7,7 @@ export interface TenantInfo {
   id: string;
   nome: string;
   tipo: TipoUsuario; // Papel do usuário neste tenant
+  logoUrl?: string | null;
 }
 
 declare module "next-auth" {

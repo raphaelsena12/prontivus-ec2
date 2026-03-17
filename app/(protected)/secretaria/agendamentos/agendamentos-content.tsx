@@ -40,6 +40,7 @@ import { PageHeader } from "@/components/page-header";
 interface Agendamento {
   id: string;
   dataHora: Date;
+  dataHoraFim?: Date | string | null;
   paciente: {
     id: string;
     nome: string;
@@ -115,6 +116,7 @@ export function AgendamentosContent() {
   const [novoAgendamentoInitialData, setNovoAgendamentoInitialData] = useState<{
     data?: string;
     hora?: string;
+    horaFim?: string;
     medicoId?: string;
   } | undefined>(undefined);
 
@@ -474,9 +476,11 @@ export function AgendamentosContent() {
                       onSlotSelect={(slotInfo) => {
                         const startDate = slotInfo.start.toISOString().split("T")[0];
                         const startTime = slotInfo.start.toTimeString().split(" ")[0].slice(0, 5);
+                        const endTime = slotInfo.end.toTimeString().split(" ")[0].slice(0, 5);
                         setNovoAgendamentoInitialData({
                           data: startDate,
                           hora: startTime,
+                          horaFim: endTime,
                           medicoId: medicoSelecionado || undefined,
                         });
                         setNovoAgendamentoModalOpen(true);

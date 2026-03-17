@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
         hostname: "randomuser.me",
         pathname: "/api/portraits/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+      },
     ],
   },
 };

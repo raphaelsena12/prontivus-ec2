@@ -16,6 +16,7 @@ const agendamentoSchema = z.object({
   pacienteId: z.string().uuid(),
   medicoId: z.string().uuid(),
   dataHora: z.string().transform((str) => new Date(str)),
+  dataHoraFim: z.string().transform((str) => new Date(str)).optional(),
   codigoTussId: z.string().uuid(),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
@@ -280,11 +281,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Duração padrão da consulta (30 minutos)
-    const DURACAO_CONSULTA_MINUTOS = 30;
     const dataHoraInicio = new Date(data.dataHora);
-    const dataHoraFim = new Date(dataHoraInicio);
-    dataHoraFim.setMinutes(dataHoraFim.getMinutes() + DURACAO_CONSULTA_MINUTOS);
+    const dataHoraFim = data.dataHoraFim ? new Date(data.dataHoraFim) : (() => {
+      const fim = new Date(dataHoraInicio);
+      fim.setMinutes(fim.getMinutes() + 30);
+      return fim;
+    })();
 
     // Buscar todos os agendamentos do médico que não estão cancelados
     const agendamentosMedico = await prisma.consulta.findMany({
@@ -307,8 +309,9 @@ export async function POST(request: NextRequest) {
     // Verificar conflitos de horário
     for (const agendamentoExistente of agendamentosMedico) {
       const inicioExistente = new Date(agendamentoExistente.dataHora);
-      const fimExistente = new Date(inicioExistente);
-      fimExistente.setMinutes(fimExistente.getMinutes() + DURACAO_CONSULTA_MINUTOS);
+      const fimExistente = agendamentoExistente.dataHoraFim
+        ? new Date(agendamentoExistente.dataHoraFim)
+        : (() => { const f = new Date(inicioExistente); f.setMinutes(f.getMinutes() + 30); return f; })();
 
       // Verificar se há sobreposição de horários
       // Conflito ocorre quando:
@@ -482,6 +485,7 @@ export async function POST(request: NextRequest) {
         pacienteId: data.pacienteId,
         medicoId: data.medicoId,
         dataHora: data.dataHora,
+        dataHoraFim: data.dataHoraFim ?? dataHoraFim,
         codigoTussId: data.codigoTussId,
         tipoConsultaId: data.tipoConsultaId,
         procedimentoId: data.procedimentoId,

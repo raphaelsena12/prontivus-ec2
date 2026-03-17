@@ -21,6 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { toast } from "sonner";
 import { formatDate, formatTime } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
@@ -36,6 +38,17 @@ import {
   LogIn,
 } from "lucide-react";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
+
+interface Medico {
+  id: string;
+  usuario: {
+    id: string;
+    nome: string;
+    avatar?: string | null;
+  };
+  crm?: string;
+  especialidade?: string;
+}
 
 interface Consulta {
   id: string;
@@ -73,6 +86,9 @@ interface Consulta {
 
 export function CheckInContent() {
   const [consultas, setConsultas] = useState<Consulta[]>([]);
+  const [medicos, setMedicos] = useState<Medico[]>([]);
+  const [medicoSelecionado, setMedicoSelecionado] = useState<string>("");
+  const [loadingMedicos, setLoadingMedicos] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [checkInDialogOpen, setCheckInDialogOpen] = useState(false);
@@ -81,6 +97,15 @@ export function CheckInContent() {
   );
   const [processing, setProcessing] = useState(false);
   const [speaking, setSpeaking] = useState<string | null>(null);
+
+  const getInitials = (nome: string) => {
+    return nome
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   const chamarPaciente = async (nomePaciente: string) => {
     setSpeaking(nomePaciente);
@@ -264,6 +289,29 @@ export function CheckInContent() {
   };
 
   useEffect(() => {
+    const fetchMedicos = async () => {
+      try {
+        setLoadingMedicos(true);
+        const response = await fetch("/api/admin-clinica/medicos");
+        if (response.ok) {
+          const data = await response.json();
+          const medicosList = data.medicos || [];
+          setMedicos(medicosList);
+          if (medicosList.length > 0 && medicoSelecionado === "") {
+            setMedicoSelecionado(medicosList[0].id);
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao carregar médicos:", error);
+      } finally {
+        setLoadingMedicos(false);
+      }
+    };
+    fetchMedicos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     fetchConsultas();
   }, []);
 
@@ -305,6 +353,9 @@ export function CheckInContent() {
   };
 
   const filteredConsultas = consultas.filter((consulta) => {
+    if (medicoSelecionado && consulta.medico?.id !== medicoSelecionado) {
+      return false;
+    }
     const searchLower = search.toLowerCase();
     return (
       consulta.paciente.nome.toLowerCase().includes(searchLower) ||
@@ -356,13 +407,67 @@ export function CheckInContent() {
         subtitle="Registre a chegada dos pacientes e gerencie os atendimentos do dia"
       />
 
-      <div className="flex flex-col">
+      <div className="flex flex-col space-y-4">
+        {/* Seletor de Médicos */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-3">Selecione o médico</p>
+          <ScrollArea className="w-full">
+            <div className="flex items-center gap-3 pb-2">
+              {loadingMedicos ? (
+                <div className="flex items-center justify-center py-8 w-full">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                medicos.map((medico) => (
+                  <button
+                    key={medico.id}
+                    onClick={() => setMedicoSelecionado(medico.id)}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all min-w-[100px] ${
+                      medicoSelecionado === medico.id
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border/60 hover:border-primary/50 hover:bg-muted/50"
+                    }`}
+                  >
+                    <AvatarWithS3
+                      avatar={medico.usuario.avatar}
+                      alt={medico.usuario.nome}
+                      fallback={getInitials(medico.usuario.nome)}
+                      className={`w-16 h-16 border-2 ${
+                        medicoSelecionado === medico.id
+                          ? "border-primary"
+                          : "border-border"
+                      }`}
+                      fallbackClassName={`text-sm font-semibold ${
+                        medicoSelecionado === medico.id
+                          ? "bg-primary/10 text-primary"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    />
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className={`text-xs font-medium text-center max-w-[90px] truncate ${
+                        medicoSelecionado === medico.id ? "text-primary" : "text-foreground"
+                      }`}>
+                        {medico.usuario.nome}
+                      </span>
+                      {medico.especialidade && (
+                        <span className="text-[10px] text-muted-foreground text-center max-w-[90px] truncate">
+                          {medico.especialidade}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
         {/* Campo de busca */}
         <div className="flex items-center justify-end pb-4">
           <div className="relative max-w-md w-full">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar paciente por nome, CPF ou médico..."
+              placeholder="Buscar paciente por nome ou CPF..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -402,7 +507,11 @@ export function CheckInContent() {
                       <div className="flex flex-col items-center gap-2">
                         <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
                         <span className="text-xs text-muted-foreground">
-                          {search ? "Nenhuma consulta encontrada" : "Nenhuma consulta para hoje"}
+                          {search
+                            ? "Nenhuma consulta encontrada"
+                            : medicoSelecionado
+                            ? "Nenhuma consulta para este médico hoje"
+                            : "Selecione um médico para ver os check-ins"}
                         </span>
                       </div>
                     </TableCell>

@@ -611,33 +611,16 @@ export function SiteHeader({ user }: SiteHeaderProps) {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background shadow-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) text-foreground overflow-x-hidden"
+      className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background shadow-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) text-foreground"
     >
-      <div className="relative z-10 flex w-full items-center gap-3 px-4 lg:gap-4 lg:px-6 text-foreground overflow-x-hidden">
+      <div className="relative z-10 flex w-full items-center gap-3 px-4 lg:gap-4 lg:px-6 text-foreground">
         <SidebarTrigger className="-ml-1 hover:bg-muted text-foreground transition-all duration-200 hover:scale-105 active:scale-95" />
 
-        {/* Logo da Clínica */}
-        {clinicaInfo.nome && (
+        {/* Seletor de Clínica (esquerda) */}
+        {mounted && user && (
           <>
             <Separator orientation="vertical" className="h-6 bg-border" />
-            <div className="flex items-center gap-2 shrink-0">
-              <Avatar className="h-7 w-7 rounded-md ring-1 ring-border">
-                {clinicaInfo.logoUrl ? (
-                  <AvatarImage src={clinicaInfo.logoUrl} alt={clinicaInfo.nome} className="object-cover" />
-                ) : null}
-                <AvatarFallback className="rounded-md bg-primary/10 text-primary text-[10px] font-bold">
-                  {clinicaInfo.nome
-                    .split(" ")
-                    .slice(0, 2)
-                    .map((w) => w[0])
-                    .join("")
-                    .toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden text-sm font-medium text-foreground md:inline-block max-w-[180px] truncate">
-                {clinicaInfo.nome}
-              </span>
-            </div>
+            <TenantSelector />
           </>
         )}
 
@@ -645,11 +628,6 @@ export function SiteHeader({ user }: SiteHeaderProps) {
 
         {user && (
           <div className="flex items-center gap-2">
-            {/* Seletor de Clínica (Multi-Tenant) */}
-            {mounted && (
-              <TenantSelector className="text-foreground [&_button]:text-foreground [&_button]:hover:bg-muted [&_svg]:text-muted-foreground" />
-            )}
-
             <Separator
               orientation="vertical"
               className="h-6 bg-border hidden md:block"

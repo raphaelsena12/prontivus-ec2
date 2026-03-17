@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Stethoscope, Upload, Filter, Plus } from "lucide-react";
+import { Loader2, Stethoscope, Upload, Filter, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
 import { MedicosTable } from "./components/medicos-table";
 import { MedicoDeleteDialog } from "./components/medico-delete-dialog";
 import { MedicoDialog } from "./components/medico-dialog";
@@ -135,6 +136,12 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
             <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
               <Upload className="mr-1.5 h-3 w-3" />
               Upload em Massa
+            </Button>
+            <Button variant="outline" asChild className="h-8 text-xs px-3">
+              <Link href="/admin-clinica/medicos/convidar">
+                <UserPlus className="mr-1.5 h-3 w-3" />
+                Convidar Médico
+              </Link>
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />

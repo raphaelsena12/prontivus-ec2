@@ -21,6 +21,7 @@ const atualizarAgendamentoSchema = z.object({
   pacienteId: z.string().uuid().optional(),
   medicoId: z.string().uuid().optional(),
   dataHora: z.string().transform((str) => new Date(str)).optional(),
+  dataHoraFim: z.string().transform((str) => new Date(str)).optional(),
   codigoTussId: z.string().uuid().optional(),
   tipoConsultaId: z.string().uuid().optional().nullable(),
   procedimentoId: z.string().uuid().optional().nullable(),
@@ -272,6 +273,7 @@ export async function PATCH(
     if (data.pacienteId) updateData.pacienteId = data.pacienteId;
     if (data.medicoId) updateData.medicoId = data.medicoId;
     if (data.dataHora) updateData.dataHora = data.dataHora;
+    if (data.dataHoraFim !== undefined) updateData.dataHoraFim = data.dataHoraFim;
     if (data.codigoTussId) updateData.codigoTussId = data.codigoTussId;
     if (data.tipoConsultaId !== undefined) updateData.tipoConsultaId = data.tipoConsultaId;
     if (data.procedimentoId !== undefined) updateData.procedimentoId = data.procedimentoId;
@@ -287,11 +289,11 @@ export async function PATCH(
       const medicoIdParaVerificar = data.medicoId || agendamentoAtual.medicoId;
       const dataHoraParaVerificar = data.dataHora ? new Date(data.dataHora) : agendamentoAtual.dataHora;
 
-      // Duração padrão da consulta (30 minutos)
-      const DURACAO_CONSULTA_MINUTOS = 30;
       const dataHoraInicio = new Date(dataHoraParaVerificar);
-      const dataHoraFim = new Date(dataHoraInicio);
-      dataHoraFim.setMinutes(dataHoraFim.getMinutes() + DURACAO_CONSULTA_MINUTOS);
+      const dataHoraFimParaVerificar = data.dataHoraFim
+        ? new Date(data.dataHoraFim)
+        : (() => { const f = new Date(dataHoraInicio); f.setMinutes(f.getMinutes() + 30); return f; })();
+      const dataHoraFim = dataHoraFimParaVerificar;
 
       // Verificar conflitos com outros agendamentos (exceto o próprio agendamento que está sendo editado)
       const agendamentosMedico = await prisma.consulta.findMany({
@@ -317,8 +319,9 @@ export async function PATCH(
       // Verificar conflitos de horário
       for (const agendamentoExistente of agendamentosMedico) {
         const inicioExistente = new Date(agendamentoExistente.dataHora);
-        const fimExistente = new Date(inicioExistente);
-        fimExistente.setMinutes(fimExistente.getMinutes() + DURACAO_CONSULTA_MINUTOS);
+        const fimExistente = agendamentoExistente.dataHoraFim
+          ? new Date(agendamentoExistente.dataHoraFim)
+          : (() => { const f = new Date(inicioExistente); f.setMinutes(f.getMinutes() + 30); return f; })();
 
         // Verificar se há sobreposição de horários
         const haConflito = 

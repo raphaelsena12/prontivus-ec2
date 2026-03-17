@@ -212,7 +212,7 @@ export async function GET(request: NextRequest) {
     console.log(`[Horários Disponíveis] É hoje? ${eHoje}, Agora: ${agora.toISOString()}, Data selecionada: ${dataParam}`);
 
     for (let hora = 8; hora < 18; hora++) {
-      for (let minuto = 0; minuto < 60; minuto += 30) {
+      for (let minuto = 0; minuto < 60; minuto += 10) {
         const chave = `${hora.toString().padStart(2, "0")}:${minuto.toString().padStart(2, "0")}`;
         if (!horariosOcupados.has(chave)) {
           // Verificar se não é um horário passado (apenas se for hoje)

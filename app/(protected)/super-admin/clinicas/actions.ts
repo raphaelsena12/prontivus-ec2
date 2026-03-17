@@ -79,8 +79,8 @@ export async function createClinica(data: CreateClinicaData) {
     const senhaHash = await bcrypt.hash("Clinica@123", 10);
     const cnpjLimpo = data.cnpj.replace(/\D/g, "");
     const emailAdmin = `admin@${cnpjLimpo}.clinica.com`;
-    // Gerar CPF único baseado no CNPJ (usando últimos 9 dígitos + prefixo)
-    const cpfAdmin = `000${cnpjLimpo.slice(-9)}`;
+    // Gerar CPF único baseado no CNPJ (usando últimos 8 dígitos + prefixo)
+    const cpfAdmin = `000${cnpjLimpo.slice(-8)}`;
 
     await prisma.usuario.create({
       data: {

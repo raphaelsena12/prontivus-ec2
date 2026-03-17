@@ -1723,7 +1723,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   }, [documentoSearch, documentModels]);
 
-  const handleGenerateDocument = async (modelId: string, examesSolicitados?: ExameSolicitado[], prioridade?: PrioridadeTISS) => {
+  const handleGenerateDocument = async (modelId: string, extraDados?: Record<string, any>, examesSolicitados?: ExameSolicitado[], prioridade?: PrioridadeTISS) => {
     // Guia TISS: abrir modal primeiro para coletar exames
     if (modelId === "guia-consulta-tiss" && !examesSolicitados) {
       setTissModalOpen(true);
@@ -1738,7 +1738,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       const requestData: any = {
         tipoDocumento: modelId,
         consultaId,
-        dados: {},
+        dados: { ...extraDados },
       };
 
       // Adicionar prescrições se for receita médica
@@ -1807,7 +1807,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     setTissModalOpen(false);
     setTissGerandoGuia(true);
     try {
-      await handleGenerateDocument("guia-consulta-tiss", exames, examesPrioridade);
+      await handleGenerateDocument("guia-consulta-tiss", undefined, exames, examesPrioridade);
     } finally {
       setTissGerandoGuia(false);
     }

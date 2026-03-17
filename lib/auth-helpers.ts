@@ -3,6 +3,7 @@ import { authOptions } from "./auth";
 import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma";
 import { TenantInfo } from "@/types/next-auth";
 import { prisma } from "./prisma";
+import { getSignedUrlFromS3 } from "./s3-service";
 
 /**
  * Obtém a sessão do usuário no servidor
@@ -96,6 +97,7 @@ export async function getUserTenants(): Promise<TenantInfo[]> {
     select: {
       id: true,
       nome: true,
+      logoUrl: true,
     },
   });
 
@@ -130,10 +132,31 @@ export async function getUserTenants(): Promise<TenantInfo[]> {
         }
       }
 
+      // Mesma lógica do PDF: preferir tenant.logoUrl, fallback para avatar do admin
+      let logoKey: string | null = tenant.logoUrl ?? null;
+      if (!logoKey) {
+        const adminUser = await prisma.usuario.findFirst({
+          where: { clinicaId: tenant.id, tipo: TipoUsuario.ADMIN_CLINICA, ativo: true },
+          select: { avatar: true },
+          orderBy: { createdAt: "asc" },
+        });
+        logoKey = adminUser?.avatar ?? null;
+      }
+
+      let logoUrl: string | null = null;
+      if (logoKey) {
+        try {
+          logoUrl = await getSignedUrlFromS3(logoKey, 3600);
+        } catch {
+          logoUrl = null;
+        }
+      }
+
       return {
         id: tenant.id,
         nome: tenant.nome,
         tipo,
+        logoUrl,
       };
     })
   );

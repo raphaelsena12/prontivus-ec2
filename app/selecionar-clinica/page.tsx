@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { TenantSelectionModal } from "@/components/tenant-selection-modal";
 import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function SelecionarClinicaPage() {
   const { data: session, status } = useSession();
@@ -14,47 +15,75 @@ export default function SelecionarClinicaPage() {
   useEffect(() => {
     if (status === "loading") return;
 
-    // Se não está autenticado, redirecionar para login
     if (!session) {
       router.push("/login");
       return;
     }
 
-    // Se não precisa selecionar tenant, ir para dashboard
     if (!session.user.requiresTenantSelection) {
       router.push("/dashboard");
       return;
     }
 
-    // Mostrar modal de seleção
     setShowModal(true);
   }, [session, status, router]);
 
-  // Loading state
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Carregando...</p>
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0f1f5c] via-[#1E4ED8] to-[#3b82f6]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
+          <p className="text-white/70 text-sm">Carregando...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-[#0f1f5c] via-[#1E4ED8] to-[#3b82f6]">
+      {/* Círculos decorativos no fundo */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute -right-32 top-1/3 h-80 w-80 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl" />
+      </div>
+
+      {/* Padrão de grade sutil */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-10"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      />
+
+      {/* Logo no topo */}
+      <div className="absolute top-8 left-1/2 -translate-x-1/2">
+        <Image
+          src="/LogotipoemFundoTransparente.webp"
+          alt="Prontivus"
+          width={140}
+          height={42}
+          className="h-auto opacity-90"
+          priority
+        />
+      </div>
+
+      {/* Modal */}
       <TenantSelectionModal
         open={showModal}
         onOpenChange={(open) => {
-          if (!open) {
-            // Se fechar sem selecionar, ir para dashboard mesmo assim
-            // (vai usar o tenant padrão)
-            router.push("/dashboard");
-          }
+          // Não permite fechar o modal sem selecionar uma clínica
+          if (!open) return;
           setShowModal(open);
         }}
       />
+
+      {/* Rodapé */}
+      <p className="absolute bottom-6 text-xs text-white/40">
+        © 2026 Prontivus. Todos os direitos reservados.
+      </p>
     </div>
   );
 }

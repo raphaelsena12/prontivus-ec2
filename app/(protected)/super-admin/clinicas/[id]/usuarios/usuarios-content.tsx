@@ -89,27 +89,7 @@ const formatCPFInput = (value: string) => {
   return value;
 };
 
-const createUsuarioSchema = z.object({
-  nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  email: z.string().email("Email inválido"),
-  cpf: z
-    .string()
-    .min(11, "CPF deve ter 11 dígitos")
-    .refine((val) => val.replace(/\D/g, "").length === 11, {
-      message: "CPF inválido",
-    }),
-  telefone: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || phoneRegex.test(formatPhone(val)),
-      { message: "Telefone inválido. Use o formato (XX) XXXXX-XXXX" }
-    ),
-  tipo: z.nativeEnum(TipoUsuario),
-  senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
-});
-
-const updateUsuarioSchema = z.object({
+const usuarioSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   email: z.string().email("Email inválido"),
   cpf: z.string().optional(),
@@ -126,7 +106,7 @@ const updateUsuarioSchema = z.object({
     .optional(),
 });
 
-type UsuarioFormValues = z.infer<typeof createUsuarioSchema>;
+type UsuarioFormValues = z.infer<typeof usuarioSchema>;
 
 
 export function UsuariosContent({ clinica }: UsuariosContentProps) {
@@ -139,7 +119,7 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
   const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<UsuarioFormValues>({
-    resolver: zodResolver(createUsuarioSchema),
+    resolver: zodResolver(usuarioSchema),
     defaultValues: {
       nome: "",
       email: "",
@@ -251,37 +231,27 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
   const onSubmit = async (data: UsuarioFormValues) => {
     setIsSubmitting(true);
     try {
-      const cpfLimpo = data.cpf.replace(/\D/g, "");
+      const cpfLimpo = (data.cpf || "").replace(/\D/g, "");
       const telefoneLimpo = data.telefone?.replace(/\D/g, "") || null;
 
-      if (editingUsuario) {
-        // Limpar erro de senha se estiver vazia
-        if (!data.senha || data.senha.trim() === "") {
-          form.clearErrors("senha");
+      if (!editingUsuario) {
+        // Validações extras apenas no create
+        if (!data.cpf || cpfLimpo.length !== 11) {
+          form.setError("cpf", { message: "CPF inválido" });
+          setIsSubmitting(false);
+          return;
         }
-        
-        // Validar schema de atualização
-        const updateValidation = updateUsuarioSchema.safeParse({
-          nome: data.nome,
-          email: data.email,
-          telefone: data.telefone,
-          tipo: data.tipo,
-          senha: data.senha?.trim() || undefined,
-        });
+        if (!data.senha || data.senha.trim().length < 6) {
+          form.setError("senha", { message: "Senha deve ter no mínimo 6 caracteres" });
+          setIsSubmitting(false);
+          return;
+        }
+      }
 
-        if (!updateValidation.success) {
-          updateValidation.error.issues.forEach((error) => {
-            const field = error.path[0] as keyof UsuarioFormValues;
-            if (field && field !== "cpf" && field !== "senha") {
-              form.setError(field as any, { message: error.message });
-            }
-            // Validar senha apenas se foi fornecida
-            if (field === "senha" && data.senha && data.senha.trim() !== "") {
-              if (data.senha.trim().length < 6) {
-                form.setError("senha", { message: "Senha deve ter no mínimo 6 caracteres" });
-              }
-            }
-          });
+      if (editingUsuario) {
+        // Validar CPF se foi alterado
+        if (data.cpf && cpfLimpo.length !== 11) {
+          form.setError("cpf", { message: "CPF inválido" });
           setIsSubmitting(false);
           return;
         }
@@ -290,9 +260,16 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
         const updateData: any = {
           nome: data.nome,
           email: data.email,
-          telefone: telefoneLimpo,
           tipo: data.tipo,
         };
+
+        // Só incluir telefone no payload (pode ser null para limpar)
+        updateData.telefone = telefoneLimpo;
+
+        // Só atualizar CPF se foi alterado
+        if (data.cpf && cpfLimpo !== editingUsuario.cpf) {
+          updateData.cpf = data.cpf;
+        }
 
         // Só atualizar senha se foi fornecida
         if (data.senha && data.senha.trim() !== "") {
@@ -458,7 +435,6 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
                           <FormControl>
                             <Input
                               placeholder="000.000.000-00"
-                              disabled={isEditing}
                               {...field}
                               onChange={(e) => {
                                 const formatted = formatCPFInput(e.target.value);
@@ -467,11 +443,6 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
                             />
                           </FormControl>
                           <FormMessage />
-                          {isEditing && (
-                            <p className="text-xs text-muted-foreground">
-                              CPF não pode ser alterado
-                            </p>
-                          )}
                         </FormItem>
                       )}
                     />

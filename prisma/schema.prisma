@@ -673,6 +673,7 @@ model Consulta {
   pacienteId        String
   medicoId          String
   dataHora          DateTime
+  dataHoraFim       DateTime?
   status            String    @default("AGENDADA")
   inicioAtendimento DateTime?
   fimAtendimento    DateTime?

@@ -18,6 +18,7 @@ const localizer = dateFnsLocalizer({
 interface Agendamento {
   id: string;
   dataHora: Date;
+  dataHoraFim?: Date | string | null;
   paciente: {
     id: string;
     nome: string;
@@ -118,8 +119,9 @@ export function AgendamentosCalendar({
   const events = useMemo(() => {
     const agendamentosEvents = agendamentos.map((agendamento) => {
       const dataHora = new Date(agendamento.dataHora);
-      const endTime = new Date(dataHora);
-      endTime.setMinutes(endTime.getMinutes() + 30); // Duração padrão de 30 minutos
+      const endTime = agendamento.dataHoraFim
+        ? new Date(agendamento.dataHoraFim)
+        : (() => { const e = new Date(dataHora); e.setMinutes(e.getMinutes() + 30); return e; })();
 
       const title = `${agendamento.paciente.nome}${agendamento.medico ? ` - Dr(a). ${agendamento.medico.usuario.nome}` : ""}`;
 
@@ -387,6 +389,8 @@ export function AgendamentosCalendar({
           views={["month", "week", "day", "agenda"]}
           messages={messages}
           culture="pt-BR"
+          step={10}
+          timeslots={1}
           min={new Date(2000, 0, 1, 6, 0)}
           max={new Date(2000, 0, 1, 23, 0)}
         />

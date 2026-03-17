@@ -26,6 +26,18 @@ export default withAuth(
       return NextResponse.redirect(url);
     }
 
+    // Se precisar selecionar tenant mas tentar acessar outra rota protegida, forçar seleção
+    if (
+      token?.requiresTenantSelection &&
+      !pathname.startsWith("/selecionar-clinica") &&
+      !pathname.startsWith("/api/") &&
+      !pathname.startsWith("/login")
+    ) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/selecionar-clinica";
+      return NextResponse.redirect(url);
+    }
+
     // Criar headers customizados
     const requestHeaders = new Headers(req.headers);
 

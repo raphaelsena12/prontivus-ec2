@@ -24,7 +24,9 @@ import {
   History,
   Check,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface ExameAnexado {
@@ -104,7 +106,7 @@ interface AISidebarProps {
     assinando?: boolean;
     erroAssinatura?: string;
   }>;
-  handleGenerateDocument: (modelId: string) => Promise<void>;
+  handleGenerateDocument: (modelId: string, extraDados?: Record<string, any>) => Promise<void>;
   onSignDocument?: (id: string) => void | Promise<void>;
   onDeleteDocument?: (id: string) => void;
   // Action
@@ -131,6 +133,111 @@ interface AISidebarProps {
   documentoSuggestions?: Array<{ id: string; nome: string }>;
 }
 
+
+function AtestadoFormModal({
+  docId,
+  docNome,
+  isDias,
+  isMeses,
+  formDias,
+  setFormDias,
+  formMeses,
+  setFormMeses,
+  cidAuto,
+  loading,
+  onConfirm,
+  onClose,
+}: {
+  docId: string | null;
+  docNome?: string;
+  isDias: boolean;
+  isMeses: boolean;
+  formDias: string;
+  setFormDias: (v: string) => void;
+  formMeses: string;
+  setFormMeses: (v: string) => void;
+  cidAuto?: { code: string; description: string };
+  loading: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={!!docId} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-sm font-bold text-slate-800">
+            {docNome || "Gerar Documento"}
+          </DialogTitle>
+          <p className="text-xs text-slate-500">Informe os dados para gerar o documento</p>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          {isDias && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                Dias de Afastamento
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="365"
+                value={formDias}
+                onChange={(e) => setFormDias(e.target.value)}
+                className="h-9 bg-slate-50 border-slate-200 text-sm"
+                autoFocus
+              />
+            </div>
+          )}
+          {isMeses && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                Validade (meses)
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="24"
+                value={formMeses}
+                onChange={(e) => setFormMeses(e.target.value)}
+                className="h-9 bg-slate-50 border-slate-200 text-sm"
+                autoFocus
+              />
+            </div>
+          )}
+          {cidAuto && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                CID-10 <span className="text-slate-400 font-normal">(diagnóstico da IA)</span>
+              </label>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50">
+                <Badge className="bg-slate-800 text-white font-mono text-xs flex-shrink-0">
+                  {cidAuto.code}
+                </Badge>
+                <span className="text-xs text-slate-600">{cidAuto.description}</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2 pt-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 bg-slate-800 hover:bg-slate-900 text-white"
+            onClick={onConfirm}
+            disabled={loading}
+          >
+            {loading
+              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              : <Printer className="w-3.5 h-3.5 mr-1.5" />
+            }
+            Gerar PDF
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function AISidebar({
   isProcessing,
@@ -223,6 +330,24 @@ export function AISidebar({
   const docInputRef = useRef<HTMLInputElement>(null);
   const docDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Modal de dados extras para documentos que precisam de formulário
+  const [formDocId, setFormDocId] = useState<string | null>(null);
+  const [formDias, setFormDias] = useState("1");
+  const [formMeses, setFormMeses] = useState("6");
+
+  const DOCS_COM_DIAS = new Set([
+    "atestado-afastamento",
+    "atestado-afastamento-cid",
+    "atestado-afastamento-sem-cid",
+    "atestado-afastamento-historico-cid",
+    "atestado-afastamento-indeterminado",
+  ]);
+  const DOCS_COM_MESES = new Set([
+    "atestado-aptidao-fisica-mental",
+    "atestado-aptidao-piscinas",
+    "atestado-aptidao-fisica",
+  ]);
+
   const filteredDocs = documentModels.filter(
     (d) =>
       docSearch.trim() === "" ||
@@ -245,15 +370,35 @@ export function AISidebar({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleGenDoc = async (id: string) => {
-    setLoadingDoc(id);
+  const handleGenDoc = (id: string) => {
     setDocSearch("");
     setDocDropdownOpen(false);
+    if (DOCS_COM_DIAS.has(id) || DOCS_COM_MESES.has(id)) {
+      setFormDocId(id);
+    } else {
+      runGenDoc(id);
+    }
+  };
+
+  const runGenDoc = async (id: string, extraDados?: Record<string, any>) => {
+    setLoadingDoc(id);
     try {
-      await handleGenerateDocument(id);
+      await handleGenerateDocument(id, extraDados);
     } finally {
       setLoadingDoc(null);
     }
+  };
+
+  const handleFormConfirm = async () => {
+    if (!formDocId) return;
+    const idParaGerar = formDocId;
+    const extraDados: Record<string, any> = {};
+    if (DOCS_COM_DIAS.has(idParaGerar)) extraDados.diasAfastamento = parseInt(formDias) || 1;
+    if (DOCS_COM_MESES.has(idParaGerar)) extraDados.mesesValidade = parseInt(formMeses) || 6;
+    setFormDocId(null);
+    setFormDias("1");
+    setFormMeses("6");
+    await runGenDoc(idParaGerar, extraDados);
   };
 
   const openDoc = (doc: (typeof documentosGerados)[0]) => {
@@ -331,6 +476,7 @@ export function AISidebar({
   ];
 
   return (
+    <>
     <div className="space-y-1.5 w-full min-w-0 overflow-x-hidden">
     <style>{`
       @keyframes ai-slow-spin {
@@ -1368,8 +1514,25 @@ export function AISidebar({
 
       {/* ── Rodapé branding ── */}
       <div className="pt-1 pb-0.5 flex items-center justify-center gap-1.5">
-        
+
       </div>
     </div>
+
+    {/* ── Modal de dados para atestados ── */}
+    <AtestadoFormModal
+      docId={formDocId}
+      docNome={documentModels.find(d => d.id === formDocId)?.nome}
+      isDias={formDocId !== null && DOCS_COM_DIAS.has(formDocId) && formDocId !== "atestado-afastamento-indeterminado"}
+      isMeses={formDocId !== null && DOCS_COM_MESES.has(formDocId)}
+      formDias={formDias}
+      setFormDias={setFormDias}
+      formMeses={formMeses}
+      setFormMeses={setFormMeses}
+      cidAuto={analysisResults?.cidCodes?.[0]}
+      loading={!!loadingDoc}
+      onConfirm={handleFormConfirm}
+      onClose={() => { setFormDocId(null); setFormDias("1"); setFormMeses("6"); }}
+    />
+    </>
   );
 }

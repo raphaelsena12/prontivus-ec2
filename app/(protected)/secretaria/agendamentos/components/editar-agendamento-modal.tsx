@@ -17,9 +17,19 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, Search, X, FileCheck } from "lucide-react";
+import { Loader2, AlertTriangle, Search, X, FileCheck, Ban } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { maskCPF, removeMask } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +37,8 @@ const agendamentoSchema = z.object({
   pacienteId: z.string().uuid("Paciente é obrigatório"),
   medicoId: z.string().uuid("Médico é obrigatório"),
   data: z.string().min(1, "Data é obrigatória"),
-  hora: z.string().min(1, "Hora é obrigatória"),
+  hora: z.string().min(1, "Hora início é obrigatória"),
+  horaFim: z.string().min(1, "Hora fim é obrigatória"),
   codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
@@ -346,6 +357,8 @@ export function EditarAgendamentoModal({
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<File[]>([]);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [loadingCancel, setLoadingCancel] = useState(false);
 
   const form = useForm<AgendamentoFormData>({
     resolver: zodResolver(agendamentoSchema),
@@ -354,6 +367,7 @@ export function EditarAgendamentoModal({
       medicoId: "",
       data: "",
       hora: "",
+      horaFim: "",
       codigoTussId: "",
       tipoConsultaId: "",
       procedimentoId: null,
@@ -458,6 +472,12 @@ export function EditarAgendamentoModal({
           const dataFormatada = `${year}-${month}-${day}`;
           const horaFormatada = `${hours}:${minutes}`;
 
+          let horaFimFormatada = "";
+          if (consulta.dataHoraFim) {
+            const dataHoraFim = new Date(consulta.dataHoraFim);
+            horaFimFormatada = `${String(dataHoraFim.getHours()).padStart(2, "0")}:${String(dataHoraFim.getMinutes()).padStart(2, "0")}`;
+          }
+
           // Usar dados do paciente que vêm na resposta da API
           if (consulta.paciente) {
             const paciente: Paciente = {
@@ -478,6 +498,7 @@ export function EditarAgendamentoModal({
             medicoId: consulta.medicoId,
             data: dataFormatada,
             hora: horaFormatada,
+            horaFim: horaFimFormatada,
             codigoTussId: consulta.codigoTussId,
             tipoConsultaId: consulta.tipoConsultaId || "",
             procedimentoId: consulta.procedimentoId || null,
@@ -658,6 +679,7 @@ export function EditarAgendamentoModal({
       setLoading(true);
 
       const dataHora = new Date(`${data.data}T${data.hora}:00`).toISOString();
+      const dataHoraFim = new Date(`${data.data}T${data.horaFim}:00`).toISOString();
 
       const response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
         method: "PATCH",
@@ -667,6 +689,7 @@ export function EditarAgendamentoModal({
         body: JSON.stringify({
           ...data,
           dataHora,
+          dataHoraFim,
           procedimentoId: data.procedimentoId || null,
           operadoraId: data.operadoraId || null,
           planoSaudeId: data.planoSaudeId || null,
@@ -690,6 +713,30 @@ export function EditarAgendamentoModal({
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelarAgendamento = async () => {
+    if (!agendamentoId) return;
+    try {
+      setLoadingCancel(true);
+      const response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao cancelar agendamento");
+      }
+
+      toast.success("Agendamento cancelado com sucesso");
+      setCancelDialogOpen(false);
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao cancelar agendamento");
+    } finally {
+      setLoadingCancel(false);
     }
   };
 
@@ -879,11 +926,30 @@ export function EditarAgendamentoModal({
                       name="hora"
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
-                          <FormLabel className="text-xs font-medium">Hora *</FormLabel>
+                          <FormLabel className="text-xs font-medium">Hora Início *</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
-                              {...field} 
+                            <Input
+                              type="time"
+                              {...field}
+                              value={field.value || ""}
+                              className="h-8 text-xs"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="horaFim"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[120px]">
+                          <FormLabel className="text-xs font-medium">Hora Fim *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
                               value={field.value || ""}
                               className="h-8 text-xs"
                             />
@@ -1089,10 +1155,20 @@ export function EditarAgendamentoModal({
           <Button
             type="button"
             variant="outline"
+            onClick={() => setCancelDialogOpen(true)}
+            disabled={loading || loadingCancel}
+            className="text-xs h-8 mr-auto border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive/60 hover:text-destructive"
+          >
+            <Ban className="mr-1.5 h-3.5 w-3.5" />
+            Cancelar Agendamento
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => onOpenChange(false)}
             className="text-xs h-8"
           >
-            Cancelar
+            Fechar
           </Button>
           <Button
             type="submit"
@@ -1105,6 +1181,30 @@ export function EditarAgendamentoModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-base font-semibold">Cancelar agendamento</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-muted-foreground/80">
+              Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="text-xs h-8" disabled={loadingCancel}>
+              Voltar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancelarAgendamento}
+              disabled={loadingCancel}
+              className="text-xs h-8 bg-destructive hover:bg-destructive/90"
+            >
+              {loadingCancel && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+              Confirmar cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
