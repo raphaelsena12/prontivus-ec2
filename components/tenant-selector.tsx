@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { TenantInfo } from "@/types/next-auth";
-import { Building2, ChevronDown, Check, Loader2 } from "lucide-react";
+import { ChevronDown, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 
@@ -108,18 +108,6 @@ export function TenantSelector({ className }: TenantSelectorProps) {
   const clinicaNome =
     currentTenant?.nome || session.user.clinicaNome || "Clínica";
 
-  // Apenas 1 clínica — exibir sem dropdown
-  if (tenants.length <= 1) {
-    return (
-      <div className={cn("flex items-center gap-2 text-sm", className)}>
-        <Building2 className="h-4 w-4 text-muted-foreground" />
-        <span className="font-medium text-sm truncate max-w-[160px]">
-          {clinicaNome}
-        </span>
-      </div>
-    );
-  }
-
   const handleTenantChange = async (tenantId: string) => {
     if (tenantId === session.user.clinicaId || isLoading) return;
     setOpen(false);
@@ -146,16 +134,20 @@ export function TenantSelector({ className }: TenantSelectorProps) {
     }
   };
 
+  const hasMultipleTenants = tenants.length > 1;
+
   return (
     <div ref={ref} className={cn("relative", className)}>
       {/* Trigger */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => hasMultipleTenants && setOpen((v) => !v)}
         disabled={isLoading}
         className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all w-72",
-          "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20",
-          "focus:outline-none focus:ring-2 focus:ring-primary/30",
+          "bg-primary/10 text-primary border border-primary/20",
+          hasMultipleTenants
+            ? "hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+            : "cursor-default",
           isLoading && "opacity-60 cursor-wait"
         )}
       >
@@ -171,12 +163,14 @@ export function TenantSelector({ className }: TenantSelectorProps) {
         <span className="truncate flex-1 text-left hidden sm:block">
           {clinicaNome}
         </span>
-        <ChevronDown
-          className={cn(
-            "h-3.5 w-3.5 opacity-60 transition-transform duration-200 flex-shrink-0",
-            open && "rotate-180"
-          )}
-        />
+        {hasMultipleTenants && (
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 opacity-60 transition-transform duration-200 flex-shrink-0",
+              open && "rotate-180"
+            )}
+          />
+        )}
       </button>
 
       {/* Dropdown */}

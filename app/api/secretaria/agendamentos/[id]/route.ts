@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { uploadPDFToS3, areAwsCredentialsConfigured } from "@/lib/s3-service";
 import {
   sendEmail,
   gerarEmailCancelamentoAgendamento,
@@ -111,6 +112,11 @@ export async function GET(
               email: true,
             },
           },
+          documentos: {
+            where: { tipoDocumento: { in: ["exame-imagem", "exame-pdf", "exame-documento"] } },
+            select: { id: true, nomeDocumento: true, tipoDocumento: true, dados: true, createdAt: true },
+            orderBy: { createdAt: "asc" },
+          },
         },
       });
     } catch (includeError: any) {
@@ -138,6 +144,11 @@ export async function GET(
                 nome: true,
                 email: true,
               },
+            },
+            documentos: {
+              where: { tipoDocumento: { in: ["exame-imagem", "exame-pdf", "exame-documento"] } },
+              select: { id: true, nomeDocumento: true, tipoDocumento: true, dados: true, createdAt: true },
+              orderBy: { createdAt: "asc" },
             },
           },
         });
@@ -187,7 +198,34 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const body = await request.json();
+
+    const contentType = request.headers.get("content-type") || "";
+    let body: any;
+    let anexosFiles: File[] = [];
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = (await request.formData()) as any;
+      const fd = (key: string) => formData.get(key) as string | null;
+      body = {
+        pacienteId: fd("pacienteId") ?? undefined,
+        medicoId: fd("medicoId") ?? undefined,
+        dataHora: fd("dataHora") ?? undefined,
+        dataHoraFim: fd("dataHoraFim") ?? undefined,
+        codigoTussId: fd("codigoTussId") ?? undefined,
+        tipoConsultaId: fd("tipoConsultaId") ?? undefined,
+        procedimentoId: fd("procedimentoId") ?? null,
+        operadoraId: fd("operadoraId") ?? null,
+        planoSaudeId: fd("planoSaudeId") ?? null,
+        numeroCarteirinha: fd("numeroCarteirinha") ?? undefined,
+        valorCobrado: fd("valorCobrado") ? parseFloat(fd("valorCobrado")!) : null,
+        observacoes: fd("observacoes") ?? undefined,
+      };
+      const anexosFormData = formData.getAll("anexos");
+      anexosFiles = anexosFormData.filter((item: any): item is File => item instanceof File);
+    } else {
+      body = await request.json();
+    }
+
     const validation = atualizarAgendamentoSchema.safeParse(body);
 
     if (!validation.success) {
@@ -481,6 +519,87 @@ export async function PATCH(
           await sendWhatsAppForClinica(auth.clinicaId!, { to: celular, message: mensagem });
         } catch (waError) {
           console.error("Erro ao enviar WhatsApp de alteração:", waError);
+        }
+      }
+    }
+
+    // Processar anexos se houver
+    if (anexosFiles.length > 0) {
+      if (!areAwsCredentialsConfigured()) {
+        console.warn("[Editar Agendamento] Credenciais AWS não configuradas. Anexos não serão enviados para S3.");
+      } else {
+        try {
+          const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+          const allowedDocTypes = ["application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+
+          const uploadPromises = anexosFiles.map(async (arquivo) => {
+            const arrayBuffer = await arquivo.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            let fileType = arquivo.type;
+            if (!fileType || fileType === "application/octet-stream") {
+              const extension = arquivo.name.toLowerCase().split('.').pop();
+              if (['jpg', 'jpeg', 'png', 'webp'].includes(extension || '')) {
+                fileType = `image/${extension === 'jpg' ? 'jpeg' : extension}`;
+              } else if (extension === 'pdf') {
+                fileType = "application/pdf";
+              } else if (extension === 'doc') {
+                fileType = "application/msword";
+              } else if (extension === 'docx') {
+                fileType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+              }
+            }
+
+            const isImage = allowedImageTypes.includes(fileType);
+            const isDoc = allowedDocTypes.includes(fileType);
+            let tipoDocumento: string;
+            if (isImage) {
+              tipoDocumento = "exame-imagem";
+            } else if (isDoc) {
+              tipoDocumento = "exame-documento";
+            } else {
+              tipoDocumento = "exame-pdf";
+            }
+
+            const s3Key = await uploadPDFToS3(
+              buffer,
+              arquivo.name,
+              {
+                clinicaId: auth.clinicaId!,
+                medicoId: agendamentoAtualizado.medicoId,
+                consultaId: id,
+                pacienteId: agendamentoAtualizado.pacienteId,
+                tipoDocumento,
+                categoria: "Exames",
+              },
+              fileType
+            );
+
+            await prisma.documentoGerado.create({
+              data: {
+                clinicaId: auth.clinicaId!,
+                consultaId: id,
+                medicoId: agendamentoAtualizado.medicoId,
+                tipoDocumento,
+                nomeDocumento: arquivo.name,
+                s3Key,
+                dados: {
+                  originalFileName: arquivo.name,
+                  fileSize: arquivo.size,
+                  mimeType: fileType,
+                  uploadedAt: new Date().toISOString(),
+                  uploadedBy: "SECRETARIA",
+                },
+              },
+            });
+
+            console.log(`[Editar Agendamento] Anexo enviado para S3: ${arquivo.name} -> ${s3Key}`);
+          });
+
+          await Promise.all(uploadPromises);
+          console.log(`[Editar Agendamento] ${anexosFiles.length} anexo(s) processado(s) com sucesso`);
+        } catch (anexoError) {
+          console.error("[Editar Agendamento] Erro ao processar anexos:", anexoError);
         }
       }
     }

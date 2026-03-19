@@ -544,6 +544,7 @@ export interface MedicalSuggestions {
   protocolos: MedicalAnalysis["protocolos"];
   exames: MedicalAnalysis["exames"];
   prescricoes: MedicalAnalysis["prescricoes"];
+  raciocinioClinico: string;
 }
 
 /**
@@ -565,15 +566,28 @@ export async function generateMedicalSuggestions(context: SuggestionsContext): P
     contextText += `\n\nMEDICAMENTOS EM USO:\n${context.medicamentosEmUso.join(", ")}`;
   }
 
-  // Buscar dados dos exames se fornecidos
+  // Buscar dados dos exames se fornecidos (incluindo imagens para Vision API)
+  const imageUrls: string[] = [];
+  const imageNames: string[] = [];
   if (context.examesIds && context.examesIds.length > 0) {
     try {
       const exames = await prisma.documentoGerado.findMany({
         where: { id: { in: context.examesIds } },
-        select: { id: true, nomeDocumento: true, tipoDocumento: true },
+        select: { id: true, nomeDocumento: true, tipoDocumento: true, s3Key: true },
       });
       if (exames.length > 0) {
         contextText += `\n\nEXAMES ANEXADOS:\n${exames.map((e) => `- ${e.nomeDocumento}`).join("\n")}`;
+        for (const exame of exames) {
+          if (exame.s3Key && exame.tipoDocumento === "exame-imagem") {
+            try {
+              const signedUrl = await getSignedUrlFromS3(exame.s3Key, 3600);
+              imageUrls.push(signedUrl);
+              imageNames.push(exame.nomeDocumento);
+            } catch (err) {
+              console.error(`Erro ao obter URL do exame ${exame.id}:`, err);
+            }
+          }
+        }
       }
     } catch (error) {
       console.error("Erro ao buscar exames para sugestões:", error);
@@ -605,20 +619,45 @@ ETAPA 4 — Prescrições (baseadas nos protocolos):
 - Use nomes genéricos ou comerciais comuns no Brasil; dosagem em formato padrão (ex: "50mg", "500mg"); posologia clara (ex: "1 comprimido 1x ao dia", "1 cp 8/8h"); duração precisa (ex: "7 dias", "30 dias", "uso contínuo").
 - OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 prescrições.
 
+ETAPA 5 — Raciocínio Clínico dos Exames (campo "raciocinioClinico"):
+- Este campo deve tratar EXCLUSIVAMENTE dos exames anexados analisados. NÃO contextualizar com anamnese ou sintomas.
+- Se houver imagens de exames, descreva detalhadamente o que foi observado: valores encontrados, padrões de imagem, alterações ou normalidades identificadas, e o que cada achado significa clinicamente.
+- Mesmo que os resultados estejam dentro da normalidade, explique por que estão normais e o que isso indica positivamente para o paciente.
+- Se algum valor estiver alterado, explique o que significa, qual a gravidade e como isso impacta o quadro clínico.
+- Se não houver exames anexados, retorne uma string vazia "".
+- Escreva em português brasileiro, tom clínico e acessível, sem marcadores ou listas — apenas texto corrido. Máximo 6 frases.
+
 Retorne APENAS um JSON válido no seguinte formato:
 {
+  "raciocinioClinico": "O hemograma analisado apresenta hemoglobina de 14,2 g/dL, dentro da faixa de referência (12–16 g/dL para mulheres), indicando ausência de anemia. Os leucócitos totalizam 7.800/mm³, sem desvio à esquerda, afastando processo infeccioso bacteriano ativo...",
   "cidCodes": [{"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}],
   "protocolos": [{"nome": "Diretriz SBC 2024 — Hipertensão Arterial Sistêmica", "descricao": "Meta <130/80 mmHg; iniciar com IECA/BRA associado a diurético tiazídico ou BCC", "justificativa": "CID I10 — diretriz de primeira linha SBC 2024"}],
   "exames": [{"nome": "Creatinina sérica e TFG estimada", "tipo": "Laboratorial", "justificativa": "Avaliação de lesão de órgão-alvo renal — Diretriz SBC 2024 para HAS"}],
   "prescricoes": [{"medicamento": "Losartana potássica", "dosagem": "50mg", "posologia": "1 comprimido 1x ao dia", "duracao": "uso contínuo", "justificativa": "BRA de primeira linha para HAS — Diretriz SBC 2024"}]
 }`;
 
+  // Montar mensagem com ou sem imagens
+  const userMessages: any[] = [
+    { role: "system", content: systemPrompt },
+  ];
+
+  if (imageUrls.length > 0) {
+    const userContent: any[] = [{ type: "text", text: contextText }];
+    for (let i = 0; i < imageUrls.length; i++) {
+      userContent.push({ type: "image_url", image_url: { url: imageUrls[i] } });
+    }
+    userMessages.push({ role: "user", content: userContent });
+  } else {
+    userMessages.push({ role: "user", content: contextText });
+  }
+
+  const model = imageUrls.length > 0
+    ? (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini")
+    : (process.env.OPENAI_MODEL || "gpt-4o-mini");
+
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: contextText },
-    ],
+    model,
+    messages: userMessages,
     response_format: { type: "json_object" },
     temperature: 0.3,
     max_tokens: 2500,
@@ -635,6 +674,7 @@ Retorne APENAS um JSON válido no seguinte formato:
   }
 
   return {
+    raciocinioClinico: typeof data.raciocinioClinico === "string" ? data.raciocinioClinico : "",
     cidCodes: (data.cidCodes || [])
       .map((cid: any) => ({
         code: cid.code || "",

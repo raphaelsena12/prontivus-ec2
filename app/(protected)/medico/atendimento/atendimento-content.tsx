@@ -157,6 +157,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [processingContext, setProcessingContext] = useState<'anamnese' | 'suggestions'>('anamnese');
   const [analysisResults, setAnalysisResults] = useState<{
     anamnese: string;
+    raciocinioClinico?: string;
     cidCodes: Array<{ code: string; description: string; score: number }>;
     protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
     exames: Array<{ nome: string; tipo: string; justificativa: string }>;
@@ -834,6 +835,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       const data = await response.json();
       setAnalysisResults((prev) => ({
         anamnese: prev?.anamnese || anamneseText,
+        raciocinioClinico: data.raciocinioClinico || '',
         cidCodes: data.cidCodes || [],
         protocolos: data.protocolos || [],
         exames: data.exames || [],

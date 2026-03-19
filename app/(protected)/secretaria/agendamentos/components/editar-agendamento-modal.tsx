@@ -46,6 +46,7 @@ const agendamentoSchema = z.object({
   planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().min(0).optional().nullable(),
+  observacoes: z.string().optional(),
   anexos: z.array(z.instanceof(File)).optional(),
 });
 
@@ -99,6 +100,14 @@ interface Procedimento {
   valor: number;
 }
 
+interface DocumentoExistente {
+  id: string;
+  nomeDocumento: string;
+  tipoDocumento: string;
+  dados: any;
+  createdAt: string;
+}
+
 interface Agendamento {
   id: string;
   pacienteId: string;
@@ -116,6 +125,7 @@ interface Agendamento {
   planoSaudeId: string | null;
   numeroCarteirinha: string | null;
   valorCobrado: number | string | null;
+  documentos?: DocumentoExistente[];
 }
 
 interface EditarAgendamentoModalProps {
@@ -357,6 +367,7 @@ export function EditarAgendamentoModal({
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<File[]>([]);
+  const [documentosExistentes, setDocumentosExistentes] = useState<DocumentoExistente[]>([]);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [loadingCancel, setLoadingCancel] = useState(false);
 
@@ -441,6 +452,7 @@ export function EditarAgendamentoModal({
       setPacienteSelecionado(null);
       setPacienteSearchValue("");
       setAnexos([]);
+      setDocumentosExistentes([]);
       setAgendamento(null);
     }
   }, [open, form]);
@@ -508,6 +520,8 @@ export function EditarAgendamentoModal({
             valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
             anexos: [],
           });
+
+          setDocumentosExistentes(consulta.documentos || []);
 
           // Carregar planos de saúde se houver operadora
           if (consulta.operadoraId) {
@@ -672,6 +686,17 @@ export function EditarAgendamentoModal({
     form.setValue("anexos", newAnexos);
   };
 
+  const handleRemoveDocumentoExistente = async (documentoId: string) => {
+    try {
+      const response = await fetch(`/api/secretaria/documentos/${documentoId}`, { method: "DELETE" });
+      if (!response.ok) throw new Error();
+      setDocumentosExistentes((prev) => prev.filter((d) => d.id !== documentoId));
+      toast.success("Documento removido");
+    } catch {
+      toast.error("Erro ao remover documento");
+    }
+  };
+
   const onSubmit = async (data: AgendamentoFormData) => {
     if (!agendamentoId) return;
 
@@ -681,22 +706,45 @@ export function EditarAgendamentoModal({
       const dataHora = new Date(`${data.data}T${data.hora}:00`).toISOString();
       const dataHoraFim = new Date(`${data.data}T${data.horaFim}:00`).toISOString();
 
-      const response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...data,
-          dataHora,
-          dataHoraFim,
-          procedimentoId: data.procedimentoId || null,
-          operadoraId: data.operadoraId || null,
-          planoSaudeId: data.planoSaudeId || null,
-          valorCobrado: data.valorCobrado || null,
-          anexos: undefined, // Por enquanto não enviar anexos
-        }),
-      });
+      let response: Response;
+
+      if (anexos.length > 0) {
+        const formData = new FormData();
+        formData.append("pacienteId", data.pacienteId);
+        formData.append("medicoId", data.medicoId);
+        formData.append("dataHora", dataHora);
+        formData.append("dataHoraFim", dataHoraFim);
+        formData.append("codigoTussId", data.codigoTussId);
+        if (data.tipoConsultaId) formData.append("tipoConsultaId", data.tipoConsultaId);
+        if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
+        if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
+        if (data.planoSaudeId) formData.append("planoSaudeId", data.planoSaudeId);
+        if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
+        if (data.valorCobrado != null) formData.append("valorCobrado", String(data.valorCobrado));
+        if (data.observacoes) formData.append("observacoes", data.observacoes);
+        anexos.forEach((file) => formData.append("anexos", file));
+
+        response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
+          method: "PATCH",
+          body: formData,
+        });
+      } else {
+        response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ...data,
+            dataHora,
+            dataHoraFim,
+            procedimentoId: data.procedimentoId || null,
+            operadoraId: data.operadoraId || null,
+            planoSaudeId: data.planoSaudeId || null,
+            valorCobrado: data.valorCobrado || null,
+          }),
+        });
+      }
 
       if (!response.ok) {
         const error = await response.json();
@@ -1110,15 +1158,68 @@ export function EditarAgendamentoModal({
                       className="hidden"
                       accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                     />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full flex flex-col items-center justify-center py-3 text-center border border-dashed border-slate-200 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      <FileCheck className="w-8 h-8 text-slate-300 mb-1.5" />
-                      <p className="text-xs text-slate-500 font-medium">Nenhum documento anexado</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Clique aqui para adicionar documentos</p>
-                    </button>
+                    {documentosExistentes.length === 0 && anexos.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full flex flex-col items-center justify-center py-3 text-center border border-dashed border-slate-200 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
+                        <FileCheck className="w-8 h-8 text-slate-300 mb-1.5" />
+                        <p className="text-xs text-slate-500 font-medium">Nenhum documento anexado</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Clique aqui para adicionar documentos</p>
+                      </button>
+                    ) : (
+                      <div className="border border-dashed border-slate-200 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-slate-600 font-medium">
+                            {documentosExistentes.length + anexos.length} documento(s) anexado(s)
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-[10px] text-blue-500 hover:text-blue-700"
+                          >
+                            + Adicionar mais
+                          </button>
+                        </div>
+                        <div className="space-y-1">
+                          {documentosExistentes.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <FileCheck className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                                <span className="text-xs text-slate-600 truncate">{doc.nomeDocumento}</span>
+                                <span className="text-[10px] text-slate-400 flex-shrink-0">
+                                  {doc.dados?.fileSize ? `(${(doc.dados.fileSize / 1024).toFixed(0)} KB)` : ""}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveDocumentoExistente(doc.id)}
+                                className="p-0.5 hover:bg-slate-200 rounded flex-shrink-0 ml-1"
+                              >
+                                <X className="w-3 h-3 text-slate-400" />
+                              </button>
+                            </div>
+                          ))}
+                          {anexos.map((file, index) => (
+                            <div key={`new-${index}`} className="flex items-center justify-between bg-blue-50 rounded px-2 py-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <FileCheck className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                                <span className="text-xs text-slate-600 truncate">{file.name}</span>
+                                <span className="text-[10px] text-slate-400 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFile(index)}
+                                className="p-0.5 hover:bg-slate-200 rounded flex-shrink-0 ml-1"
+                              >
+                                <X className="w-3 h-3 text-slate-400" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Row 6: Valor */}

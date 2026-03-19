@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"FormData\\\\|file.*upload\\\\|upload.*file\" /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2/app/api --include=\"*.ts\" ! -path \"*/.next/*\")"
+    ]
+  }
+}
