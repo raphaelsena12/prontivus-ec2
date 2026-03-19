@@ -17,10 +17,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle, Search, X, FileCheck } from "lucide-react";
+import { Loader2, AlertTriangle, Search, X, FileCheck, UserPlus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { maskCPF, removeMask } from "@/lib/masks";
+import { maskCPF, maskCelular, removeMask } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 
 const agendamentoSchema = z.object({
@@ -101,6 +101,194 @@ interface NovoAgendamentoModalProps {
     medicoId?: string;
     pacienteId?: string;
   };
+}
+
+// Componente de criação rápida de paciente
+function NovoPacienteQuickDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (paciente: Paciente) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [sexo, setSexo] = useState("");
+  const [celular, setCelular] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleClose = () => {
+    setNome("");
+    setCpf("");
+    setDataNascimento("");
+    setSexo("");
+    setCelular("");
+    setErrors({});
+    onOpenChange(false);
+  };
+
+  const validate = () => {
+    const newErrors: Record<string, string> = {};
+    if (!nome.trim() || nome.trim().length < 3) newErrors.nome = "Nome deve ter pelo menos 3 caracteres";
+    const cpfLimpo = removeMask(cpf);
+    if (!cpfLimpo || cpfLimpo.length !== 11) newErrors.cpf = "CPF deve ter 11 dígitos";
+    if (!dataNascimento) newErrors.dataNascimento = "Data de nascimento é obrigatória";
+    if (!sexo) newErrors.sexo = "Sexo é obrigatório";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    try {
+      setLoading(true);
+      const response = await fetch("/api/admin-clinica/pacientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: nome.trim(),
+          cpf: removeMask(cpf),
+          dataNascimento,
+          sexo,
+          celular: celular ? removeMask(celular) : null,
+        }),
+      });
+
+      if (response.ok) {
+        const paciente = await response.json();
+        toast.success(`Paciente ${paciente.nome} cadastrado com sucesso`);
+        onSuccess({
+          id: paciente.id,
+          nome: paciente.nome,
+          cpf: paciente.cpf,
+          email: paciente.email,
+          celular: paciente.celular,
+          dataNascimento: paciente.dataNascimento,
+        });
+        handleClose();
+      } else {
+        const data = await response.json();
+        if (response.status === 409) {
+          setErrors({ cpf: data.error || "CPF já cadastrado" });
+        } else if (data.details) {
+          const fieldErrors: Record<string, string> = {};
+          data.details.forEach((d: { field: string; message: string }) => {
+            fieldErrors[d.field] = d.message;
+          });
+          setErrors(fieldErrors);
+        } else {
+          toast.error(data.error || "Erro ao cadastrar paciente");
+        }
+      }
+    } catch {
+      toast.error("Erro ao cadastrar paciente");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-sm flex items-center gap-2">
+            <UserPlus className="h-4 w-4 text-primary" />
+            Cadastro Rápido de Paciente
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Preencha os dados essenciais. Você pode completar o cadastro depois em Pacientes.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3 py-1">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Nome completo *</label>
+            <Input
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              placeholder="Nome do paciente"
+              className="h-8 text-xs"
+              maxLength={100}
+            />
+            {errors.nome && <p className="text-xs text-destructive">{errors.nome}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">CPF *</label>
+              <Input
+                value={cpf}
+                onChange={(e) => {
+                  const v = removeMask(e.target.value);
+                  if (/^\d*$/.test(v)) setCpf(maskCPF(v));
+                }}
+                placeholder="000.000.000-00"
+                className="h-8 text-xs"
+                maxLength={14}
+              />
+              {errors.cpf && <p className="text-xs text-destructive">{errors.cpf}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Celular</label>
+              <Input
+                value={celular}
+                onChange={(e) => {
+                  const v = removeMask(e.target.value);
+                  if (/^\d*$/.test(v)) setCelular(maskCelular(v));
+                }}
+                placeholder="(00) 00000-0000"
+                className="h-8 text-xs"
+                maxLength={16}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Data de nascimento *</label>
+              <Input
+                type="date"
+                value={dataNascimento}
+                onChange={(e) => setDataNascimento(e.target.value)}
+                className="h-8 text-xs"
+              />
+              {errors.dataNascimento && <p className="text-xs text-destructive">{errors.dataNascimento}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium">Sexo *</label>
+              <Select value={sexo} onValueChange={setSexo}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="M" className="text-xs">Masculino</SelectItem>
+                  <SelectItem value="F" className="text-xs">Feminino</SelectItem>
+                  <SelectItem value="OUTRO" className="text-xs">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.sexo && <p className="text-xs text-destructive">{errors.sexo}</p>}
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleClose} className="text-xs h-8">
+              Cancelar
+            </Button>
+            <Button type="submit" size="sm" disabled={loading} className="text-xs h-8">
+              {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Cadastrar Paciente
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // Componente de busca de paciente
@@ -345,6 +533,7 @@ export function NovoAgendamentoModal({
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<File[]>([]);
+  const [novoPacienteOpen, setNovoPacienteOpen] = useState(false);
 
   const form = useForm<AgendamentoFormData>({
     resolver: zodResolver(agendamentoSchema),
@@ -596,6 +785,11 @@ export function NovoAgendamentoModal({
     }
   };
 
+  const handleNovoPacienteCriado = (paciente: Paciente) => {
+    setPacienteSearchValue(paciente.nome);
+    handlePacienteSelect(paciente);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setAnexos((prev) => [...prev, ...files]);
@@ -676,6 +870,7 @@ export function NovoAgendamentoModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-6xl sm:!max-w-6xl max-h-[90vh] p-0 gap-0 flex flex-col">
         <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
@@ -816,7 +1011,17 @@ export function NovoAgendamentoModal({
                       name="pacienteId"
                       render={({ field }) => (
                         <FormItem className="min-w-[400px] flex-1">
-                          <FormLabel className="text-xs font-medium">Paciente (CPF ou Nome) *</FormLabel>
+                          <div className="flex items-center justify-between">
+                            <FormLabel className="text-xs font-medium">Paciente (CPF ou Nome) *</FormLabel>
+                            <button
+                              type="button"
+                              onClick={() => setNovoPacienteOpen(true)}
+                              className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+                            >
+                              <UserPlus className="h-3 w-3" />
+                              Novo paciente
+                            </button>
+                          </div>
                           <FormControl>
                             <PacienteSearchInput
                               value={pacienteSearchValue}
@@ -1140,5 +1345,12 @@ export function NovoAgendamentoModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <NovoPacienteQuickDialog
+      open={novoPacienteOpen}
+      onOpenChange={setNovoPacienteOpen}
+      onSuccess={handleNovoPacienteCriado}
+    />
+    </>
   );
 }

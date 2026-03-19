@@ -63,7 +63,18 @@ export async function GET(request: NextRequest) {
           in: ["AGENDADA", "CONFIRMADA"],
         },
       },
-      include: {
+      select: {
+        id: true,
+        dataHora: true,
+        status: true,
+        updatedAt: true,
+        pressaoSistolica: true,
+        pressaoDiastolica: true,
+        frequenciaCardiaca: true,
+        saturacaoO2: true,
+        temperatura: true,
+        peso: true,
+        altura: true,
         paciente: {
           select: {
             id: true,
@@ -74,7 +85,8 @@ export async function GET(request: NextRequest) {
           },
         },
         medico: {
-          include: {
+          select: {
+            id: true,
             usuario: {
               select: {
                 nome: true,

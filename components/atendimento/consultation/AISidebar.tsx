@@ -775,24 +775,25 @@ export function AISidebar({
           </div>
         </div>
 
-        {/* ── Raciocínio Clínico da IA ── */}
-        {hasAIData && analysisResults?.raciocinioClinico && (
-          <div className="border-t border-slate-100">
-            <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-              <Brain
-                className="flex-shrink-0"
-                style={{ width: "14px", height: "14px", color: "#93c5fd" }}
-              />
-              <span className="text-xs font-semibold text-white">Raciocínio Clínico</span>
-              <span className="ml-auto text-[9px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">✦ IA</span>
-            </div>
-            <div className="px-3 py-2.5">
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                {analysisResults.raciocinioClinico}
-              </p>
-            </div>
+        {/* ── Análise de Exames ── */}
+        <div className="border-t border-slate-100">
+          <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
+            <Brain
+              className="flex-shrink-0"
+              style={{ width: "14px", height: "14px", color: "#93c5fd" }}
+            />
+            <span className="text-xs font-semibold text-white">Análise de Exames</span>
+            <span className="ml-auto text-[9px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">✦ IA</span>
           </div>
-        )}
+          <div className="px-3 py-2.5">
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              {analysisResults?.raciocinioClinico
+                ? analysisResults.raciocinioClinico
+                : <span className="italic text-slate-400">Nenhuma análise disponível. Clique em &quot;Analisar com IA&quot; para gerar.</span>
+              }
+            </p>
+          </div>
+        </div>
 
         {/* ── CID Sugerido ── */}
         <div className="border-t border-slate-100">

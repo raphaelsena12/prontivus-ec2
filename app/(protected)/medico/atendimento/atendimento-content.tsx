@@ -108,6 +108,13 @@ interface Consulta {
   tipoConsulta: {
     nome: string;
   } | null;
+  pressaoSistolica?: number | null;
+  pressaoDiastolica?: number | null;
+  frequenciaCardiaca?: number | null;
+  saturacaoO2?: number | string | null;
+  temperatura?: number | string | null;
+  peso?: number | string | null;
+  altura?: number | string | null;
 }
 
 interface Prontuario {
@@ -274,24 +281,62 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     processTranscription,
   } = useTranscription();
 
-  // Dados mockados para funcionalidades que ainda não estão implementadas
-  // Função para calcular IMC
-  const calcularIMC = (peso: number, altura: number): number => {
-    if (altura <= 0) return 0;
-    return peso / (altura * altura);
-  };
-
-  const peso = 68.5; // kg
-  const altura = 1.70; // metros
-  const imc = calcularIMC(peso, altura);
+  // Calculate IMC if peso and altura are available
+  const peso = consulta?.peso ? Number(consulta.peso) : null;
+  const altura = consulta?.altura ? Number(consulta.altura) : null;
+  const imc = peso && altura && altura > 0 ? peso / (altura * altura) : null;
 
   const vitals = [
-    { icon: Heart, label: "Pressão", value: "120/80", unit: "mmHg", status: "normal", iconColor: "text-red-500" },
-    { icon: Activity, label: "Frequência", value: "72", unit: "bpm", status: "normal", iconColor: "text-blue-500" },
-    { icon: Droplet, label: "Saturação", value: "98", unit: "%", status: "normal", iconColor: "text-cyan-500" },
-    { icon: Weight, label: "Peso", value: "68.5", unit: "kg", status: "normal", iconColor: "text-orange-500" },
-    { icon: Ruler, label: "Altura", value: `${altura.toFixed(2)}`, unit: "m", status: "normal", iconColor: "text-green-500" },
-    { icon: TrendingUp, label: "IMC", value: imc.toFixed(1), unit: "kg/m²", status: "normal", iconColor: "text-purple-500" },
+    {
+      icon: Heart,
+      label: "Pressão",
+      value: consulta?.pressaoSistolica && consulta?.pressaoDiastolica
+        ? `${consulta.pressaoSistolica}/${consulta.pressaoDiastolica}`
+        : "-",
+      unit: "mmHg",
+      status: "normal",
+      iconColor: "text-red-500"
+    },
+    {
+      icon: Activity,
+      label: "Frequência",
+      value: consulta?.frequenciaCardiaca ? String(consulta.frequenciaCardiaca) : "-",
+      unit: "bpm",
+      status: "normal",
+      iconColor: "text-blue-500"
+    },
+    {
+      icon: Droplet,
+      label: "Saturação",
+      value: consulta?.saturacaoO2 ? String(Number(consulta.saturacaoO2)) : "-",
+      unit: "%",
+      status: "normal",
+      iconColor: "text-cyan-500"
+    },
+    {
+      icon: Weight,
+      label: "Peso",
+      value: peso ? peso.toFixed(1) : "-",
+      unit: "kg",
+      status: "normal",
+      iconColor: "text-orange-500"
+    },
+    {
+      icon: Ruler,
+      label: "Altura",
+      value: altura ? altura.toFixed(2) : "-",
+      unit: "m",
+      status: "normal",
+      iconColor: "text-green-500"
+    },
+    {
+      icon: TrendingUp,
+      label: "IMC",
+      value: imc ? imc.toFixed(1) : "-",
+      unit: "kg/m²",
+      status: "normal",
+      iconColor: "text-purple-500"
+    },
   ];
 
   const exams: any[] = [];

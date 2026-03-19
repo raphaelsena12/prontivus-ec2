@@ -43,6 +43,7 @@ interface Usuario {
   telefone: string | null;
   tipo: TipoUsuario;
   ativo: boolean;
+  isEnfermeiro: boolean;
 }
 
 interface UsuarioDialogProps {
@@ -118,6 +119,7 @@ export function UsuarioDialog({
   onSuccess,
 }: UsuarioDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [isEnfermeiro, setIsEnfermeiro] = useState(false);
   const isEditing = !!usuario;
 
   const form = useForm<UsuarioFormValues>({
@@ -133,6 +135,8 @@ export function UsuarioDialog({
     },
   });
 
+  const tipoAtual = form.watch("tipo");
+
   useEffect(() => {
     if (usuario) {
       form.reset({
@@ -143,6 +147,7 @@ export function UsuarioDialog({
         tipo: usuario.tipo,
         senha: "",
       });
+      setIsEnfermeiro(usuario.isEnfermeiro ?? false);
     } else {
       form.reset({
         nome: "",
@@ -152,6 +157,7 @@ export function UsuarioDialog({
         tipo: TipoUsuario.MEDICO,
         senha: "",
       });
+      setIsEnfermeiro(false);
     }
     // Atualizar o resolver quando mudar entre criar e editar
     form.clearErrors();
@@ -201,6 +207,7 @@ export function UsuarioDialog({
           email: data.email,
           telefone: telefoneLimpo,
           tipo: data.tipo,
+          isEnfermeiro: data.tipo === TipoUsuario.SECRETARIA ? isEnfermeiro : false,
         };
 
         if (data.senha && data.senha.trim() !== "") {
@@ -241,6 +248,7 @@ export function UsuarioDialog({
             telefone: telefoneLimpo,
             tipo: data.tipo,
             senha: data.senha,
+            isEnfermeiro: data.tipo === TipoUsuario.SECRETARIA ? isEnfermeiro : false,
           }),
         });
 
@@ -431,6 +439,25 @@ export function UsuarioDialog({
                 )}
               />
             </div>
+
+            {tipoAtual === TipoUsuario.SECRETARIA && (
+              <div className="flex items-center gap-3 rounded-lg border p-3 bg-muted/30">
+                <Checkbox
+                  id="isEnfermeiro"
+                  checked={isEnfermeiro}
+                  onCheckedChange={(checked) => setIsEnfermeiro(checked === true)}
+                  disabled={loading}
+                />
+                <div className="flex flex-col gap-0.5">
+                  <label htmlFor="isEnfermeiro" className="text-sm font-medium cursor-pointer">
+                    Enfermeiro(a)
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Permite registrar sinais vitais dos pacientes no check-in
+                  </p>
+                </div>
+              </div>
+            )}
 
             <FormField
               control={form.control}

@@ -21,6 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { toast } from "sonner";
@@ -36,6 +44,12 @@ import {
   Stethoscope,
   Volume2,
   LogIn,
+  Activity,
+  Heart,
+  Droplet,
+  Weight,
+  Ruler,
+  Thermometer,
 } from "lucide-react";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 
@@ -55,6 +69,13 @@ interface Consulta {
   dataHora: string;
   status: string;
   updatedAt: string;
+  pressaoSistolica: number | null;
+  pressaoDiastolica: number | null;
+  frequenciaCardiaca: number | null;
+  saturacaoO2: number | null;
+  temperatura: number | null;
+  peso: number | null;
+  altura: number | null;
   paciente: {
     id: string;
     nome: string;
@@ -97,6 +118,19 @@ export function CheckInContent() {
   );
   const [processing, setProcessing] = useState(false);
   const [speaking, setSpeaking] = useState<string | null>(null);
+  const [sinaisVitaisOpen, setSinaisVitaisOpen] = useState(false);
+  const [consultaForSinais, setConsultaForSinais] = useState<Consulta | null>(null);
+  const [savingSinais, setSavingSinais] = useState(false);
+  const [isEnfermeiro, setIsEnfermeiro] = useState(false);
+  const [sinaisVitais, setSinaisVitais] = useState({
+    pressaoSistolica: "",
+    pressaoDiastolica: "",
+    frequenciaCardiaca: "",
+    saturacaoO2: "",
+    temperatura: "",
+    peso: "",
+    altura: "",
+  });
 
   const getInitials = (nome: string) => {
     return nome
@@ -315,6 +349,21 @@ export function CheckInContent() {
     fetchConsultas();
   }, []);
 
+  useEffect(() => {
+    const fetchPerfil = async () => {
+      try {
+        const response = await fetch("/api/secretaria/perfil");
+        if (response.ok) {
+          const data = await response.json();
+          setIsEnfermeiro(data.usuario?.isEnfermeiro ?? false);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar perfil:", error);
+      }
+    };
+    fetchPerfil();
+  }, []);
+
   const handleCheckIn = async () => {
     if (!consultaToCheckIn) return;
 
@@ -350,6 +399,69 @@ export function CheckInContent() {
   const openCheckInDialog = (consulta: Consulta) => {
     setConsultaToCheckIn(consulta);
     setCheckInDialogOpen(true);
+  };
+
+  const openSinaisVitais = (consulta: Consulta) => {
+    setConsultaForSinais(consulta);
+    setSinaisVitais({
+      pressaoSistolica: consulta.pressaoSistolica != null ? String(consulta.pressaoSistolica) : "",
+      pressaoDiastolica: consulta.pressaoDiastolica != null ? String(consulta.pressaoDiastolica) : "",
+      frequenciaCardiaca: consulta.frequenciaCardiaca != null ? String(consulta.frequenciaCardiaca) : "",
+      saturacaoO2: consulta.saturacaoO2 != null ? String(consulta.saturacaoO2) : "",
+      temperatura: consulta.temperatura != null ? String(consulta.temperatura) : "",
+      peso: consulta.peso != null ? String(consulta.peso) : "",
+      altura: consulta.altura != null ? String(consulta.altura) : "",
+    });
+    setSinaisVitaisOpen(true);
+  };
+
+  const handleSaveSinaisVitais = async () => {
+    if (!consultaForSinais) return;
+    try {
+      setSavingSinais(true);
+      const response = await fetch("/api/secretaria/sinais-vitais", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consultaId: consultaForSinais.id,
+          pressaoSistolica: sinaisVitais.pressaoSistolica ? parseInt(sinaisVitais.pressaoSistolica) : null,
+          pressaoDiastolica: sinaisVitais.pressaoDiastolica ? parseInt(sinaisVitais.pressaoDiastolica) : null,
+          frequenciaCardiaca: sinaisVitais.frequenciaCardiaca ? parseInt(sinaisVitais.frequenciaCardiaca) : null,
+          saturacaoO2: sinaisVitais.saturacaoO2 ? parseFloat(sinaisVitais.saturacaoO2) : null,
+          temperatura: sinaisVitais.temperatura ? parseFloat(sinaisVitais.temperatura) : null,
+          peso: sinaisVitais.peso ? parseFloat(sinaisVitais.peso) : null,
+          altura: sinaisVitais.altura ? parseFloat(sinaisVitais.altura) : null,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Erro ao salvar sinais vitais");
+      }
+      toast.success("Sinais vitais salvos com sucesso!");
+      // Atualiza os dados localmente para refletir o novo estado sem refetch
+      setConsultas((prev) =>
+        prev.map((c) =>
+          c.id === consultaForSinais.id
+            ? {
+                ...c,
+                pressaoSistolica: sinaisVitais.pressaoSistolica ? parseInt(sinaisVitais.pressaoSistolica) : null,
+                pressaoDiastolica: sinaisVitais.pressaoDiastolica ? parseInt(sinaisVitais.pressaoDiastolica) : null,
+                frequenciaCardiaca: sinaisVitais.frequenciaCardiaca ? parseInt(sinaisVitais.frequenciaCardiaca) : null,
+                saturacaoO2: sinaisVitais.saturacaoO2 ? parseFloat(sinaisVitais.saturacaoO2) : null,
+                temperatura: sinaisVitais.temperatura ? parseFloat(sinaisVitais.temperatura) : null,
+                peso: sinaisVitais.peso ? parseFloat(sinaisVitais.peso) : null,
+                altura: sinaisVitais.altura ? parseFloat(sinaisVitais.altura) : null,
+              }
+            : c
+        )
+      );
+      setSinaisVitaisOpen(false);
+      setConsultaForSinais(null);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao salvar sinais vitais");
+    } finally {
+      setSavingSinais(false);
+    }
   };
 
   const filteredConsultas = consultas.filter((consulta) => {
@@ -582,15 +694,14 @@ export function CheckInContent() {
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         {consulta.status === "CONFIRMADA" ? (
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3 w-3 text-muted-foreground" />
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {formatTime(new Date(consulta.updatedAt))}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {formatDate(new Date(consulta.updatedAt))}
-                              </span>
+                          <div className="flex flex-col gap-1.5">
+                            <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight w-fit">
+                              <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
+                              Check-in realizado
+                            </Badge>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>{formatTime(new Date(consulta.updatedAt))}</span>
                             </div>
                           </div>
                         ) : (
@@ -602,29 +713,55 @@ export function CheckInContent() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-xs h-7"
+                            className="h-7 w-7 p-0"
                             onClick={() => chamarPaciente(consulta.paciente.nome)}
                             disabled={speaking === consulta.paciente.nome}
+                            title="Chamar paciente"
                           >
-                            <Volume2 className="h-3 w-3 mr-1.5" />
-                            {speaking === consulta.paciente.nome ? "Chamando..." : "Chamar"}
+                            <Volume2 className="h-3 w-3" />
                           </Button>
-                          {consulta.status === "AGENDADA" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs h-7"
-                              onClick={() => openCheckInDialog(consulta)}
-                            >
-                              <CheckCircle2 className="h-3 w-3 mr-1.5" />
-                              Check-in
-                            </Button>
-                          ) : consulta.status === "CONFIRMADA" ? (
-                            <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
-                              <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
-                              Check-in realizado
-                            </Badge>
-                          ) : null}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-7"
+                            onClick={() => openCheckInDialog(consulta)}
+                            disabled={consulta.status === "CONFIRMADA"}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1.5" />
+                            Check-in
+                          </Button>
+                          {(() => {
+                            const confirmada = consulta.status === "CONFIRMADA";
+                            const temSinais = confirmada && (
+                              consulta.pressaoSistolica != null ||
+                              consulta.frequenciaCardiaca != null ||
+                              consulta.peso != null ||
+                              consulta.saturacaoO2 != null ||
+                              consulta.temperatura != null ||
+                              consulta.altura != null
+                            );
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!confirmada}
+                                className={`text-xs h-7 ${temSinais ? "border-green-500 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950" : ""}`}
+                                onClick={() => confirmada && openSinaisVitais(consulta)}
+                              >
+                                {temSinais ? (
+                                  <>
+                                    <IconCircleCheckFilled className="h-3 w-3 mr-1.5 fill-green-500 dark:fill-green-400" />
+                                    Sinais Vitais
+                                  </>
+                                ) : (
+                                  <>
+                                    <Activity className="h-3 w-3 mr-1.5" />
+                                    Sinais Vitais
+                                  </>
+                                )}
+                              </Button>
+                            );
+                          })()}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -708,6 +845,127 @@ export function CheckInContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={sinaisVitaisOpen} onOpenChange={setSinaisVitaisOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-sidebar-accent via-sidebar-accent/90 to-sidebar-accent/80">
+                <Activity className="h-5 w-5 text-sidebar-accent-foreground" />
+              </div>
+              <DialogTitle className="text-xl">Sinais Vitais</DialogTitle>
+            </div>
+            {consultaForSinais && (
+              <p className="text-sm text-muted-foreground">
+                Paciente: <strong>{consultaForSinais.paciente.nome}</strong>
+              </p>
+            )}
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Pressão Sistólica (mmHg)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 120"
+                value={sinaisVitais.pressaoSistolica}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, pressaoSistolica: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Pressão Diastólica (mmHg)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 80"
+                value={sinaisVitais.pressaoDiastolica}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, pressaoDiastolica: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Freq. Cardíaca (bpm)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 72"
+                value={sinaisVitais.frequenciaCardiaca}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, frequenciaCardiaca: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Saturação O₂ (%)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 98"
+                step="0.1"
+                value={sinaisVitais.saturacaoO2}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, saturacaoO2: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Temperatura (°C)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 36.5"
+                step="0.1"
+                value={sinaisVitais.temperatura}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, temperatura: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Peso (kg)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 70.5"
+                step="0.1"
+                value={sinaisVitais.peso}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, peso: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs font-medium">Altura (m)</Label>
+              <Input
+                type="number"
+                placeholder="ex: 1.70"
+                step="0.01"
+                value={sinaisVitais.altura}
+                onChange={(e) => setSinaisVitais(prev => ({ ...prev, altura: e.target.value }))}
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setSinaisVitaisOpen(false)}
+              disabled={savingSinais}
+              className="shadow-sm"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveSinaisVitais}
+              disabled={savingSinais}
+              className="gap-2 bg-sidebar-accent hover:bg-sidebar-accent/90 text-sidebar-accent-foreground shadow-sm hover:shadow-md transition-all"
+            >
+              {savingSinais ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-sidebar-accent-foreground border-t-transparent" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Activity className="h-4 w-4" />
+                  Salvar Sinais Vitais
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

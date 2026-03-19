@@ -182,6 +182,16 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
       defaultOpen: false,
       items: [
         {
+          title: "Operadoras",
+          url: "/admin-clinica/operadoras",
+          icon: IconFileText,
+        },
+        {
+          title: "Planos de Saúde",
+          url: "/admin-clinica/planos-saude",
+          icon: IconFileText,
+        },
+        {
           title: "Códigos TUSS",
           url: "/admin-clinica/codigos-tuss",
           icon: IconFileText,

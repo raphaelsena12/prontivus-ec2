@@ -21,6 +21,7 @@ interface Usuario {
   telefone: string | null;
   tipo: TipoUsuario;
   ativo: boolean;
+  isEnfermeiro: boolean;
   primeiroAcesso: boolean;
   ultimoAcesso: Date | null;
   createdAt: Date;

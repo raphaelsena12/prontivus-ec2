@@ -155,6 +155,7 @@ model Usuario {
   updatedAt         DateTime    @updatedAt
   resetToken        String?
   resetTokenExpires DateTime?
+  isEnfermeiro      Boolean     @default(false)
 
   clinica                   Tenant?                    @relation(fields: [clinicaId], references: [id])
   medicos                   Medico[]
@@ -692,6 +693,13 @@ model Consulta {
   valorRepassado    Decimal?  @db.Decimal(10, 2)
   procedimentoId    String?
   modalidade        String    @default("PRESENCIAL") // PRESENCIAL, TELEMEDICINA
+  pressaoSistolica   Int?
+  pressaoDiastolica  Int?
+  frequenciaCardiaca Int?
+  saturacaoO2        Decimal?  @db.Decimal(5, 2)
+  temperatura        Decimal?  @db.Decimal(4, 1)
+  peso               Decimal?  @db.Decimal(5, 2)
+  altura             Decimal?  @db.Decimal(4, 2)
 
   clinica                 Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   paciente                Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)

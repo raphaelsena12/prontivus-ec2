@@ -30,6 +30,7 @@ const updateUsuarioSchema = z.object({
     .max(255, "Senha deve ter no máximo 255 caracteres")
     .optional(),
   ativo: z.boolean().optional(),
+  isEnfermeiro: z.boolean().optional(),
 });
 
 // Helper para validar UUID
@@ -90,6 +91,7 @@ export async function PUT(
       tipo?: TipoUsuario;
       senha?: string;
       ativo?: boolean;
+      isEnfermeiro?: boolean;
     } = {};
 
     // Verificar se email já existe (se mudou)
@@ -113,6 +115,9 @@ export async function PUT(
       updateData.telefone = data.telefone.replace(/\D/g, "");
     if (data.tipo) updateData.tipo = data.tipo;
     if (data.ativo !== undefined) updateData.ativo = data.ativo;
+    if (data.isEnfermeiro !== undefined) {
+      updateData.isEnfermeiro = (data.tipo ?? usuarioExistente.tipo) === "SECRETARIA" ? data.isEnfermeiro : false;
+    }
 
     // Hash da senha se fornecida
     if (data.senha) {
@@ -131,6 +136,7 @@ export async function PUT(
         telefone: true,
         tipo: true,
         ativo: true,
+        isEnfermeiro: true,
         primeiroAcesso: true,
         ultimoAcesso: true,
         createdAt: true,

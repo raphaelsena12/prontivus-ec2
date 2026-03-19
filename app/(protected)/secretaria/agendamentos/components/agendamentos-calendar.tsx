@@ -123,7 +123,7 @@ export function AgendamentosCalendar({
         ? new Date(agendamento.dataHoraFim)
         : (() => { const e = new Date(dataHora); e.setMinutes(e.getMinutes() + 30); return e; })();
 
-      const title = `${agendamento.paciente.nome}${agendamento.medico ? ` - Dr(a). ${agendamento.medico.usuario.nome}` : ""}`;
+      const title = `${agendamento.paciente.nome}${agendamento.tipoConsulta ? ` - ${agendamento.tipoConsulta.nome}` : ""}`;
 
       return {
         id: agendamento.id,

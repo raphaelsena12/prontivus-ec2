@@ -32,6 +32,7 @@ const createUsuarioSchema = z.object({
   senha: z.string()
     .min(6, "Senha deve ter no mínimo 6 caracteres")
     .max(255, "Senha deve ter no máximo 255 caracteres"),
+  isEnfermeiro: z.boolean().optional(),
 });
 
 // GET /api/admin-clinica/usuarios
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
         telefone: true,
         tipo: true,
         ativo: true,
+        isEnfermeiro: true,
         primeiroAcesso: true,
         ultimoAcesso: true,
         createdAt: true,
@@ -138,6 +140,7 @@ export async function POST(request: NextRequest) {
         clinicaId: auth.clinicaId!,
         ativo: true,
         primeiroAcesso: true,
+        isEnfermeiro: data.tipo === "SECRETARIA" ? (data.isEnfermeiro ?? false) : false,
       },
       select: {
         id: true,
@@ -147,6 +150,7 @@ export async function POST(request: NextRequest) {
         telefone: true,
         tipo: true,
         ativo: true,
+        isEnfermeiro: true,
         primeiroAcesso: true,
         ultimoAcesso: true,
         createdAt: true,

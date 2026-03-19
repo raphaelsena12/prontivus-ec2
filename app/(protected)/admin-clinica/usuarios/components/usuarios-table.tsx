@@ -54,6 +54,7 @@ interface Usuario {
   telefone: string | null;
   tipo: TipoUsuario;
   ativo: boolean;
+  isEnfermeiro: boolean;
   primeiroAcesso: boolean;
   ultimoAcesso: Date | null;
   createdAt: Date;
@@ -160,9 +161,16 @@ export function UsuariosTable({
         accessorKey: "tipo",
         header: "Tipo",
         cell: ({ row }) => (
-          <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
-            {getTipoLabel(row.original.tipo)}
-          </Badge>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
+              {getTipoLabel(row.original.tipo)}
+            </Badge>
+            {row.original.tipo === TipoUsuario.SECRETARIA && row.original.isEnfermeiro && (
+              <Badge variant="outline" className="bg-transparent border-purple-500 text-purple-700 dark:text-purple-400 text-[10px] py-0.5 px-1.5 leading-tight">
+                Enfermeiro(a)
+              </Badge>
+            )}
+          </div>
         ),
       },
       {
