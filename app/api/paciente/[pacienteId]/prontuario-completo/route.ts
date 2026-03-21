@@ -115,6 +115,43 @@ export async function GET(
           clinicaId: auth.clinicaId,
         },
         include: {
+          prontuarios: {
+            select: {
+              id: true,
+              anamnese: true,
+              exameFisico: true,
+              diagnostico: true,
+              conduta: true,
+              evolucao: true,
+              createdAt: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+          },
+          consultaCids: {
+            select: {
+              id: true,
+              code: true,
+              description: true,
+            },
+          },
+          consultaExames: {
+            select: {
+              id: true,
+              nome: true,
+              tipo: true,
+            },
+          },
+          consultaPrescricoes: {
+            select: {
+              id: true,
+              medicamento: true,
+              dosagem: true,
+              posologia: true,
+              duracao: true,
+            },
+          },
           medico: {
             include: {
               usuario: {

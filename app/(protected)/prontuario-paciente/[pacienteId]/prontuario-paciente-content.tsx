@@ -69,6 +69,23 @@ interface ProntuarioCompleto {
       evolucao: string | null;
       createdAt: string;
     }>;
+    consultaCids?: Array<{
+      id: string;
+      code: string;
+      description: string;
+    }>;
+    consultaExames?: Array<{
+      id: string;
+      nome: string;
+      tipo: string | null;
+    }>;
+    consultaPrescricoes?: Array<{
+      id: string;
+      medicamento: string;
+      dosagem: string | null;
+      posologia: string;
+      duracao: string | null;
+    }>;
   }>;
   prontuarios: any[];
   solicitacoesExames: Array<{
@@ -341,6 +358,9 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                         consulta={consulta}
                         exames={data.solicitacoesExames.filter(e => e.consulta.id === consulta.id)}
                         prescricoes={data.prescricoes.filter(p => p.consulta.id === consulta.id)}
+                        cidsLegacy={consulta.consultaCids ?? []}
+                        examesLegacy={consulta.consultaExames ?? []}
+                        prescricoesLegacy={consulta.consultaPrescricoes ?? []}
                         fichaDocumento={data.documentos.find(d => d.consulta.id === consulta.id && d.tipoDocumento === 'ficha-atendimento') ?? null}
                         examesAnexados={data.documentos.filter(d => d.consulta.id === consulta.id && (d.tipoDocumento === 'exame-imagem' || d.tipoDocumento === 'exame-pdf'))}
                         loadingFicha={loadingFicha}
@@ -365,6 +385,9 @@ function ConsultaRow({
   consulta,
   exames,
   prescricoes,
+  cidsLegacy,
+  examesLegacy,
+  prescricoesLegacy,
   fichaDocumento,
   examesAnexados,
   loadingFicha,
@@ -373,6 +396,9 @@ function ConsultaRow({
   consulta: ProntuarioCompleto['consultas'][0];
   exames: ProntuarioCompleto['solicitacoesExames'];
   prescricoes: ProntuarioCompleto['prescricoes'];
+  cidsLegacy: NonNullable<ProntuarioCompleto['consultas'][0]['consultaCids']>;
+  examesLegacy: NonNullable<ProntuarioCompleto['consultas'][0]['consultaExames']>;
+  prescricoesLegacy: NonNullable<ProntuarioCompleto['consultas'][0]['consultaPrescricoes']>;
   fichaDocumento: ProntuarioCompleto['documentos'][0] | null;
   examesAnexados: ProntuarioCompleto['documentos'];
   loadingFicha: string | null;
@@ -465,6 +491,19 @@ function ConsultaRow({
             </div>
           )}
 
+          {cidsLegacy.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">CID / CIAP</p>
+              <div className="flex flex-wrap gap-2">
+                {cidsLegacy.map((c) => (
+                  <span key={c.id} className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {c.code}{c.description ? ` · ${c.description}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Exames solicitados nesta consulta */}
           {exames.length > 0 && (
             <div>
@@ -490,6 +529,22 @@ function ConsultaRow({
             </div>
           )}
 
+          {examesLegacy.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Exames (Legado)</p>
+              <div className="space-y-2">
+                {examesLegacy.map((e) => (
+                  <div key={e.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700">{e.nome}</p>
+                      {e.tipo && <p className="text-[10px] text-slate-400 mt-0.5">{e.tipo}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Prescrições desta consulta */}
           {prescricoes.length > 0 && (
             <div>
@@ -503,6 +558,24 @@ function ConsultaRow({
                       <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Posologia:</span> {p.posologia}</p>
                       <p className="text-xs text-slate-600"><span className="font-medium">Quantidade:</span> {p.quantidade} unidade(s)</p>
                       {p.observacoes && <p className="text-xs text-slate-500 mt-1">{p.observacoes}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {prescricoesLegacy.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Prescrições (Legado)</p>
+              <div className="space-y-2">
+                {prescricoesLegacy.map((p) => (
+                  <div key={p.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-700">{p.medicamento}</p>
+                      {p.dosagem && <p className="text-[10px] text-slate-400 mt-0.5">{p.dosagem}</p>}
+                      <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Posologia:</span> {p.posologia}</p>
+                      {p.duracao && <p className="text-xs text-slate-500 mt-1"><span className="font-medium">Duração:</span> {p.duracao}</p>}
                     </div>
                   </div>
                 ))}
@@ -543,7 +616,8 @@ function ConsultaRow({
           </div>
 
           {/* Fallback */}
-          {!prontuario && exames.length === 0 && prescricoes.length === 0 && examesAnexados.length === 0 &&
+          {!prontuario && exames.length === 0 && prescricoes.length === 0 && examesLegacy.length === 0 &&
+            prescricoesLegacy.length === 0 && cidsLegacy.length === 0 && examesAnexados.length === 0 &&
             !consulta.codigoTuss && consulta.valorCobrado == null && !consulta.observacoes && (
             <p className="text-xs text-slate-400">Sem informações adicionais.</p>
           )}

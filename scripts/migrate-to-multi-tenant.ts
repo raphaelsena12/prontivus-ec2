@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "../lib/prisma";
-import { TipoUsuario } from "../lib/generated/prisma";
+import { TipoUsuario } from "../lib/generated/prisma/enums";
 
 // Prisma client já importado
 
