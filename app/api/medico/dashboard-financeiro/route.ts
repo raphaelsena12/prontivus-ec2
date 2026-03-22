@@ -2,6 +2,49 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 
+type MonthBucket = {
+  mes: string;
+  year: number;
+  month: number;
+  start: Date;
+  end: Date;
+};
+
+function getLastSixMonthBuckets(): MonthBucket[] {
+  const now = new Date();
+  const buckets: MonthBucket[] = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const year = now.getFullYear();
+    const month = now.getMonth() - i;
+    const start = new Date(year, month, 1, 0, 0, 0, 0);
+    const end = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
+    buckets.push({
+      mes: start
+        .toLocaleDateString("pt-BR", { month: "short" })
+        .replace(".", "")
+        .toLowerCase(),
+      year: start.getFullYear(),
+      month: start.getMonth(),
+      start,
+      end,
+    });
+  }
+
+  return buckets;
+}
+
+function findBucketByDate(date: Date, buckets: MonthBucket[]) {
+  return buckets.find(
+    (bucket) =>
+      date >= bucket.start &&
+      date <= bucket.end &&
+      date.getFullYear() === bucket.year &&
+      date.getMonth() === bucket.month
+  );
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
@@ -91,12 +134,91 @@ export async function GET(request: NextRequest) {
         valor: true,
         status: true,
         dataVencimento: true,
+        dataPagamento: true,
       },
     });
 
     const totalPagar = contasPagar
       .filter((c) => c.status === "PENDENTE" || c.status === "VENCIDO")
       .reduce((acc, c) => acc + Number(c.valor), 0);
+
+    const monthBuckets = getLastSixMonthBuckets();
+    const chartData = {
+      receitaPorMes: monthBuckets.map((bucket) => ({
+        mes: bucket.mes,
+        receita: 0,
+      })),
+      entradasVsSaidas: monthBuckets.map((bucket) => ({
+        mes: bucket.mes,
+        entradas: 0,
+        saidas: 0,
+      })),
+      contasReceber: monthBuckets.map((bucket) => ({
+        mes: bucket.mes,
+        pendente: 0,
+        recebido: 0,
+      })),
+    };
+
+    for (const consulta of consultas) {
+      const date = new Date(consulta.dataHora);
+      const bucket = findBucketByDate(date, monthBuckets);
+      if (!bucket) continue;
+
+      const entry = chartData.receitaPorMes.find((item) => item.mes === bucket.mes);
+      if (entry) {
+        entry.receita += Number(consulta.valorCobrado || 0);
+      }
+    }
+
+    for (const conta of contasReceber) {
+      const baseDate = conta.dataRecebimento || conta.dataVencimento;
+      const date = new Date(baseDate);
+      const bucket = findBucketByDate(date, monthBuckets);
+      if (!bucket) continue;
+
+      const entrada = chartData.entradasVsSaidas.find((item) => item.mes === bucket.mes);
+      const receber = chartData.contasReceber.find((item) => item.mes === bucket.mes);
+      if (!entrada || !receber) continue;
+
+      const value = Number(conta.valor || 0);
+      if (conta.status === "RECEBIDO") {
+        entrada.entradas += value;
+        receber.recebido += value;
+      } else if (conta.status === "PENDENTE" || conta.status === "VENCIDO") {
+        receber.pendente += value;
+      }
+    }
+
+    for (const conta of contasPagar) {
+      const baseDate = conta.dataPagamento || conta.dataVencimento;
+      const date = new Date(baseDate);
+      const bucket = findBucketByDate(date, monthBuckets);
+      if (!bucket) continue;
+
+      const entry = chartData.entradasVsSaidas.find((item) => item.mes === bucket.mes);
+      if (!entry) continue;
+
+      const value = Number(conta.valor || 0);
+      if (conta.status === "PAGO") {
+        entry.saidas += value;
+      }
+    }
+
+    chartData.receitaPorMes = chartData.receitaPorMes.map((item) => ({
+      ...item,
+      receita: Math.round(item.receita * 100) / 100,
+    }));
+    chartData.entradasVsSaidas = chartData.entradasVsSaidas.map((item) => ({
+      ...item,
+      entradas: Math.round(item.entradas * 100) / 100,
+      saidas: Math.round(item.saidas * 100) / 100,
+    }));
+    chartData.contasReceber = chartData.contasReceber.map((item) => ({
+      ...item,
+      pendente: Math.round(item.pendente * 100) / 100,
+      recebido: Math.round(item.recebido * 100) / 100,
+    }));
 
     return NextResponse.json({
       resumo: {
@@ -112,6 +234,7 @@ export async function GET(request: NextRequest) {
       consultas: consultas.slice(0, 10), // Últimas 10 consultas
       contasReceber: contasReceber.slice(0, 10),
       contasPagar: contasPagar.slice(0, 10),
+      chartData,
     });
   } catch (error) {
     console.error("Erro ao buscar dashboard financeiro:", error);

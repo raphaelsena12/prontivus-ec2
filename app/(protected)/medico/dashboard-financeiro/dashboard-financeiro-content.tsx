@@ -48,8 +48,19 @@ interface Resumo {
   totalConsultas: number;
 }
 
+interface ChartData {
+  receitaPorMes: Array<{ mes: string; receita: number }>;
+  entradasVsSaidas: Array<{ mes: string; entradas: number; saidas: number }>;
+  contasReceber: Array<{ mes: string; pendente: number; recebido: number }>;
+}
+
 export function DashboardFinanceiroContent() {
   const [resumo, setResumo] = useState<Resumo | null>(null);
+  const [chartData, setChartData] = useState<ChartData>({
+    receitaPorMes: [],
+    entradasVsSaidas: [],
+    contasReceber: [],
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -59,6 +70,13 @@ export function DashboardFinanceiroContent() {
         if (response.ok) {
           const data = await response.json();
           setResumo(data.resumo);
+          setChartData(
+            data.chartData || {
+              receitaPorMes: [],
+              entradasVsSaidas: [],
+              contasReceber: [],
+            }
+          );
         }
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
@@ -69,34 +87,6 @@ export function DashboardFinanceiroContent() {
 
     fetchData();
   }, []);
-
-  // Mock data para gráficos (substituir por dados reais quando disponível)
-  const mockChartData = {
-    receitaPorMes: [
-      { mes: "set", receita: 12500.00 },
-      { mes: "out", receita: 15200.50 },
-      { mes: "nov", receita: 13800.00 },
-      { mes: "dez", receita: 16800.75 },
-      { mes: "jan", receita: 14500.00 },
-      { mes: "fev", receita: 13200.00 },
-    ],
-    entradasVsSaidas: [
-      { mes: "set", entradas: 12500.00, saidas: 3200.00 },
-      { mes: "out", entradas: 15200.50, saidas: 4100.00 },
-      { mes: "nov", entradas: 13800.00, saidas: 3800.00 },
-      { mes: "dez", entradas: 16800.75, saidas: 4500.00 },
-      { mes: "jan", entradas: 14500.00, saidas: 3900.00 },
-      { mes: "fev", entradas: 13200.00, saidas: 3500.00 },
-    ],
-    contasReceber: [
-      { mes: "set", pendente: 8500.00, recebido: 4000.00 },
-      { mes: "out", pendente: 9200.00, recebido: 6000.00 },
-      { mes: "nov", pendente: 7800.00, recebido: 5800.00 },
-      { mes: "dez", pendente: 10200.00, recebido: 6600.00 },
-      { mes: "jan", pendente: 8800.00, recebido: 5700.00 },
-      { mes: "fev", pendente: 7500.00, recebido: 4500.00 },
-    ],
-  };
 
   const receitaConfig: ChartConfig = {
     receita: {
@@ -295,7 +285,7 @@ export function DashboardFinanceiroContent() {
                 <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
               </div>
               <ChartContainer config={receitaConfig} className="h-[220px] w-full">
-                <BarChart data={mockChartData.receitaPorMes} barGap={2}>
+                <BarChart data={chartData.receitaPorMes} barGap={2}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="mes"
@@ -332,7 +322,7 @@ export function DashboardFinanceiroContent() {
                 <p className="text-xs text-slate-400 mt-0.5">Últimos 6 meses</p>
               </div>
               <ChartContainer config={entradasSaidasConfig} className="h-[220px] w-full">
-                <BarChart data={mockChartData.entradasVsSaidas} barGap={2}>
+                <BarChart data={chartData.entradasVsSaidas} barGap={2}>
                   <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis
                     dataKey="mes"
@@ -370,7 +360,7 @@ export function DashboardFinanceiroContent() {
                 <p className="text-xs text-slate-400 mt-0.5">Pendente vs Recebido</p>
               </div>
               <ChartContainer config={contasConfig} className="h-[220px] w-full">
-                <AreaChart data={mockChartData.contasReceber}>
+                <AreaChart data={chartData.contasReceber}>
                   <defs>
                     <linearGradient id="pendenteGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.15} />
