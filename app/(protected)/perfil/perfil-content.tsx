@@ -605,191 +605,185 @@ export function PerfilContent() {
 
             <TabsContent value="perfil" className="space-y-4">
               <Card>
-                <CardHeader className="p-4 pb-3">
-                  <CardTitle className="text-xl">Foto de Perfil</CardTitle>
-                  <CardDescription className="text-xs">
-                    Carregue uma foto ou tire na hora. Antes de salvar, ajuste o zoom.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="flex items-center gap-6">
-                    <div className="relative">
-                      <AvatarWithS3
-                        avatar={usuario.avatar}
-                        alt={usuario.nome}
-                        fallback={getInitials(usuario.nome)}
-                        className="h-20 w-20"
-                        fallbackClassName="bg-gradient-to-br from-primary/20 to-primary/10 font-semibold text-xl"
-                      />
-                      <div className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full">
-                        <Camera className="h-3.5 w-3.5" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-2">
-                        JPG, PNG ou WEBP. Máximo de 5MB.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <label htmlFor="avatar-upload-file">
-                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" asChild>
-                            <span>
-                              <Upload className="mr-1 h-3.5 w-3.5" />
-                              Carregar foto
-                            </span>
-                          </Button>
-                        </label>
-                        <input
-                          id="avatar-upload-file"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarFileSelected}
-                          disabled={uploadingAvatar}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs"
-                          onClick={startCameraCapture}
-                          disabled={uploadingAvatar || cameraLoading}
-                        >
-                          <Camera className="mr-1 h-3.5 w-3.5" />
-                          Tirar foto
-                        </Button>
-                      </div>
-                      {uploadingAvatar && (
-                        <p className="text-xs text-primary mt-2 flex items-center gap-2">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Enviando...
-                        </p>
-                      )}
-                      {cameraError && (
-                        <p className="text-xs text-destructive mt-2">{cameraError}</p>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="p-4 pb-3">
+                <CardHeader className="p-4 pb-2">
                   <CardTitle className="text-xl">Informações Pessoais</CardTitle>
                   <CardDescription className="text-xs">
-                    Atualize suas informações de contato
+                    Atualize sua foto e os dados de contato em um único painel
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <Form {...perfilForm}>
-                    <form
-                      onSubmit={perfilForm.handleSubmit(handleUpdatePerfil)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={perfilForm.control}
-                        name="nome"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nome Completo</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Seu nome completo" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                          control={perfilForm.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email</FormLabel>
-                              <FormControl>
-                                <Input
-                                  type="email"
-                                  placeholder="seu@email.com"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={perfilForm.control}
-                          name="telefone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Telefone</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="(00) 00000-0000"
-                                  {...field}
-                                  onChange={(e) => {
-                                    const formatted = formatPhone(e.target.value);
-                                    field.onChange(formatted);
-                                  }}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormItem>
-                          <FormLabel>CPF</FormLabel>
-                          <FormControl>
-                            <Input
-                              value={formatCPF(usuario.cpf)}
-                              disabled
-                              className="bg-muted"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground">
-                            CPF não pode ser alterado
+                <CardContent className="p-4 pt-2">
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+                    <div className="rounded-lg bg-muted/20 p-4">
+                      <div className="flex flex-col items-center text-center">
+                        <div className="relative">
+                          <AvatarWithS3
+                            avatar={usuario.avatar}
+                            alt={usuario.nome}
+                            fallback={getInitials(usuario.nome)}
+                            className="h-32 w-32"
+                            fallbackClassName="bg-gradient-to-br from-primary/20 to-primary/10 font-semibold text-2xl"
+                          />
+                          <div className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full">
+                            <Camera className="h-3.5 w-3.5" />
+                          </div>
+                        </div>
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          JPG, PNG ou WEBP. Maximo de 5MB.
+                        </p>
+                        <div className="mt-3 flex w-full flex-col gap-2">
+                          <label htmlFor="avatar-upload-file" className="w-full">
+                            <Button type="button" variant="outline" size="sm" className="h-8 w-full text-xs" asChild>
+                              <span>
+                                <Upload className="mr-1 h-3.5 w-3.5" />
+                                Carregar foto
+                              </span>
+                            </Button>
+                          </label>
+                          <input
+                            id="avatar-upload-file"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleAvatarFileSelected}
+                            disabled={uploadingAvatar}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-full text-xs"
+                            onClick={startCameraCapture}
+                            disabled={uploadingAvatar || cameraLoading}
+                          >
+                            <Camera className="mr-1 h-3.5 w-3.5" />
+                            Tirar foto
+                          </Button>
+                        </div>
+                        {uploadingAvatar && (
+                          <p className="text-xs text-primary mt-3 flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Enviando...
                           </p>
-                        </FormItem>
-
-                        <FormItem>
-                          <FormLabel>Tipo de Usuário</FormLabel>
-                          <FormControl>
-                            <Input
-                              value={usuario.tipo}
-                              disabled
-                              className="bg-muted"
-                            />
-                          </FormControl>
-                        </FormItem>
+                        )}
+                        {cameraError && (
+                          <p className="text-xs text-destructive mt-2">{cameraError}</p>
+                        )}
                       </div>
+                    </div>
 
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => router.back()}
-                          disabled={isSubmitting}
-                          className="text-xs"
+                    <div>
+                      <Form {...perfilForm}>
+                        <form
+                          onSubmit={perfilForm.handleSubmit(handleUpdatePerfil)}
+                          className="space-y-4"
                         >
-                          Cancelar
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting} className="text-xs">
-                          {isSubmitting ? (
-                            <>
-                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                              Salvando...
-                            </>
-                          ) : (
-                            "Salvar Alterações"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
+                          <FormField
+                            control={perfilForm.control}
+                            name="nome"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Nome Completo</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Seu nome completo" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={perfilForm.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="email"
+                                      placeholder="seu@email.com"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={perfilForm.control}
+                              name="telefone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Telefone</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="(00) 00000-0000"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const formatted = formatPhone(e.target.value);
+                                        field.onChange(formatted);
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormItem>
+                              <FormLabel>CPF</FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={formatCPF(usuario.cpf)}
+                                  disabled
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                              <p className="text-xs text-muted-foreground">
+                                CPF não pode ser alterado
+                              </p>
+                            </FormItem>
+
+                            <FormItem>
+                              <FormLabel>Tipo de Usuário</FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={usuario.tipo}
+                                  disabled
+                                  className="bg-muted"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          </div>
+
+                          <div className="flex justify-end gap-2 pt-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => router.back()}
+                              disabled={isSubmitting}
+                              className="text-xs"
+                            >
+                              Cancelar
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting} className="text-xs">
+                              {isSubmitting ? (
+                                <>
+                                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                  Salvando...
+                                </>
+                              ) : (
+                                "Salvar Alterações"
+                              )}
+                            </Button>
+                          </div>
+                        </form>
+                      </Form>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
