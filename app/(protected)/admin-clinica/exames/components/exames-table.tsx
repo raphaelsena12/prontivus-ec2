@@ -122,7 +122,7 @@ export function ExamesTable({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 50,
   });
 
   // Filtrar dados localmente
@@ -222,9 +222,10 @@ export function ExamesTable({
               size="sm"
               onClick={() => onEdit(row.original)}
               title="Editar exame"
-              className="h-7 w-7 p-0"
+              className="h-7 px-2 text-xs"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="mr-1 h-4 w-4" />
+              Editar
             </Button>
             <Button
               variant="outline"

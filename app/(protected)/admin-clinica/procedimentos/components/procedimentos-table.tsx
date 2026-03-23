@@ -92,7 +92,7 @@ export function ProcedimentosTable({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 50,
   });
 
   // Filtrar dados localmente
@@ -188,9 +188,10 @@ export function ProcedimentosTable({
               size="sm"
               onClick={() => onEdit ? onEdit(row.original) : undefined}
               title="Editar procedimento"
-              className="shadow-sm shadow-gray-300/50 hover:shadow-md hover:shadow-gray-400/50 transition-shadow"
+              className="px-2 text-xs shadow-sm shadow-gray-300/50 hover:shadow-md hover:shadow-gray-400/50 transition-shadow"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="mr-1 h-4 w-4" />
+              Editar
             </Button>
             {onDelete && (
               <Button

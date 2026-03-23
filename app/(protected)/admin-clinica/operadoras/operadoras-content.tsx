@@ -171,9 +171,10 @@ export function OperadorasContent({ clinicaId }: OperadorasContentProps) {
                             size="sm"
                             onClick={() => router.push(`/admin-clinica/operadoras/editar/${operadora.id}`)}
                             title="Editar operadora"
-                            className="h-7 w-7 p-0"
+                            className="h-7 px-2 text-xs"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="mr-1 h-4 w-4" />
+                            Editar
                           </Button>
                           <Button
                             variant="outline"

@@ -5,9 +5,22 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Edit, Upload, UserCircle, Filter, Ban, CheckCircle } from "lucide-react";
+import { Plus, Search, Edit, Upload, UserCircle, Filter, MoreHorizontal } from "lucide-react";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { PacienteDeleteDialog } from "./components/paciente-delete-dialog";
@@ -53,6 +66,8 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ativo");
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [pacienteDialogOpen, setPacienteDialogOpen] = useState(false);
   const [editingPaciente, setEditingPaciente] = useState<Paciente | null>(null);
@@ -65,7 +80,7 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
       setLoading(true);
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "10",
+        limit: limit.toString(),
         status: statusFilter,
         ...(search && { search }),
       });
@@ -73,6 +88,7 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
       if (!response.ok) throw new Error("Erro ao carregar pacientes");
       const data = await response.json();
       setPacientes(data.pacientes);
+      setTotalItems(data.pagination.total || 0);
       setTotalPages(data.pagination.totalPages);
     } catch (error) {
       toast.error("Erro ao carregar pacientes");
@@ -80,7 +96,7 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, limit, search, statusFilter]);
 
   useEffect(() => {
     fetchPacientes();
@@ -237,34 +253,31 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="outline"
-                            size="icon"
+                            size="sm"
                             onClick={() => handleEdit(paciente)}
                             title="Editar paciente"
-                            className="h-7 w-7"
+                            className="h-7 px-2 text-xs"
                           >
-                            <Edit className="h-3 w-3" />
+                            <Edit className="mr-1 h-3 w-3" />
+                            Editar
                           </Button>
-                          {paciente.ativo ? (
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleToggleStatusClick(paciente)}
-                              title="Desativar paciente"
-                              className="h-7 w-7 text-amber-500 hover:text-amber-600 hover:border-amber-300"
-                            >
-                              <Ban className="h-3 w-3" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleToggleStatusClick(paciente)}
-                              title="Reativar paciente"
-                              className="h-7 w-7 text-emerald-500 hover:text-emerald-600 hover:border-emerald-300"
-                            >
-                              <CheckCircle className="h-3 w-3" />
-                            </Button>
-                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                title="Mais ações"
+                              >
+                                <MoreHorizontal className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleToggleStatusClick(paciente)}>
+                                {paciente.ativo ? "Desativar paciente" : "Reativar paciente"}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -274,33 +287,80 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
             </Table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 pb-6 pt-4">
-              <p className="text-xs text-muted-foreground">
-                Página {page} de {totalPages}
-              </p>
-              <div className="flex gap-2">
+          <div className="flex items-center justify-between px-6 pb-6 pt-4">
+            <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
+              {totalItems} paciente(s) encontrado(s).
+            </div>
+            <div className="flex w-full items-center gap-8 lg:w-fit">
+              <div className="hidden items-center gap-2 lg:flex">
+                <Label htmlFor="rows-per-page" className="text-xs font-medium">
+                  Linhas por página
+                </Label>
+                <Select
+                  value={`${limit}`}
+                  onValueChange={(value) => {
+                    setLimit(Number(value));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger size="sm" className="w-20 h-7 text-xs" id="rows-per-page">
+                    <SelectValue placeholder={limit} />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    {[10, 20, 30, 40, 50].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex w-fit items-center justify-center text-xs font-medium">
+                Página {page} de {Math.max(totalPages, 1)}
+              </div>
+              <div className="ml-auto flex items-center gap-2 lg:ml-0">
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="text-xs h-7"
+                  className="hidden h-7 w-7 p-0 lg:flex text-xs"
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
                 >
-                  Anterior
+                  <span className="sr-only">Primeira página</span>
+                  <IconChevronsLeft className="h-3 w-3" />
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="text-xs h-7"
+                  className="h-7 w-7 text-xs"
+                  size="icon"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
                 >
-                  Próxima
+                  <span className="sr-only">Página anterior</span>
+                  <IconChevronLeft className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-7 w-7 text-xs"
+                  size="icon"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  <span className="sr-only">Próxima página</span>
+                  <IconChevronRight className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="hidden h-7 w-7 lg:flex text-xs"
+                  size="icon"
+                  onClick={() => setPage(Math.max(totalPages, 1))}
+                  disabled={page >= totalPages}
+                >
+                  <span className="sr-only">Última página</span>
+                  <IconChevronsRight className="h-3 w-3" />
                 </Button>
               </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 

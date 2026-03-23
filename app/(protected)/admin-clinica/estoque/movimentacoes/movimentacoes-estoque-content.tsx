@@ -41,7 +41,7 @@ export function MovimentacoesEstoqueContent({ clinicaId, estoques }: Movimentaco
   const fetchMovimentacoes = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ page: page.toString(), limit: "10", ...(estoqueFilter && { estoqueId: estoqueFilter }), ...(tipoFilter && { tipo: tipoFilter }) });
+      const params = new URLSearchParams({ page: page.toString(), limit: "50", ...(estoqueFilter && { estoqueId: estoqueFilter }), ...(tipoFilter && { tipo: tipoFilter }) });
       const response = await fetch(`/api/admin-clinica/estoque/movimentacoes?${params.toString()}`);
       if (!response.ok) throw new Error("Erro ao carregar movimentações");
       const data = await response.json();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,8 +27,17 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { formatCPF } from "@/lib/utils";
-import { Loader2, ArrowLeft, Camera, Lock, User, FileCheck } from "lucide-react";
+import { Loader2, Camera, Lock, User, FileCheck, Upload, ZoomIn, UserCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/page-header";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Usuario {
   id: string;
@@ -109,6 +118,27 @@ export function PerfilContent() {
   const [certSenha, setCertSenha] = useState("");
   const [certUploading, setCertUploading] = useState(false);
   const [certDeleting, setCertDeleting] = useState(false);
+  const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
+  const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarZoom, setAvatarZoom] = useState(1);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [pendingAvatarMimeType, setPendingAvatarMimeType] = useState("image/jpeg");
+  const [pendingAvatarExtension, setPendingAvatarExtension] = useState("jpg");
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const attachCameraStream = (stream: MediaStream | null) => {
+    const video = cameraVideoRef.current;
+    if (!video || !stream) return;
+    if (video.srcObject !== stream) {
+      video.srcObject = stream;
+    }
+    video.play().catch(() => {
+      // Alguns navegadores podem bloquear temporariamente; o usuário já interagiu.
+    });
+  };
 
   const perfilForm = useForm<PerfilFormValues>({
     resolver: zodResolver(updatePerfilSchema),
@@ -121,6 +151,21 @@ export function PerfilContent() {
   useEffect(() => {
     loadPerfil();
   }, []);
+
+  useEffect(() => {
+    attachCameraStream(cameraStream);
+  }, [cameraStream, cameraDialogOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+      }
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [cameraStream, avatarPreviewUrl]);
 
   const loadCertificado = async () => {
     setCertLoading(true);
@@ -252,57 +297,196 @@ export function PerfilContent() {
     }
   };
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadAvatarFile = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-    // Validar tipo de arquivo
+    const response = await fetch("/api/perfil/avatar", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Erro ao atualizar avatar");
+    }
+
+    const result = await response.json();
+    setUsuario(result.usuario);
+
+    await update({
+      ...session,
+      user: {
+        ...session?.user,
+        avatar: result.usuario.avatar,
+      },
+    });
+  };
+
+  const openAvatarEditorWithFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast.error("Por favor, selecione uma imagem");
       return;
     }
 
-    // Validar tamanho (máximo 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("A imagem deve ter no máximo 5MB");
       return;
     }
 
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl);
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    setPendingAvatarExtension(extension);
+    setPendingAvatarMimeType(file.type || "image/jpeg");
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    setAvatarZoom(1);
+    setAvatarEditorOpen(true);
+  };
+
+  const handleAvatarFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    openAvatarEditorWithFile(file);
+    event.target.value = "";
+  };
+
+  const startCameraCapture = async () => {
+    setCameraLoading(true);
+    setCameraError(null);
+    setCameraReady(false);
+    try {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false,
+        });
+      } catch {
+        // Fallback para navegadores/dispositivos que não respeitam facingMode.
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+      setCameraStream(stream);
+      setCameraDialogOpen(true);
+      // Garante binding mesmo se o vídeo montar um pouco depois.
+      setTimeout(() => attachCameraStream(stream), 50);
+      setTimeout(() => attachCameraStream(stream), 250);
+    } catch (error) {
+      console.error("Erro ao acessar câmera:", error);
+      setCameraError("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
+      toast.error("Não foi possível acessar a câmera");
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  const stopCameraCapture = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setCameraReady(false);
+    setCameraDialogOpen(false);
+  };
+
+  const handleTakePhotoNow = async () => {
+    const video = cameraVideoRef.current;
+    if (!video || !cameraReady || video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error("Câmera ainda não está pronta");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast.error("Erro ao capturar imagem da câmera");
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.95)
+    );
+    if (!blob) {
+      toast.error("Não foi possível capturar a foto");
+      return;
+    }
+
+    const file = new File([blob], `camera-${Date.now()}.jpg`, { type: "image/jpeg" });
+    stopCameraCapture();
+    openAvatarEditorWithFile(file);
+  };
+
+  const createCroppedAvatarFile = async (): Promise<File> => {
+    if (!avatarPreviewUrl) {
+      throw new Error("Nenhuma imagem selecionada");
+    }
+
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Erro ao carregar imagem"));
+      img.src = avatarPreviewUrl;
+    });
+
+    const outputSize = 512;
+    const canvas = document.createElement("canvas");
+    canvas.width = outputSize;
+    canvas.height = outputSize;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Erro ao preparar imagem");
+    }
+
+    const width = image.naturalWidth;
+    const height = image.naturalHeight;
+    const minSide = Math.min(width, height);
+    const cropSize = minSide / Math.max(1, avatarZoom);
+    const sx = Math.max(0, (width - cropSize) / 2);
+    const sy = Math.max(0, (height - cropSize) / 2);
+
+    ctx.drawImage(image, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+
+    const mimeType = pendingAvatarMimeType.startsWith("image/")
+      ? pendingAvatarMimeType
+      : "image/jpeg";
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, mimeType, 0.95)
+    );
+
+    if (!blob) {
+      throw new Error("Erro ao processar imagem");
+    }
+
+    return new File([blob], `avatar-${Date.now()}.${pendingAvatarExtension || "jpg"}`, {
+      type: mimeType,
+    });
+  };
+
+  const handleSaveAvatar = async () => {
     setUploadingAvatar(true);
     try {
-      // Criar FormData para enviar o arquivo
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/perfil/avatar", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao atualizar avatar");
-      }
-
-      const result = await response.json();
-      setUsuario(result.usuario);
-      
-      // Atualizar sessão
-      await update({
-        ...session,
-        user: {
-          ...session?.user,
-          avatar: result.usuario.avatar,
-        },
-      });
-
+      const file = await createCroppedAvatarFile();
+      await uploadAvatarFile(file);
       toast.success("Foto atualizada com sucesso!");
-      setUploadingAvatar(false);
+      setAvatarEditorOpen(false);
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+      setAvatarPreviewUrl(null);
     } catch (error) {
       console.error("Erro ao atualizar avatar:", error);
       toast.error(
         error instanceof Error ? error.message : "Erro ao atualizar avatar"
       );
+    } finally {
       setUploadingAvatar(false);
     }
   };
@@ -383,21 +567,36 @@ export function PerfilContent() {
   }
 
   return (
-    <div className="@container/main flex flex-1 flex-col">
-      <div className="flex flex-col pt-2">
-        <div className="px-4 lg:px-6">
+    <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
+      <PageHeader
+        icon={UserCircle}
+        title="Meu Perfil"
+        subtitle="Gerencie suas informações pessoais, senha e certificado digital"
+      />
+
+      <div className="flex flex-col">
+        <div>
           <Tabs defaultValue="perfil" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="perfil" className="flex items-center gap-2 text-xs">
+            <TabsList className="h-auto w-full flex-wrap items-stretch gap-1 rounded-xl border bg-muted/40 p-1">
+              <TabsTrigger
+                value="perfil"
+                className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
                 <User className="h-3.5 w-3.5" />
                 Informações Pessoais
               </TabsTrigger>
-              <TabsTrigger value="senha" className="flex items-center gap-2 text-xs">
+              <TabsTrigger
+                value="senha"
+                className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
                 <Lock className="h-3.5 w-3.5" />
                 Alterar Senha
               </TabsTrigger>
               {usuario?.tipo === "MEDICO" && (
-                <TabsTrigger value="certificado" className="flex items-center gap-2 text-xs">
+                <TabsTrigger
+                  value="certificado"
+                  className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                >
                   <FileCheck className="h-3.5 w-3.5" />
                   Certificado Digital
                 </TabsTrigger>
@@ -409,7 +608,7 @@ export function PerfilContent() {
                 <CardHeader className="p-4 pb-3">
                   <CardTitle className="text-xl">Foto de Perfil</CardTitle>
                   <CardDescription className="text-xs">
-                    Clique na foto para alterar sua imagem de perfil
+                    Carregue uma foto ou tire na hora. Antes de salvar, ajuste o zoom.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
@@ -422,30 +621,51 @@ export function PerfilContent() {
                         className="h-20 w-20"
                         fallbackClassName="bg-gradient-to-br from-primary/20 to-primary/10 font-semibold text-xl"
                       />
-                      <label
-                        htmlFor="avatar-upload"
-                        className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full cursor-pointer hover:bg-primary/90 transition-colors"
-                      >
+                      <div className="absolute bottom-0 right-0 p-1.5 bg-primary text-primary-foreground rounded-full">
                         <Camera className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        JPG, PNG ou WEBP. Máximo de 5MB.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <label htmlFor="avatar-upload-file">
+                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" asChild>
+                            <span>
+                              <Upload className="mr-1 h-3.5 w-3.5" />
+                              Carregar foto
+                            </span>
+                          </Button>
+                        </label>
                         <input
-                          id="avatar-upload"
+                          id="avatar-upload-file"
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={handleAvatarUpload}
+                          onChange={handleAvatarFileSelected}
                           disabled={uploadingAvatar}
                         />
-                      </label>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground">
-                        JPG, PNG ou GIF. Máximo de 5MB.
-                      </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={startCameraCapture}
+                          disabled={uploadingAvatar || cameraLoading}
+                        >
+                          <Camera className="mr-1 h-3.5 w-3.5" />
+                          Tirar foto
+                        </Button>
+                      </div>
                       {uploadingAvatar && (
                         <p className="text-xs text-primary mt-2 flex items-center gap-2">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           Enviando...
                         </p>
+                      )}
+                      {cameraError && (
+                        <p className="text-xs text-destructive mt-2">{cameraError}</p>
                       )}
                     </div>
                   </div>
@@ -785,6 +1005,100 @@ export function PerfilContent() {
               </TabsContent>
             )}
           </Tabs>
+
+          <Dialog open={cameraDialogOpen} onOpenChange={(open) => !open && stopCameraCapture()}>
+            <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Tirar foto</DialogTitle>
+                <DialogDescription>
+                  Posicione seu rosto e capture a imagem para continuar.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-hidden rounded-lg border bg-black/90">
+                <video
+                  ref={cameraVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-[300px] w-full object-cover"
+                  onLoadedMetadata={() => setCameraReady(true)}
+                  onCanPlay={() => setCameraReady(true)}
+                  onPlaying={() => setCameraReady(true)}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={stopCameraCapture}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleTakePhotoNow}>
+                  Capturar foto
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={avatarEditorOpen}
+            onOpenChange={(open) => {
+              if (!uploadingAvatar) setAvatarEditorOpen(open);
+            }}
+          >
+            <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Ajustar foto de perfil</DialogTitle>
+                <DialogDescription>
+                  Ajuste o zoom da imagem e confirme para salvar.
+                </DialogDescription>
+              </DialogHeader>
+              {avatarPreviewUrl && (
+                <div className="space-y-4">
+                  <div className="mx-auto h-72 w-72 overflow-hidden rounded-xl border bg-muted">
+                    <img
+                      src={avatarPreviewUrl}
+                      alt="Prévia da foto"
+                      className="h-full w-full object-cover transition-transform duration-150"
+                      style={{ transform: `scale(${avatarZoom})` }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <ZoomIn className="h-3.5 w-3.5" />
+                      Zoom: {avatarZoom.toFixed(1)}x
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.1}
+                      value={avatarZoom}
+                      onChange={(e) => setAvatarZoom(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAvatarEditorOpen(false)}
+                  disabled={uploadingAvatar}
+                >
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveAvatar} disabled={uploadingAvatar}>
+                  {uploadingAvatar ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar foto"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

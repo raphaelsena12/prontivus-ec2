@@ -123,8 +123,10 @@ export function TiposConsultaContent({ clinicaId }: TiposConsultaContentProps) {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => router.push(`/admin-clinica/tipos-consulta/editar/${tipo.id}`)}
+                            className="h-8 px-2 text-xs"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="mr-1 h-4 w-4" />
+                            Editar
                           </Button>
                         </div>
                       </TableCell>

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     const pacienteId = searchParams.get("pacienteId");
     const medicoId = searchParams.get("medicoId");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
 
     if (!auth.userType) {

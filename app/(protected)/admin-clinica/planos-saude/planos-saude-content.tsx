@@ -161,9 +161,10 @@ export function PlanosSaudeContent({ clinicaId }: PlanosSaudeContentProps) {
                             size="sm"
                             onClick={() => router.push(`/admin-clinica/planos-saude/editar/${plano.id}`)}
                             title="Editar plano de saúde"
-                            className="h-7 w-7 p-0"
+                            className="h-7 px-2 text-xs"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="mr-1 h-4 w-4" />
+                            Editar
                           </Button>
                           <Button
                             variant="outline"
