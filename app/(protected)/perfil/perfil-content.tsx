@@ -27,8 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { formatCPF } from "@/lib/utils";
-import { Loader2, Camera, Lock, User, FileCheck, Upload, ZoomIn, UserCircle } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Camera, Lock, Upload, ZoomIn, UserCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import {
   Dialog,
@@ -44,6 +43,7 @@ interface Usuario {
   nome: string;
   email: string;
   cpf: string;
+  crm: string | null;
   telefone: string | null;
   avatar: string | null;
   tipo: string;
@@ -73,6 +73,10 @@ const formatPhone = (value: string) => {
 const updatePerfilSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   email: z.string().email("Email inválido"),
+  cpf: z
+    .string()
+    .refine((val) => val.replace(/\D/g, "").length === 11, "CPF deve conter 11 dígitos"),
+  crm: z.string().optional(),
   telefone: z
     .string()
     .optional()
@@ -118,10 +122,13 @@ export function PerfilContent() {
   const [certSenha, setCertSenha] = useState("");
   const [certUploading, setCertUploading] = useState(false);
   const [certDeleting, setCertDeleting] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarZoom, setAvatarZoom] = useState(1);
+  const [avatarOffset, setAvatarOffset] = useState({ x: 0, y: 0 });
+  const [avatarImageSize, setAvatarImageSize] = useState({ width: 1, height: 1 });
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -129,6 +136,35 @@ export function PerfilContent() {
   const [pendingAvatarMimeType, setPendingAvatarMimeType] = useState("image/jpeg");
   const [pendingAvatarExtension, setPendingAvatarExtension] = useState("jpg");
   const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const avatarDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  } | null>(null);
+  const AVATAR_PREVIEW_SIZE = 288;
+  const getAvatarDragBounds = (zoom = avatarZoom) => {
+    const baseScale = Math.max(
+      AVATAR_PREVIEW_SIZE / avatarImageSize.width,
+      AVATAR_PREVIEW_SIZE / avatarImageSize.height
+    );
+    const displayedWidth = avatarImageSize.width * baseScale * zoom;
+    const displayedHeight = avatarImageSize.height * baseScale * zoom;
+    return {
+      displayedWidth,
+      displayedHeight,
+      maxOffsetX: Math.max(0, (displayedWidth - AVATAR_PREVIEW_SIZE) / 2),
+      maxOffsetY: Math.max(0, (displayedHeight - AVATAR_PREVIEW_SIZE) / 2),
+    };
+  };
+  const clampAvatarOffset = (x: number, y: number, zoom = avatarZoom) => {
+    const { maxOffsetX, maxOffsetY } = getAvatarDragBounds(zoom);
+    return {
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, y)),
+    };
+  };
   const attachCameraStream = (stream: MediaStream | null) => {
     const video = cameraVideoRef.current;
     if (!video || !stream) return;
@@ -198,6 +234,8 @@ export function PerfilContent() {
       perfilForm.reset({
         nome: data.usuario.nome,
         email: data.usuario.email,
+        cpf: formatCPF(data.usuario.cpf),
+        crm: data.usuario.crm || "",
         telefone: data.usuario.telefone
           ? formatPhone(data.usuario.telefone)
           : "",
@@ -227,6 +265,13 @@ export function PerfilContent() {
     setIsSubmitting(true);
     try {
       const telefoneLimpo = data.telefone?.replace(/\D/g, "") || null;
+      const cpfLimpo = data.cpf.replace(/\D/g, "");
+      const crmLimpo = data.crm?.trim() || "";
+
+      if (usuario?.tipo === "MEDICO" && !crmLimpo) {
+        perfilForm.setError("crm", { message: "CRM é obrigatório para médicos" });
+        return;
+      }
 
       const response = await fetch("/api/perfil", {
         method: "PATCH",
@@ -234,6 +279,8 @@ export function PerfilContent() {
         body: JSON.stringify({
           nome: data.nome,
           email: data.email,
+          cpf: cpfLimpo,
+          crm: crmLimpo || undefined,
           telefone: telefoneLimpo,
         }),
       });
@@ -286,6 +333,7 @@ export function PerfilContent() {
       }
 
       passwordForm.reset();
+      setPasswordModalOpen(false);
       toast.success("Senha alterada com sucesso!");
     } catch (error) {
       console.error("Erro ao alterar senha:", error);
@@ -339,11 +387,25 @@ export function PerfilContent() {
     }
 
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    setPendingAvatarExtension(extension);
-    setPendingAvatarMimeType(file.type || "image/jpeg");
-    setAvatarPreviewUrl(URL.createObjectURL(file));
-    setAvatarZoom(1);
-    setAvatarEditorOpen(true);
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setAvatarImageSize({
+        width: Math.max(1, img.naturalWidth || img.width || 1),
+        height: Math.max(1, img.naturalHeight || img.height || 1),
+      });
+      setPendingAvatarExtension(extension);
+      setPendingAvatarMimeType(file.type || "image/jpeg");
+      setAvatarPreviewUrl(objectUrl);
+      setAvatarZoom(1);
+      setAvatarOffset({ x: 0, y: 0 });
+      setAvatarEditorOpen(true);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      toast.error("Não foi possível carregar esta imagem");
+    };
+    img.src = objectUrl;
   };
 
   const handleAvatarFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -447,12 +509,23 @@ export function PerfilContent() {
 
     const width = image.naturalWidth;
     const height = image.naturalHeight;
-    const minSide = Math.min(width, height);
-    const cropSize = minSide / Math.max(1, avatarZoom);
-    const sx = Math.max(0, (width - cropSize) / 2);
-    const sy = Math.max(0, (height - cropSize) / 2);
+    const baseScale = Math.max(AVATAR_PREVIEW_SIZE / width, AVATAR_PREVIEW_SIZE / height);
+    const displayScale = baseScale * Math.max(1, avatarZoom);
+    const displayedWidth = width * displayScale;
+    const displayedHeight = height * displayScale;
+    const imageLeft = AVATAR_PREVIEW_SIZE / 2 - displayedWidth / 2 + avatarOffset.x;
+    const imageTop = AVATAR_PREVIEW_SIZE / 2 - displayedHeight / 2 + avatarOffset.y;
+    const sx = Math.max(
+      0,
+      Math.min(width, (0 - imageLeft) / displayScale)
+    );
+    const sy = Math.max(
+      0,
+      Math.min(height, (0 - imageTop) / displayScale)
+    );
+    const sourceSize = Math.min(width - sx, height - sy, AVATAR_PREVIEW_SIZE / displayScale);
 
-    ctx.drawImage(image, sx, sy, cropSize, cropSize, 0, 0, outputSize, outputSize);
+    ctx.drawImage(image, sx, sy, sourceSize, sourceSize, 0, 0, outputSize, outputSize);
 
     const mimeType = pendingAvatarMimeType.startsWith("image/")
       ? pendingAvatarMimeType
@@ -481,6 +554,7 @@ export function PerfilContent() {
         URL.revokeObjectURL(avatarPreviewUrl);
       }
       setAvatarPreviewUrl(null);
+      setAvatarOffset({ x: 0, y: 0 });
     } catch (error) {
       console.error("Erro ao atualizar avatar:", error);
       toast.error(
@@ -488,6 +562,34 @@ export function PerfilContent() {
       );
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+  const handleAvatarPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!avatarPreviewUrl) return;
+    event.preventDefault();
+    avatarDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startOffsetX: avatarOffset.x,
+      startOffsetY: avatarOffset.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handleAvatarPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = avatarDragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    const dx = event.clientX - dragState.startX;
+    const dy = event.clientY - dragState.startY;
+    setAvatarOffset(
+      clampAvatarOffset(dragState.startOffsetX + dx, dragState.startOffsetY + dy)
+    );
+  };
+  const handleAvatarPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (avatarDragRef.current?.pointerId !== event.pointerId) return;
+    avatarDragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
 
@@ -576,43 +678,30 @@ export function PerfilContent() {
 
       <div className="flex flex-col">
         <div>
-          <Tabs defaultValue="perfil" className="space-y-4">
-            <TabsList className="h-auto w-full flex-wrap items-stretch gap-1 rounded-xl border bg-muted/40 p-1">
-              <TabsTrigger
-                value="perfil"
-                className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                <User className="h-3.5 w-3.5" />
-                Informações Pessoais
-              </TabsTrigger>
-              <TabsTrigger
-                value="senha"
-                className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Alterar Senha
-              </TabsTrigger>
-              {usuario?.tipo === "MEDICO" && (
-                <TabsTrigger
-                  value="certificado"
-                  className="min-h-9 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-                >
-                  <FileCheck className="h-3.5 w-3.5" />
-                  Certificado Digital
-                </TabsTrigger>
-              )}
-            </TabsList>
-
-            <TabsContent value="perfil" className="space-y-4">
-              <Card>
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-xl">Informações Pessoais</CardTitle>
-                  <CardDescription className="text-xs">
-                    Atualize sua foto e os dados de contato em um único painel
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-xl">Informações Pessoais</CardTitle>
+                    <CardDescription className="text-xs">
+                      Atualize sua foto e os dados de contato em um único painel
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setPasswordModalOpen(true)}
+                  >
+                    <Lock className="mr-1 h-3.5 w-3.5" />
+                    Alterar Senha
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
                     <div className="rounded-lg bg-muted/20 p-4">
                       <div className="flex flex-col items-center text-center">
                         <div className="relative">
@@ -733,19 +822,48 @@ export function PerfilContent() {
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormItem>
-                              <FormLabel>CPF</FormLabel>
-                              <FormControl>
-                                <Input
-                                  value={formatCPF(usuario.cpf)}
-                                  disabled
-                                  className="bg-muted"
-                                />
-                              </FormControl>
-                              <p className="text-xs text-muted-foreground">
-                                CPF não pode ser alterado
-                              </p>
-                            </FormItem>
+                            {usuario?.tipo === "MEDICO" && (
+                              <FormField
+                                control={perfilForm.control}
+                                name="crm"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      CRM <span className="text-destructive">*</span>
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        placeholder="Ex: CRM-SP 123456"
+                                        {...field}
+                                        value={field.value || ""}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+
+                            <FormField
+                              control={perfilForm.control}
+                              name="cpf"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>CPF</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="000.000.000-00"
+                                      {...field}
+                                      onChange={(e) => {
+                                        const cleaned = e.target.value.replace(/\D/g, "").slice(0, 11);
+                                        field.onChange(formatCPF(cleaned));
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
                             <FormItem>
                               <FormLabel>Tipo de Usuário</FormLabel>
@@ -786,115 +904,15 @@ export function PerfilContent() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="senha" className="space-y-4">
+            {usuario?.tipo === "MEDICO" && (
               <Card>
                 <CardHeader className="p-4 pb-3">
-                  <CardTitle className="text-xl">Alterar Senha</CardTitle>
+                  <CardTitle className="text-xl">Certificado Digital (.pfx)</CardTitle>
                   <CardDescription className="text-xs">
-                    Digite sua senha atual e escolha uma nova senha
+                    Envie seu certificado para assinar digitalmente os documentos gerados no atendimento.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <Form {...passwordForm}>
-                    <form
-                      onSubmit={passwordForm.handleSubmit(handleChangePassword)}
-                      className="space-y-4"
-                    >
-                      <FormField
-                        control={passwordForm.control}
-                        name="senhaAtual"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Senha Atual</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="Digite sua senha atual"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Separator />
-
-                      <FormField
-                        control={passwordForm.control}
-                        name="novaSenha"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Nova Senha</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="Mínimo 6 caracteres"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={passwordForm.control}
-                        name="confirmarSenha"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Confirmar Nova Senha</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="password"
-                                placeholder="Digite a nova senha novamente"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => passwordForm.reset()}
-                          disabled={isChangingPassword}
-                          className="text-xs"
-                        >
-                          Limpar
-                        </Button>
-                        <Button type="submit" disabled={isChangingPassword} className="text-xs">
-                          {isChangingPassword ? (
-                            <>
-                              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                              Alterando...
-                            </>
-                          ) : (
-                            "Alterar Senha"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {usuario?.tipo === "MEDICO" && (
-              <TabsContent value="certificado" className="space-y-4">
-                <Card>
-                  <CardHeader className="p-4 pb-3">
-                    <CardTitle className="text-xl">Certificado Digital (.pfx)</CardTitle>
-                    <CardDescription className="text-xs">
-                      Envie seu certificado para assinar digitalmente os documentos gerados no atendimento.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0 space-y-4">
+                <CardContent className="p-4 pt-0 space-y-4">
                     {certLoading ? (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -994,11 +1012,10 @@ export function PerfilContent() {
                         )}
                       </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                </CardContent>
+              </Card>
             )}
-          </Tabs>
+          </div>
 
           <Dialog open={cameraDialogOpen} onOpenChange={(open) => !open && stopCameraCapture()}>
             <DialogContent className="sm:max-w-xl">
@@ -1032,6 +1049,111 @@ export function PerfilContent() {
           </Dialog>
 
           <Dialog
+            open={passwordModalOpen}
+            onOpenChange={(open) => {
+              if (!isChangingPassword) {
+                setPasswordModalOpen(open);
+                if (!open) passwordForm.reset();
+              }
+            }}
+          >
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Alterar Senha</DialogTitle>
+                <DialogDescription>
+                  Digite sua senha atual e escolha uma nova senha.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...passwordForm}>
+                <form
+                  onSubmit={passwordForm.handleSubmit(handleChangePassword)}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={passwordForm.control}
+                    name="senhaAtual"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Senha Atual</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Digite sua senha atual"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Separator />
+
+                  <FormField
+                    control={passwordForm.control}
+                    name="novaSenha"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nova Senha</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Mínimo 6 caracteres"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmarSenha"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirmar Nova Senha</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder="Digite a nova senha novamente"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setPasswordModalOpen(false);
+                        passwordForm.reset();
+                      }}
+                      disabled={isChangingPassword}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={isChangingPassword}>
+                      {isChangingPassword ? (
+                        <>
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          Alterando...
+                        </>
+                      ) : (
+                        "Alterar Senha"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
             open={avatarEditorOpen}
             onOpenChange={(open) => {
               if (!uploadingAvatar) setAvatarEditorOpen(open);
@@ -1041,19 +1163,42 @@ export function PerfilContent() {
               <DialogHeader>
                 <DialogTitle>Ajustar foto de perfil</DialogTitle>
                 <DialogDescription>
-                  Ajuste o zoom da imagem e confirme para salvar.
+                  Ajuste o zoom e arraste a foto para enquadrar como preferir.
                 </DialogDescription>
               </DialogHeader>
               {avatarPreviewUrl && (
                 <div className="space-y-4">
-                  <div className="mx-auto h-72 w-72 overflow-hidden rounded-xl border bg-muted">
-                    <img
-                      src={avatarPreviewUrl}
-                      alt="Prévia da foto"
-                      className="h-full w-full object-cover transition-transform duration-150"
-                      style={{ transform: `scale(${avatarZoom})` }}
-                    />
-                  </div>
+                  {(() => {
+                    const { displayedWidth, displayedHeight } = getAvatarDragBounds();
+                    return (
+                      <div
+                        className="mx-auto relative h-72 w-72 overflow-hidden rounded-xl border bg-muted touch-none cursor-grab active:cursor-grabbing"
+                        onPointerDown={handleAvatarPointerDown}
+                        onPointerMove={handleAvatarPointerMove}
+                        onPointerUp={handleAvatarPointerEnd}
+                        onPointerCancel={handleAvatarPointerEnd}
+                        onDragStart={(event) => event.preventDefault()}
+                        style={{ touchAction: "none" }}
+                      >
+                        <div
+                          className="absolute left-1/2 top-1/2"
+                          style={{
+                            width: displayedWidth,
+                            height: displayedHeight,
+                            transform: `translate3d(calc(-50% + ${avatarOffset.x}px), calc(-50% + ${avatarOffset.y}px), 0)`,
+                          }}
+                        >
+                          <img
+                            src={avatarPreviewUrl}
+                            alt="Prévia da foto"
+                            className="h-full w-full object-cover select-none pointer-events-none"
+                            draggable={false}
+                            onDragStart={(event) => event.preventDefault()}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <ZoomIn className="h-3.5 w-3.5" />
@@ -1065,7 +1210,11 @@ export function PerfilContent() {
                       max={3}
                       step={0.1}
                       value={avatarZoom}
-                      onChange={(e) => setAvatarZoom(Number(e.target.value))}
+                      onChange={(e) => {
+                        const nextZoom = Number(e.target.value);
+                        setAvatarZoom(nextZoom);
+                        setAvatarOffset((prev) => clampAvatarOffset(prev.x, prev.y, nextZoom));
+                      }}
                       className="w-full"
                     />
                   </div>

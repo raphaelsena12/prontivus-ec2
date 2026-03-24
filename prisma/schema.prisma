@@ -114,6 +114,7 @@ model Tenant {
   lotesTiss                   LoteTiss[]
   guiaTissProcedimentos       GuiaTissProcedimento[]
   medicosTelemedicina         MedicoTelemedicina[]
+  cidsCatalogo                Cid[]
 
   @@index([cnpj])
   @@index([dataExpiracao])
@@ -1466,6 +1467,28 @@ model ConsultaCid {
   @@index([clinicaId])
   @@index([consultaId])
   @@map("consulta_cids")
+}
+
+model Cid {
+  id           String   @id @default(uuid())
+  clinicaId    String
+  codigo       String
+  descricao    String
+  categoria    String?
+  subcategoria String?
+  observacoes  String?
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  clinica Tenant @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicaId, codigo])
+  @@index([clinicaId])
+  @@index([codigo])
+  @@index([descricao])
+  @@index([ativo])
+  @@map("cids")
 }
 
 model ConsultaExame {

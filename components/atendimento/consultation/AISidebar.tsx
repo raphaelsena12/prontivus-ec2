@@ -80,6 +80,7 @@ interface AISidebarProps {
   cidsManuais: Array<{ code: string; description: string }>;
   setCidsManuais: (cids: Array<{ code: string; description: string }>) => void;
   setCidDialogOpen: (v: boolean) => void;
+  setCidSearchDialogOpen: (v: boolean) => void;
   // Exames AI
   selectedExamesAI: Set<number>;
   setSelectedExamesAI: (s: Set<number>) => void;
@@ -252,6 +253,7 @@ export function AISidebar({
   cidsManuais,
   setCidsManuais,
   setCidDialogOpen,
+  setCidSearchDialogOpen,
   selectedExamesAI,
   setSelectedExamesAI,
   examesManuais,
@@ -336,6 +338,8 @@ export function AISidebar({
   const [formDocId, setFormDocId] = useState<string | null>(null);
   const [formDias, setFormDias] = useState("1");
   const [formMeses, setFormMeses] = useState("6");
+  const [examAnalysisModalOpen, setExamAnalysisModalOpen] = useState(false);
+  const [selectedExamForAnalysis, setSelectedExamForAnalysis] = useState<ExameAnexado | null>(null);
 
   const DOCS_COM_DIAS = new Set([
     "atestado-afastamento",
@@ -471,9 +475,58 @@ export function AISidebar({
     prescricoes.length > 0 ||
     (hasAIData && (analysisResults!.prescricoes?.length ?? 0) > 0);
 
+  const selectedContextExams = examesAnexados.filter((exame) =>
+    aiContext.examesIds.includes(exame.id)
+  );
+
+  const openExamFile = async (examId: string) => {
+    try {
+      const response = await fetch(`/api/medico/exames/url?exameId=${encodeURIComponent(examId)}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (error) {
+      console.error("Erro ao abrir exame:", error);
+    }
+  };
+
+  const resolveExamConclusion = (analysisText?: string): "Ótimo" | "Bom" | "Ruim" | "Muito Ruim" => {
+    const text = (analysisText || "").toLowerCase();
+    if (!text.trim()) return "Bom";
+
+    if (/grave|cr[ií]tic|sever|urgente|alto risco|descompensa|importante altera/.test(text)) {
+      return "Muito Ruim";
+    }
+
+    const hasBad =
+      /alterad|fora da faixa|anormal|aten[çc][ãa]o|infe[cç][ãa]o|inflama[cç][ãa]o|reduzid|elevad/.test(text);
+    const hasGood =
+      /normal|normalidade|sem altera[cç][õo]es|dentro da faixa|dentro do esperado|aus[êe]ncia/.test(text);
+
+    if (hasBad && hasGood) return "Bom";
+    if (hasBad) return "Ruim";
+    if (hasGood) return "Ótimo";
+    return "Bom";
+  };
+
+  const getConclusionStyles = (conclusao: "Ótimo" | "Bom" | "Ruim" | "Muito Ruim") => {
+    if (conclusao === "Ótimo") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    if (conclusao === "Bom") return "bg-blue-50 text-blue-700 border-blue-200";
+    if (conclusao === "Ruim") return "bg-amber-50 text-amber-700 border-amber-200";
+    return "bg-rose-50 text-rose-700 border-rose-200";
+  };
+
+  const getConclusionReason = (analysisText?: string): string => {
+    const text = (analysisText || "").trim();
+    if (!text) return "A IA ainda não retornou detalhes analíticos para os exames selecionados.";
+    const firstSentence = text.split(/(?<=[.!?])\s+/)[0];
+    return firstSentence || text;
+  };
+
+  const hasExamAnalysisReady = !!(analysisResults?.raciocinioClinico && analysisResults.raciocinioClinico.trim());
+
   const FIXED_CONTEXT_ITEMS = [
     { key: "anamnese" as const,     label: "Anamnese da consulta" },
-    { key: "alergias" as const,     label: "Alergias do paciente" },
     { key: "medicamentos" as const, label: "Medicamentos em uso" },
   ];
 
@@ -621,7 +674,7 @@ export function AISidebar({
             Selecione para analisar com Inteligência Artificial:
           </p>
           <div className="space-y-2">
-            {/* Itens fixos: anamnese, alergias, medicamentos */}
+            {/* Itens fixos: anamnese e medicamentos */}
             {FIXED_CONTEXT_ITEMS.map((item) => {
               const checked = aiContext[item.key] as boolean;
               return (
@@ -785,13 +838,47 @@ export function AISidebar({
             <span className="text-xs font-semibold text-white">Análise de Exames</span>
             <span className="ml-auto text-[9px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">✦ IA</span>
           </div>
-          <div className="px-3 py-2.5">
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              {analysisResults?.raciocinioClinico
-                ? analysisResults.raciocinioClinico
-                : <span className="italic text-slate-400">Nenhuma análise disponível. Clique em &quot;Analisar com IA&quot; para gerar.</span>
-              }
-            </p>
+          <div className="divide-y divide-slate-50">
+            {selectedContextExams.length === 0 ? (
+              <div className="px-3 py-2.5">
+                <p className="text-[11px] text-slate-400 italic">
+                  Selecione ao menos um exame no contexto da IA para ver a análise por exame.
+                </p>
+              </div>
+            ) : (
+              selectedContextExams.map((exame) => {
+                const conclusao = hasExamAnalysisReady
+                  ? resolveExamConclusion(analysisResults?.raciocinioClinico)
+                  : null;
+                return (
+                  <div key={`exam-analysis-${exame.id}`} className="px-3 py-2.5 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!hasExamAnalysisReady) return;
+                        setSelectedExamForAnalysis(exame);
+                        setExamAnalysisModalOpen(true);
+                      }}
+                      className="flex-1 min-w-0 text-left"
+                      title={hasExamAnalysisReady ? "Abrir análise completa" : "Aguardando análise da IA"}
+                    >
+                      <p className={`text-xs font-medium truncate ${hasExamAnalysisReady ? "text-slate-700 hover:text-blue-700 hover:underline cursor-pointer" : "text-slate-500"}`}>
+                        {exame.nome}
+                      </p>
+                    </button>
+                    {conclusao ? (
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getConclusionStyles(conclusao)}`}>
+                        {conclusao}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-500 border-slate-200">
+                        Aguardando IA
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -803,11 +890,20 @@ export function AISidebar({
               style={{ width: "14px", height: "14px", color: "#FBBF24" }}
             />
             <span className="text-xs font-semibold text-white">CID-10</span>
-            {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
-              <span className="ml-auto text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
-                {analysisResults!.cidCodes.length}
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
+                <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
+                  {analysisResults!.cidCodes.length}
+                </span>
+              )}
+              <button
+                onClick={() => setCidSearchDialogOpen(true)}
+                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                title="Buscar CID"
+              >
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           <div className="divide-y divide-slate-50">
             {isProcessing ? (
@@ -1555,6 +1651,69 @@ export function AISidebar({
       onConfirm={handleFormConfirm}
       onClose={() => { setFormDocId(null); setFormDias("1"); setFormMeses("6"); }}
     />
+    <Dialog
+      open={examAnalysisModalOpen && hasExamAnalysisReady}
+      onOpenChange={(open) => {
+        if (!open) setExamAnalysisModalOpen(false);
+      }}
+    >
+      <DialogContent className="sm:max-w-3xl p-0 overflow-hidden border-slate-200">
+        <DialogHeader>
+          <div className="px-5 py-4 pr-14 border-b border-slate-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white border border-blue-200 flex items-center justify-center flex-shrink-0">
+                <Brain className="w-4 h-4 text-blue-700" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-sm font-semibold text-slate-800 truncate">
+                  {selectedExamForAnalysis?.nome || "Análise do exame"}
+                </DialogTitle>
+                <p className="text-xs text-slate-500 mt-0.5">Análise detalhada gerada por IA clínica</p>
+              </div>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getConclusionStyles(resolveExamConclusion(analysisResults?.raciocinioClinico))}`}>
+                {resolveExamConclusion(analysisResults?.raciocinioClinico)}
+              </span>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="p-5 space-y-4 bg-white">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 mb-1.5">Resumo da conclusão</p>
+            <p className="text-sm text-slate-700 leading-relaxed">
+              {getConclusionReason(analysisResults?.raciocinioClinico)}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 mb-2">Análise completa da IA</p>
+            <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed max-h-[42vh] overflow-y-auto pr-1">
+              {analysisResults?.raciocinioClinico?.trim()
+                ? analysisResults.raciocinioClinico
+                : "Ainda não há análise disponível para os exames selecionados."}
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 text-xs"
+              onClick={() => {
+                if (selectedExamForAnalysis?.id) openExamFile(selectedExamForAnalysis.id);
+              }}
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+              Abrir exame
+            </Button>
+            <Button
+              type="button"
+              className="h-8 text-xs bg-[#1E40AF] hover:bg-[#1e3a8a] text-white"
+              onClick={() => setExamAnalysisModalOpen(false)}
+            >
+              Fechar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

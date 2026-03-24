@@ -184,7 +184,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [selectedPrescricoesAI, setSelectedPrescricoesAI] = useState<Set<number>>(new Set());
   const [medicamentoDialogOpen, setMedicamentoDialogOpen] = useState(false);
   const [medicamentoSearch, setMedicamentoSearch] = useState("");
-  const [medicamentos, setMedicamentos] = useState<Array<{ id: string; nome: string; principioAtivo: string | null; laboratorio: string | null; apresentacao: string | null; concentracao: string | null; unidade: string | null }>>([]);
+  const [medicamentos, setMedicamentos] = useState<Array<{ id: string; nome: string; principioAtivo: string | null; laboratorio: string | null; apresentacao: string | null; concentracao: string | null; unidade: string | null; controle: string | null }>>([]);
   const [loadingMedicamentos, setLoadingMedicamentos] = useState(false);
   const [manipulados, setManipulados] = useState<Array<{ id: string; descricao: string; informacoes: string | null }>>([]);
   const [loadingManipulados, setLoadingManipulados] = useState(false);
@@ -236,10 +236,15 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [protocolosManuais, setProtocolosManuais] = useState<Array<{ nome: string; descricao: string }>>([]);
   const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string; codigoTussId?: string | null; codigoTuss?: string | null; exameId?: string | null; grupoId?: string | null }>>([]);
   const [cidDialogOpen, setCidDialogOpen] = useState(false);
+  const [cidSearchDialogOpen, setCidSearchDialogOpen] = useState(false);
   const [protocoloDialogOpen, setProtocoloDialogOpen] = useState(false);
   const [exameDialogOpen, setExameDialogOpen] = useState(false);
   const [novoCidCode, setNovoCidCode] = useState("");
   const [novoCidDescription, setNovoCidDescription] = useState("");
+  const [cidSearch, setCidSearch] = useState("");
+  const [cidsCadastrados, setCidsCadastrados] = useState<Array<{ id: string; codigo: string; descricao: string; categoria: string | null }>>([]);
+  const [loadingCidsCadastrados, setLoadingCidsCadastrados] = useState(false);
+  const [selectedCidsCatalogoIds, setSelectedCidsCatalogoIds] = useState<Set<string>>(new Set());
   const [novoExameNome, setNovoExameNome] = useState("");
   const [novoExameTipo, setNovoExameTipo] = useState("");
   const [exameSearchDialogOpen, setExameSearchDialogOpen] = useState(false);
@@ -546,6 +551,24 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exameSearchDialogOpen]);
 
+  useEffect(() => {
+    if (cidSearchDialogOpen) {
+      const preSelecionados = new Set(
+        cidsCadastrados
+          .filter((cid) => cidsManuais.some((m) => m.code === cid.codigo))
+          .map((cid) => cid.id)
+      );
+      setSelectedCidsCatalogoIds(preSelecionados);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cidSearchDialogOpen]);
+
+  useEffect(() => {
+    if (cidSearchDialogOpen) {
+      fetchCidsCadastrados();
+    }
+  }, [cidSearchDialogOpen, cidSearch]);
+
   // Buscar exames quando o dialog abrir
   useEffect(() => {
     if (exameSearchDialogOpen) {
@@ -637,6 +660,52 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     } finally {
       setLoadingGruposExames(false);
     }
+  };
+
+  const fetchCidsCadastrados = async () => {
+    try {
+      setLoadingCidsCadastrados(true);
+      const params = new URLSearchParams();
+      if (cidSearch.trim()) params.append("search", cidSearch.trim());
+      params.append("limit", "300");
+      const response = await fetch(`/api/medico/cids?${params.toString()}`);
+      if (!response.ok) throw new Error("Erro ao buscar CIDs");
+      const data = await response.json();
+      setCidsCadastrados(data.cids || []);
+    } catch (error) {
+      console.error("Erro ao buscar CIDs:", error);
+      toast.error("Erro ao buscar CIDs");
+    } finally {
+      setLoadingCidsCadastrados(false);
+    }
+  };
+
+  const handleToggleCidCatalogo = (id: string) => {
+    setSelectedCidsCatalogoIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleConfirmarCidsCatalogo = () => {
+    const manuaisDigitados = cidsManuais.filter(
+      (cid) => !cidsCadastrados.some((catalogo) => catalogo.codigo === cid.code)
+    );
+    const selecionados = cidsCadastrados
+      .filter((cid) => selectedCidsCatalogoIds.has(cid.id))
+      .map((cid) => ({ code: cid.codigo, description: cid.descricao }));
+
+    setCidsManuais([...manuaisDigitados, ...selecionados]);
+    setCidSearchDialogOpen(false);
+    setCidSearch("");
+    setSelectedCidsCatalogoIds(new Set());
+  };
+
+  const handleCancelarCidsCatalogo = () => {
+    setCidSearchDialogOpen(false);
+    setCidSearch("");
+    setSelectedCidsCatalogoIds(new Set());
   };
 
   const handleToggleExame = (id: string) => {
@@ -1077,6 +1146,33 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     setMedicamentoDialogOpen(false);
     setMedicamentoSearch("");
     setSelectedPrescricaoIndex(null);
+  };
+
+  const getTarjaBadgeClass = (controle?: string | null) => {
+    const value = (controle || "").toLowerCase();
+    if (!value) return "bg-slate-100 text-slate-700 border-slate-300";
+
+    if (value.includes("preta")) {
+      return "bg-slate-900 text-white border-slate-900";
+    }
+
+    if (value.includes("vermelha")) {
+      return "bg-red-100 text-red-800 border-red-300";
+    }
+
+    if (value.includes("amarela")) {
+      return "bg-amber-100 text-amber-800 border-amber-300";
+    }
+
+    if (value.includes("controlado")) {
+      return "bg-violet-100 text-violet-800 border-violet-300";
+    }
+
+    if (value.includes("simples")) {
+      return "bg-emerald-100 text-emerald-800 border-emerald-300";
+    }
+
+    return "bg-slate-100 text-slate-700 border-slate-300";
   };
 
   // Debug: monitorar mudanças em analysisResults
@@ -2186,6 +2282,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   cidsManuais={cidsManuais}
                   setCidsManuais={setCidsManuais}
                   setCidDialogOpen={setCidDialogOpen}
+                  setCidSearchDialogOpen={setCidSearchDialogOpen}
                   selectedExamesAI={selectedExamesAI}
                   setSelectedExamesAI={setSelectedExamesAI}
                   examesManuais={examesManuais}
@@ -2638,12 +2735,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                         <button
                           key={med.id}
                           onClick={() => handlePreSelectMedicamento(med)}
-                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors"
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-colors relative"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-slate-800 truncate">{med.nome}</p>
-                              <div className="flex flex-wrap gap-2 mt-1">
+                              <div className={`flex flex-wrap gap-2 mt-1 ${med.controle ? "pr-24" : ""}`}>
                                 {med.principioAtivo && (
                                   <span className="text-xs text-slate-500">Princípio: {med.principioAtivo}</span>
                                 )}
@@ -2660,6 +2757,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                             </div>
                             <Pill className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                           </div>
+                          {med.controle && (
+                            <span className={`absolute top-2 right-2 text-[10px] font-medium px-1.5 py-0.5 rounded border ${getTarjaBadgeClass(med.controle)}`}>
+                              {med.controle}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -2850,6 +2952,78 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               disabled={!novoCidCode.trim() || !novoCidDescription.trim()}
             >
               Adicionar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Busca de CID */}
+      <Dialog open={cidSearchDialogOpen} onOpenChange={(open) => {
+        if (!open) handleCancelarCidsCatalogo();
+        else setCidSearchDialogOpen(true);
+      }}>
+        <DialogContent className="max-w-2xl h-[640px] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Selecionar CID</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-3">
+            <div className="relative flex-shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Buscar CID por codigo, descricao ou categoria..."
+                value={cidSearch}
+                onChange={(e) => setCidSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
+              {loadingCidsCadastrados ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                </div>
+              ) : cidsCadastrados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                  <Stethoscope className="w-10 h-10 text-slate-200 mb-3" />
+                  <p className="text-sm text-slate-500 font-medium">Nenhum CID encontrado</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {cidSearch ? "Tente uma busca diferente" : "Digite para buscar CIDs cadastrados"}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2 space-y-1">
+                  {cidsCadastrados.map((cid) => {
+                    const isSelected = selectedCidsCatalogoIds.has(cid.id);
+                    return (
+                      <button
+                        key={cid.id}
+                        onClick={() => handleToggleCidCatalogo(cid.id)}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-slate-400 hover:bg-slate-50"}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500" : "border-slate-300"}`}>
+                            {isSelected && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 truncate">{cid.codigo}</p>
+                            <p className="text-xs text-slate-500">{cid.descricao}</p>
+                            {cid.categoria && (
+                              <Badge variant="outline" className="text-xs text-slate-500 border-slate-200 mt-1">
+                                {cid.categoria}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={handleCancelarCidsCatalogo}>Cancelar</Button>
+            <Button onClick={handleConfirmarCidsCatalogo} disabled={selectedCidsCatalogoIds.size === 0}>
+              Adicionar selecionados
             </Button>
           </div>
         </DialogContent>

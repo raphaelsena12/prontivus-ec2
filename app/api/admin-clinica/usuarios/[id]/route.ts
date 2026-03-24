@@ -85,13 +85,6 @@ export async function PUT(
 
     const data = validation.data;
 
-    if (data.tipo === TipoUsuario.ADMIN_CLINICA) {
-      return NextResponse.json(
-        { error: "Admin Clínica não pode definir usuário como Admin Clínica" },
-        { status: 403 }
-      );
-    }
-
     const updateData: {
       nome?: string;
       email?: string;

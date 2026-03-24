@@ -78,10 +78,13 @@ const createUsuarioSchema = z.object({
       { message: "Telefone inválido. Use o formato (XX) XXXXX-XXXX" }
     ),
   tipo: z.nativeEnum(TipoUsuario),
-  senha: z.string()
-    .min(1, "Senha é obrigatória")
-    .min(6, "Senha deve ter no mínimo 6 caracteres")
-    .max(255, "Senha deve ter no máximo 255 caracteres"),
+  senha: z
+    .union([
+      z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(255, "Senha deve ter no máximo 255 caracteres"),
+      z.literal(""),
+      z.undefined(),
+    ])
+    .optional(),
 });
 
 const updateUsuarioSchema = z.object({
@@ -121,6 +124,7 @@ export function UsuarioDialog({
   const [loading, setLoading] = useState(false);
   const [isEnfermeiro, setIsEnfermeiro] = useState(false);
   const isEditing = !!usuario;
+  const showAdminOption = true;
 
   const form = useForm<UsuarioFormValues>({
     resolver: zodResolver(createUsuarioSchema),
@@ -238,6 +242,12 @@ export function UsuarioDialog({
 
         toast.success("Usuário atualizado com sucesso!");
       } else {
+        if (!data.senha || data.senha.trim() === "") {
+          form.setError("senha", { message: "Senha é obrigatória" });
+          setLoading(false);
+          return;
+        }
+
         const response = await fetch(`/api/admin-clinica/usuarios`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -247,7 +257,7 @@ export function UsuarioDialog({
             cpf: cpfLimpo,
             telefone: telefoneLimpo,
             tipo: data.tipo,
-            senha: data.senha,
+            senha: data.senha.trim(),
             isEnfermeiro: data.tipo === TipoUsuario.SECRETARIA ? isEnfermeiro : false,
           }),
         });
@@ -420,9 +430,11 @@ export function UsuarioDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={TipoUsuario.ADMIN_CLINICA}>
-                          Admin Clínica
-                        </SelectItem>
+                        {showAdminOption && (
+                          <SelectItem value={TipoUsuario.ADMIN_CLINICA}>
+                            Admin Clínica
+                          </SelectItem>
+                        )}
                         <SelectItem value={TipoUsuario.MEDICO}>
                           Médico
                         </SelectItem>
