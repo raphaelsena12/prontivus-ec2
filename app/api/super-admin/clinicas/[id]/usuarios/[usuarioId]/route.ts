@@ -180,6 +180,47 @@ export async function PUT(
       },
     });
 
+    // Sincronizar tipo por tenant para evitar divergência entre usuario.tipo e UsuarioTenant.tipo
+    if (data.tipo && data.tipo !== usuarioExistente.tipo) {
+      try {
+        await prisma.usuarioTenant.upsert({
+          where: {
+            usuarioId_tenantId: {
+              usuarioId,
+              tenantId: id,
+            },
+          },
+          update: {
+            tipo: data.tipo,
+            ativo: true,
+          },
+          create: {
+            usuarioId,
+            tenantId: id,
+            tipo: data.tipo,
+            ativo: true,
+            isPrimary: true,
+          },
+        });
+      } catch {
+        // Tabela UsuarioTenant pode não existir em ambientes legados
+      }
+
+      // Ao remover papel de MEDICO neste tenant, desativa vínculo legado de médico
+      if (data.tipo !== TipoUsuario.MEDICO) {
+        await prisma.medico.updateMany({
+          where: {
+            usuarioId,
+            clinicaId: id,
+            ativo: true,
+          },
+          data: {
+            ativo: false,
+          },
+        });
+      }
+    }
+
     return NextResponse.json({ usuario });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);

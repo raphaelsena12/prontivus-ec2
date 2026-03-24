@@ -84,6 +84,14 @@ export async function PUT(
     }
 
     const data = validation.data;
+
+    if (data.tipo === TipoUsuario.ADMIN_CLINICA) {
+      return NextResponse.json(
+        { error: "Admin Clínica não pode definir usuário como Admin Clínica" },
+        { status: 403 }
+      );
+    }
+
     const updateData: {
       nome?: string;
       email?: string;
@@ -143,6 +151,47 @@ export async function PUT(
         updatedAt: true,
       },
     });
+
+    // Sincronizar tipo por tenant para evitar divergência entre usuario.tipo e UsuarioTenant.tipo
+    if (data.tipo && data.tipo !== usuarioExistente.tipo) {
+      try {
+        await prisma.usuarioTenant.upsert({
+          where: {
+            usuarioId_tenantId: {
+              usuarioId: id,
+              tenantId: auth.clinicaId!,
+            },
+          },
+          update: {
+            tipo: data.tipo,
+            ativo: true,
+          },
+          create: {
+            usuarioId: id,
+            tenantId: auth.clinicaId!,
+            tipo: data.tipo,
+            ativo: true,
+            isPrimary: true,
+          },
+        });
+      } catch {
+        // Tabela UsuarioTenant pode não existir em ambientes legados
+      }
+
+      // Ao remover papel de MEDICO neste tenant, desativa vínculo legado de médico
+      if (data.tipo !== TipoUsuario.MEDICO) {
+        await prisma.medico.updateMany({
+          where: {
+            usuarioId: id,
+            clinicaId: auth.clinicaId!,
+            ativo: true,
+          },
+          data: {
+            ativo: false,
+          },
+        });
+      }
+    }
 
     return NextResponse.json({ usuario });
   } catch (error) {
