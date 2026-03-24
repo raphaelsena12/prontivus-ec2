@@ -12,6 +12,7 @@ import {
 } from "@/lib/email";
 import { gerarEmailMedico } from "@/lib/utils";
 import { sendWhatsAppForClinica, gerarMensagemConfirmacaoAgendamento } from "@/lib/whatsapp";
+import { horarioEstaDentroDasFaixas, obterFaixasAgendaMedicoParaData } from "@/lib/medico-escala";
 
 const agendamentoSchema = z.object({
   pacienteId: z.string().uuid(),
@@ -314,6 +315,33 @@ export async function POST(request: NextRequest) {
       fim.setMinutes(fim.getMinutes() + 30);
       return fim;
     })();
+    const inicioHHMM = dataHoraInicio.toLocaleTimeString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const fimHHMM = dataHoraFim.toLocaleTimeString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const faixasPermitidas = await obterFaixasAgendaMedicoParaData(
+      auth.clinicaId!,
+      data.medicoId,
+      dataHoraInicio
+    );
+    if (!horarioEstaDentroDasFaixas(inicioHHMM, fimHHMM, faixasPermitidas)) {
+      return NextResponse.json(
+        {
+          error: "Este médico não possui atendimento configurado para este horário.",
+          detalhes: { inicio: inicioHHMM, fim: fimHHMM },
+        },
+        { status: 400 }
+      );
+    }
 
     // Buscar todos os agendamentos do médico que não estão cancelados
     const agendamentosMedico = await prisma.consulta.findMany({

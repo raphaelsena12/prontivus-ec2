@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { brazilDayStart, brazilDayEnd, brazilDateTime, brazilToday, getBrazilHourMinute } from "@/lib/timezone-utils";
+import { obterFaixasAgendaMedicoParaData } from "@/lib/medico-escala";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -81,8 +82,7 @@ export async function GET(request: NextRequest) {
 
     // Parse da data com fuso Brasil
     const dataSelecionada = brazilDayStart(dataParam);
-    const dataInicio = brazilDateTime(dataParam, "08:00");
-    const dataFim = brazilDateTime(dataParam, "18:00");
+    const dataInicio = brazilDayStart(dataParam);
 
     // Buscar agendamentos existentes do médico neste dia
     const agendamentos = await prisma.consulta.findMany({
@@ -125,7 +125,12 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Horários Disponíveis] Bloqueios encontrados: ${bloqueios.length}`);
 
-    // Gerar horários disponíveis (de 30 em 30 minutos, das 8h às 18h)
+    // Gerar horários disponíveis de acordo com a escala do médico
+    const faixasAgenda = await obterFaixasAgendaMedicoParaData(auth.clinicaId!, medicoId, dataSelecionada);
+    if (faixasAgenda.length === 0) {
+      return NextResponse.json({ horarios: [], data: dataParam, medicoId });
+    }
+
     const horariosDisponiveis: string[] = [];
     const horariosOcupados = new Set<string>();
 
@@ -165,21 +170,17 @@ export async function GET(request: NextRequest) {
         let horaFimFinal = horaFim;
         let minutoFimFinal = minutoFim;
 
-        // Se o bloqueio começa antes do dia, começar às 8h
+        // Se o bloqueio começa antes do dia, começar no início da agenda regular
         if (dataInicioBloqueioStr < dataParam) {
-          horaInicioFinal = 8;
+          horaInicioFinal = 0;
           minutoInicioFinal = 0;
         }
 
-        // Se o bloqueio termina depois do dia, terminar às 18h
+        // Se o bloqueio termina depois do dia, terminar no fim do dia
         if (dataFimBloqueioStr > dataParam) {
-          horaFimFinal = 18;
+          horaFimFinal = 23;
           minutoFimFinal = 0;
         }
-
-        // Garantir que os horários estão dentro do intervalo válido (8h-18h)
-        horaInicioFinal = Math.max(8, Math.min(18, horaInicioFinal));
-        horaFimFinal = Math.max(8, Math.min(18, horaFimFinal));
 
         // Marcar todos os horários dentro do bloqueio
         let horaAtual = horaInicioFinal;
@@ -199,7 +200,7 @@ export async function GET(request: NextRequest) {
           }
           
           // Proteção contra loop infinito
-          if (horaAtual >= 18) break;
+          if (horaAtual >= 23) break;
         }
       }
     });
@@ -211,28 +212,29 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Horários Disponíveis] É hoje? ${eHoje}, Agora: ${agora.toISOString()}, Data selecionada: ${dataParam}`);
 
-    for (let hora = 8; hora < 18; hora++) {
-      for (let minuto = 0; minuto < 60; minuto += 10) {
+    for (const faixa of faixasAgenda) {
+      const [iniH, iniM] = faixa.horaInicio.split(":").map(Number);
+      const [fimH, fimM] = faixa.horaFim.split(":").map(Number);
+      let minutos = iniH * 60 + iniM;
+      const limite = fimH * 60 + fimM;
+
+      while (minutos < limite) {
+        const hora = Math.floor(minutos / 60);
+        const minuto = minutos % 60;
         const chave = `${hora.toString().padStart(2, "0")}:${minuto.toString().padStart(2, "0")}`;
         if (!horariosOcupados.has(chave)) {
-          // Verificar se não é um horário passado (apenas se for hoje)
           if (eHoje) {
             const dataHoraHorario = brazilDateTime(dataParam, chave);
-            
-            // Adicionar 10 minutos de margem para evitar problemas de timezone
-            const margem = 10 * 60 * 1000; // 10 minutos em milissegundos
+            const margem = 10 * 60 * 1000;
             if (dataHoraHorario.getTime() > agora.getTime() + margem) {
               horariosDisponiveis.push(chave);
-            } else {
-              console.log(`[Horários Disponíveis] Horário ${chave} ignorado (passado ou muito próximo)`);
             }
           } else {
-            // Se não for hoje, adicionar todos os horários disponíveis
             horariosDisponiveis.push(chave);
           }
-        } else {
-          console.log(`[Horários Disponíveis] Horário ${chave} ocupado`);
         }
+
+        minutos += 10;
       }
     }
 

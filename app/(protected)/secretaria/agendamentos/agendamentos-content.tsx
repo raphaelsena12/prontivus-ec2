@@ -36,6 +36,7 @@ import { EditarAgendamentoModal } from "./components/editar-agendamento-modal";
 import { BloqueioAgendaModal } from "./components/bloqueio-agenda-modal";
 import { NovoAgendamentoModal } from "./components/novo-agendamento-modal";
 import { PageHeader } from "@/components/page-header";
+import { EscalaMedicoModal } from "./components/escala-medico-modal";
 
 interface Agendamento {
   id: string;
@@ -98,6 +99,12 @@ interface Medico {
   especialidade?: string;
 }
 
+interface EscalaHorario {
+  diaSemana: number;
+  horaInicio: string;
+  horaFim: string;
+}
+
 export function AgendamentosContent() {
   const router = useRouter();
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
@@ -113,6 +120,8 @@ export function AgendamentosContent() {
   const [view, setView] = useState<"calendar" | "table">("calendar");
   const [bloqueioModalOpen, setBloqueioModalOpen] = useState(false);
   const [novoAgendamentoModalOpen, setNovoAgendamentoModalOpen] = useState(false);
+  const [escalaModalOpen, setEscalaModalOpen] = useState(false);
+  const [escalasMedico, setEscalasMedico] = useState<EscalaHorario[]>([]);
   const [novoAgendamentoInitialData, setNovoAgendamentoInitialData] = useState<{
     data?: string;
     hora?: string;
@@ -219,6 +228,27 @@ export function AgendamentosContent() {
   useEffect(() => {
     fetchAgendamentos();
   }, [fetchAgendamentos]);
+
+  useEffect(() => {
+    const fetchEscala = async () => {
+      if (!medicoSelecionado) {
+        setEscalasMedico([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/secretaria/medicos/${medicoSelecionado}/escala`);
+        if (!response.ok) throw new Error("Erro ao carregar escala");
+        const data = await response.json();
+        setEscalasMedico(data.escalas || []);
+      } catch (error) {
+        console.error("Erro ao carregar escala do médico:", error);
+        setEscalasMedico([]);
+      }
+    };
+
+    fetchEscala();
+  }, [medicoSelecionado, escalaModalOpen]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -426,6 +456,14 @@ export function AgendamentosContent() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEscalaModalOpen(true)}
+                className="text-xs h-8 border-border/60 hover:bg-muted/80 transition-colors"
+              >
+                <Clock className="mr-1.5 h-3.5 w-3.5" />
+                Escala
+              </Button>
               <Button 
                 variant="outline"
                 onClick={() => setBloqueioModalOpen(true)}
@@ -469,6 +507,7 @@ export function AgendamentosContent() {
                     <AgendamentosCalendar
                       agendamentos={agendamentos}
                       bloqueios={bloqueios}
+                      escalas={escalasMedico}
                       onEventClick={(agendamento) => {
                         setAgendamentoToEdit(agendamento.id);
                         setEditModalOpen(true);
@@ -477,13 +516,33 @@ export function AgendamentosContent() {
                         const startDate = slotInfo.start.toISOString().split("T")[0];
                         const startTime = slotInfo.start.toTimeString().split(" ")[0].slice(0, 5);
                         const endTime = slotInfo.end.toTimeString().split(" ")[0].slice(0, 5);
-                        setNovoAgendamentoInitialData({
-                          data: startDate,
-                          hora: startTime,
-                          horaFim: endTime,
-                          medicoId: medicoSelecionado || undefined,
-                        });
-                        setNovoAgendamentoModalOpen(true);
+                        const validarEabrir = async () => {
+                          if (!medicoSelecionado) return;
+                          try {
+                            const res = await fetch(
+                              `/api/secretaria/horarios-disponiveis?medicoId=${medicoSelecionado}&data=${startDate}&intervaloMin=10`
+                            );
+                            if (!res.ok) throw new Error();
+                            const data = await res.json();
+                            const disponiveis: string[] = data.horarios || [];
+                            if (!disponiveis.includes(startTime)) {
+                              toast.error("Este horário está fora da escala do médico.");
+                              return;
+                            }
+                          } catch {
+                            toast.error("Não foi possível validar a escala do médico.");
+                            return;
+                          }
+
+                          setNovoAgendamentoInitialData({
+                            data: startDate,
+                            hora: startTime,
+                            horaFim: endTime,
+                            medicoId: medicoSelecionado || undefined,
+                          });
+                          setNovoAgendamentoModalOpen(true);
+                        };
+                        validarEabrir();
                       }}
                     />
                   )}
@@ -707,6 +766,13 @@ export function AgendamentosContent() {
           fetchAgendamentos();
         }}
         initialData={novoAgendamentoInitialData}
+      />
+
+      <EscalaMedicoModal
+        open={escalaModalOpen}
+        onOpenChange={setEscalaModalOpen}
+        medicoId={medicoSelecionado || undefined}
+        medicoNome={medicos.find((m) => m.id === medicoSelecionado)?.usuario.nome}
       />
     </div>
   );

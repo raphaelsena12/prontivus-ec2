@@ -17,6 +17,7 @@ import {
   gerarMensagemAlteracaoAgendamento,
   gerarMensagemCancelamentoAgendamento,
 } from "@/lib/whatsapp";
+import { horarioEstaDentroDasFaixas, obterFaixasAgendaMedicoParaData } from "@/lib/medico-escala";
 
 const atualizarAgendamentoSchema = z.object({
   pacienteId: z.string().uuid().optional(),
@@ -332,6 +333,33 @@ export async function PATCH(
         ? new Date(data.dataHoraFim)
         : (() => { const f = new Date(dataHoraInicio); f.setMinutes(f.getMinutes() + 30); return f; })();
       const dataHoraFim = dataHoraFimParaVerificar;
+      const inicioHHMM = dataHoraInicio.toLocaleTimeString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const fimHHMM = dataHoraFim.toLocaleTimeString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const faixasPermitidas = await obterFaixasAgendaMedicoParaData(
+        auth.clinicaId!,
+        medicoIdParaVerificar,
+        dataHoraInicio
+      );
+      if (!horarioEstaDentroDasFaixas(inicioHHMM, fimHHMM, faixasPermitidas)) {
+        return NextResponse.json(
+          {
+            error: "Este médico não possui atendimento configurado para este horário.",
+            detalhes: { inicio: inicioHHMM, fim: fimHHMM },
+          },
+          { status: 400 }
+        );
+      }
 
       // Verificar conflitos com outros agendamentos (exceto o próprio agendamento que está sendo editado)
       const agendamentosMedico = await prisma.consulta.findMany({

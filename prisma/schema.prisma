@@ -114,6 +114,8 @@ model Tenant {
   lotesTiss                   LoteTiss[]
   guiaTissProcedimentos       GuiaTissProcedimento[]
   medicosTelemedicina         MedicoTelemedicina[]
+  medicosEscalasAgenda        MedicoEscalaAgenda[]         @relation("TenantToMedicoEscalaAgenda")
+  medicosEscalasAgendaExcecoes MedicoEscalaAgendaExcecao[] @relation("TenantToMedicoEscalaAgendaExcecao")
   cidsCatalogo                Cid[]
 
   @@index([cnpj])
@@ -296,6 +298,8 @@ model Medico {
   mensagensMedicoSecretaria   MensagemMedicoSecretaria[]
   medicoEspecialidades        MedicoEspecialidade[]
   bloqueiosAgenda             BloqueioAgenda[]
+  escalasAgenda              MedicoEscalaAgenda[]
+  excecoesEscalaAgenda       MedicoEscalaAgendaExcecao[]
   manipulados                 Manipulado[]
   gruposExames                GrupoExame[]
   documentos                  DocumentoGerado[]
@@ -310,6 +314,45 @@ model Medico {
   @@index([crm])
   @@index([usuarioId])
   @@map("medicos")
+}
+
+model MedicoEscalaAgenda {
+  id         String   @id @default(uuid())
+  clinicaId  String
+  medicoId   String
+  diaSemana  Int
+  horaInicio String
+  horaFim    String
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  clinica Tenant @relation("TenantToMedicoEscalaAgenda", fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId, medicoId, diaSemana])
+  @@index([medicoId, ativo])
+  @@map("medicos_escalas_agenda")
+}
+
+model MedicoEscalaAgendaExcecao {
+  id         String   @id @default(uuid())
+  clinicaId  String
+  medicoId   String
+  data       DateTime
+  horaInicio String?
+  horaFim    String?
+  ativo      Boolean  @default(false)
+  observacoes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  clinica Tenant @relation("TenantToMedicoEscalaAgendaExcecao", fields: [clinicaId], references: [id], onDelete: Cascade)
+  medico  Medico @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId, medicoId, data])
+  @@index([medicoId, data])
+  @@map("medicos_escalas_agenda_excecoes")
 }
 
 model MedicoTelemedicina {

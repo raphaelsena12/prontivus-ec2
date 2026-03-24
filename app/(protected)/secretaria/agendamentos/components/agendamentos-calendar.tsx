@@ -68,6 +68,11 @@ interface BloqueioAgenda {
 interface AgendamentosCalendarProps {
   agendamentos: Agendamento[];
   bloqueios?: BloqueioAgenda[];
+  escalas?: Array<{
+    diaSemana: number;
+    horaInicio: string;
+    horaFim: string;
+  }>;
   onEventClick?: (agendamento: Agendamento) => void;
   onSlotSelect?: (slotInfo: { start: Date; end: Date }) => void;
 }
@@ -111,10 +116,32 @@ const getTiposConsultaUnicos = (agendamentos: Agendamento[]): string[] => {
 export function AgendamentosCalendar({
   agendamentos,
   bloqueios = [],
+  escalas = [],
   onEventClick,
   onSlotSelect,
 }: AgendamentosCalendarProps) {
   const router = useRouter();
+
+  const escalaPorDia = useMemo(() => {
+    const map = new Map<number, Array<{ inicio: number; fim: number }>>();
+    for (const escala of escalas) {
+      const [hIni, mIni] = escala.horaInicio.split(":").map(Number);
+      const [hFim, mFim] = escala.horaFim.split(":").map(Number);
+      const item = { inicio: hIni * 60 + mIni, fim: hFim * 60 + mFim };
+      const lista = map.get(escala.diaSemana) || [];
+      lista.push(item);
+      map.set(escala.diaSemana, lista);
+    }
+    return map;
+  }, [escalas]);
+
+  const isSlotDisponivel = (date: Date) => {
+    const diaSemana = date.getDay();
+    const faixas = escalaPorDia.get(diaSemana) || [];
+    if (faixas.length === 0) return false;
+    const minutos = date.getHours() * 60 + date.getMinutes();
+    return faixas.some((faixa) => minutos >= faixa.inicio && minutos < faixa.fim);
+  };
 
   const events = useMemo(() => {
     const agendamentosEvents = agendamentos.map((agendamento) => {
@@ -227,6 +254,9 @@ export function AgendamentosCalendar({
   };
 
   const handleSelectSlot = (slotInfo: { start: Date; end: Date }) => {
+    if (!isSlotDisponivel(slotInfo.start)) {
+      return;
+    }
     if (onSlotSelect) {
       onSlotSelect(slotInfo);
     }
@@ -374,6 +404,10 @@ export function AgendamentosCalendar({
           .calendar-compact .rbc-today {
             background-color: rgba(0, 0, 0, 0.02) !important;
           }
+          .calendar-compact .rbc-time-slot.slot-bloqueado {
+            background-color: rgba(17, 24, 39, 0.08) !important;
+            cursor: not-allowed !important;
+          }
         `}} />
         <Calendar
           localizer={localizer}
@@ -383,8 +417,17 @@ export function AgendamentosCalendar({
           style={{ height: "100%" }}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleEventClick}
+          onSelecting={(slotInfo) => isSlotDisponivel(slotInfo.start)}
           selectable
           eventPropGetter={eventStyleGetter}
+          slotPropGetter={(date) => {
+            if (!isSlotDisponivel(date)) {
+              return {
+                className: "slot-bloqueado",
+              };
+            }
+            return {};
+          }}
           defaultView="week"
           views={["month", "week", "day", "agenda"]}
           messages={messages}

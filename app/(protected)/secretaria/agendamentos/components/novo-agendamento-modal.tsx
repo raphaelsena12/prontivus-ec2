@@ -534,6 +534,8 @@ export function NovoAgendamentoModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<File[]>([]);
   const [novoPacienteOpen, setNovoPacienteOpen] = useState(false);
+  const [horariosDisponiveis, setHorariosDisponiveis] = useState<string[]>([]);
+  const [loadingHorarios, setLoadingHorarios] = useState(false);
 
   const form = useForm<AgendamentoFormData>({
     resolver: zodResolver(agendamentoSchema),
@@ -560,6 +562,7 @@ export function NovoAgendamentoModal({
   const tipoConsultaId = form.watch("tipoConsultaId");
   const data = form.watch("data");
   const hora = form.watch("hora");
+  const horaFim = form.watch("horaFim");
 
   // Carregar dados quando o modal abrir
   useEffect(() => {
@@ -770,6 +773,48 @@ export function NovoAgendamentoModal({
 
     verificarSugestaoDataRetorno();
   }, [pacienteId, medicoId, tipoConsultaId, tiposConsulta]);
+
+  useEffect(() => {
+    const carregarHorarios = async () => {
+      if (!medicoId || !data) {
+        setHorariosDisponiveis([]);
+        return;
+      }
+
+      try {
+        setLoadingHorarios(true);
+        const response = await fetch(
+          `/api/secretaria/horarios-disponiveis?medicoId=${medicoId}&data=${data}&intervaloMin=10`
+        );
+        if (!response.ok) throw new Error();
+        const responseData = await response.json();
+        const horarios = responseData.horarios || [];
+        setHorariosDisponiveis(horarios);
+
+        if (hora && !horarios.includes(hora)) {
+          form.setValue("hora", "");
+          form.setValue("horaFim", "");
+        }
+      } catch (error) {
+        console.error("Erro ao carregar horários disponíveis:", error);
+        setHorariosDisponiveis([]);
+      } finally {
+        setLoadingHorarios(false);
+      }
+    };
+
+    carregarHorarios();
+  }, [medicoId, data, form, hora]);
+
+  useEffect(() => {
+    if (!hora) {
+      form.setValue("horaFim", "");
+      return;
+    }
+    if (horaFim && horaFim <= hora) {
+      form.setValue("horaFim", "");
+    }
+  }, [hora, horaFim, form]);
 
   const handleAplicarDataSugerida = () => {
     if (sugestaoDataRetorno?.dataSugerida) {
@@ -1067,14 +1112,20 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Início *</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              value={field.value || ""}
-                              className="h-8 text-xs"
-                            />
-                          </FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={!medicoId || !data || loadingHorarios}>
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder={loadingHorarios ? "Carregando..." : "Selecione"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {horariosDisponiveis.map((horario) => (
+                                <SelectItem key={horario} value={horario} className="text-xs">
+                                  {horario}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -1086,14 +1137,26 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Fim *</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              value={field.value || ""}
-                              className="h-8 text-xs"
-                            />
-                          </FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                            disabled={!hora || loadingHorarios}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Selecione" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {horariosDisponiveis
+                                .filter((horario) => horario > (hora || ""))
+                                .map((horario) => (
+                                  <SelectItem key={horario} value={horario} className="text-xs">
+                                    {horario}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
