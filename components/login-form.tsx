@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { AlertCircle, Mail, Lock, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Mail, Lock, ArrowLeft, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,7 @@ function LoginFormContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showRecuperarSenha, setShowRecuperarSenha] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [recuperarSenhaSuccess, setRecuperarSenhaSuccess] = useState(false);
@@ -312,9 +313,9 @@ function LoginFormContent({
                                 <Input
                                   {...field}
                                   id="password"
-                                  type="password"
+                                  type={showPassword ? "text" : "password"}
                                   placeholder="••••••••"
-                                  className="pl-9 bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:bg-white"
+                                  className="pl-9 pr-10 bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:bg-white"
                                   style={{ '--tw-ring-color': 'rgba(30, 78, 216, 0.2)' } as React.CSSProperties}
                                   onFocus={(e) => {
                                     e.currentTarget.style.borderColor = '#1E4ED8';
@@ -327,6 +328,19 @@ function LoginFormContent({
                                   }}
                                   disabled={isLoading}
                                 />
+                                <button
+                                  type="button"
+                                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                                  onClick={() => setShowPassword((prev) => !prev)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                  disabled={isLoading}
+                                >
+                                  {showPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </button>
                               </div>
                             </FormControl>
                             <FormMessage />
