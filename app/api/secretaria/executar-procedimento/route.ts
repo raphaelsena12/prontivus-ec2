@@ -80,7 +80,10 @@ export async function POST(request: NextRequest) {
           include: {
             medicamento: {
               include: {
-                estoqueMedicamento: true,
+                estoqueMedicamentos: {
+                  where: { clinicaId: auth.clinicaId! },
+                  take: 1,
+                },
               },
             },
           },
@@ -103,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Verificar estoque de medicamentos
     const estoqueInsuficiente: string[] = [];
     for (const procMed of procedimento.procedimentosMedicamentos) {
-      const estoque = procMed.medicamento.estoqueMedicamento;
+      const estoque = procMed.medicamento.estoqueMedicamentos[0];
       if (!estoque) {
         estoqueInsuficiente.push(
           `${procMed.medicamento.nome} - Estoque não cadastrado`
@@ -165,7 +168,7 @@ export async function POST(request: NextRequest) {
       // 1. Baixar estoque de medicamentos
       const movimentacoes = [];
       for (const procMed of procedimento.procedimentosMedicamentos) {
-        const estoque = procMed.medicamento.estoqueMedicamento;
+        const estoque = procMed.medicamento.estoqueMedicamentos[0];
         if (estoque) {
           const quantidade = Number(procMed.quantidade || 0);
           const novaQuantidade = estoque.quantidadeAtual - quantidade;

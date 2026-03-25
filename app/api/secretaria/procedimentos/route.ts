@@ -75,7 +75,10 @@ export async function GET(request: NextRequest) {
             include: {
               medicamento: {
                 include: {
-                  estoqueMedicamento: true,
+                  estoqueMedicamentos: {
+                    where: { clinicaId: auth.clinicaId! },
+                    take: 1,
+                  },
                 },
               },
             },

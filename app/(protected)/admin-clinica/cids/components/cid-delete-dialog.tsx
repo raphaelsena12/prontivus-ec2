@@ -25,16 +25,23 @@ interface CidDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   cid: Cid | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
-export function CidDeleteDialog({ open, onOpenChange, cid, onSuccess }: CidDeleteDialogProps) {
+export function CidDeleteDialog({
+  open,
+  onOpenChange,
+  cid,
+  onSuccess,
+  apiBasePath = "/api/admin-clinica/cids",
+}: CidDeleteDialogProps) {
   const [loading, setLoading] = useState(false);
 
   const handleDelete = async () => {
     if (!cid) return;
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin-clinica/cids/${cid.id}`, { method: "DELETE" });
+      const response = await fetch(`${apiBasePath}/${cid.id}`, { method: "DELETE" });
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Erro ao excluir CID");

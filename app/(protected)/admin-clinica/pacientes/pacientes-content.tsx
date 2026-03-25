@@ -155,16 +155,6 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Pacientes</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }}>
-              <SelectTrigger className="h-7 text-xs w-32">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ativo">Ativos</SelectItem>
-                <SelectItem value="inativo">Inativos</SelectItem>
-                <SelectItem value="todos">Todos</SelectItem>
-              </SelectContent>
-            </Select>
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
               <Input
@@ -177,9 +167,24 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
                 className="pl-9 h-7 text-xs bg-background w-64"
               />
             </div>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
+            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1); }}>
+              <SelectTrigger className="h-7 text-xs w-32">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativos</SelectItem>
+                <SelectItem value="inativo">Inativos</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />

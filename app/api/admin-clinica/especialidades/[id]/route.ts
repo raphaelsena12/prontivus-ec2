@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { z } from "zod";
 
-const updateEspecialidadeSchema = z.object({
-  nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres").optional(),
-  descricao: z.string().optional(),
-  ativo: z.boolean().optional(),
-});
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -81,23 +75,10 @@ export async function PATCH(
       return auth.response;
     }
 
-    const { id } = await params;
-    const body = await request.json();
-    const validation = updateEspecialidadeSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const especialidade = await prisma.especialidadeMedica.update({
-      where: { id },
-      data: validation.data,
-    });
-
-    return NextResponse.json({ especialidade });
+    return NextResponse.json(
+      { error: "Especialidades agora são gerenciadas pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao atualizar especialidade:", error);
     return NextResponse.json(
@@ -118,13 +99,10 @@ export async function DELETE(
       return auth.response;
     }
 
-    const { id } = await params;
-
-    await prisma.especialidadeMedica.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ message: "Especialidade excluída com sucesso" });
+    return NextResponse.json(
+      { error: "Especialidades agora são gerenciadas pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao deletar especialidade:", error);
     return NextResponse.json(

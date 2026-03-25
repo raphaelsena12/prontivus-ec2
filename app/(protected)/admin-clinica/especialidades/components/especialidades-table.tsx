@@ -104,6 +104,8 @@ export function EspecialidadesTable({
     });
   }, [data, globalFilter]);
 
+  const showActions = Boolean(onEdit || onDelete);
+
   const columns: ColumnDef<Especialidade>[] = React.useMemo(
     () => [
       {
@@ -156,38 +158,46 @@ export function EspecialidadesTable({
           )
         ),
       },
-      {
-        id: "actions",
-        header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit ? onEdit(row.original) : undefined}
-              title="Editar especialidade"
-              className="h-7 px-2 text-xs"
-            >
-              <Edit className="mr-1 h-4 w-4" />
-              Editar
-            </Button>
-            {onDelete && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete(row.original)}
-                title="Excluir especialidade"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ),
-        enableHiding: false,
-      },
+      ...(showActions
+        ? [
+            {
+              id: "actions",
+              header: () => (
+                <div className="w-full text-right text-xs font-semibold">Ações</div>
+              ),
+              cell: ({ row }: { row: { original: Especialidade } }) => (
+                <div className="flex justify-end gap-2">
+                  {onEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(row.original)}
+                      title="Editar especialidade"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Edit className="mr-1 h-4 w-4" />
+                      Editar
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDelete(row.original)}
+                      title="Excluir especialidade"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ),
+              enableHiding: false,
+            } as ColumnDef<Especialidade>,
+          ]
+        : []),
     ],
-    [onEdit, onDelete]
+    [onEdit, onDelete, showActions]
   );
 
   const table = useReactTable({

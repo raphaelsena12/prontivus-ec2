@@ -78,24 +78,9 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           icon: IconStethoscope,
         },
         {
-          title: "Especialidades",
-          url: "/admin-clinica/especialidades",
-          icon: IconStethoscope,
-        },
-        {
           title: "Exames",
           url: "/admin-clinica/exames",
           icon: IconFlask,
-        },
-        {
-          title: "CIDs",
-          url: "/admin-clinica/cids",
-          icon: IconList,
-        },
-        {
-          title: "Medicamentos",
-          url: "/admin-clinica/medicamentos",
-          icon: IconPill,
         },
         {
           title: "Insumos",
@@ -106,11 +91,6 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Procedimentos",
           url: "/admin-clinica/procedimentos",
           icon: IconFileText,
-        },
-        {
-          title: "Formas de Pagamento",
-          url: "/admin-clinica/formas-pagamento",
-          icon: IconCreditCard,
         },
         {
           title: "Estoque",
@@ -182,7 +162,7 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
     });
 
     categories.push({
-      title: "TUSS",
+      title: "Convênios",
       icon: IconFileText,
       defaultOpen: false,
       items: [
@@ -196,11 +176,14 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           url: "/admin-clinica/planos-saude",
           icon: IconFileText,
         },
-        {
-          title: "Códigos TUSS",
-          url: "/admin-clinica/codigos-tuss",
-          icon: IconFileText,
-        },
+      ],
+    });
+
+    categories.push({
+      title: "Faturamento (TUSS)",
+      icon: IconFileText,
+      defaultOpen: false,
+      items: [
         {
           title: "Valores TUSS",
           url: "/admin-clinica/tuss-valores",
@@ -331,6 +314,31 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
     items.push({
       title: "Pagamentos",
       url: "/super-admin/pagamentos",
+      icon: IconCreditCard,
+    });
+    items.push({
+      title: "Catálogo TUSS",
+      url: "/super-admin/codigos-tuss",
+      icon: IconFileText,
+    });
+    items.push({
+      title: "CIDs",
+      url: "/super-admin/cids",
+      icon: IconList,
+    });
+    items.push({
+      title: "Especialidades",
+      url: "/super-admin/especialidades",
+      icon: IconStethoscope,
+    });
+    items.push({
+      title: "Medicamentos",
+      url: "/super-admin/medicamentos",
+      icon: IconPill,
+    });
+    items.push({
+      title: "Formas de Pagamento",
+      url: "/super-admin/formas-pagamento",
       icon: IconCreditCard,
     });
   }

@@ -5,10 +5,25 @@ import { prisma } from "@/lib/prisma";
 import { EditarEstoqueForm } from "./editar-estoque-form";
 
 async function getEstoque(id: string, clinicaId: string) {
-  return await prisma.estoqueMedicamento.findFirst({
+  const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({
     where: { id, clinicaId },
     include: { medicamento: true },
   });
+
+  if (estoqueMedicamento) {
+    return { estoque: estoqueMedicamento, tipoEstoque: "MEDICAMENTO" as const };
+  }
+
+  const estoqueInsumo = await prisma.estoqueInsumo.findFirst({
+    where: { id, clinicaId },
+    include: { insumo: true },
+  });
+
+  if (estoqueInsumo) {
+    return { estoque: estoqueInsumo, tipoEstoque: "INSUMO" as const };
+  }
+
+  return null;
 }
 
 export default async function EditarEstoquePage({ params }: { params: Promise<{ id: string }> }) {
@@ -19,9 +34,15 @@ export default async function EditarEstoquePage({ params }: { params: Promise<{ 
   const clinicaId = await getUserClinicaId();
   if (!clinicaId) redirect("/dashboard");
   const { id } = await params;
-  const estoque = await getEstoque(id, clinicaId);
-  if (!estoque) redirect("/admin-clinica/estoque");
-  return <EditarEstoqueForm estoque={estoque} clinicaId={clinicaId} />;
+  const result = await getEstoque(id, clinicaId);
+  if (!result) redirect("/admin-clinica/estoque");
+  return (
+    <EditarEstoqueForm
+      estoque={result.estoque}
+      clinicaId={clinicaId}
+      tipoEstoque={result.tipoEstoque}
+    />
+  );
 }
 
 

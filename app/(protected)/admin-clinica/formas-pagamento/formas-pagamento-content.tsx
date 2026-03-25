@@ -99,9 +99,14 @@ export function FormasPagamentoContent({ clinicaId }: FormasPagamentoContentProp
             <CardTitle className="text-sm font-semibold">Lista de Formas de Pagamento</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />

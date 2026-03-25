@@ -96,7 +96,7 @@ export function UsuariosTable({
   onCreate,
   onUpload,
 }: UsuariosTableProps) {
-  const [data] = React.useState(() => initialData);
+  const data = React.useMemo(() => initialData, [initialData]);
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = React.useState("");

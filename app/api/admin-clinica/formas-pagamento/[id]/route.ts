@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { id } = await params;
-    const formaPagamento = await prisma.formaPagamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    const formaPagamento = await prisma.formaPagamento.findFirst({ where: { id, clinicaId: null } });
     if (!formaPagamento) return NextResponse.json({ error: "Forma de pagamento não encontrada" }, { status: 404 });
     return NextResponse.json({ formaPagamento });
   } catch (error) {
@@ -29,16 +29,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
-    const { id } = await params;
-    const formaPagamentoExistente = await prisma.formaPagamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
-    if (!formaPagamentoExistente) return NextResponse.json({ error: "Forma de pagamento não encontrada" }, { status: 404 });
-    const body = await request.json();
-    const validation = updateFormaPagamentoSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
-    }
-    const formaPagamento = await prisma.formaPagamento.update({ where: { id }, data: validation.data });
-    return NextResponse.json({ formaPagamento });
+
+    return NextResponse.json(
+      { error: "Formas de pagamento agora são gerenciadas pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao atualizar forma de pagamento:", error);
     return NextResponse.json({ error: "Erro ao atualizar forma de pagamento" }, { status: 500 });
@@ -49,11 +44,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
-    const { id } = await params;
-    const formaPagamento = await prisma.formaPagamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
-    if (!formaPagamento) return NextResponse.json({ error: "Forma de pagamento não encontrada" }, { status: 404 });
-    await prisma.formaPagamento.delete({ where: { id } });
-    return NextResponse.json({ message: "Forma de pagamento excluída com sucesso" });
+
+    return NextResponse.json(
+      { error: "Formas de pagamento agora são gerenciadas pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao deletar forma de pagamento:", error);
     return NextResponse.json({ error: "Erro ao deletar forma de pagamento" }, { status: 500 });

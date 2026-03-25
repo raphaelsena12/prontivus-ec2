@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AnvisaSyncService } from "@/lib/anvisa/sync-service";
-import { MedicamentoAnvisaRepository } from "@/lib/anvisa/medicamento-repository";
 import { getSession } from "@/lib/auth-helpers";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { MedicamentoSyncRepository } from "@/lib/anvisa/medicamento-sync-repository";
 
 /**
  * POST /api/anvisa/sync
@@ -29,19 +29,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Obter clinicaId do body da requisição
-    const body = await request.json().catch(() => ({}));
-    const { clinicaId } = body;
-
-    if (!clinicaId || typeof clinicaId !== "string") {
-      return NextResponse.json(
-        { error: "clinicaId é obrigatório no body da requisição" },
-        { status: 400 }
-      );
-    }
-
-    // Iniciar sincronização em background
-    const syncService = new AnvisaSyncService(clinicaId);
+    // Sincronização GLOBAL: clinicaId = null (catálogo global do super-admin)
+    const syncService = new AnvisaSyncService(null);
 
     // Executar sincronização (pode demorar vários minutos)
     const result = await syncService.sync();
@@ -74,15 +63,64 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * GET /api/anvisa/sync/status
- * Retorna estatísticas da base de medicamentos
+ * GET /api/anvisa/sync
+ * Retorna progresso da sincronização global ou estatísticas do catálogo global
  */
 export async function GET(request: NextRequest) {
   try {
-    const repository = new MedicamentoAnvisaRepository();
-    const total = await repository.count();
+    // Verificar autenticação
+    const session = await getSession();
+
+    if (!session) {
+      return NextResponse.json(
+        { error: "Não autenticado" },
+        { status: 401 }
+      );
+    }
+
+    // Verificar se é SUPER_ADMIN
+    if (session.user.tipo !== TipoUsuario.SUPER_ADMIN) {
+      return NextResponse.json(
+        { error: "Acesso negado" },
+        { status: 403 }
+      );
+    }
+
+    // Verificar se há progresso de sincronização em andamento (GLOBAL)
+    const progress = AnvisaSyncService.getProgress(null);
+
+    if (progress) {
+      const percentage =
+        progress.status === "completed" || progress.status === "error"
+          ? 100
+          : progress.total > 0
+            ? Math.round((progress.processed / progress.total) * 100)
+            : 0;
+
+      return NextResponse.json({
+        inProgress: progress.status !== "completed" && progress.status !== "error",
+        progress: {
+          total: progress.total,
+          processed:
+            progress.status === "completed" || progress.status === "error"
+              ? progress.total
+              : progress.processed,
+          inserted: progress.inserted,
+          updated: progress.updated,
+          errors: progress.errors,
+          status: progress.status,
+          message: progress.message,
+          percentage,
+        },
+      });
+    }
+
+    // Se não há sincronização em andamento, retornar estatísticas do catálogo global
+    const repository = new MedicamentoSyncRepository();
+    const total = await repository.countByClinica(null);
 
     return NextResponse.json({
+      inProgress: false,
       totalMedicamentos: total,
       lastSync: "Verificar logs do sistema", // TODO: Implementar tracking de última sincronização
     });

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Buscar formas de pagamento da clínica
     const formasPagamento = await prisma.formaPagamento.findMany({
       where: {
-        clinicaId: auth.clinicaId,
+        clinicaId: null, // catálogo global
       },
       select: {
         id: true,

@@ -40,6 +40,7 @@ interface EspecialidadeDialogProps {
   onOpenChange: (open: boolean) => void;
   especialidade: Especialidade | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 const especialidadeSchema = z.object({
@@ -56,6 +57,7 @@ export function EspecialidadeDialog({
   onOpenChange,
   especialidade,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/especialidades",
 }: EspecialidadeDialogProps) {
   const [loading, setLoading] = useState(false);
   const isEditing = !!especialidade;
@@ -104,8 +106,8 @@ export function EspecialidadeDialog({
       }
 
       const url = isEditing
-        ? `/api/admin-clinica/especialidades/${especialidade.id}`
-        : `/api/admin-clinica/especialidades`;
+        ? `${apiBasePath}/${especialidade.id}`
+        : `${apiBasePath}`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

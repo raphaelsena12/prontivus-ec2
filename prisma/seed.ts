@@ -386,7 +386,8 @@ async function main() {
   const medicamentos = await Promise.all([
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Paracetamol",
         principioAtivo: "Paracetamol",
         laboratorio: "Medley",
@@ -398,7 +399,8 @@ async function main() {
     }),
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Ibuprofeno",
         principioAtivo: "Ibuprofeno",
         laboratorio: "Eurofarma",
@@ -410,7 +412,8 @@ async function main() {
     }),
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Amoxicilina",
         principioAtivo: "Amoxicilina",
         laboratorio: "EMS",
@@ -422,7 +425,8 @@ async function main() {
     }),
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Dipirona",
         principioAtivo: "Dipirona Sódica",
         laboratorio: "Sanofi",
@@ -434,7 +438,8 @@ async function main() {
     }),
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Omeprazol",
         principioAtivo: "Omeprazol",
         laboratorio: "Aché",
@@ -446,7 +451,8 @@ async function main() {
     }),
     prisma.medicamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Losartana",
         principioAtivo: "Losartana Potássica",
         laboratorio: "Germed",
@@ -538,7 +544,8 @@ async function main() {
   const formasPagamento = await Promise.all([
     prisma.formaPagamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Dinheiro",
         descricao: "Pagamento em dinheiro",
         tipo: "DINHEIRO",
@@ -547,7 +554,8 @@ async function main() {
     }),
     prisma.formaPagamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Cartão de Crédito",
         descricao: "Pagamento com cartão de crédito",
         tipo: "CARTAO_CREDITO",
@@ -556,7 +564,8 @@ async function main() {
     }),
     prisma.formaPagamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Cartão de Débito",
         descricao: "Pagamento com cartão de débito",
         tipo: "CARTAO_DEBITO",
@@ -565,7 +574,8 @@ async function main() {
     }),
     prisma.formaPagamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "PIX",
         descricao: "Pagamento via PIX",
         tipo: "PIX",
@@ -574,7 +584,8 @@ async function main() {
     }),
     prisma.formaPagamento.create({
       data: {
-        clinicaId: clinicaExemplo.id,
+        // Catálogo global (gerenciado pelo SUPER_ADMIN)
+        clinicaId: null,
         nome: "Boleto Bancário",
         descricao: "Pagamento via boleto bancário",
         tipo: "BOLETO",

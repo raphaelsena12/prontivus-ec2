@@ -42,6 +42,7 @@ interface CidDialogProps {
   onOpenChange: (open: boolean) => void;
   cid: Cid | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 const cidSchema = z.object({
@@ -55,7 +56,13 @@ const cidSchema = z.object({
 
 type CidFormValues = z.infer<typeof cidSchema>;
 
-export function CidDialog({ open, onOpenChange, cid, onSuccess }: CidDialogProps) {
+export function CidDialog({
+  open,
+  onOpenChange,
+  cid,
+  onSuccess,
+  apiBasePath = "/api/admin-clinica/cids",
+}: CidDialogProps) {
   const [loading, setLoading] = useState(false);
   const isEditing = !!cid;
 
@@ -107,7 +114,7 @@ export function CidDialog({ open, onOpenChange, cid, onSuccess }: CidDialogProps
       };
 
       const response = await fetch(
-        isEditing ? `/api/admin-clinica/cids/${cid.id}` : "/api/admin-clinica/cids",
+        isEditing ? `${apiBasePath}/${cid.id}` : `${apiBasePath}`,
         {
           method: isEditing ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },

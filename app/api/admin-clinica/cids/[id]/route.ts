@@ -21,7 +21,7 @@ export async function GET(
 
     const { id } = await params;
     const cid = await prisma.cid.findFirst({
-      where: { id, clinicaId: auth.clinicaId! },
+      where: { id, clinicaId: null },
     });
 
     if (!cid) {
@@ -43,36 +43,10 @@ export async function PATCH(
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
 
-    const { id } = await params;
-    const cidExistente = await prisma.cid.findFirst({
-      where: { id, clinicaId: auth.clinicaId! },
-    });
-
-    if (!cidExistente) {
-      return NextResponse.json({ error: "CID nao encontrado" }, { status: 404 });
-    }
-
-    const body = await request.json();
-    const validation = updateCidSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados invalidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const cid = await prisma.cid.update({
-      where: { id },
-      data: {
-        ...validation.data,
-        descricao: validation.data.descricao?.trim(),
-        categoria: validation.data.categoria?.trim() || null,
-        subcategoria: validation.data.subcategoria?.trim() || null,
-        observacoes: validation.data.observacoes?.trim() || null,
-      },
-    });
-
-    return NextResponse.json({ cid });
+    return NextResponse.json(
+      { error: "CIDs agora são gerenciados pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao atualizar CID:", error);
     return NextResponse.json({ error: "Erro ao atualizar CID" }, { status: 500 });
@@ -87,17 +61,10 @@ export async function DELETE(
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
 
-    const { id } = await params;
-    const cid = await prisma.cid.findFirst({
-      where: { id, clinicaId: auth.clinicaId! },
-    });
-
-    if (!cid) {
-      return NextResponse.json({ error: "CID nao encontrado" }, { status: 404 });
-    }
-
-    await prisma.cid.delete({ where: { id } });
-    return NextResponse.json({ message: "CID excluido com sucesso" });
+    return NextResponse.json(
+      { error: "CIDs agora são gerenciados pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao excluir CID:", error);
     return NextResponse.json({ error: "Erro ao excluir CID" }, { status: 500 });

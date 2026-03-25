@@ -124,9 +124,14 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
               <Database className="mr-1.5 h-3 w-3" />
               Integração Anvisa
             </Button>
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />
@@ -186,7 +191,6 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
       <AnvisaSyncDialog
         open={anvisaSyncDialogOpen}
         onOpenChange={setAnvisaSyncDialogOpen}
-        clinicaId={clinicaId}
         onSuccess={handleSuccess}
       />
     </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Stethoscope, Upload, Filter, Plus, UserPlus } from "lucide-react";
+import { Loader2, Stethoscope, Upload, Filter, Plus, UserPlus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
@@ -12,6 +12,14 @@ import { MedicoDeleteDialog } from "./components/medico-delete-dialog";
 import { MedicoDialog } from "./components/medico-dialog";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Medico {
   id: string;
@@ -49,6 +57,8 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [medicoToDelete, setMedicoToDelete] = useState<Medico | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo">("ativo");
+  const [search, setSearch] = useState("");
 
   const fetchMedicos = useCallback(async () => {
     try {
@@ -57,6 +67,8 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
         page: "1",
         limit: "1000", // Buscar muitos registros para paginação no cliente
       });
+      params.set("ativo", statusFilter === "ativo" ? "true" : "false");
+      if (search.trim().length) params.set("search", search.trim());
       const response = await fetch(`/api/admin-clinica/medicos?${params.toString()}`);
       if (!response.ok) throw new Error("Erro ao carregar médicos");
       const data = await response.json();
@@ -67,7 +79,7 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter, search]);
 
   const fetchUsuarios = useCallback(async () => {
     try {
@@ -133,15 +145,42 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Médicos</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
-            </Button>
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Buscar por nome, CRM ou especialidade..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-7 text-xs bg-background w-64"
+              />
+            </div>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => setStatusFilter(value as "ativo" | "inativo")}
+            >
+              <SelectTrigger className="h-7 text-xs w-28">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativos</SelectItem>
+                <SelectItem value="inativo">Inativos</SelectItem>
+              </SelectContent>
+            </Select>
             <Button variant="outline" asChild className="h-8 text-xs px-3">
               <Link href="/admin-clinica/medicos/convidar">
                 <UserPlus className="mr-1.5 h-3 w-3" />
                 Convidar Médico
               </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />

@@ -43,7 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Trash2, Plus, FlaskConical, ScanLine, Circle, Upload } from "lucide-react";
+import { Edit, Trash2, Plus, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface Exame {
@@ -79,20 +79,6 @@ const getTipoLabel = (tipo: string | null) => {
     OUTROS: "Outros",
   };
   return labels[tipo] || tipo;
-};
-
-const getTipoIcon = (tipo: string | null) => {
-  if (!tipo) return null;
-  switch (tipo) {
-    case "LABORATORIAL":
-      return <FlaskConical className="mr-1 h-3 w-3 text-blue-500" />;
-    case "IMAGEM":
-      return <ScanLine className="mr-1 h-3 w-3 text-purple-500" />;
-    case "OUTROS":
-      return <Circle className="mr-1 h-3 w-3 text-gray-500" />;
-    default:
-      return null;
-  }
 };
 
 const formatDate = (date: Date) => {
@@ -171,7 +157,6 @@ export function ExamesTable({
         header: "Tipo",
         cell: ({ row }) => (
           <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
-            {getTipoIcon(row.original.tipo)}
             {getTipoLabel(row.original.tipo)}
           </Badge>
         ),

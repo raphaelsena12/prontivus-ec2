@@ -6,7 +6,8 @@ import { NovaMovimentacaoForm } from "./nova-movimentacao-form";
 
 async function getFormasPagamento(clinicaId: string) {
   return await prisma.formaPagamento.findMany({
-    where: { clinicaId, ativo: true },
+    // Catálogo global (gerenciado pelo SUPER_ADMIN)
+    where: { clinicaId: null, ativo: true },
     select: { id: true, nome: true },
     orderBy: { nome: "asc" },
   });

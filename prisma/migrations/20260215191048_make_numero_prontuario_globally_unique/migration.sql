@@ -1,14 +1,25 @@
 -- AlterTable: Tornar numeroProntuario único globalmente
--- Primeiro, remover a constraint única composta (clinicaId, numeroProntuario)
-ALTER TABLE "pacientes" DROP CONSTRAINT IF EXISTS "pacientes_clinicaId_numeroProntuario_key";
+-- Atenção: alguns ambientes antigos não possuem a coluna "numeroProntuario" nesta altura da linha do tempo.
+-- Para manter a cadeia de migrations aplicável no shadow database (e em bases legacy),
+-- só executamos as alterações se a coluna existir.
 
--- Adicionar índice único global no campo numeroProntuario
--- Nota: O Prisma já adiciona @unique no schema, mas precisamos garantir que não há duplicados antes
--- Execute o script fix-duplicate-prontuarios.ts antes de aplicar esta migration
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'pacientes'
+      AND column_name = 'numeroProntuario'
+  ) THEN
+    -- Primeiro, remover a constraint única composta (clinicaId, numeroProntuario)
+    EXECUTE 'ALTER TABLE "pacientes" DROP CONSTRAINT IF EXISTS "pacientes_clinicaId_numeroProntuario_key"';
 
--- Adicionar constraint única global
-CREATE UNIQUE INDEX IF NOT EXISTS "pacientes_numeroProntuario_key" ON "pacientes"("numeroProntuario") WHERE "numeroProntuario" IS NOT NULL;
+    -- Adicionar índice único global no campo numeroProntuario (ignorando NULL)
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS "pacientes_numeroProntuario_key" ON "pacientes"("numeroProntuario") WHERE "numeroProntuario" IS NOT NULL';
 
--- Adicionar índice para melhor performance (se ainda não existir)
-CREATE INDEX IF NOT EXISTS "pacientes_numeroProntuario_idx" ON "pacientes"("numeroProntuario");
+    -- Índice auxiliar (performance)
+    EXECUTE 'CREATE INDEX IF NOT EXISTS "pacientes_numeroProntuario_idx" ON "pacientes"("numeroProntuario")';
+  END IF;
+END $$;
 

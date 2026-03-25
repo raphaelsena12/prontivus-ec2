@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const cids = await prisma.cid.findMany({
       where: {
-        clinicaId: auth.clinicaId,
+        clinicaId: null, // catálogo global
         ativo: true,
         ...(search && {
           OR: [

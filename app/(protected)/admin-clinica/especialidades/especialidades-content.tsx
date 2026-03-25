@@ -1,15 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Loader2, Stethoscope, Upload, Filter, Plus } from "lucide-react";
+import { Loader2, Stethoscope, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { EspecialidadesTable } from "./components/especialidades-table";
-import { EspecialidadeDeleteDialog } from "./components/especialidade-delete-dialog";
-import { EspecialidadeDialog } from "./components/especialidade-dialog";
-import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Especialidade {
@@ -26,14 +21,8 @@ interface EspecialidadesContentProps {
 }
 
 export function EspecialidadesContent({ clinicaId }: EspecialidadesContentProps) {
-  const router = useRouter();
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [loading, setLoading] = useState(true);
-  const [especialidadeDialogOpen, setEspecialidadeDialogOpen] = useState(false);
-  const [editingEspecialidade, setEditingEspecialidade] = useState<Especialidade | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [especialidadeToDelete, setEspecialidadeToDelete] = useState<Especialidade | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const fetchEspecialidades = useCallback(async () => {
     try {
@@ -54,35 +43,12 @@ export function EspecialidadesContent({ clinicaId }: EspecialidadesContentProps)
     fetchEspecialidades();
   }, [fetchEspecialidades]);
 
-  const handleEdit = (especialidade: Especialidade) => {
-    setEditingEspecialidade(especialidade);
-    setEspecialidadeDialogOpen(true);
-  };
-
-  const handleDeleteClick = (especialidade: Especialidade) => {
-    setEspecialidadeToDelete(especialidade);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleSuccess = () => {
-    fetchEspecialidades();
-    setEspecialidadeDialogOpen(false);
-    setDeleteDialogOpen(false);
-    setEditingEspecialidade(null);
-    setEspecialidadeToDelete(null);
-  };
-
-  const handleCreate = () => {
-    setEditingEspecialidade(null);
-    setEspecialidadeDialogOpen(true);
-  };
-
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
       <PageHeader
         icon={Stethoscope}
         title="Especialidades"
-        subtitle="Gerencie as especialidades médicas cadastradas"
+        subtitle="Catálogo global (gerenciado pelo Super Admin) — usado por todos os tenants"
       />
 
       {/* Card Branco com Tabela */}
@@ -91,16 +57,6 @@ export function EspecialidadesContent({ clinicaId }: EspecialidadesContentProps)
           <div className="flex items-center gap-1.5">
             <Filter className="h-3 w-3 text-muted-foreground" />
             <CardTitle className="text-sm font-semibold">Lista de Especialidades</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
-            </Button>
-            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
-              <Plus className="mr-1.5 h-3 w-3" />
-              Nova Especialidade
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -118,37 +74,10 @@ export function EspecialidadesContent({ clinicaId }: EspecialidadesContentProps)
           ) : (
             <EspecialidadesTable 
               data={especialidades} 
-              onEdit={handleEdit}
-              onDelete={handleDeleteClick}
-              onCreate={handleCreate}
-              onUpload={() => setUploadDialogOpen(true)}
             />
           )}
         </CardContent>
       </Card>
-
-      <EspecialidadeDialog
-        open={especialidadeDialogOpen}
-        onOpenChange={setEspecialidadeDialogOpen}
-        especialidade={editingEspecialidade}
-        onSuccess={handleSuccess}
-      />
-
-      <EspecialidadeDeleteDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        especialidade={especialidadeToDelete}
-        onSuccess={handleSuccess}
-      />
-
-      <UploadExcelDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        endpoint="/api/admin-clinica/upload/especialidades"
-        title="Upload de Especialidades em Massa"
-        description="Faça upload de um arquivo Excel (.xlsx) com os dados das especialidades. O arquivo deve conter colunas: codigo, nome, descricao, etc."
-        onSuccess={handleSuccess}
-      />
     </div>
   );
 }

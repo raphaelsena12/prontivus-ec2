@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, Upload, Filter, Plus } from "lucide-react";
+import { Loader2, Users, Upload, Filter, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { UsuariosTable } from "./components/usuarios-table";
@@ -12,6 +12,7 @@ import { UsuarioDeleteDialog } from "./components/usuario-delete-dialog";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface Usuario {
   id: string;
@@ -36,6 +37,7 @@ export function UsuariosContent({ clinicaId }: UsuariosContentProps) {
   const router = useRouter();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   // Dialogs
   const [usuarioDialogOpen, setUsuarioDialogOpen] = useState(false);
@@ -47,7 +49,11 @@ export function UsuariosContent({ clinicaId }: UsuariosContentProps) {
   const fetchUsuarios = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin-clinica/usuarios`);
+      const params = new URLSearchParams();
+      if (search.trim().length) params.set("search", search.trim());
+      const response = await fetch(
+        `/api/admin-clinica/usuarios${params.toString() ? `?${params.toString()}` : ""}`
+      );
       if (!response.ok) throw new Error("Erro ao carregar usuários");
       const data = await response.json();
       setUsuarios(data.usuarios || []);
@@ -57,7 +63,7 @@ export function UsuariosContent({ clinicaId }: UsuariosContentProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search]);
 
   useEffect(() => {
     fetchUsuarios();
@@ -102,9 +108,24 @@ export function UsuariosContent({ clinicaId }: UsuariosContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Usuários</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Buscar por nome, CPF ou email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-7 text-xs bg-background w-64"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />

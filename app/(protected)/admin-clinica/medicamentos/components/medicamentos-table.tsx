@@ -124,6 +124,8 @@ export function MedicamentosTable({
     });
   }, [data, globalFilter]);
 
+  const showActions = Boolean(onEdit || onDelete);
+
   const columns: ColumnDef<Medicamento>[] = React.useMemo(
     () => [
       {
@@ -160,13 +162,19 @@ export function MedicamentosTable({
           const getBadgeColor = (controle: string) => {
             const controleLower = controle.toLowerCase();
             if (controleLower.includes("preta") || controleLower.includes("preto")) {
-              return "bg-black text-white border-black";
+              return "bg-transparent border-neutral-900 text-neutral-900 dark:border-neutral-200 dark:text-neutral-200";
+            }
+            if (controleLower.includes("laranja") || controleLower.includes("orange")) {
+              return "bg-transparent border-orange-500 text-orange-700 dark:text-orange-400";
+            }
+            if (controleLower.includes("amarela") || controleLower.includes("amarelo") || controleLower.includes("yellow")) {
+              return "bg-transparent border-yellow-500 text-yellow-700 dark:text-yellow-400";
             }
             if (controleLower.includes("vermelha") || controleLower.includes("vermelho")) {
-              return "bg-red-600 text-white border-red-600";
+              return "bg-transparent border-red-500 text-red-700 dark:text-red-400";
             }
             // Verde para Simples e outros
-            return "bg-green-600 text-white border-green-600";
+            return "bg-transparent border-green-500 text-green-700 dark:text-green-400";
           };
           
           return (
@@ -196,38 +204,46 @@ export function MedicamentosTable({
           )
         ),
       },
-      {
-        id: "actions",
-        header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit ? onEdit(row.original) : undefined}
-              title="Editar medicamento"
-              className="h-7 px-2 text-xs"
-            >
-              <Edit className="mr-1 h-4 w-4" />
-              Editar
-            </Button>
-            {onDelete && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete(row.original)}
-                title="Excluir medicamento"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ),
-        enableHiding: false,
-      },
+      ...(showActions
+        ? [
+            {
+              id: "actions",
+              header: () => (
+                <div className="w-full text-right text-xs font-semibold">Ações</div>
+              ),
+              cell: ({ row }: { row: { original: Medicamento } }) => (
+                <div className="flex justify-end gap-2">
+                  {onEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(row.original)}
+                      title="Editar medicamento"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Edit className="mr-1 h-4 w-4" />
+                      Editar
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDelete(row.original)}
+                      title="Excluir medicamento"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ),
+              enableHiding: false,
+            } as ColumnDef<Medicamento>,
+          ]
+        : []),
     ],
-    [onEdit, onDelete]
+    [onEdit, onDelete, showActions]
   );
 
   const table = useReactTable({

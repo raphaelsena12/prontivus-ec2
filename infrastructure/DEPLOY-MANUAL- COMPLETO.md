@@ -16,7 +16,7 @@ git log HEAD..origin/main --oneline
 pm2 stop prontivus
 
 # Verificar que parou
-pm2 status
+pm2 statusl
 
 cd /opt/prontivus
 

@@ -24,6 +24,7 @@ interface FormaPagamentoDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   formaPagamento: FormaPagamento | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 export function FormaPagamentoDeleteDialog({
@@ -31,6 +32,7 @@ export function FormaPagamentoDeleteDialog({
   onOpenChange,
   formaPagamento,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/formas-pagamento",
 }: FormaPagamentoDeleteDialogProps) {
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +42,7 @@ export function FormaPagamentoDeleteDialog({
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admin-clinica/formas-pagamento/${formaPagamento.id}`, {
+      const response = await fetch(`${apiBasePath}/${formaPagamento.id}`, {
         method: "DELETE",
       });
 

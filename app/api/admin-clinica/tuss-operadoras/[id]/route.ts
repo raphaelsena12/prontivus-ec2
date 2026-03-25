@@ -71,8 +71,11 @@ export async function PATCH(
     const data = validation.data;
 
     // Verificar se regra existe
-    const tussOperadoraExistente = await prisma.tussOperadora.findUnique({
-      where: { id },
+    const tussOperadoraExistente = await prisma.tussOperadora.findFirst({
+      where: {
+        id,
+        operadora: { clinicaId: auth.clinicaId },
+      },
     });
 
     if (!tussOperadoraExistente) {
@@ -80,23 +83,6 @@ export async function PATCH(
         { error: "Regra de aceitação TUSS não encontrada" },
         { status: 404 }
       );
-    }
-
-    // Verificar se operadora pertence à clínica (se houver)
-    if (tussOperadoraExistente.operadoraId) {
-      const operadora = await prisma.operadora.findFirst({
-        where: {
-          id: tussOperadoraExistente.operadoraId,
-          clinicaId: auth.clinicaId,
-        },
-      });
-
-      if (!operadora) {
-        return NextResponse.json(
-          { error: "Operadora não pertence à clínica" },
-          { status: 403 }
-        );
-      }
     }
 
     // Atualizar regra
@@ -138,8 +124,11 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificar se regra existe
-    const tussOperadoraExistente = await prisma.tussOperadora.findUnique({
-      where: { id },
+    const tussOperadoraExistente = await prisma.tussOperadora.findFirst({
+      where: {
+        id,
+        operadora: { clinicaId: auth.clinicaId },
+      },
     });
 
     if (!tussOperadoraExistente) {
@@ -147,23 +136,6 @@ export async function DELETE(
         { error: "Regra de aceitação TUSS não encontrada" },
         { status: 404 }
       );
-    }
-
-    // Verificar se operadora pertence à clínica (se houver)
-    if (tussOperadoraExistente.operadoraId) {
-      const operadora = await prisma.operadora.findFirst({
-        where: {
-          id: tussOperadoraExistente.operadoraId,
-          clinicaId: auth.clinicaId,
-        },
-      });
-
-      if (!operadora) {
-        return NextResponse.json(
-          { error: "Operadora não pertence à clínica" },
-          { status: 403 }
-        );
-      }
     }
 
     await prisma.tussOperadora.delete({

@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const tussOperadoraSchema = z.object({
   codigoTussId: z.string().uuid("ID do código TUSS inválido"),
-  operadoraId: z.string().uuid().optional().nullable(),
+  operadoraId: z.string().uuid("Operadora é obrigatória"),
   planoSaudeId: z.string().uuid().optional().nullable(),
   aceito: z.boolean().default(true),
   observacoes: z.string().optional(),
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
     const aceito = searchParams.get("aceito");
 
     const where: any = {
+      operadora: { clinicaId: auth.clinicaId },
       ...(codigoTussId && { codigoTussId }),
       ...(operadoraId && { operadoraId }),
       ...(planoSaudeId && { planoSaudeId }),
@@ -135,20 +136,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar se operadora pertence à clínica (se fornecida)
-    if (data.operadoraId) {
-      const operadora = await prisma.operadora.findFirst({
-        where: {
-          id: data.operadoraId,
-          clinicaId: auth.clinicaId,
-        },
-      });
+    const operadora = await prisma.operadora.findFirst({
+      where: {
+        id: data.operadoraId,
+        clinicaId: auth.clinicaId,
+      },
+    });
 
-      if (!operadora) {
-        return NextResponse.json(
-          { error: "Operadora não encontrada ou não pertence à clínica" },
-          { status: 404 }
-        );
-      }
+    if (!operadora) {
+      return NextResponse.json(
+        { error: "Operadora não encontrada ou não pertence à clínica" },
+        { status: 404 }
+      );
     }
 
     // Verificar se plano pertence à operadora (se fornecido)
@@ -172,7 +171,7 @@ export async function POST(request: NextRequest) {
     const existente = await prisma.tussOperadora.findFirst({
       where: {
         codigoTussId: data.codigoTussId,
-        operadoraId: data.operadoraId || null,
+        operadoraId: data.operadoraId,
         planoSaudeId: data.planoSaudeId || null,
       },
     });
@@ -187,7 +186,7 @@ export async function POST(request: NextRequest) {
     const tussOperadora = await prisma.tussOperadora.create({
       data: {
         codigoTussId: data.codigoTussId,
-        operadoraId: data.operadoraId || null,
+        operadoraId: data.operadoraId,
         planoSaudeId: data.planoSaudeId || null,
         aceito: data.aceito,
         observacoes: data.observacoes || null,

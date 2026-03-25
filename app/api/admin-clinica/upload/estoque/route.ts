@@ -115,8 +115,9 @@ export async function POST(request: NextRequest) {
         }
 
         // Verificar se estoque já existe
-        const estoqueExistente = await prisma.estoqueMedicamento.findUnique({
+        const estoqueExistente = await prisma.estoqueMedicamento.findFirst({
           where: {
+            clinicaId: auth.clinicaId!,
             medicamentoId: medicamento.id,
           },
         });
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
           // Atualizar estoque existente
           await prisma.estoqueMedicamento.update({
             where: {
-              medicamentoId: medicamento.id,
+              id: estoqueExistente.id,
             },
             data: {
               quantidadeAtual: parseInt(row.quantidade_atual || row.quantidade || "0") || 0,

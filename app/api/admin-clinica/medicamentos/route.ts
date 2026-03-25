@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit;
 
     const where = {
-      clinicaId: auth.clinicaId!,
+      // Catálogo global (gerenciado pelo SUPER_ADMIN)
+      clinicaId: null,
       ...(search && {
         OR: [
           { nome: { contains: search, mode: "insensitive" as const } },
@@ -71,24 +72,10 @@ export async function POST(request: NextRequest) {
       return auth.response;
     }
 
-    const body = await request.json();
-    const validation = medicamentoSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const medicamento = await prisma.medicamento.create({
-      data: {
-        ...validation.data,
-        clinicaId: auth.clinicaId!,
-      },
-    });
-
-    return NextResponse.json({ medicamento }, { status: 201 });
+    return NextResponse.json(
+      { error: "Medicamentos agora são gerenciados pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao criar medicamento:", error);
     return NextResponse.json(

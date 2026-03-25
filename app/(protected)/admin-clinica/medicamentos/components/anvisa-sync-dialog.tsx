@@ -28,15 +28,15 @@ interface SyncStatus {
 interface AnvisaSyncDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  clinicaId: string;
   onSuccess?: () => void;
+  apiPath?: string; // default: /api/admin-clinica/anvisa/sync
 }
 
 export function AnvisaSyncDialog({
   open,
   onOpenChange,
-  clinicaId,
   onSuccess,
+  apiPath = "/api/admin-clinica/anvisa/sync",
 }: AnvisaSyncDialogProps) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     status: "idle",
@@ -53,7 +53,7 @@ export function AnvisaSyncDialog({
 
     const pollProgress = async () => {
       try {
-        const response = await fetch("/api/admin-clinica/anvisa/sync");
+        const response = await fetch(apiPath);
         if (response.ok) {
           const data = await response.json();
           if (data.inProgress && data.progress) {
@@ -124,7 +124,7 @@ export function AnvisaSyncDialog({
         message: "Iniciando sincronização...",
       });
 
-      const response = await fetch("/api/admin-clinica/anvisa/sync", {
+      const response = await fetch(apiPath, {
         method: "POST",
       });
 

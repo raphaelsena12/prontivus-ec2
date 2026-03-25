@@ -21,13 +21,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -81,7 +75,9 @@ export function ExameDialog({
 }: ExameDialogProps) {
   const [loading, setLoading] = useState(false);
   const [loadingCodigosTuss, setLoadingCodigosTuss] = useState(false);
+  const [tussSearch, setTussSearch] = useState("");
   const [codigosTuss, setCodigosTuss] = useState<CodigoTuss[]>([]);
+  const [showTussSuggestions, setShowTussSuggestions] = useState(false);
   const isEditing = !!exame;
 
   const form = useForm<ExameFormValues>({
@@ -95,29 +91,63 @@ export function ExameDialog({
     },
   });
 
-  // Carregar códigos TUSS quando o dialog abrir
+  // Buscar códigos TUSS sob demanda (3+ caracteres)
   useEffect(() => {
-    if (open) {
-      const fetchCodigosTuss = async () => {
-        try {
-          setLoadingCodigosTuss(true);
-          const response = await fetch(
-            "/api/admin-clinica/codigos-tuss?tipoProcedimento=EXAME&ativo=true"
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setCodigosTuss(data.codigosTuss || []);
-          }
-        } catch (error) {
-          console.error("Erro ao buscar códigos TUSS:", error);
-        } finally {
-          setLoadingCodigosTuss(false);
-        }
-      };
+    if (!open) return;
 
-      fetchCodigosTuss();
+    const term = tussSearch.trim();
+    if (term.length < 3) {
+      setCodigosTuss([]);
+      setLoadingCodigosTuss(false);
+      return;
     }
-  }, [open]);
+
+    const controller = new AbortController();
+    const fetchCodigosTuss = async () => {
+      try {
+        setLoadingCodigosTuss(true);
+        const response = await fetch(
+          `/api/admin-clinica/codigos-tuss?tipoProcedimento=EXAME&ativo=true&search=${encodeURIComponent(term)}`,
+          { signal: controller.signal }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const resultados = data.codigosTuss || [];
+
+          // Fallback: alguns catálogos podem não estar com tipoProcedimento=EXAME consistente.
+          if (resultados.length === 0) {
+            const fallbackResponse = await fetch(
+              `/api/admin-clinica/codigos-tuss?ativo=true&search=${encodeURIComponent(term)}`,
+              { signal: controller.signal }
+            );
+
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              setCodigosTuss(fallbackData.codigosTuss || []);
+            } else {
+              setCodigosTuss([]);
+            }
+          } else {
+            setCodigosTuss(resultados);
+          }
+
+          setShowTussSuggestions(true);
+        }
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") {
+          console.error("Erro ao buscar códigos TUSS:", error);
+        }
+      } finally {
+        setLoadingCodigosTuss(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchCodigosTuss, 250);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [open, tussSearch]);
 
   useEffect(() => {
     if (exame) {
@@ -128,6 +158,11 @@ export function ExameDialog({
         codigoTussId: exame.codigoTussId || undefined,
         ativo: exame.ativo,
       });
+      setTussSearch(
+        exame.codigoTuss
+          ? `${exame.codigoTuss.codigoTuss} - ${exame.codigoTuss.descricao}`
+          : ""
+      );
     } else {
       form.reset({
         nome: "",
@@ -136,7 +171,10 @@ export function ExameDialog({
         codigoTussId: undefined,
         ativo: true,
       });
+      setTussSearch("");
     }
+    setCodigosTuss([]);
+    setShowTussSuggestions(false);
   }, [exame, form]);
 
   const onSubmit = async (data: ExameFormValues) => {
@@ -262,41 +300,63 @@ export function ExameDialog({
               control={form.control}
               name="codigoTussId"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="relative">
                   <FormLabel>
                     Código TUSS <span className="text-destructive">*</span>
                   </FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      // Garantir que sempre seja uma string válida
-                      field.onChange(value);
-                    }}
-                    value={field.value || ""}
-                    disabled={loading || loadingCodigosTuss}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o código TUSS" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
+                  <FormControl>
+                    <Input
+                      placeholder="Digite ao menos 3 letras para buscar"
+                      value={tussSearch}
+                      disabled={loading}
+                      onChange={(e) => {
+                        setTussSearch(e.target.value);
+                        field.onChange(undefined);
+                        if (e.target.value.trim().length >= 3) {
+                          setShowTussSuggestions(true);
+                        } else {
+                          setShowTussSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (tussSearch.trim().length >= 3) {
+                          setShowTussSuggestions(true);
+                        }
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setShowTussSuggestions(false), 150);
+                      }}
+                    />
+                  </FormControl>
+                  {showTussSuggestions && (
+                    <div className="absolute left-0 top-full z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md">
                       {loadingCodigosTuss ? (
-                        <SelectItem value="loading" disabled>
+                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
                           Carregando...
-                        </SelectItem>
+                        </p>
                       ) : codigosTuss.length === 0 ? (
-                        <SelectItem value="empty" disabled>
+                        <p className="px-2 py-1.5 text-sm text-muted-foreground">
                           Nenhum código TUSS encontrado
-                        </SelectItem>
+                        </p>
                       ) : (
                         codigosTuss.map((codigo) => (
-                          <SelectItem key={codigo.id} value={codigo.id}>
+                          <button
+                            key={codigo.id}
+                            type="button"
+                            className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              field.onChange(codigo.id);
+                              setTussSearch(`${codigo.codigoTuss} - ${codigo.descricao}`);
+                              setShowTussSuggestions(false);
+                            }}
+                          >
                             {codigo.codigoTuss} - {codigo.descricao}
-                          </SelectItem>
+                          </button>
                         ))
                       )}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

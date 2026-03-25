@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
 
     const where = {
-      clinicaId: auth.clinicaId,
+      clinicaId: null, // catálogo global
       ativo: true, // Apenas medicamentos ativos
       ...(search && {
         OR: [

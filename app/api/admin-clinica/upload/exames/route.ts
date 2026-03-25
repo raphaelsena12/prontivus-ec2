@@ -1,50 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
-import { TipoUsuario } from "@/lib/generated/prisma";
 import { parseExcelFile, normalizeColumnName } from "@/lib/excel-utils";
+import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 
-async function checkAuthorization() {
-  const session = await getSession();
+function toStr(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value).trim();
+  return s.length ? s : null;
+}
 
-  if (!session) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        { error: "Não autenticado" },
-        { status: 401 }
-      ),
-    };
-  }
-
-  if (session.user.tipo !== TipoUsuario.ADMIN_CLINICA) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        { error: "Acesso negado" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  const clinicaId = await getUserClinicaId();
-
-  if (!clinicaId) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        { error: "Clínica não encontrada" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { authorized: true, clinicaId };
+function normalizeTussCodigo(value: unknown): string | null {
+  const s = toStr(value);
+  if (!s) return null;
+  // Mantém apenas dígitos (evita " 123.45 " etc). Se o seu TUSS tiver letras, ajuste aqui.
+  const digits = s.replace(/\D/g, "");
+  return digits.length ? digits : null;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await checkAuthorization();
+    const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) {
       return auth.response;
     }
@@ -87,7 +62,14 @@ export async function POST(request: NextRequest) {
       const linha = i + 2;
 
       try {
-        const nome = row.nome || row.name;
+        const nome = row.nome || row.name || row.exame;
+        const codigoTuss = normalizeTussCodigo(
+          row.codigo_tuss ||
+            row.codigotuss ||
+            row.tuss ||
+            row.codigo ||
+            row.codugo_tuss // cobre planilhas com "Códugo TUSS"
+        );
 
         if (!nome) {
           erros.push(`Linha ${linha}: Nome é obrigatório`);
@@ -108,13 +90,28 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // TUSS: sem validações bloqueantes durante o upload.
+        // Se o código existir no catálogo, vincula; se não existir, cria o exame sem vincular.
+        const codigoTussEncontrado = codigoTuss
+          ? await prisma.codigoTuss.findUnique({
+              where: { codigoTuss },
+              select: { id: true, categoriaExame: true },
+            })
+          : null;
+
+        const tipoRow = toStr(row.tipo);
+        const tipoFinal =
+          (tipoRow ? tipoRow.toUpperCase() : null) ||
+          (codigoTussEncontrado?.categoriaExame ? String(codigoTussEncontrado.categoriaExame) : null);
+
         // Criar exame
         await prisma.exame.create({
           data: {
             clinicaId: auth.clinicaId!,
             nome: nome.toString().trim(),
             descricao: row.descricao || row.desc ? (row.descricao || row.desc).toString().trim() : null,
-            tipo: row.tipo ? row.tipo.toString().trim().toUpperCase() : null,
+            tipo: tipoFinal,
+            codigoTussId: codigoTussEncontrado?.id ?? null,
             ativo: true,
           },
         });

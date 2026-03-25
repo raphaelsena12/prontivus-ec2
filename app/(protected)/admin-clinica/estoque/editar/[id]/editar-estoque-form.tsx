@@ -25,9 +25,10 @@ type EstoqueFormData = z.infer<typeof estoqueSchema>;
 interface EditarEstoqueFormProps {
   estoque: any;
   clinicaId: string;
+  tipoEstoque: "MEDICAMENTO" | "INSUMO";
 }
 
-export function EditarEstoqueForm({ estoque, clinicaId }: EditarEstoqueFormProps) {
+export function EditarEstoqueForm({ estoque, clinicaId, tipoEstoque }: EditarEstoqueFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const form = useForm<EstoqueFormData>({
@@ -71,14 +72,20 @@ export function EditarEstoqueForm({ estoque, clinicaId }: EditarEstoqueFormProps
           </Link>
           <div>
             <h1 className="text-2xl font-bold">Editar Estoque</h1>
-            <p className="text-muted-foreground">Medicamento: {estoque.medicamento.nome}</p>
+            <p className="text-muted-foreground">
+              {tipoEstoque === "MEDICAMENTO"
+                ? `Medicamento: ${estoque.medicamento?.nome || "-"}`
+                : `Insumo: ${estoque.insumo?.nome || "-"}`}
+            </p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Dados do Estoque</CardTitle>
-            <CardDescription>Atualize as informações do estoque do medicamento</CardDescription>
+            <CardDescription>
+              Atualize as informações do estoque do {tipoEstoque === "MEDICAMENTO" ? "medicamento" : "insumo"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>

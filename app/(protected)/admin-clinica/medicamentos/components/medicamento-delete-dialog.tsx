@@ -24,6 +24,7 @@ interface MedicamentoDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   medicamento: Medicamento | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 export function MedicamentoDeleteDialog({
@@ -31,6 +32,7 @@ export function MedicamentoDeleteDialog({
   onOpenChange,
   medicamento,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/medicamentos",
 }: MedicamentoDeleteDialogProps) {
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +42,7 @@ export function MedicamentoDeleteDialog({
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admin-clinica/medicamentos/${medicamento.id}`, {
+      const response = await fetch(`${apiBasePath}/${medicamento.id}`, {
         method: "DELETE",
       });
 

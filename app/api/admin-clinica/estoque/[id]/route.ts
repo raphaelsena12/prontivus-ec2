@@ -15,12 +15,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { id } = await params;
-    const estoque = await prisma.estoqueMedicamento.findFirst({
+
+    const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({
       where: { id, clinicaId: auth.clinicaId! },
       include: { medicamento: true },
     });
-    if (!estoque) return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
-    return NextResponse.json({ estoque });
+
+    if (estoqueMedicamento) {
+      return NextResponse.json({ estoque: estoqueMedicamento, tipoEstoque: "MEDICAMENTO" });
+    }
+
+    const estoqueInsumo = await prisma.estoqueInsumo.findFirst({
+      where: { id, clinicaId: auth.clinicaId! },
+      include: { insumo: true },
+    });
+
+    if (estoqueInsumo) {
+      return NextResponse.json({ estoque: estoqueInsumo, tipoEstoque: "INSUMO" });
+    }
+
+    return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
   } catch (error) {
     console.error("Erro ao buscar estoque:", error);
     return NextResponse.json({ error: "Erro ao buscar estoque" }, { status: 500 });
@@ -32,15 +46,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { id } = await params;
-    const estoqueExistente = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
-    if (!estoqueExistente) return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
     const body = await request.json();
     const validation = updateEstoqueSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
     }
-    const estoque = await prisma.estoqueMedicamento.update({ where: { id }, data: validation.data });
-    return NextResponse.json({ estoque });
+
+    const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    if (estoqueMedicamento) {
+      const estoque = await prisma.estoqueMedicamento.update({ where: { id }, data: validation.data });
+      return NextResponse.json({ estoque, tipoEstoque: "MEDICAMENTO" });
+    }
+
+    const estoqueInsumo = await prisma.estoqueInsumo.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    if (estoqueInsumo) {
+      const estoque = await prisma.estoqueInsumo.update({ where: { id }, data: validation.data });
+      return NextResponse.json({ estoque, tipoEstoque: "INSUMO" });
+    }
+
+    return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
   } catch (error) {
     console.error("Erro ao atualizar estoque:", error);
     return NextResponse.json({ error: "Erro ao atualizar estoque" }, { status: 500 });
@@ -52,10 +76,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
     const { id } = await params;
-    const estoque = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
-    if (!estoque) return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
-    await prisma.estoqueMedicamento.delete({ where: { id } });
-    return NextResponse.json({ message: "Estoque deletado com sucesso" });
+
+    const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    if (estoqueMedicamento) {
+      await prisma.estoqueMedicamento.delete({ where: { id } });
+      return NextResponse.json({ message: "Estoque deletado com sucesso", tipoEstoque: "MEDICAMENTO" });
+    }
+
+    const estoqueInsumo = await prisma.estoqueInsumo.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    if (estoqueInsumo) {
+      await prisma.estoqueInsumo.delete({ where: { id } });
+      return NextResponse.json({ message: "Estoque deletado com sucesso", tipoEstoque: "INSUMO" });
+    }
+
+    return NextResponse.json({ error: "Estoque não encontrado" }, { status: 404 });
   } catch (error) {
     console.error("Erro ao deletar estoque:", error);
     return NextResponse.json({ error: "Erro ao deletar estoque" }, { status: 500 });

@@ -35,25 +35,28 @@ const syncProgress = new Map<string, {
 
 export class AnvisaSyncService {
   private repository: MedicamentoSyncRepository;
-  private clinicaId: string;
+  private clinicaId: string | null;
+  private progressKey: string;
 
-  constructor(clinicaId: string) {
+  constructor(clinicaId: string | null) {
     this.repository = new MedicamentoSyncRepository();
     this.clinicaId = clinicaId;
+    this.progressKey = clinicaId ?? "__GLOBAL__";
   }
 
   /**
    * Obtém o progresso atual da sincronização
    */
-  static getProgress(clinicaId: string) {
-    return syncProgress.get(clinicaId) || null;
+  static getProgress(clinicaId: string | null) {
+    const key = clinicaId ?? "__GLOBAL__";
+    return syncProgress.get(key) || null;
   }
 
   /**
    * Atualiza o progresso da sincronização
    */
   private updateProgress(updates: Partial<typeof syncProgress extends Map<string, infer T> ? T : never>) {
-    const current = syncProgress.get(this.clinicaId) || {
+    const current = syncProgress.get(this.progressKey) || {
       total: 0,
       processed: 0,
       inserted: 0,
@@ -62,7 +65,7 @@ export class AnvisaSyncService {
       status: "idle" as const,
       message: "",
     };
-    syncProgress.set(this.clinicaId, { ...current, ...updates });
+    syncProgress.set(this.progressKey, { ...current, ...updates });
   }
 
   /**

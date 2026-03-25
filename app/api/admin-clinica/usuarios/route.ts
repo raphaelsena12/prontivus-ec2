@@ -43,11 +43,24 @@ export async function GET(request: NextRequest) {
       return auth.response;
     }
 
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get("search") || "").trim();
+    const cpfSearch = search.replace(/\D/g, "");
+
     // Buscar usuários da clínica (apenas ativos)
     const usuarios = await prisma.usuario.findMany({
       where: {
         clinicaId: auth.clinicaId!,
         ativo: true,
+        ...(search && {
+          OR: [
+            { nome: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+            ...(cpfSearch
+              ? [{ cpf: { contains: cpfSearch, mode: "insensitive" as const } }]
+              : []),
+          ],
+        }),
       },
       select: {
         id: true,

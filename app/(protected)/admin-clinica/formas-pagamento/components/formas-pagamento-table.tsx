@@ -20,8 +20,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
-  IconLoader,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -85,18 +83,6 @@ const getTipoLabel = (tipo: string) => {
   return labels[tipo] || tipo;
 };
 
-const getTipoBadgeVariant = (tipo: string) => {
-  switch (tipo) {
-    case "PIX":
-      return "default";
-    case "CARTAO_CREDITO":
-    case "CARTAO_DEBITO":
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
 export function FormasPagamentoTable({
   data: initialData,
   onEdit,
@@ -128,90 +114,70 @@ export function FormasPagamentoTable({
     });
   }, [data, globalFilter]);
 
+  const showActions = Boolean(onEdit || onDelete);
+
   const columns: ColumnDef<FormaPagamento>[] = React.useMemo(
     () => [
       {
-        accessorKey: "createdAt",
-        header: "Data",
-        cell: ({ row }) => formatDate(row.original.createdAt),
-      },
-      {
         accessorKey: "nome",
-        header: "Nome",
+        header: "Descrição",
         cell: ({ row }) => (
           <div className="font-medium">{row.original.nome}</div>
         ),
         enableHiding: false,
       },
       {
-        accessorKey: "descricao",
-        header: "Descrição",
-        cell: ({ row }) => (
-          <div className="max-w-md truncate">
-            {row.original.descricao || (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </div>
-        ),
-      },
-      {
         accessorKey: "tipo",
         header: "Tipo",
         cell: ({ row }) => (
-          <Badge variant={getTipoBadgeVariant(row.original.tipo)} className="text-[10px] py-0.5 px-1.5 leading-tight">
+          <Badge
+            variant="outline"
+            className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight"
+          >
             {getTipoLabel(row.original.tipo)}
           </Badge>
         ),
       },
-      {
-        accessorKey: "ativo",
-        header: "Status",
-        cell: ({ row }) => (
-          row.original.ativo ? (
-            <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
-              <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
-              Ativo
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
-              <IconLoader className="mr-1 h-3 w-3" />
-              Inativo
-            </Badge>
-          )
-        ),
-      },
-      {
-        id: "actions",
-        header: () => <div className="w-full text-right text-xs font-semibold">Ações</div>,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onEdit ? onEdit(row.original) : undefined}
-              title="Editar forma de pagamento"
-              className="h-7 px-2 text-xs"
-            >
-              <Edit className="mr-1 h-4 w-4" />
-              Editar
-            </Button>
-            {onDelete && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete(row.original)}
-                title="Excluir forma de pagamento"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ),
-        enableHiding: false,
-      },
+      ...(showActions
+        ? [
+            {
+              id: "actions",
+              header: () => (
+                <div className="w-full text-right text-xs font-semibold">Ações</div>
+              ),
+              cell: ({ row }: { row: { original: FormaPagamento } }) => (
+                <div className="flex justify-end gap-2">
+                  {onEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(row.original)}
+                      title="Editar forma de pagamento"
+                      className="h-7 px-2 text-xs"
+                    >
+                      <Edit className="mr-1 h-4 w-4" />
+                      Editar
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDelete(row.original)}
+                      title="Excluir forma de pagamento"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ),
+              enableHiding: false,
+            } as ColumnDef<FormaPagamento>,
+          ]
+        : []),
     ],
-    [onEdit, onDelete]
+    [onEdit, onDelete, showActions]
   );
 
   const table = useReactTable({

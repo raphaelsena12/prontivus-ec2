@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
     const where = {
-      clinicaId: auth.clinicaId!,
+      // Catálogo global (gerenciado pelo SUPER_ADMIN)
+      clinicaId: null,
       ativo: true, // Apenas formas de pagamento ativas
       ...(search && { OR: [{ nome: { contains: search, mode: "insensitive" as const } }] }),
     };
@@ -40,15 +41,11 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await checkAdminClinicaAuth();
     if (!auth.authorized) return auth.response;
-    const body = await request.json();
-    const validation = formaPagamentoSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
-    }
-    const formaPagamento = await prisma.formaPagamento.create({
-      data: { ...validation.data, clinicaId: auth.clinicaId! },
-    });
-    return NextResponse.json({ formaPagamento }, { status: 201 });
+
+    return NextResponse.json(
+      { error: "Formas de pagamento agora são gerenciadas pelo Super Admin (catálogo global)." },
+      { status: 403 }
+    );
   } catch (error) {
     console.error("Erro ao criar forma de pagamento:", error);
     return NextResponse.json({ error: "Erro ao criar forma de pagamento" }, { status: 500 });

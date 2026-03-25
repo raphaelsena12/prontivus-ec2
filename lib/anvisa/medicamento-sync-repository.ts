@@ -17,7 +17,7 @@ export class MedicamentoSyncRepository {
   /**
    * Busca um medicamento pelo número de registro e clínica
    */
-  async findByNumeroRegistro(clinicaId: string, numeroRegistro: string) {
+  async findByNumeroRegistro(clinicaId: string | null, numeroRegistro: string) {
     return await prisma.medicamento.findFirst({
       where: {
         AND: [
@@ -32,7 +32,7 @@ export class MedicamentoSyncRepository {
    * Cria ou atualiza um medicamento (UPSERT)
    * Usa numeroRegistro + clinicaId como chave única
    */
-  async upsert(clinicaId: string, data: MedicamentoAnvisaData) {
+  async upsert(clinicaId: string | null, data: MedicamentoAnvisaData) {
     // Primeiro verificar se existe
     const existing = await this.findByNumeroRegistro(clinicaId, data.numeroRegistro);
     
@@ -73,7 +73,7 @@ export class MedicamentoSyncRepository {
   /**
    * Conta o total de medicamentos sincronizados da ANVISA para uma clínica
    */
-  async countByClinica(clinicaId: string) {
+  async countByClinica(clinicaId: string | null) {
     return await prisma.medicamento.count({
       where: {
         clinicaId,

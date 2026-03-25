@@ -42,6 +42,7 @@ interface MedicamentoDialogProps {
   onOpenChange: (open: boolean) => void;
   medicamento: Medicamento | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 const medicamentoSchema = z.object({
@@ -61,6 +62,7 @@ export function MedicamentoDialog({
   onOpenChange,
   medicamento,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/medicamentos",
 }: MedicamentoDialogProps) {
   const [loading, setLoading] = useState(false);
   const isEditing = !!medicamento;
@@ -120,8 +122,8 @@ export function MedicamentoDialog({
       }
 
       const url = isEditing
-        ? `/api/admin-clinica/medicamentos/${medicamento.id}`
-        : `/api/admin-clinica/medicamentos`;
+        ? `${apiBasePath}/${medicamento.id}`
+        : `${apiBasePath}`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",

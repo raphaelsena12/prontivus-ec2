@@ -22,9 +22,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -37,9 +35,7 @@ import { toast } from "sonner";
 interface FormaPagamento {
   id: string;
   nome: string;
-  descricao: string | null;
   tipo: "DINHEIRO" | "CARTAO_CREDITO" | "CARTAO_DEBITO" | "PIX" | "BOLETO" | "TRANSFERENCIA";
-  bandeiraCartao: string | null;
   ativo: boolean;
 }
 
@@ -48,14 +44,12 @@ interface FormaPagamentoDialogProps {
   onOpenChange: (open: boolean) => void;
   formaPagamento: FormaPagamento | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 const formaPagamentoSchema = z.object({
-  nome: z.string().min(1, "Nome é obrigatório"),
-  descricao: z.string().optional(),
+  nome: z.string().min(1, "Descrição é obrigatória"),
   tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
-  bandeiraCartao: z.string().optional(),
-  ativo: z.boolean().optional(),
 });
 
 type FormaPagamentoFormValues = z.infer<typeof formaPagamentoSchema>;
@@ -65,6 +59,7 @@ export function FormaPagamentoDialog({
   onOpenChange,
   formaPagamento,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/formas-pagamento",
 }: FormaPagamentoDialogProps) {
   const [loading, setLoading] = useState(false);
   const isEditing = !!formaPagamento;
@@ -73,32 +68,20 @@ export function FormaPagamentoDialog({
     resolver: zodResolver(formaPagamentoSchema),
     defaultValues: {
       nome: "",
-      descricao: "",
       tipo: "DINHEIRO",
-      bandeiraCartao: "",
-      ativo: true,
     },
   });
-
-  const tipoSelecionado = form.watch("tipo");
-  const isCartao = tipoSelecionado === "CARTAO_CREDITO" || tipoSelecionado === "CARTAO_DEBITO";
 
   useEffect(() => {
     if (formaPagamento) {
       form.reset({
         nome: formaPagamento.nome,
-        descricao: formaPagamento.descricao || "",
         tipo: formaPagamento.tipo,
-        bandeiraCartao: formaPagamento.bandeiraCartao || "",
-        ativo: formaPagamento.ativo,
       });
     } else {
       form.reset({
         nome: "",
-        descricao: "",
         tipo: "DINHEIRO",
-        bandeiraCartao: "",
-        ativo: true,
       });
     }
   }, [formaPagamento, form]);
@@ -107,20 +90,14 @@ export function FormaPagamentoDialog({
     try {
       setLoading(true);
 
-      const payload: any = {
+      const payload = {
         nome: data.nome,
-        descricao: data.descricao || null,
         tipo: data.tipo,
-        bandeiraCartao: data.bandeiraCartao || null,
       };
 
-      if (isEditing) {
-        payload.ativo = data.ativo;
-      }
-
       const url = isEditing
-        ? `/api/admin-clinica/formas-pagamento/${formaPagamento.id}`
-        : `/api/admin-clinica/formas-pagamento`;
+        ? `${apiBasePath}/${formaPagamento.id}`
+        : `${apiBasePath}`;
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
@@ -171,11 +148,11 @@ export function FormaPagamentoDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Nome <span className="text-destructive">*</span>
+                    Descrição <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Digite o nome da forma de pagamento"
+                      placeholder="Digite a descrição da forma de pagamento"
                       {...field}
                       disabled={loading}
                     />
@@ -194,12 +171,7 @@ export function FormaPagamentoDialog({
                     Tipo <span className="text-destructive">*</span>
                   </FormLabel>
                   <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      if (value !== "CARTAO_CREDITO" && value !== "CARTAO_DEBITO") {
-                        form.setValue("bandeiraCartao", "");
-                      }
-                    }}
+                    onValueChange={field.onChange}
                     value={field.value}
                     disabled={loading}
                   >
@@ -221,82 +193,6 @@ export function FormaPagamentoDialog({
                 </FormItem>
               )}
             />
-
-            {isCartao && (
-              <FormField
-                control={form.control}
-                name="bandeiraCartao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bandeira do Cartão</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={loading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a bandeira" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="VISA">Visa</SelectItem>
-                        <SelectItem value="MASTERCARD">Mastercard</SelectItem>
-                        <SelectItem value="ELO">Elo</SelectItem>
-                        <SelectItem value="AMEX">American Express</SelectItem>
-                        <SelectItem value="HIPERCARD">Hipercard</SelectItem>
-                        <SelectItem value="DINERS">Diners Club</SelectItem>
-                        <SelectItem value="OUTROS">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            <FormField
-              control={form.control}
-              name="descricao"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Digite uma descrição (opcional)"
-                      rows={4}
-                      {...field}
-                      disabled={loading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {isEditing && (
-              <FormField
-                control={form.control}
-                name="ativo"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={loading}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Forma de pagamento ativa</FormLabel>
-                      <p className="text-sm text-muted-foreground">
-                        Desmarque para desativar a forma de pagamento no sistema
-                      </p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-            )}
 
             <DialogFooter>
               <Button

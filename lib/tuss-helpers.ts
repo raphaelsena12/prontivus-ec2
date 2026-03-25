@@ -205,6 +205,7 @@ export async function buscarValorTuss(
  * Verifica se um código TUSS é aceito por uma operadora/plano
  */
 export async function verificarAceitacaoTuss(
+  clinicaId: string,
   codigoTussId: string,
   operadoraId?: string | null,
   planoSaudeId?: string | null
@@ -219,6 +220,7 @@ export async function verificarAceitacaoTuss(
     where: {
       codigoTussId,
       operadoraId,
+      operadora: { clinicaId },
       OR: [
         { planoSaudeId: planoSaudeId || null },
         { planoSaudeId: null }, // Regra geral para todos os planos

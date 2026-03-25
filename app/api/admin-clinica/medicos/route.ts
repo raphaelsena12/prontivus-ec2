@@ -59,12 +59,14 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const ativo = searchParams.get("ativo");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
 
     const where = {
       clinicaId: auth.clinicaId,
+      ...(ativo !== null && { ativo: ativo === "true" }),
       ...(search && {
         OR: [
           { crm: { contains: search, mode: "insensitive" as const } },

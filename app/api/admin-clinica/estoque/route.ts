@@ -123,8 +123,11 @@ export async function POST(request: NextRequest) {
     if (!medicamento) {
       return NextResponse.json({ error: "Medicamento não encontrado" }, { status: 404 });
     }
-    const estoqueExistente = await prisma.estoqueMedicamento.findUnique({
-      where: { medicamentoId: data.medicamentoId },
+    const estoqueExistente = await prisma.estoqueMedicamento.findFirst({
+      where: {
+        clinicaId: auth.clinicaId!,
+        medicamentoId: data.medicamentoId,
+      },
     });
     if (estoqueExistente) {
       return NextResponse.json({ error: "Já existe um estoque para este medicamento" }, { status: 400 });

@@ -264,6 +264,7 @@ export async function POST(request: NextRequest) {
 
     // Verificar se código TUSS é aceito pela operadora/plano
     const aceitacao = await verificarAceitacaoTuss(
+      auth.clinicaId!,
       data.codigoTussId,
       data.operadoraId || null,
       data.planoSaudeId || null

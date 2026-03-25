@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Upload, Filter, Plus, ClipboardList } from "lucide-react";
+import { Loader2, FileText, Upload, Filter, Plus, ClipboardList, Search } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { ExamesTable } from "./components/exames-table";
 import { ExameDialog } from "./components/exame-dialog";
 import { ExameDeleteDialog } from "./components/exame-delete-dialog";
+import { ExamesClearDialog } from "./components/exames-clear-dialog";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -37,6 +38,7 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
   const router = useRouter();
   const [exames, setExames] = useState<Exame[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   // Dialogs
   const [exameDialogOpen, setExameDialogOpen] = useState(false);
@@ -44,6 +46,7 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingExame, setDeletingExame] = useState<Exame | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   const fetchExames = useCallback(async () => {
     try {
@@ -52,6 +55,7 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
         page: "1",
         limit: "1000", // Buscar muitos registros para paginação no cliente
       });
+      if (search.trim().length) params.set("search", search.trim());
       const response = await fetch(`/api/admin-clinica/exames?${params.toString()}`);
       if (!response.ok) throw new Error("Erro ao carregar exames");
       const data = await response.json();
@@ -62,7 +66,7 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search]);
 
   useEffect(() => {
     fetchExames();
@@ -107,9 +111,24 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
             <CardTitle className="text-sm font-semibold">Lista de Exames</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setUploadDialogOpen(true)} className="h-8 text-xs px-3">
-              <Upload className="mr-1.5 h-3 w-3" />
-              Upload em Massa
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Buscar por nome ou descrição..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-7 text-xs bg-background w-64"
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />
@@ -161,7 +180,13 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
         onOpenChange={setUploadDialogOpen}
         endpoint="/api/admin-clinica/upload/exames"
         title="Upload de Exames em Massa"
-        description="Faça upload de um arquivo Excel (.xlsx) com os dados dos exames. O arquivo deve conter colunas: nome, descricao, tipo, etc."
+        description='Faça upload de um arquivo Excel (.xlsx/.xls). Colunas aceitas: "nome" (ou "Exame"), "codigo_tuss" (ou "Código TUSS"), "descricao", "tipo".'
+        onSuccess={handleSuccess}
+      />
+
+      <ExamesClearDialog
+        open={clearDialogOpen}
+        onOpenChange={setClearDialogOpen}
         onSuccess={handleSuccess}
       />
     </div>

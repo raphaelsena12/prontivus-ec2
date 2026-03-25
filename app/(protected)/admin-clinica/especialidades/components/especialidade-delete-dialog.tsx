@@ -24,6 +24,7 @@ interface EspecialidadeDeleteDialogProps {
   onOpenChange: (open: boolean) => void;
   especialidade: Especialidade | null;
   onSuccess: () => void;
+  apiBasePath?: string;
 }
 
 export function EspecialidadeDeleteDialog({
@@ -31,6 +32,7 @@ export function EspecialidadeDeleteDialog({
   onOpenChange,
   especialidade,
   onSuccess,
+  apiBasePath = "/api/admin-clinica/especialidades",
 }: EspecialidadeDeleteDialogProps) {
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +42,7 @@ export function EspecialidadeDeleteDialog({
     try {
       setLoading(true);
 
-      const response = await fetch(`/api/admin-clinica/especialidades/${especialidade.id}`, {
+      const response = await fetch(`${apiBasePath}/${especialidade.id}`, {
         method: "DELETE",
       });
 
