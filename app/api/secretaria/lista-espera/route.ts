@@ -105,6 +105,9 @@ export async function POST(request: NextRequest) {
         id: data.medicoId,
         clinicaId: auth.clinicaId,
         ativo: true,
+        usuario: {
+          ativo: true,
+        },
       },
     });
 

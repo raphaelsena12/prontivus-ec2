@@ -571,7 +571,8 @@ export function NovoAgendamentoModal({
         try {
           setLoadingData(true);
           const [medicosRes, codigosTussRes, tiposConsultaRes, procedimentosRes, operadorasRes] = await Promise.all([
-            fetch("/api/admin-clinica/medicos"),
+            // Somente médicos ativos devem aparecer para seleção no agendamento
+            fetch("/api/admin-clinica/medicos?ativo=true"),
             fetch("/api/admin-clinica/codigos-tuss"),
             fetch("/api/admin-clinica/tipos-consulta"),
             fetch("/api/secretaria/procedimentos?limit=1000"),

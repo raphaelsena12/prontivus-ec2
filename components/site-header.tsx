@@ -49,6 +49,7 @@ const getPageTitle = (pathname: string): string => {
     "/super-admin/medicamentos": "Medicamentos (Global)",
     "/super-admin/cids": "CIDs (Global)",
     "/super-admin/formas-pagamento": "Formas de Pagamento (Global)",
+    "/super-admin/operadoras": "Operadoras (Global)",
     "/admin-clinica": "Admin Clínica",
     "/admin-clinica/exames": "Exames",
     "/admin-clinica/especialidades": "Especialidades Médicas",

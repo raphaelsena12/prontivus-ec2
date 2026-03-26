@@ -64,9 +64,17 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
 
+    const ativoBool = ativo === null ? null : ativo === "true";
+
+    // Observação: "ativo" no produto costuma significar tanto o registro de médico quanto o usuário associado.
+    // Ex.: quando o usuário é desativado (Usuario.ativo=false), ele não deve aparecer para agendamento,
+    // mesmo que Medico.ativo ainda esteja true por legado.
     const where = {
       clinicaId: auth.clinicaId,
-      ...(ativo !== null && { ativo: ativo === "true" }),
+      ...(ativoBool !== null && {
+        ativo: ativoBool,
+        ...(ativoBool === true ? { usuario: { ativo: true } } : {}),
+      }),
       ...(search && {
         OR: [
           { crm: { contains: search, mode: "insensitive" as const } },

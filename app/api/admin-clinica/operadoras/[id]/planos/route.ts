@@ -67,12 +67,13 @@ export async function GET(
 
     const { id } = await params;
 
-    // Verificar se operadora pertence à clínica
+    // Verificar se operadora é aceita pela clínica (vínculo TenantOperadora)
     const operadora = await prisma.operadora.findFirst({
       where: {
         id,
-        clinicaId: auth.clinicaId,
+        tenantsAceitacao: { some: { tenantId: auth.clinicaId, aceita: true } },
       },
+      select: { id: true },
     });
 
     if (!operadora) {
@@ -104,55 +105,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
+  const auth = await checkAuthorization();
+  if (!auth.authorized) return auth.response!;
 
-    const { id } = await params;
-
-    // Verificar se operadora pertence à clínica
-    const operadora = await prisma.operadora.findFirst({
-      where: {
-        id,
-        clinicaId: auth.clinicaId,
-      },
-    });
-
-    if (!operadora) {
-      return NextResponse.json(
-        { error: "Operadora não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    const body = await request.json();
-    const validation = planoSaudeSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const data = validation.data;
-
-    const planoSaude = await prisma.planoSaude.create({
-      data: {
-        ...data,
-        operadoraId: id,
-      },
-    });
-
-    return NextResponse.json({ planoSaude }, { status: 201 });
-  } catch (error) {
-    console.error("Erro ao criar plano de saúde:", error);
-    return NextResponse.json(
-      { error: "Erro ao criar plano de saúde" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    { error: "Cadastro de planos é gerenciado pelo Super Admin. A clínica apenas seleciona/aceita operadoras/planos." },
+    { status: 403 }
+  );
 }
 

@@ -58,7 +58,13 @@ export async function POST(req: NextRequest) {
   const { operadoraId, guiaIds, observacoes } = parsed.data;
 
   // Verify operadora
-  const operadora = await prisma.operadora.findFirst({ where: { id: operadoraId, clinicaId } });
+  const operadora = await prisma.operadora.findFirst({
+    where: {
+      id: operadoraId,
+      tenantsAceitacao: { some: { tenantId: clinicaId, aceita: true } },
+    },
+    select: { id: true },
+  });
   if (!operadora) {
     return NextResponse.json({ error: "Operadora não encontrada" }, { status: 404 });
   }

@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
   if (tipo === "operadoras") {
     const operadoras = await prisma.operadora.findMany({
       where: {
-        clinicaId,
         ativo: true,
+        tenantsAceitacao: { some: { tenantId: clinicaId, aceita: true } },
         ...(q ? { razaoSocial: { contains: q, mode: "insensitive" } } : {}),
       },
       select: { id: true, codigoAns: true, razaoSocial: true, nomeFantasia: true },

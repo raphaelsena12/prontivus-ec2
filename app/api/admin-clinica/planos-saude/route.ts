@@ -55,7 +55,8 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       operadora: {
-        clinicaId: auth.clinicaId,
+        // plano só deve aparecer se a operadora for aceita pela clínica
+        tenantsAceitacao: { some: { tenantId: auth.clinicaId, aceita: true } },
       },
       ...(search && {
         OR: [

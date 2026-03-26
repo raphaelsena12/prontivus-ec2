@@ -4,15 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 
-const updateOperadoraSchema = z.object({
-  codigoAns: z.string().min(1, "Código ANS é obrigatório").optional(),
-  razaoSocial: z.string().min(3, "Razão social é obrigatória").optional(),
-  nomeFantasia: z.string().optional(),
-  cnpj: z.string().optional(),
-  telefone: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  ativo: z.boolean().optional(),
-});
+// CRUD de operadora agora é gerenciado pelo SUPER_ADMIN (catálogo global).
+// Este endpoint mantém apenas GET (leitura) para uso interno/telas legadas.
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -74,13 +67,21 @@ export async function GET(
         cnpj: true,
         telefone: true,
         email: true,
+        cep: true,
+        endereco: true,
+        numero: true,
+        complemento: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        pais: true,
         ativo: true,
         createdAt: true,
         updatedAt: true,
       },
       where: {
         id,
-        clinicaId: auth.clinicaId,
+        OR: [{ clinicaId: null }, { clinicaId: auth.clinicaId }],
       },
     });
 
@@ -113,117 +114,7 @@ export async function GET(
   }
 }
 
-// PATCH /api/admin-clinica/operadoras/[id]
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
-
-    const { id } = await params;
-    const body = await request.json();
-    const validation = updateOperadoraSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    // Verificar se operadora pertence à clínica
-    const operadoraExistente = await prisma.operadora.findFirst({
-      where: {
-        id,
-        clinicaId: auth.clinicaId,
-      },
-    });
-
-    if (!operadoraExistente) {
-      return NextResponse.json(
-        { error: "Operadora não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    const data = validation.data;
-    const operadora = await prisma.operadora.update({
-      where: { id },
-      data: {
-        ...data,
-        email: data.email || null,
-      },
-    });
-
-    // Buscar planos separadamente
-    const planosSaude = await prisma.planoSaude.findMany({
-      where: {
-        operadoraId: operadora.id,
-      },
-    });
-
-    return NextResponse.json({
-      operadora: {
-        ...operadora,
-        planosSaude,
-      },
-    });
-  } catch (error) {
-    console.error("Erro ao atualizar operadora:", error);
-    return NextResponse.json(
-      { error: "Erro ao atualizar operadora" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/admin-clinica/operadoras/[id]
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
-
-    const { id } = await params;
-
-    // Verificar se operadora pertence à clínica
-    const operadora = await prisma.operadora.findFirst({
-      where: {
-        id,
-        clinicaId: auth.clinicaId,
-      },
-    });
-
-    if (!operadora) {
-      return NextResponse.json(
-        { error: "Operadora não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    // Desativar ao invés de deletar
-    await prisma.operadora.update({
-      where: { id },
-      data: { ativo: false },
-    });
-
-    return NextResponse.json({ message: "Operadora desativada com sucesso" });
-  } catch (error) {
-    console.error("Erro ao deletar operadora:", error);
-    return NextResponse.json(
-      { error: "Erro ao deletar operadora" },
-      { status: 500 }
-    );
-  }
-}
+// PATCH/DELETE removidos: gestão de operadoras é no super-admin; aceitação é via /aceitacao.
 
 
 

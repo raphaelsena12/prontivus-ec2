@@ -19,6 +19,8 @@ export async function GET(req: NextRequest) {
     status: "REALIZADA",
     preparadoTiss: false,
     operadoraId: { not: null },
+    // Só operadoras aceitas pela clínica
+    operadora: { tenantsAceitacao: { some: { tenantId: clinicaId, aceita: true } } },
   };
 
   if (operadoraId) where.operadoraId = operadoraId;

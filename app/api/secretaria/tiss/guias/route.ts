@@ -78,7 +78,10 @@ export async function POST(req: NextRequest) {
 
   // Verify operadora belongs to clinica
   const operadora = await prisma.operadora.findFirst({
-    where: { id: data.operadoraId, clinicaId },
+    where: {
+      id: data.operadoraId,
+      tenantsAceitacao: { some: { tenantId: clinicaId, aceita: true } },
+    },
   });
   if (!operadora) {
     return NextResponse.json({ error: "Operadora não encontrada" }, { status: 404 });

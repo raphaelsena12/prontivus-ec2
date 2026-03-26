@@ -134,7 +134,8 @@ export function AgendamentosContent() {
     const fetchMedicos = async () => {
       try {
         setLoadingMedicos(true);
-        const response = await fetch("/api/admin-clinica/medicos");
+        // Somente médicos ativos devem aparecer para seleção na agenda da secretaria
+        const response = await fetch("/api/admin-clinica/medicos?ativo=true");
 
         if (response.ok) {
           const data = await response.json();

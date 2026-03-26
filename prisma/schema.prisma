@@ -94,7 +94,10 @@ model Tenant {
   prontuarios                 Prontuario[]
   solicitacoesExames          SolicitacaoExame[]
   prescricoesMedicamentos     PrescricaoMedicamento[]
-  operadoras                  Operadora[]
+  // Operadoras "legadas" criadas diretamente por uma clínica (mantidas por compatibilidade)
+  operadorasLegadas           Operadora[]                   @relation("TenantOperadorasLegadas")
+  // Vínculo oficial de aceitação de operadoras (catálogo global) por clínica
+  tenantOperadoras            TenantOperadora[]
   tussValores                 TussValor[]
   guiasTiss                   GuiaTiss[]
   mensagens                   Mensagem[]
@@ -964,18 +967,30 @@ model TipoConsulta {
 
 model Operadora {
   id           String   @id @default(uuid())
-  clinicaId    String
+  // clinicaId:
+  // - NULL   => operadora global (catálogo gerenciado pelo SUPER_ADMIN)
+  // - filled => operadora legada/criada por clínica (mantida por compatibilidade)
+  clinicaId    String?
   codigoAns    String
   razaoSocial  String
   nomeFantasia String?
   cnpj         String?
   telefone     String?
   email        String?
+  cep          String?
+  endereco     String?
+  numero       String?
+  complemento  String?
+  bairro       String?
+  cidade       String?
+  estado       String?
+  pais         String?  @default("Brasil")
   ativo        Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  clinica        Tenant          @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  clinica          Tenant?           @relation("TenantOperadorasLegadas", fields: [clinicaId], references: [id], onDelete: SetNull)
+  tenantsAceitacao TenantOperadora[]
   consultas      Consulta[]
   planosSaude    PlanoSaude[]
   tussOperadoras TussOperadora[]
@@ -988,6 +1003,26 @@ model Operadora {
   @@index([cnpj])
   @@index([ativo])
   @@map("operadoras")
+}
+
+// Aceitação/configuração de operadoras por clínica
+model TenantOperadora {
+  id         String   @id @default(uuid())
+  tenantId   String
+  operadoraId String
+  aceita     Boolean  @default(true)
+  observacoes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operadora Operadora @relation(fields: [operadoraId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, operadoraId])
+  @@index([tenantId])
+  @@index([operadoraId])
+  @@index([aceita])
+  @@map("tenants_operadoras")
 }
 
 model PlanoSaude {
@@ -1431,7 +1466,7 @@ model TelemedicineSession {
   startedAt             DateTime?
   finishedAt            DateTime?
 
-  consulta     Consulta                  @relation(fields: [consultaId], references: [id])
+  consulta     Consulta                  @relation(fields: [consultaId], references: [id], onDelete: Cascade)
   participants TelemedicineParticipant[]
   logs         TelemedicineLog[]
   consents     TelemedicineConsent[]

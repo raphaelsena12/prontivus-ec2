@@ -95,18 +95,18 @@ export async function PATCH(
       );
     }
 
-    // Verificar se operadora pertence à clínica (se fornecida)
+    // Verificar se operadora é aceita pela clínica (se fornecida)
     if (data.operadoraId) {
       const operadora = await prisma.operadora.findFirst({
         where: {
           id: data.operadoraId,
-          clinicaId: auth.clinicaId,
+          tenantsAceitacao: { some: { tenantId: auth.clinicaId, aceita: true } },
         },
       });
 
       if (!operadora) {
         return NextResponse.json(
-          { error: "Operadora não encontrada ou não pertence à clínica" },
+          { error: "Operadora não encontrada ou não está aceita pela clínica" },
           { status: 404 }
         );
       }

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Plus, Search, Eye, Edit, Users, Calendar, Ban, CheckCircle, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
@@ -62,21 +61,6 @@ interface Paciente {
   observacoes: string | null;
   ativo: boolean;
 }
-
-const getInitials = (nome: string) =>
-  nome
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-
-const getAvatarUrl = (nome: string, sexo: string) => {
-  const hash = nome.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const num = (hash % 70) + 1;
-  const genero = sexo === "F" ? "women" : "men";
-  return `https://randomuser.me/api/portraits/${genero}/${num}.jpg`;
-};
 
 const getStatusBadge = (ativo: boolean) => {
   if (ativo) {
@@ -257,19 +241,9 @@ export function PacientesContent() {
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         <div 
-                          className="flex items-center gap-2 cursor-pointer hover:opacity-80"
+                          className="flex items-center cursor-pointer hover:opacity-80"
                           onClick={() => handleViewPaciente(paciente.id)}
                         >
-                          <Avatar className="h-8 w-8 shrink-0">
-                            <AvatarImage
-                              src={getAvatarUrl(paciente.nome, paciente.sexo)}
-                              alt={paciente.nome}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="text-[10px] font-bold bg-muted">
-                              {getInitials(paciente.nome)}
-                            </AvatarFallback>
-                          </Avatar>
                           <span className="font-medium">{paciente.nome}</span>
                         </div>
                       </TableCell>

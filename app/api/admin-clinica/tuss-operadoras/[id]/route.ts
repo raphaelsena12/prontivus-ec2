@@ -74,7 +74,7 @@ export async function PATCH(
     const tussOperadoraExistente = await prisma.tussOperadora.findFirst({
       where: {
         id,
-        operadora: { clinicaId: auth.clinicaId },
+        operadora: { tenantsAceitacao: { some: { tenantId: auth.clinicaId, aceita: true } } },
       },
     });
 
@@ -127,7 +127,7 @@ export async function DELETE(
     const tussOperadoraExistente = await prisma.tussOperadora.findFirst({
       where: {
         id,
-        operadora: { clinicaId: auth.clinicaId },
+        operadora: { tenantsAceitacao: { some: { tenantId: auth.clinicaId, aceita: true } } },
       },
     });
 

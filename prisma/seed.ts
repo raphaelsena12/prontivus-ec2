@@ -1222,146 +1222,186 @@ async function main() {
   console.log("✅ Tipos de consulta criados:", { total: tiposConsulta.length });
 
   // ============================================
-  // 18. Criar Operadoras de Saúde Reais
+  // 18. Criar Operadoras de Saúde (Catálogo Global via ANS)
   // ============================================
-  console.log("🏥 Criando operadoras de saúde reais...");
+  console.log("🏥 Importando operadoras (ANS) para o catálogo global...");
 
-  // Função auxiliar para criar ou atualizar operadora
-  const criarOuAtualizarOperadora = async (dados: {
-    codigoAns: string;
-    razaoSocial: string;
-    nomeFantasia: string;
+  type AnsOperadoraListItem = {
+    registro_ans: string;
     cnpj: string;
-    telefone: string;
-    email: string;
-  }) => {
+    razao_social: string;
+    nome_fantasia?: string;
+    classificacao_sigla?: string;
+    ativa: boolean;
+  };
+
+  type AnsOperadoraDetalhe = {
+    registro_ans: string;
+    cnpj: string;
+    razao_social: string;
+    nome_fantasia?: string;
+    ativa: boolean;
+    classificacao_sigla?: string;
+    endereco_logradouro?: string;
+    endereco_numero?: string;
+    endereco_bairro?: string;
+    endereco_cep?: string;
+    endereco_municipio_nome?: string;
+    endereco_uf_sigla?: string;
+    telefone_ddd?: string;
+    telefone_numero?: string;
+  };
+
+  const ANS_BASE = "https://www.ans.gov.br/operadoras-entity/v1";
+
+  async function fetchJson<T>(url: string): Promise<T> {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`ANS API error ${res.status} em ${url}: ${text.slice(0, 200)}`);
+    }
+    return (await res.json()) as T;
+  }
+
+  function isOdonto(sigla?: string) {
+    return !!sigla && sigla.toUpperCase().startsWith("OD");
+  }
+
+  const norm = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase();
+
+  async function listarOperadorasAns(): Promise<AnsOperadoraListItem[]> {
+    // Importante: a ANS ocasionalmente bloqueia requests com filtros (ativa/nome_fantasia).
+    // Para evitar WAF, buscamos por paginação SEM filtros e fazemos o match localmente.
+    const size = 100;
+    const firstUrl = `${ANS_BASE}/operadoras/?page=1&size=${size}`;
+    const first = await fetchJson<{
+      total_pages: number;
+      content: AnsOperadoraListItem[];
+    }>(firstUrl);
+
+    const all: AnsOperadoraListItem[] = [...(first.content ?? [])];
+    const totalPages = first.total_pages ?? 1;
+
+    for (let page = 2; page <= totalPages; page++) {
+      const url = `${ANS_BASE}/operadoras/?page=${page}&size=${size}`;
+      const data = await fetchJson<{ content: AnsOperadoraListItem[] }>(url);
+      all.push(...(data.content ?? []));
+    }
+
+    return all;
+  }
+
+  function acharOperadoraPorTermoNoCatalogo(
+    catalogo: AnsOperadoraListItem[],
+    termo: string
+  ): AnsOperadoraListItem | null {
+    const t = norm(termo);
+    const candidatas = catalogo.filter((o) => o.ativa && !isOdonto(o.classificacao_sigla));
+    if (candidatas.length === 0) return null;
+
+    const best =
+      candidatas.find((o) => norm(o.nome_fantasia ?? "").includes(t)) ??
+      candidatas.find((o) => norm(o.razao_social).includes(t)) ??
+      null;
+
+    return best;
+  }
+
+  async function importarOperadoraGlobalPorRegistro(registroAns: string) {
+    const det = await fetchJson<AnsOperadoraDetalhe>(`${ANS_BASE}/operadoras/${registroAns}`);
+    const telefone =
+      det.telefone_ddd && det.telefone_numero ? `${det.telefone_ddd}${det.telefone_numero}` : null;
+
     const existente = await prisma.operadora.findFirst({
-      where: {
-        clinicaId: clinicaExemplo.id,
-        codigoAns: dados.codigoAns,
-      },
+      where: { clinicaId: null, codigoAns: det.registro_ans },
     });
 
     if (existente) {
-      return await prisma.operadora.update({
+      return prisma.operadora.update({
         where: { id: existente.id },
-        data: dados,
+        data: {
+          razaoSocial: det.razao_social,
+          nomeFantasia: det.nome_fantasia ?? null,
+          cnpj: det.cnpj ?? null,
+          telefone,
+          email: null, // ANS não disponibiliza email no endpoint
+          cep: det.endereco_cep ?? null,
+          endereco: det.endereco_logradouro ?? null,
+          numero: det.endereco_numero ?? null,
+          complemento: null,
+          bairro: det.endereco_bairro ?? null,
+          cidade: det.endereco_municipio_nome ?? null,
+          estado: det.endereco_uf_sigla ?? null,
+          pais: "Brasil",
+          ativo: det.ativa ?? true,
+        },
       });
     }
 
-    return await prisma.operadora.create({
+    return prisma.operadora.create({
       data: {
-        clinicaId: clinicaExemplo.id,
-        ...dados,
-        ativo: true,
+        clinicaId: null,
+        codigoAns: det.registro_ans,
+        razaoSocial: det.razao_social,
+        nomeFantasia: det.nome_fantasia ?? null,
+        cnpj: det.cnpj ?? null,
+        telefone,
+        email: null,
+        cep: det.endereco_cep ?? null,
+        endereco: det.endereco_logradouro ?? null,
+        numero: det.endereco_numero ?? null,
+        complemento: null,
+        bairro: det.endereco_bairro ?? null,
+        cidade: det.endereco_municipio_nome ?? null,
+        estado: det.endereco_uf_sigla ?? null,
+        pais: "Brasil",
+        ativo: det.ativa ?? true,
       },
     });
-  };
+  }
 
-  const operadoras = await Promise.all([
-    criarOuAtualizarOperadora({
-      codigoAns: "416703",
-      razaoSocial: "Unimed do Brasil S.A.",
-      nomeFantasia: "Unimed",
-      cnpj: "11.222.333/0001-81",
-      telefone: "0800-701-0000",
-      email: "contato@unimed.com.br",
-    }),
-    criarOuAtualizarOperadora({
-      codigoAns: "416704",
-      razaoSocial: "Amil Assistência Médica Internacional S.A.",
-      nomeFantasia: "Amil",
-      cnpj: "33.444.555/0001-22",
-      telefone: "0800-772-0000",
-      email: "contato@amil.com.br",
-    }),
-    criarOuAtualizarOperadora({
-      codigoAns: "416705",
-      razaoSocial: "Bradesco Saúde S.A.",
-      nomeFantasia: "Bradesco Saúde",
-      cnpj: "44.555.666/0001-33",
-      telefone: "0800-701-0001",
-      email: "contato@bradescosaude.com.br",
-    }),
-    criarOuAtualizarOperadora({
-      codigoAns: "416706",
-      razaoSocial: "SulAmérica Saúde S.A.",
-      nomeFantasia: "SulAmérica",
-      cnpj: "55.666.777/0001-44",
-      telefone: "0800-701-0002",
-      email: "contato@sulamerica.com.br",
-    }),
-    criarOuAtualizarOperadora({
-      codigoAns: "416707",
-      razaoSocial: "NotreDame Intermédica Saúde S.A.",
-      nomeFantasia: "NotreDame Intermédica",
-      cnpj: "66.777.888/0001-55",
-      telefone: "0800-701-0003",
-      email: "contato@notredame.com.br",
-    }),
-  ]);
+  // Lista curada (marcas) — buscamos na ANS e importamos o registro encontrado.
+  // Observação: “Unimed” possui múltiplas operadoras por UF/município; aqui importamos o primeiro match ativo.
+  const PRINCIPAIS_TERMOS = [
+    "BRADESCO SAUDE",
+    "SULAMERICA",
+    "AMIL",
+    "HAPVIDA",
+    "NOTREDAME INTERMEDICA",
+    "PORTO SEGURO",
+    "PREVENT SENIOR",
+    "ASSIM SAUDE",
+    "UNIMED",
+    "ALLIANZ",
+  ];
 
-  console.log("✅ Operadoras criadas:", { total: operadoras.length });
+  const operadorasGlobaisImportadas = [];
+  const catalogoAns = await listarOperadorasAns();
+  for (const termo of PRINCIPAIS_TERMOS) {
+    const item = acharOperadoraPorTermoNoCatalogo(catalogoAns, termo);
+    if (!item) {
+      console.warn(`⚠️ Não encontrei na ANS (ativa) para termo: ${termo}`);
+      continue;
+    }
+    const op = await importarOperadoraGlobalPorRegistro(item.registro_ans);
+    operadorasGlobaisImportadas.push(op);
+    console.log(`✅ Operadora importada: ${op.codigoAns} - ${op.nomeFantasia ?? op.razaoSocial}`);
+  }
+
+  console.log("✅ Operadoras globais importadas:", { total: operadorasGlobaisImportadas.length });
+
+  // Alias para manter compatibilidade com o restante do seed (TUSS valores/aceitação)
+  // Índices usados mais abaixo:
+  // 0 = Unimed (ou primeiro match do termo)
+  // 1 = Amil
+  // 2 = Bradesco
+  const operadoras = operadorasGlobaisImportadas;
 
   // ============================================
-  // 19. Criar Planos de Saúde Reais
+  // 19. Planos de Saúde
   // ============================================
-  console.log("📋 Criando planos de saúde reais...");
-
-  const planosSaude = await Promise.all([
-    prisma.planoSaude.create({
-      data: {
-        operadoraId: operadoras[0].id, // Unimed
-        codigoAns: "416703-001",
-        nome: "Unimed Nacional",
-        tipoPlano: "AMBULATORIAL_HOSPITALAR",
-        abrangencia: "NACIONAL",
-        ativo: true,
-      },
-    }),
-    prisma.planoSaude.create({
-      data: {
-        operadoraId: operadoras[0].id, // Unimed
-        codigoAns: "416703-002",
-        nome: "Unimed Básico",
-        tipoPlano: "AMBULATORIAL",
-        abrangencia: "NACIONAL",
-        ativo: true,
-      },
-    }),
-    prisma.planoSaude.create({
-      data: {
-        operadoraId: operadoras[1].id, // Amil
-        codigoAns: "416704-001",
-        nome: "Amil One Health",
-        tipoPlano: "AMBULATORIAL_HOSPITALAR",
-        abrangencia: "NACIONAL",
-        ativo: true,
-      },
-    }),
-    prisma.planoSaude.create({
-      data: {
-        operadoraId: operadoras[2].id, // Bradesco
-        codigoAns: "416705-001",
-        nome: "Bradesco Saúde Empresarial",
-        tipoPlano: "AMBULATORIAL_HOSPITALAR",
-        abrangencia: "NACIONAL",
-        ativo: true,
-      },
-    }),
-    prisma.planoSaude.create({
-      data: {
-        operadoraId: operadoras[3].id, // SulAmérica
-        codigoAns: "416706-001",
-        nome: "SulAmérica Total",
-        tipoPlano: "AMBULATORIAL_HOSPITALAR",
-        abrangencia: "NACIONAL",
-        ativo: true,
-      },
-    }),
-  ]);
-
-  console.log("✅ Planos de saúde criados:", { total: planosSaude.length });
+  console.log("📋 Planos de saúde: pulando (você pediu apenas operadoras por enquanto).");
+  const planosSaude: any[] = [];
 
   // ============================================
   // 20. Criar Códigos TUSS Reais

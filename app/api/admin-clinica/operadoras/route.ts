@@ -4,15 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 
-const operadoraSchema = z.object({
-  codigoAns: z.string().min(1, "Código ANS é obrigatório"),
-  razaoSocial: z.string().min(3, "Razão social é obrigatória"),
-  nomeFantasia: z.string().optional(),
-  cnpj: z.string().optional(),
-  telefone: z.string().optional(),
-  email: z.string().email("Email inválido").optional().or(z.literal("")),
-  ativo: z.boolean().optional().default(true),
-});
+// Cadastro de operadoras agora é gerenciado pelo SUPER_ADMIN (catálogo global).
+// No admin-clinica, a clínica apenas "aceita / não aceita" operadoras via TenantOperadora.
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -64,7 +57,8 @@ export async function GET(request: NextRequest) {
     const ativo = searchParams.get("ativo");
 
     const where: any = {
-      clinicaId: auth.clinicaId,
+      // Catálogo global (clinicaId NULL) + operadoras legadas da própria clínica
+      OR: [{ clinicaId: null }, { clinicaId: auth.clinicaId }],
       ...(search && {
         OR: [
           { codigoAns: { contains: search, mode: "insensitive" as const } },
@@ -85,6 +79,14 @@ export async function GET(request: NextRequest) {
         cnpj: true,
         telefone: true,
         email: true,
+        cep: true,
+        endereco: true,
+        numero: true,
+        complemento: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        pais: true,
         ativo: true,
         createdAt: true,
         updatedAt: true,
@@ -92,6 +94,14 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { razaoSocial: "asc" },
     });
+
+    // Aceitação por clínica (TenantOperadora)
+    const aceitacoes = await prisma.tenantOperadora.findMany({
+      where: { tenantId: auth.clinicaId },
+      select: { operadoraId: true, aceita: true },
+    });
+    const aceitaMap = new Map<string, boolean>();
+    aceitacoes.forEach((a) => aceitaMap.set(a.operadoraId, a.aceita));
 
     // Buscar planos separadamente
     const operadoraIds = operadoras.map(o => o.id);
@@ -112,6 +122,8 @@ export async function GET(request: NextRequest) {
     const operadorasComPlanos = operadoras.map(operadora => ({
       ...operadora,
       planosSaude: planosMap.get(operadora.id) || [],
+      aceitaNaClinica: aceitaMap.get(operadora.id) ?? false,
+      isGlobal: operadora.clinicaId === null,
     }));
 
     return NextResponse.json({ operadoras: operadorasComPlanos });
@@ -126,58 +138,12 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin-clinica/operadoras
 export async function POST(request: NextRequest) {
-  try {
-    const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
+  const auth = await checkAuthorization();
+  if (!auth.authorized) return auth.response!;
 
-    const body = await request.json();
-    const validation = operadoraSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
-        { status: 400 }
-      );
-    }
-
-    const data = validation.data;
-
-    if (!auth.clinicaId) {
-      return NextResponse.json(
-        { error: "Clínica não encontrada" },
-        { status: 404 }
-      );
-    }
-
-    const operadora = await prisma.operadora.create({
-      data: {
-        ...data,
-        clinicaId: auth.clinicaId,
-        email: data.email || null,
-      },
-    });
-
-    // Buscar planos separadamente (será vazio para nova operadora)
-    const planosSaude = await prisma.planoSaude.findMany({
-      where: {
-        operadoraId: operadora.id,
-      },
-    });
-
-    return NextResponse.json({
-      operadora: {
-        ...operadora,
-        planosSaude,
-      },
-    }, { status: 201 });
-  } catch (error) {
-    console.error("Erro ao criar operadora:", error);
-    return NextResponse.json(
-      { error: "Erro ao criar operadora" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    { error: "Cadastro de operadoras é gerenciado pelo Super Admin. Aqui você apenas seleciona/aceita operadoras." },
+    { status: 403 }
+  );
 }
 

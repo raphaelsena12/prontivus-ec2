@@ -7,7 +7,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
-    seed: "tsx prisma/seed.ts",
+    // Segurança: por padrão, rodar SOMENTE o seed de operadoras (não cria dados demo)
+    seed: "tsx prisma/seed-operadoras.ts",
   },
   datasource: {
     url: process.env.DATABASE_URL,

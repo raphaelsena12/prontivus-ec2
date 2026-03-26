@@ -85,7 +85,8 @@ export function ListaEsperaContent() {
     const fetchMedicos = async () => {
       try {
         setLoadingMedicos(true);
-        const response = await fetch("/api/admin-clinica/medicos");
+        // Somente médicos ativos devem aparecer para seleção na lista de espera
+        const response = await fetch("/api/admin-clinica/medicos?ativo=true");
 
         if (response.ok) {
           const data = await response.json();

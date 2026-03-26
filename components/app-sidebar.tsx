@@ -171,11 +171,6 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           url: "/admin-clinica/operadoras",
           icon: IconFileText,
         },
-        {
-          title: "Planos de Saúde",
-          url: "/admin-clinica/planos-saude",
-          icon: IconFileText,
-        },
       ],
     });
 
@@ -340,6 +335,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       title: "Formas de Pagamento",
       url: "/super-admin/formas-pagamento",
       icon: IconCreditCard,
+    });
+    items.push({
+      title: "Operadoras",
+      url: "/super-admin/operadoras",
+      icon: IconFileText,
     });
   }
 
