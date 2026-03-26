@@ -47,7 +47,7 @@ async function checkAuthorization() {
     };
   }
 
-  return { authorized: true, clinicaId };
+  return { authorized: true, clinicaId, userTipo: session.user.tipo };
 }
 
 export async function GET(request: NextRequest) {
@@ -64,7 +64,12 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const skip = (page - 1) * limit;
 
-    const ativoBool = ativo === null ? null : ativo === "true";
+    // Para telas da SECRETARIA, o padrão esperado é listar apenas médicos ativos
+    // mesmo que o frontend antigo não envie ?ativo=true.
+    const ativoBool =
+      ativo === null
+        ? (auth.userTipo === TipoUsuario.SECRETARIA ? true : null)
+        : ativo === "true";
 
     // Observação: "ativo" no produto costuma significar tanto o registro de médico quanto o usuário associado.
     // Ex.: quando o usuário é desativado (Usuario.ativo=false), ele não deve aparecer para agendamento,
@@ -73,7 +78,19 @@ export async function GET(request: NextRequest) {
       clinicaId: auth.clinicaId,
       ...(ativoBool !== null && {
         ativo: ativoBool,
-        ...(ativoBool === true ? { usuario: { ativo: true } } : {}),
+        ...(ativoBool === true
+          ? {
+              usuario: {
+                ativo: true,
+                // Se existir vínculo por tenant (multi-tenant), respeitar também o ativo do usuário NO tenant.
+                // Mantém compatibilidade: se não houver registro em UsuarioTenant para esse tenant, não bloqueia.
+                OR: [
+                  { usuariosTenants: { none: { tenantId: auth.clinicaId } } },
+                  { usuariosTenants: { some: { tenantId: auth.clinicaId, ativo: true } } },
+                ],
+              },
+            }
+          : {}),
       }),
       ...(search && {
         OR: [

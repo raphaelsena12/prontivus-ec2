@@ -326,7 +326,8 @@ export function CheckInContent() {
     const fetchMedicos = async () => {
       try {
         setLoadingMedicos(true);
-        const response = await fetch("/api/admin-clinica/medicos");
+        // Somente médicos ativos devem aparecer para seleção no check-in
+        const response = await fetch("/api/admin-clinica/medicos?ativo=true");
         if (response.ok) {
           const data = await response.json();
           const medicosList = data.medicos || [];

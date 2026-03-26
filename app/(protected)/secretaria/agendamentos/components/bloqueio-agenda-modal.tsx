@@ -91,7 +91,8 @@ export function BloqueioAgendaModal({
   const fetchMedicos = async () => {
     try {
       setLoadingData(true);
-      const response = await fetch("/api/admin-clinica/medicos");
+      // Somente médicos ativos devem aparecer para seleção no bloqueio de agenda
+      const response = await fetch("/api/admin-clinica/medicos?ativo=true");
 
       if (!response.ok) {
         throw new Error("Erro ao carregar médicos");
