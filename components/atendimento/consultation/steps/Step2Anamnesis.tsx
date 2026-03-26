@@ -46,6 +46,8 @@ interface Step2AnamnesisProps {
   isTranscribing?: boolean;
   startTranscription?: () => Promise<void>;
   transcriptionText?: string;
+  observacoes?: string;
+  setObservacoes?: (v: string) => void;
 }
 
 const ANAMNESE_SECTIONS = [
@@ -466,6 +468,8 @@ export function Step2Anamnesis({
   isTranscribing,
   startTranscription,
   transcriptionText = "",
+  observacoes = "",
+  setObservacoes,
 }: Step2AnamnesisProps) {
   // Determinar o texto da anamnese
   const rawAnamnese = isAnamneseEdited
@@ -632,6 +636,19 @@ export function Step2Anamnesis({
                   />
                 </div>
               ))}
+
+              {/* Campo extra do atendimento */}
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Observações
+                </label>
+                <Textarea
+                  value={observacoes}
+                  onChange={(e) => setObservacoes?.(e.target.value)}
+                  placeholder="Observações do atendimento"
+                  className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                />
+              </div>
             </div>
           ) : isTranscribing && transcriptionText ? (
             /* ── Mostrar transcrição durante gravação (aba IA) ── */
