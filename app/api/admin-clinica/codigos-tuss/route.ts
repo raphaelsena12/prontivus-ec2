@@ -81,6 +81,12 @@ export async function GET(request: NextRequest) {
     const tipoProcedimento = searchParams.get("tipoProcedimento");
     const ativo = searchParams.get("ativo");
     const especialidadeId = searchParams.get("especialidadeId");
+    const limitParam = searchParams.get("limit");
+    const pageParam = searchParams.get("page");
+
+    const limit = Math.min(Math.max(parseInt(limitParam || "50", 10) || 50, 1), 200);
+    const page = Math.max(parseInt(pageParam || "1", 10) || 1, 1);
+    const skip = (page - 1) * limit;
 
     const where: any = {
       ...(search && {
@@ -111,6 +117,8 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { codigoTuss: "asc" },
+      take: limit,
+      skip,
     });
 
     return NextResponse.json({ codigosTuss });

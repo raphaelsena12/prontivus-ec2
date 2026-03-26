@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { maskCPF, maskCelular, removeMask } from "@/lib/masks";
 import { cn } from "@/lib/utils";
+import { CodigoTussSearchInput } from "./codigo-tuss-search-input";
 
 const agendamentoSchema = z.object({
   pacienteId: z.string().uuid("Paciente é obrigatório"),
@@ -57,12 +58,6 @@ interface Medico {
   usuario: {
     nome: string;
   };
-}
-
-interface CodigoTuss {
-  id: string;
-  codigoTuss: string;
-  descricao: string;
 }
 
 interface TipoConsulta {
@@ -509,7 +504,6 @@ export function NovoAgendamentoModal({
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [medicos, setMedicos] = useState<Medico[]>([]);
-  const [codigosTuss, setCodigosTuss] = useState<CodigoTuss[]>([]);
   const [tiposConsulta, setTiposConsulta] = useState<TipoConsulta[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [operadoras, setOperadoras] = useState<Operadora[]>([]);
@@ -570,10 +564,9 @@ export function NovoAgendamentoModal({
       const fetchData = async () => {
         try {
           setLoadingData(true);
-          const [medicosRes, codigosTussRes, tiposConsultaRes, procedimentosRes, operadorasRes] = await Promise.all([
+          const [medicosRes, tiposConsultaRes, procedimentosRes, operadorasRes] = await Promise.all([
             // Somente médicos ativos devem aparecer para seleção no agendamento
             fetch("/api/admin-clinica/medicos?ativo=true"),
-            fetch("/api/admin-clinica/codigos-tuss"),
             fetch("/api/admin-clinica/tipos-consulta"),
             fetch("/api/secretaria/procedimentos?limit=1000"),
             fetch("/api/admin-clinica/operadoras"),
@@ -582,11 +575,6 @@ export function NovoAgendamentoModal({
           if (medicosRes.ok) {
             const data = await medicosRes.json();
             setMedicos(data.medicos || []);
-          }
-
-          if (codigosTussRes.ok) {
-            const data = await codigosTussRes.json();
-            setCodigosTuss(data.codigosTuss || []);
           }
 
           if (tiposConsultaRes.ok) {
@@ -1030,20 +1018,13 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Código TUSS *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs w-full">
-                                <SelectValue placeholder="Selecione o código TUSS" />
-                              </SelectTrigger>
+                              <CodigoTussSearchInput
+                                codigoTussId={field.value || ""}
+                                onSelectCodigoTussId={field.onChange}
+                                error={form.formState.errors.codigoTussId?.message}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              {codigosTuss.map((codigo) => (
-                                <SelectItem key={codigo.id} value={codigo.id} className="text-xs">
-                                  {codigo.codigoTuss} - {codigo.descricao}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}

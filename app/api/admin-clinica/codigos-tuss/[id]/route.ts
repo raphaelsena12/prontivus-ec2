@@ -76,6 +76,48 @@ async function checkAuthorization() {
   return { authorized: true, clinicaId };
 }
 
+// GET /api/admin-clinica/codigos-tuss/[id]
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await checkAuthorization();
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
+    const { id } = await params;
+
+    const codigoTuss = await prisma.codigoTuss.findUnique({
+      where: { id },
+      include: {
+        grupo: true,
+        tussEspecialidades: {
+          include: {
+            especialidade: true,
+          },
+        },
+      },
+    });
+
+    if (!codigoTuss) {
+      return NextResponse.json(
+        { error: "Código TUSS não encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ codigoTuss });
+  } catch (error) {
+    console.error("Erro ao buscar código TUSS:", error);
+    return NextResponse.json(
+      { error: "Erro ao buscar código TUSS" },
+      { status: 500 }
+    );
+  }
+}
+
 // PATCH /api/admin-clinica/codigos-tuss/[id]
 export async function PATCH(
   request: NextRequest,
