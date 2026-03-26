@@ -16,6 +16,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle, Search, X, FileCheck, Ban } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -380,6 +381,7 @@ export function EditarAgendamentoModal({
       planoSaudeId: null,
       numeroCarteirinha: "",
       valorCobrado: null,
+      observacoes: "",
       anexos: [],
     },
   });
@@ -507,6 +509,7 @@ export function EditarAgendamentoModal({
             planoSaudeId: consulta.planoSaudeId,
             numeroCarteirinha: consulta.numeroCarteirinha || "",
             valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
+            observacoes: consulta.observacoes || "",
             anexos: [],
           });
 
@@ -1203,6 +1206,26 @@ export function EditarAgendamentoModal({
                       </div>
                     )}
                   </div>
+
+                  {/* Observações */}
+                  <FormField
+                    control={form.control}
+                    name="observacoes"
+                    render={({ field }) => (
+                      <FormItem className="w-full">
+                        <FormLabel className="text-xs font-medium">Observações</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Observações (opcional)"
+                            className="min-h-20 text-xs"
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
 
                   {/* Row 6: Valor */}
                   <div className="flex flex-wrap items-start gap-2.5 justify-end">

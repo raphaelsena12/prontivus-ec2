@@ -86,7 +86,6 @@ import { AvatarWithS3 } from '@/components/avatar-with-s3';
 interface Consulta {
   id: string;
   dataHora: string;
-  observacoes?: string | null;
   paciente: {
     id: string;
     nome: string;
@@ -138,7 +137,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [saving, setSaving] = useState(false);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [prontuario, setProntuario] = useState<Prontuario | null>(null);
-  const [observacoesAtendimento, setObservacoesAtendimento] = useState<string>("");
   const [activeTab, setActiveTab] = useState<string>('informacoes');
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -1217,20 +1215,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       }
       
       setConsulta(data.consulta);
-      setObservacoesAtendimento(data.consulta?.observacoes || "");
       
       if (data.prontuario) {
         setProntuario(data.prontuario);
-      } else {
-        // Garantir que exista um prontuário em memória para permitir edição (mesmo antes de salvar no banco)
-        setProntuario({
-          id: "",
-          anamnese: null,
-          exameFisico: null,
-          diagnostico: null,
-          conduta: null,
-          evolucao: null,
-        });
       }
 
       // Definir aba inicial baseado no tipo de consulta
@@ -1598,7 +1585,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
           evolucao: prontuario?.evolucao || "",
-          observacoes: observacoesAtendimento || "",
         }),
       });
 
@@ -1633,7 +1619,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
           evolucao: prontuario?.evolucao || "",
-          observacoes: observacoesAtendimento || "",
           cids: [
             ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
             ...cidsManuais,
@@ -2278,8 +2263,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   .filter((e) => !e.isPartial)
                   .map((e) => e.text)
                   .join(" ") || transcription.map((e) => e.text).join(" ")}
-                observacoes={observacoesAtendimento}
-                setObservacoes={setObservacoesAtendimento}
               />
             </div>
 

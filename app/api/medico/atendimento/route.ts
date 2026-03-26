@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { consultaId, anamnese, exameFisico, diagnostico, conduta, evolucao, observacoes, cids, exames, prescricoes } = body;
+    const { consultaId, anamnese, exameFisico, diagnostico, conduta, evolucao, cids, exames, prescricoes } = body;
 
     if (!consultaId) {
       return NextResponse.json(
@@ -443,7 +443,6 @@ export async function POST(request: NextRequest) {
       data: {
         status: "REALIZADA",
         fimAtendimento: agora,
-        observacoes: observacoes || null,
       },
     });
 
