@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -12,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Calendar, Clock, User, Stethoscope, Loader2, ArrowRight, RefreshCw, Filter, List, CheckCircle2 } from "lucide-react";
+import { Clock, User, Loader2, ArrowRight, RefreshCw, Filter, List, CheckCircle2, Bell } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatDate, formatTime, formatCPF } from "@/lib/utils";
+import { formatTime, formatCPF } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 
 interface Consulta {
@@ -55,11 +57,14 @@ interface Consulta {
 
 export function FilaAtendimentoContent() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [consultas, setConsultas] = useState<Consulta[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("CONFIRMADA"); // Padrão: Aguardando
+  const [statusFilter, setStatusFilter] = useState<string>("CONFIRMADA");
   const [mounted, setMounted] = useState(false);
+  const [sala, setSala] = useState("");
+  const [loadingChamar, setLoadingChamar] = useState<string | null>(null);
 
   const fetchConsultas = useCallback(async (silent = false) => {
     try {
@@ -95,6 +100,8 @@ export function FilaAtendimentoContent() {
 
   useEffect(() => {
     setMounted(true);
+    const salaSalva = localStorage.getItem("medico-sala");
+    if (salaSalva) setSala(salaSalva);
   }, []);
 
   useEffect(() => {
@@ -149,6 +156,38 @@ export function FilaAtendimentoContent() {
     }
   };
 
+  const handleChamarPaciente = async (consulta: Consulta) => {
+    if (!sala.trim()) {
+      toast.error("Informe o consultório antes de chamar o paciente");
+      return;
+    }
+    const clinicaId = session?.user?.clinicaId;
+    if (!clinicaId) {
+      toast.error("Clínica não identificada");
+      return;
+    }
+    try {
+      setLoadingChamar(consulta.id);
+      const res = await fetch("/api/painel/chamar-paciente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pacienteNome: consulta.paciente.nome,
+          medicoNome: session?.user?.nome ?? "Médico",
+          sala: sala.trim(),
+          status: "CHAMANDO",
+          clinicaId,
+        }),
+      });
+      if (!res.ok) throw new Error("Erro ao chamar paciente");
+      toast.success(`${consulta.paciente.nome} chamado(a) no painel`);
+    } catch {
+      toast.error("Não foi possível enviar a chamada para o painel");
+    } finally {
+      setLoadingChamar(null);
+    }
+  };
+
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
       <PageHeader
@@ -170,6 +209,21 @@ export function FilaAtendimentoContent() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            {mounted && (
+              <div className="flex items-center gap-1.5">
+                <Bell className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <Input
+                  value={sala}
+                  onChange={(e) => {
+                    setSala(e.target.value);
+                    localStorage.setItem("medico-sala", e.target.value);
+                  }}
+                  placeholder="Consultório (ex: Sala 3)"
+                  className="h-8 w-[170px] text-xs"
+                  title="Informe seu consultório para chamar pacientes no painel"
+                />
+              </div>
+            )}
             {mounted ? (
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-8 w-[200px] text-xs">
@@ -343,19 +397,38 @@ export function FilaAtendimentoContent() {
                         )}
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4 text-right">
-                        {consulta.status === "CONFIRMADA" || consulta.status === "EM_ATENDIMENTO" ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleIniciarAtendimento(consulta.id, consulta.modalidade)}
-                            className="text-xs h-7"
-                          >
-                            {consulta.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar"}
-                            <ArrowRight className="h-3 w-3 mr-1.5" />
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground/50">-</span>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {consulta.status === "CONFIRMADA" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleChamarPaciente(consulta)}
+                              disabled={loadingChamar === consulta.id}
+                              className="text-xs h-7 border-amber-200 text-amber-700 hover:bg-amber-50"
+                              title="Chamar paciente no painel de TV"
+                            >
+                              {loadingChamar === consulta.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Bell className="h-3 w-3" />
+                              )}
+                              Chamar
+                            </Button>
+                          )}
+                          {(consulta.status === "CONFIRMADA" || consulta.status === "EM_ATENDIMENTO") ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleIniciarAtendimento(consulta.id, consulta.modalidade)}
+                              className="text-xs h-7"
+                            >
+                              {consulta.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar"}
+                              <ArrowRight className="h-3 w-3 ml-1" />
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">-</span>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

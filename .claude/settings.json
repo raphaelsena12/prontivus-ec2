@@ -8,7 +8,9 @@
       "Bash(cat /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2/app/api/secretaria/tiss/guias/[id]/procedimentos/route.ts)",
       "Bash(find /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2 -type f \\\\\\(-name *guia* -o -name *sadt* -o -name *tiss* -o -name *pdf* \\\\\\))",
       "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
-      "Bash(curl -s -H \"Authorization: Bearer cc7c2e75bd5f603a72a6a4a17f6b7ba461addea576f58b06502489e5e92d0c16\" https://prontivus.com/api/cron/lembretes-whatsapp)"
+      "Bash(curl -s -H \"Authorization: Bearer cc7c2e75bd5f603a72a6a4a17f6b7ba461addea576f58b06502489e5e92d0c16\" https://prontivus.com/api/cron/lembretes-whatsapp)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(ls -la \"c:\\\\Users\\\\raphael.souza\\\\Desktop\\\\Prontivus\\\\prontivus-ec2\\\\app\\\\\\(protected\\)\")"
     ]
   }
 }

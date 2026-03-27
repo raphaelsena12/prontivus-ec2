@@ -64,4 +64,11 @@ export {
   gerarEmailTelemedicinalink,
   gerarEmailTelemedicinalinkTexto,
 } from "./templates/telemedicina-link";
-
+export {
+  gerarEmailCancelamentoPlano,
+  gerarEmailCancelamentoPlanoTexto,
+} from "./templates/cancelamento-plano";
+export {
+  gerarEmailAlteracaoPlano,
+  gerarEmailAlteracaoPlanoTexto,
+} from "./templates/alteracao-plano";

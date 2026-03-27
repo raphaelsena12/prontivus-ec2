@@ -17,6 +17,14 @@ import {
   gerarEmailPagamentoSucesso,
   gerarEmailPagamentoSucessoTexto,
 } from "@/lib/email/templates/pagamento-sucesso";
+import {
+  gerarEmailCancelamentoPlano,
+  gerarEmailCancelamentoPlanoTexto,
+} from "@/lib/email/templates/cancelamento-plano";
+import {
+  gerarEmailAlteracaoPlano,
+  gerarEmailAlteracaoPlanoTexto,
+} from "@/lib/email/templates/alteracao-plano";
 
 // Mapeamento de planos Stripe para TipoPlano do Prisma
 const PLANO_MAPPING: Record<string, TipoPlano> = {
@@ -452,6 +460,12 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       return;
     }
 
+    // Ignorar faturas de mudança de plano (email tratado em handleSubscriptionUpdated)
+    if (invoice.billing_reason === "subscription_update") {
+      console.log("Cobrança de mudança de plano - ignorando (email tratado em handleSubscriptionUpdated)");
+      return;
+    }
+
     // P1-5: Idempotência — ignorar se esta invoice já foi processada
     const pagamentoExistente = await prisma.pagamento.findFirst({
       where: { transacaoId: invoice.id },
@@ -517,38 +531,44 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
     console.log("Clínica renovada — dataExpiracao:", novaDataExpiracao.toISOString());
 
-    // Se a clínica estava suspensa, enviar email de reativação
-    if (estavaSuspensa) {
-      const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
-      const planoNome = PLANO_NOMES[plano.nome] || plano.nome;
+    // Enviar email de pagamento confirmado (reativação ou renovação normal)
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const planoNome = PLANO_NOMES[plano.nome] || plano.nome;
+    const dataProximoVencimento = novaDataExpiracao.toLocaleDateString("pt-BR");
+    const subject = estavaSuspensa
+      ? `Conta reativada — Prontivus`
+      : `Pagamento confirmado — Prontivus`;
 
-      try {
-        const emailHtml = gerarEmailPagamentoSucesso({
-          nomeClinica: clinica.nome,
-          plano: planoNome,
-          dataRenovacao: new Date().toLocaleDateString("pt-BR"),
-          loginUrl: `${baseUrl}/login`,
-        });
+    try {
+      const emailHtml = gerarEmailPagamentoSucesso({
+        nomeClinica: clinica.nome,
+        plano: planoNome,
+        dataRenovacao: new Date().toLocaleDateString("pt-BR"),
+        dataProximoVencimento,
+        loginUrl: `${baseUrl}/login`,
+        reativacao: estavaSuspensa,
+      });
 
-        const emailTexto = gerarEmailPagamentoSucessoTexto({
-          nomeClinica: clinica.nome,
-          plano: planoNome,
-          dataRenovacao: new Date().toLocaleDateString("pt-BR"),
-          loginUrl: `${baseUrl}/login`,
-        });
+      const emailTexto = gerarEmailPagamentoSucessoTexto({
+        nomeClinica: clinica.nome,
+        plano: planoNome,
+        dataRenovacao: new Date().toLocaleDateString("pt-BR"),
+        dataProximoVencimento,
+        loginUrl: `${baseUrl}/login`,
+        reativacao: estavaSuspensa,
+      });
 
-        await sendEmail({
-          to: clinica.email,
-          subject: `Pagamento confirmado - Sua conta foi reativada!`,
-          html: emailHtml,
-          text: emailTexto,
-          fromName: "Prontivus",
-        });
+      await sendEmail({
+        to: clinica.email,
+        subject,
+        html: emailHtml,
+        text: emailTexto,
+        fromName: "Prontivus",
+      });
 
-        console.log("Email de reativação enviado para:", clinica.email);
-      } catch (emailError) {
-        console.error("Erro ao enviar email de reativação:", emailError);
-      }
+      console.log("Email de pagamento enviado para:", clinica.email);
+    } catch (emailError) {
+      console.error("Erro ao enviar email de pagamento:", emailError);
     }
 
     console.log("============================================");
@@ -600,6 +620,10 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       const plano = await prisma.plano.findUnique({ where: { nome: tipoPlano } });
 
       if (plano && plano.id !== clinica.planoId) {
+        const planoAntigo = await prisma.plano.findUnique({ where: { id: clinica.planoId } });
+        const planoAntigoNome = planoAntigo ? (PLANO_NOMES[planoAntigo.nome] || planoAntigo.nome) : "plano anterior";
+        const planoNovoNome = PLANO_NOMES[tipoPlano] || tipoPlano;
+
         await prisma.tenant.update({
           where: { id: clinica.id },
           data: {
@@ -608,6 +632,38 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
             telemedicineHabilitada: plano.telemedicineHabilitada,
           },
         });
+
+        const PLANO_ORDEM: Record<string, number> = { BASICO: 1, INTERMEDIARIO: 2, PROFISSIONAL: 3 };
+        const upgrade = (PLANO_ORDEM[tipoPlano] || 0) > (PLANO_ORDEM[planoAntigo?.nome || ""] || 0);
+        const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+
+        try {
+          await sendEmail({
+            to: clinica.email,
+            subject: upgrade ? `Upgrade realizado — Prontivus` : `Plano alterado — Prontivus`,
+            html: gerarEmailAlteracaoPlano({
+              nomeClinica: clinica.nome,
+              planoAnterior: planoAntigoNome,
+              planoNovo: planoNovoNome,
+              upgrade,
+              dataAlteracao: new Date().toLocaleDateString("pt-BR"),
+              loginUrl: `${baseUrl}/login`,
+            }),
+            text: gerarEmailAlteracaoPlanoTexto({
+              nomeClinica: clinica.nome,
+              planoAnterior: planoAntigoNome,
+              planoNovo: planoNovoNome,
+              upgrade,
+              dataAlteracao: new Date().toLocaleDateString("pt-BR"),
+              loginUrl: `${baseUrl}/login`,
+            }),
+            fromName: "Prontivus",
+          });
+          console.log("Email de alteração de plano enviado para:", clinica.email);
+        } catch (emailError) {
+          console.error("Erro ao enviar email de alteração de plano:", emailError);
+        }
+
         console.log(
           `Plano sincronizado: ${clinica.planoId} → ${plano.id} (${tipoPlano}) para clínica ${clinica.id}`
         );
@@ -646,6 +702,41 @@ async function handleSubscriptionCanceled(subscription: Stripe.Subscription) {
         stripeSubscriptionId: null,
       },
     });
+
+    // Enviar email de cancelamento
+    const plano = await prisma.plano.findUnique({ where: { id: clinica.planoId } });
+    const planoNome = plano ? (PLANO_NOMES[plano.nome] || plano.nome) : "seu plano";
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
+    const subscriptionWithPeriodEnd = subscription as Stripe.Subscription & {
+      current_period_end?: number;
+    };
+    const periodEnd = subscriptionWithPeriodEnd.current_period_end;
+    const dataFimAcesso = periodEnd
+      ? new Date(periodEnd * 1000).toLocaleDateString("pt-BR")
+      : undefined;
+
+    try {
+      await sendEmail({
+        to: clinica.email,
+        subject: `Assinatura cancelada — Prontivus`,
+        html: gerarEmailCancelamentoPlano({
+          nomeClinica: clinica.nome,
+          plano: planoNome,
+          dataFimAcesso,
+          loginUrl: `${baseUrl}/login`,
+        }),
+        text: gerarEmailCancelamentoPlanoTexto({
+          nomeClinica: clinica.nome,
+          plano: planoNome,
+          dataFimAcesso,
+          loginUrl: `${baseUrl}/login`,
+        }),
+        fromName: "Prontivus",
+      });
+      console.log("Email de cancelamento enviado para:", clinica.email);
+    } catch (emailError) {
+      console.error("Erro ao enviar email de cancelamento:", emailError);
+    }
 
     console.log("============================================");
     console.log("ASSINATURA CANCELADA:");

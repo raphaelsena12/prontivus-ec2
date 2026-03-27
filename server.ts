@@ -72,6 +72,26 @@ app.prepare().then(() => {
     status: string;
   }>();
 
+  // ============================================
+  // PAINEL DE CHAMADAS
+  // ============================================
+  interface ChamadaPainel {
+    id: string;
+    pacienteNome: string;
+    medicoNome: string;
+    sala: string;
+    status: "CHAMANDO" | "EM_ATENDIMENTO";
+    horario: string;
+    clinicaId: string;
+  }
+
+  // Últimas 10 chamadas por clínica (em memória)
+  const painelChamadas = new Map<string, ChamadaPainel[]>();
+
+  // Expor io e store globalmente para uso nas API routes
+  (global as any).__socketIO = io;
+  (global as any).__painelChamadas = painelChamadas;
+
   io.on("connection", (socket) => {
     console.log("Cliente conectado:", socket.id);
 
@@ -151,6 +171,17 @@ app.prepare().then(() => {
         activeStreams.delete(socket.id);
       }
       socket.emit("transcription-stopped");
+    });
+
+    // ============================================
+    // EVENTOS DO PAINEL DE CHAMADAS
+    // ============================================
+
+    socket.on("join-painel", (data: { clinicaId: string }) => {
+      socket.join(`painel:${data.clinicaId}`);
+      const chamadas = painelChamadas.get(data.clinicaId) || [];
+      socket.emit("chamadas-atuais", { chamadas });
+      console.log(`[Painel] TV conectada para clínica ${data.clinicaId}`);
     });
 
     // ============================================

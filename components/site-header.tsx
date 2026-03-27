@@ -809,6 +809,15 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                         Painel de Chamadas
                       </DropdownMenuItem>
                     )}
+                    {session?.user?.tipo === TipoUsuario.ADMIN_CLINICA && session?.user?.clinicaId && (
+                      <DropdownMenuItem
+                        onClick={() => window.open(`/painel-chamadas?clinicaId=${session.user.clinicaId}`, "_blank")}
+                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                      >
+                        <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
+                        Painel de Chamadas (TV)
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
