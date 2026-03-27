@@ -86,6 +86,8 @@ export default withAuth(
           "/api/auth",
           "/api/public",
           "/api/stripe",
+          "/api/cron",
+          "/api/whatsapp/webhook",
           "/pagamento",
           "/telemedicina",                              // Página de acesso público do paciente
           "/api/paciente/telemedicina/sessao",          // APIs públicas de telemedicina do paciente
