@@ -440,7 +440,7 @@ export function PacienteDialog({
                         <Input
                           {...field}
                           placeholder="(00) 0000-0000"
-                          maxLength={14}
+                          maxLength={15}
                           disabled={loading}
                           value={field.value ? maskTelefone(field.value) : ""}
                           onChange={(e) => {

@@ -6,7 +6,8 @@
       "Bash(ls -la '/c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2/app/\\(protected\\)/secretaria/tiss/nova-guia/')",
       "Bash(cat /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2/app/api/secretaria/tiss/guias/[id]/route.ts)",
       "Bash(cat /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2/app/api/secretaria/tiss/guias/[id]/procedimentos/route.ts)",
-      "Bash(find /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2 -type f \\\\\\(-name *guia* -o -name *sadt* -o -name *tiss* -o -name *pdf* \\\\\\))"
+      "Bash(find /c/Users/raphael.souza/Desktop/Prontivus/prontivus-ec2 -type f \\\\\\(-name *guia* -o -name *sadt* -o -name *tiss* -o -name *pdf* \\\\\\))",
+      "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")"
     ]
   }
 }

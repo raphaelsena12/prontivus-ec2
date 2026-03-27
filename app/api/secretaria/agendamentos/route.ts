@@ -11,7 +11,7 @@ import {
   gerarEmailConfirmacaoAgendamentoTexto,
 } from "@/lib/email";
 import { gerarEmailMedico } from "@/lib/utils";
-import { sendWhatsAppForClinica, gerarMensagemConfirmacaoAgendamento } from "@/lib/whatsapp";
+import { getClinicaWhatsAppService } from "@/lib/whatsapp";
 import { horarioEstaDentroDasFaixas, obterFaixasAgendaMedicoParaData } from "@/lib/medico-escala";
 
 const agendamentoSchema = z.object({
@@ -625,18 +625,36 @@ export async function POST(request: NextRequest) {
       console.log(`Paciente ${consulta.paciente.nome} não possui email cadastrado`);
     }
 
-    // Enviar WhatsApp de confirmação (se clínica tiver WhatsApp configurado e paciente tiver celular)
+    // Enviar WhatsApp de confirmação via template (se clínica tiver WhatsApp configurado e paciente tiver celular)
     if (consulta.status === "AGENDADA") {
       const celular = consulta.paciente.celular || consulta.paciente.telefone;
       if (celular) {
         try {
-          const mensagem = gerarMensagemConfirmacaoAgendamento(
-            consulta.paciente.nome,
-            consulta.dataHora,
-            consulta.medico.usuario.nome,
-            consulta.clinica.nome
-          );
-          await sendWhatsAppForClinica(auth.clinicaId!, { to: celular, message: mensagem });
+          const service = await getClinicaWhatsAppService(auth.clinicaId!);
+          if (service) {
+            const dataFormatada = consulta.dataHora.toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            });
+            const horaFormatada = consulta.dataHora.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            });
+            await service.sendTemplateMessage({
+              to: celular,
+              message: "",
+              templateId: "confirmacao_agendamento",
+              templateParams: [
+                consulta.paciente.nome,
+                dataFormatada,
+                horaFormatada,
+                consulta.clinica.nome,
+                consulta.medico.usuario.nome,
+              ],
+            });
+          }
         } catch (waError) {
           console.error("Erro ao enviar WhatsApp de confirmação:", waError);
         }

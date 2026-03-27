@@ -81,17 +81,19 @@ async function resolveClinicaByPhoneNumberId(phoneNumberId: string): Promise<str
 async function processIncomingMessage(message: any, value: any, clinicaId: string | null) {
   try {
     const from = message.from;
-    const messageText = message.text?.body || "";
+    const messageText = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || "";
 
     console.log(`📨 Mensagem recebida de ${from}: ${messageText}`);
 
     const telefoneFormatado = from.replace(/\D/g, "");
+    const ultimosNoveDigitos = telefoneFormatado.slice(-9);
 
-    // Se temos clinicaId resolvido pelo phoneNumberId, filtrar por clínica
+    // Buscar paciente pelo celular ou telefone
     const whereClause: any = {
-      telefone: {
-        contains: telefoneFormatado.slice(-9),
-      },
+      OR: [
+        { celular: { contains: ultimosNoveDigitos } },
+        { telefone: { contains: ultimosNoveDigitos } },
+      ],
     };
     if (clinicaId) {
       whereClause.clinicaId = clinicaId;
@@ -103,12 +105,13 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
         clinica: true,
         consultas: {
           where: {
-            status: { in: ["AGENDADA", "EM_ANDAMENTO"] },
+            status: { in: ["AGENDADA", "CONFIRMADA"] },
+            dataHora: { gte: new Date() },
           },
           include: {
             medico: { include: { usuario: true } },
           },
-          orderBy: { dataHora: "desc" },
+          orderBy: { dataHora: "asc" },
           take: 1,
         },
       },
@@ -120,6 +123,23 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
     }
 
     const consulta = paciente.consultas[0];
+
+    // Processar resposta de confirmação/cancelamento
+    const resposta = messageText.trim();
+    if (consulta && (resposta === "1" || /^(sim|confirmo|confirmar)/i.test(resposta))) {
+      await prisma.consulta.update({
+        where: { id: consulta.id },
+        data: { status: "CONFIRMADA" },
+      });
+      console.log(`✅ Consulta ${consulta.id} confirmada pelo paciente ${paciente.nome}`);
+    } else if (consulta && (resposta === "2" || /^(não|nao|cancelar|cancelo)/i.test(resposta))) {
+      await prisma.consulta.update({
+        where: { id: consulta.id },
+        data: { status: "CANCELADA" },
+      });
+      console.log(`❌ Consulta ${consulta.id} cancelada pelo paciente ${paciente.nome}`);
+    }
+
     let medicoId: string | undefined = consulta?.medicoId;
 
     if (!medicoId) {

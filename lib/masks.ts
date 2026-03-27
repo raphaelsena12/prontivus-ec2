@@ -38,6 +38,11 @@ export const maskTelefone = (value: string): string => {
       .replace(/(\d{2})(\d)/, "($1) $2")
       .replace(/(\d{4})(\d)/, "$1-$2");
   }
+  if (cleaned.length === 11) {
+    return cleaned
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2");
+  }
   return value;
 };
 

@@ -12,11 +12,7 @@ import {
   gerarEmailAlteracaoAgendamentoTexto,
 } from "@/lib/email";
 import { gerarEmailMedico } from "@/lib/utils";
-import {
-  sendWhatsAppForClinica,
-  gerarMensagemAlteracaoAgendamento,
-  gerarMensagemCancelamentoAgendamento,
-} from "@/lib/whatsapp";
+import { getClinicaWhatsAppService } from "@/lib/whatsapp";
 import { horarioEstaDentroDasFaixas, obterFaixasAgendaMedicoParaData } from "@/lib/medico-escala";
 
 const atualizarAgendamentoSchema = z.object({
@@ -538,13 +534,31 @@ export async function PATCH(
       const celular = agendamentoAtualizado.paciente.celular || agendamentoAtualizado.paciente.telefone;
       if (celular) {
         try {
-          const mensagem = gerarMensagemAlteracaoAgendamento(
-            agendamentoAtualizado.paciente.nome,
-            agendamentoAtual.dataHora,
-            agendamentoAtualizado.dataHora,
-            agendamentoAtualizado.medico.usuario.nome
-          );
-          await sendWhatsAppForClinica(auth.clinicaId!, { to: celular, message: mensagem });
+          const service = await getClinicaWhatsAppService(auth.clinicaId!);
+          if (service) {
+            const dataFormatada = agendamentoAtualizado.dataHora.toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            });
+            const horaFormatada = agendamentoAtualizado.dataHora.toLocaleTimeString("pt-BR", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            });
+            await service.sendTemplateMessage({
+              to: celular,
+              message: "",
+              templateId: "alteracao_agendamento",
+              templateParams: [
+                agendamentoAtualizado.paciente.nome,
+                dataFormatada,
+                horaFormatada,
+                agendamentoAtualizado.clinica.nome,
+                agendamentoAtualizado.medico.usuario.nome,
+              ],
+            });
+          }
         } catch (waError) {
           console.error("Erro ao enviar WhatsApp de alteração:", waError);
         }
@@ -787,12 +801,31 @@ export async function DELETE(
     const celularCanc = agendamentoCancelado.paciente.celular || agendamentoCancelado.paciente.telefone;
     if (celularCanc) {
       try {
-        const mensagem = gerarMensagemCancelamentoAgendamento(
-          agendamentoCancelado.paciente.nome,
-          agendamentoCancelado.dataHora,
-          motivoCancelamento
-        );
-        await sendWhatsAppForClinica(auth.clinicaId!, { to: celularCanc, message: mensagem });
+        const service = await getClinicaWhatsAppService(auth.clinicaId!);
+        if (service) {
+          const dataFormatada = agendamentoCancelado.dataHora.toLocaleDateString("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          });
+          const horaFormatada = agendamentoCancelado.dataHora.toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          });
+          await service.sendTemplateMessage({
+            to: celularCanc,
+            message: "",
+            templateId: "cancelamento_agendamento",
+            templateParams: [
+              agendamentoCancelado.paciente.nome,
+              dataFormatada,
+              horaFormatada,
+              agendamentoCancelado.clinica.nome,
+              agendamentoCancelado.medico.usuario.nome,
+            ],
+          });
+        }
       } catch (waError) {
         console.error("Erro ao enviar WhatsApp de cancelamento:", waError);
       }
