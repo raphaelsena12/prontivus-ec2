@@ -596,18 +596,16 @@ export function CheckInContent() {
                 <TableRow>
                   <TableHead className="text-xs font-semibold py-3">Data</TableHead>
                   <TableHead className="text-xs font-semibold py-3">Paciente</TableHead>
-                  <TableHead className="text-xs font-semibold py-3">Telefone</TableHead>
                   <TableHead className="text-xs font-semibold py-3">Médico</TableHead>
-                  <TableHead className="text-xs font-semibold py-3">Tipo</TableHead>
-                  <TableHead className="text-xs font-semibold py-3">Convênio</TableHead>
                   <TableHead className="text-xs font-semibold py-3">Horário Check-in</TableHead>
+                  <TableHead className="text-xs font-semibold py-3">Confirmação</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                         <span className="text-xs text-muted-foreground">Carregando consultas...</span>
@@ -616,7 +614,7 @@ export function CheckInContent() {
                   </TableRow>
                 ) : filteredConsultas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <Calendar className="h-12 w-12 text-muted-foreground opacity-50" />
                         <span className="text-xs text-muted-foreground">
@@ -654,18 +652,6 @@ export function CheckInContent() {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs py-3">
-                        {(consulta.paciente.telefone || consulta.paciente.celular) ? (
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-3 w-3 text-muted-foreground" />
-                            <span>
-                              {consulta.paciente.celular || consulta.paciente.telefone}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs py-3">
                         {consulta.medico ? (
                           <div className="flex items-center gap-2">
                             <Stethoscope className="h-3 w-3 text-muted-foreground" />
@@ -673,24 +659,6 @@ export function CheckInContent() {
                           </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs py-3">
-                        {consulta.tipoConsulta ? (
-                          <span>{consulta.tipoConsulta.nome}</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs py-3">
-                        {consulta.operadora ? (
-                          <Badge variant="outline" className="bg-transparent border-blue-500 text-blue-700 dark:text-blue-400 text-[10px] py-0.5 px-1.5 leading-tight">
-                            {consulta.operadora.nomeFantasia || consulta.operadora.razaoSocial}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-transparent border-gray-500 text-gray-700 dark:text-gray-400 text-[10px] py-0.5 px-1.5 leading-tight">
-                            Particular
-                          </Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-xs py-3">
@@ -705,6 +673,16 @@ export function CheckInContent() {
                               <span>{formatTime(new Date(consulta.updatedAt))}</span>
                             </div>
                           </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs py-3">
+                        {consulta.status === "CONFIRMADA" || consulta.status === "CONFIRMADO" ? (
+                          <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
+                            <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
+                            Confirmado
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,6 +122,9 @@ export function AgendamentosContent() {
   const [novoAgendamentoModalOpen, setNovoAgendamentoModalOpen] = useState(false);
   const [escalaModalOpen, setEscalaModalOpen] = useState(false);
   const [escalasMedico, setEscalasMedico] = useState<EscalaHorario[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
+
   const [novoAgendamentoInitialData, setNovoAgendamentoInitialData] = useState<{
     data?: string;
     hora?: string;
@@ -156,6 +159,10 @@ export function AgendamentosContent() {
     fetchMedicos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [medicoSelecionado]);
 
   const fetchAgendamentos = useCallback(async () => {
     // Não buscar agendamentos se nenhum médico estiver selecionado
@@ -302,6 +309,7 @@ export function AgendamentosContent() {
           </Badge>
         );
       case "CONFIRMADO":
+      case "CONFIRMADA":
         return (
           <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
             <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
@@ -344,6 +352,12 @@ export function AgendamentosContent() {
         );
     }
   };
+
+  const totalPages = Math.ceil(agendamentos.length / PAGE_SIZE);
+  const agendamentosPaginados = useMemo(
+    () => agendamentos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [agendamentos, currentPage, PAGE_SIZE]
+  );
 
   const getInitials = (nome: string) => {
     return nome
@@ -601,7 +615,7 @@ export function AgendamentosContent() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  agendamentos.map((agendamento) => (
+                  agendamentosPaginados.map((agendamento) => (
                     <TableRow 
                       key={agendamento.id} 
                       className="hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0"
@@ -620,7 +634,7 @@ export function AgendamentosContent() {
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-foreground">{agendamento.paciente.nome}</span>
+                          <span className="font-medium text-foreground truncate max-w-[140px] block" title={agendamento.paciente.nome}>{agendamento.paciente.nome}</span>
                           {agendamento.paciente.telefone && (
                             <span className="text-[10px] text-muted-foreground/70">
                               {agendamento.paciente.telefone}
@@ -708,6 +722,33 @@ export function AgendamentosContent() {
               </TableBody>
             </Table>
                   </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-3">
+                      <span className="text-[11px] text-muted-foreground">
+                        {agendamentos.length} agendamentos · página {currentPage} de {totalPages}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs px-2"
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          Próximo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
