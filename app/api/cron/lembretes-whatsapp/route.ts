@@ -20,14 +20,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  // Janela: consultas de hoje (00:00 até 23:59 no horário de Brasília)
+  // Janela: consultas entre 1h50 e 2h10 a partir de agora
+  // Cron roda a cada 15min — janela de 20min garante que nenhuma consulta é perdida
   const agora = new Date();
 
-  const inicioDia = new Date(agora);
-  inicioDia.setHours(0, 0, 0, 0);
-
-  const fimDia = new Date(agora);
-  fimDia.setHours(23, 59, 59, 999);
+  const inicioDia = new Date(agora.getTime() + 110 * 60 * 1000); // +1h50
+  const fimDia = new Date(agora.getTime() + 130 * 60 * 1000);   // +2h10
 
   const consultas = await prisma.consulta.findMany({
     where: {
