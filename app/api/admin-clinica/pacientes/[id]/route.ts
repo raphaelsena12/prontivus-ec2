@@ -30,7 +30,7 @@ const updatePacienteSchema = z.object({
 });
 
 // Helper para verificar autorização
-async function checkAuthorization() {
+async function checkAuthorization(options?: { allowSecretaria?: boolean }) {
   const session = await getSession();
 
   if (!session) {
@@ -43,11 +43,15 @@ async function checkAuthorization() {
     };
   }
 
-  if (session.user.tipo !== TipoUsuario.ADMIN_CLINICA) {
+  const allowSecretaria = options?.allowSecretaria === true;
+  const isAdminClinica = session.user.tipo === TipoUsuario.ADMIN_CLINICA;
+  const isSecretaria = session.user.tipo === TipoUsuario.SECRETARIA;
+
+  if (!isAdminClinica && !(allowSecretaria && isSecretaria)) {
     return {
       authorized: false,
       response: NextResponse.json(
-        { error: "Acesso negado. Apenas Admin Clínica." },
+        { error: "Acesso negado" },
         { status: 403 }
       ),
     };
@@ -74,7 +78,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await checkAuthorization();
+    const auth = await checkAuthorization({ allowSecretaria: true });
     if (!auth.authorized) {
       return auth.response;
     }
@@ -111,7 +115,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await checkAuthorization();
+    const auth = await checkAuthorization({ allowSecretaria: true });
     if (!auth.authorized) {
       return auth.response;
     }
@@ -193,7 +197,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await checkAuthorization();
+    const auth = await checkAuthorization({ allowSecretaria: false });
     if (!auth.authorized) {
       return auth.response;
     }
