@@ -332,7 +332,7 @@ export function PacienteDialog({
                           {...field}
                           placeholder="000.000.000-00"
                           maxLength={14}
-                          disabled={loading || isEditing}
+                          disabled={loading}
                           value={field.value ? maskCPF(field.value) : ""}
                           onChange={(e) => {
                             const masked = maskCPF(e.target.value);
