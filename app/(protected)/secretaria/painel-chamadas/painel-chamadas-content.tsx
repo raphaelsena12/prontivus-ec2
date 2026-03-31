@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Phone, PhoneOff, Clock, User, CheckCircle2, XCircle } from "lucide-react";
+import { Phone, PhoneOff, Clock, User, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { formatTime } from "@/lib/utils";
+import Link from "next/link";
 
 interface Chamada {
   id: string;
@@ -23,6 +24,7 @@ interface Chamada {
 export function PainelChamadasContent() {
   const [chamadas, setChamadas] = useState<Chamada[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clinicaId, setClinicaId] = useState<string | null>(null);
 
   const fetchChamadas = async () => {
     try {
@@ -48,6 +50,23 @@ export function PainelChamadasContent() {
     // Atualizar a cada 5 segundos
     const interval = setInterval(fetchChamadas, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchClinicaFromSession = async () => {
+      try {
+        const res = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const id = data?.user?.clinicaId ?? null;
+        if (typeof id === "string" && id.length > 0) {
+          setClinicaId(id);
+        }
+      } catch {
+        // silencioso
+      }
+    };
+    fetchClinicaFromSession();
   }, []);
 
   const handleAtender = async (id: string) => {
@@ -107,10 +126,27 @@ export function PainelChamadasContent() {
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
         <div className="px-4 lg:px-6">
-          <h1 className="text-2xl font-bold">Painel de Chamadas</h1>
-          <p className="text-muted-foreground">
-            Gerencie as chamadas dos pacientes na recepção
-          </p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Painel de Chamadas</h1>
+              <p className="text-muted-foreground">
+                Gerencie as chamadas dos pacientes na recepção
+              </p>
+            </div>
+            {clinicaId && (
+              <Link
+                href={`/painel-chamadas?clinicaId=${encodeURIComponent(clinicaId)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex"
+              >
+                <Button variant="outline" className="gap-2">
+                  Abrir painel público
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 px-4 lg:px-6 md:grid-cols-2">
