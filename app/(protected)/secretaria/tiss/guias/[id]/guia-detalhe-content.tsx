@@ -18,10 +18,14 @@ import { ptBR } from "date-fns/locale";
 import { ArrowLeft, FileText, Plus, Trash2, CheckCircle, Search } from "lucide-react";
 import { toast } from "sonner";
 
-interface CodigoTuss { id: string; codigoTuss: string; descricao: string }
+interface CodigoTuss {
+  id: string;
+  codigoTuss: string;
+  descricao: string;
+}
 interface Procedimento {
   id: string; codigoTussId: string; quantidade: number;
-  valorUnitario: string; valorTotal: string; codigoTuss: CodigoTuss;
+  valorUnitario: string; valorTotal: string; codigoTuss: CodigoTuss | null;
 }
 interface Guia {
   id: string; numeroGuia: string | null; tipoGuia: string; status: string;
@@ -237,9 +241,9 @@ export function GuiaDetalheContent({ id }: { id: string }) {
                   {guia.procedimentos.map((proc) => (
                     <TableRow key={proc.id} className="hover:bg-muted/50">
                       <TableCell className="text-xs py-3 font-mono font-semibold text-primary">
-                        {proc.codigoTuss.codigoTuss}
+                        {proc.codigoTuss?.codigoTuss ?? "—"}
                       </TableCell>
-                      <TableCell className="text-xs py-3">{proc.codigoTuss.descricao}</TableCell>
+                      <TableCell className="text-xs py-3">{proc.codigoTuss?.descricao ?? "—"}</TableCell>
                       <TableCell className="text-xs py-3 text-center">{proc.quantidade}</TableCell>
                       <TableCell className="text-xs py-3 text-right">
                         R$ {parseFloat(proc.valorUnitario).toFixed(2)}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useMemo } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Upload, X, FileText, Eye as EyeIcon, Trash2 } from "lucide-react";
@@ -36,10 +36,16 @@ import { toast } from "sonner";
 interface Medico {
   id: string;
   crm: string;
-  especialidade: string;
-  rqe?: number | null;
+  especialidade: string; // legado (principal)
+  rqe?: number | null; // legado (principal)
   limiteMaximoRetornosPorDia?: number | null;
   ativo?: boolean;
+  medicoEspecialidades?: Array<{
+    id: string;
+    rqe: string | null;
+    especialidade: { id: string; codigo: string; nome: string };
+    categoria: { id: string; codigo: string; nome: string } | null;
+  }>;
   usuario: {
     id: string;
     nome: string;
@@ -59,6 +65,18 @@ interface Especialidade {
   nome: string;
   descricao?: string | null;
   ativo: boolean;
+}
+
+interface Categoria {
+  id: string;
+  codigo: string;
+  nome: string;
+  ativo: boolean;
+}
+
+interface RelacaoEspecialidadeCategoria {
+  especialidadeId: string;
+  categoriaId: string;
 }
 
 interface DocumentoUpload {
@@ -88,15 +106,25 @@ interface MedicoDialogProps {
 const createMedicoSchema = z.object({
   usuarioId: z.string().uuid("Selecione um usuário médico"),
   crm: z.string().min(1, "CRM é obrigatório"),
-  especialidade: z.string().min(1, "Especialidade é obrigatória"),
-  rqe: z.number().int().min(0).nullable().optional(),
+  especialidades: z.array(
+    z.object({
+      especialidadeId: z.string().uuid("Selecione uma especialidade"),
+      categoriaId: z.string().uuid("Categoria inválida").nullable().optional(),
+      rqe: z.string().min(1, "RQE é obrigatório"),
+    })
+  ).min(1, "Adicione ao menos 1 especialidade"),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
 });
 
 const updateMedicoSchema = z.object({
   crm: z.string().min(1, "CRM é obrigatório"),
-  especialidade: z.string().min(1, "Especialidade é obrigatória"),
-  rqe: z.number().int().min(0).nullable().optional(),
+  especialidades: z.array(
+    z.object({
+      especialidadeId: z.string().uuid("Selecione uma especialidade"),
+      categoriaId: z.string().uuid("Categoria inválida").nullable().optional(),
+      rqe: z.string().min(1, "RQE é obrigatório"),
+    })
+  ).min(1, "Adicione ao menos 1 especialidade"),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
   ativo: z.boolean().optional(),
 });
@@ -113,6 +141,9 @@ export function MedicoDialog({
   const [loading, setLoading] = useState(false);
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [loadingEspecialidades, setLoadingEspecialidades] = useState(false);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [relacoes, setRelacoes] = useState<RelacaoEspecialidadeCategoria[]>([]);
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
   const [documentos, setDocumentos] = useState<DocumentoUpload[]>([]);
   const [documentosExistentes, setDocumentosExistentes] = useState<DocumentoExistente[]>([]);
   const [loadingDocumentos, setLoadingDocumentos] = useState(false);
@@ -126,11 +157,15 @@ export function MedicoDialog({
     defaultValues: {
       usuarioId: "",
       crm: "",
-      especialidade: "",
-      rqe: null,
+      especialidades: [{ especialidadeId: "", categoriaId: null, rqe: "" }],
       limiteMaximoRetornosPorDia: null,
       ativo: true,
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "especialidades",
   });
 
   // Buscar especialidades
@@ -153,6 +188,42 @@ export function MedicoDialog({
       fetchEspecialidades();
     }
   }, [open]);
+
+  // Buscar categorias e relações (especialidade↔categoria)
+  useEffect(() => {
+    if (!open) return;
+    const fetchCats = async () => {
+      try {
+        setLoadingCategorias(true);
+        const [resCats, resRel] = await Promise.all([
+          fetch("/api/admin-clinica/especialidades-categorias?ativo=true"),
+          fetch("/api/admin-clinica/especialidades-categorias-itens?limit=5000"),
+        ]);
+        if (resCats.ok) {
+          const data = await resCats.json();
+          setCategorias(data.categorias || []);
+        }
+        if (resRel.ok) {
+          const data = await resRel.json();
+          setRelacoes((data.itens || []).map((it: any) => ({ especialidadeId: it.especialidadeId, categoriaId: it.categoriaId })));
+        }
+      } catch (e) {
+        console.error("Erro ao buscar categorias/relações:", e);
+      } finally {
+        setLoadingCategorias(false);
+      }
+    };
+    fetchCats();
+  }, [open]);
+
+  const categoriasPorEspecialidade = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const r of relacoes) {
+      if (!map.has(r.especialidadeId)) map.set(r.especialidadeId, new Set());
+      map.get(r.especialidadeId)!.add(r.categoriaId);
+    }
+    return map;
+  }, [relacoes]);
 
   // Buscar documentos existentes quando estiver editando
   useEffect(() => {
@@ -192,8 +263,14 @@ export function MedicoDialog({
     if (medico) {
       form.reset({
         crm: medico.crm,
-        especialidade: medico.especialidade,
-        rqe: medico.rqe ?? null,
+        especialidades:
+          medico.medicoEspecialidades && medico.medicoEspecialidades.length > 0
+            ? medico.medicoEspecialidades.map((me) => ({
+                especialidadeId: me.especialidade.id,
+                categoriaId: me.categoria?.id ?? null,
+                rqe: me.rqe || "",
+              }))
+            : [{ especialidadeId: "", categoriaId: null, rqe: "" }],
         limiteMaximoRetornosPorDia: medico.limiteMaximoRetornosPorDia,
         ativo: medico.ativo,
       });
@@ -201,8 +278,7 @@ export function MedicoDialog({
       form.reset({
         usuarioId: "",
         crm: "",
-        especialidade: "",
-        rqe: null,
+        especialidades: [{ especialidadeId: "", categoriaId: null, rqe: "" }],
         limiteMaximoRetornosPorDia: null,
         ativo: true,
       });
@@ -336,8 +412,11 @@ export function MedicoDialog({
 
       const payload: any = {
         crm: data.crm,
-        especialidade: data.especialidade,
-        rqe: data.rqe ?? null,
+        especialidades: (data.especialidades || []).map((it: any) => ({
+          especialidadeId: it.especialidadeId,
+          categoriaId: it.categoriaId || null,
+          rqe: String(it.rqe || "").trim(),
+        })),
         limiteMaximoRetornosPorDia: data.limiteMaximoRetornosPorDia ?? null,
       };
 
@@ -480,59 +559,134 @@ export function MedicoDialog({
 
             <FormField
               control={form.control}
-              name="especialidade"
+              name="especialidades"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Especialidade <span className="text-destructive">*</span>
+                    Especialidades / Categorias / RQE <span className="text-destructive">*</span>
                   </FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={loading || loadingEspecialidades}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a especialidade" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {especialidades.map((especialidade) => (
-                        <SelectItem key={especialidade.id} value={especialidade.nome}>
-                          {especialidade.nome} {especialidade.codigo && `(${especialidade.codigo})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  <div className="space-y-3">
+                    {fields.map((f, idx) => {
+                      const espId = form.watch(`especialidades.${idx}.especialidadeId`);
+                      const allowedCats = espId ? categoriasPorEspecialidade.get(espId) : undefined;
+                      const cats = allowedCats
+                        ? categorias.filter((c) => allowedCats.has(c.id))
+                        : categorias;
 
-            <FormField
-              control={form.control}
-              name="rqe"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>RQE</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      placeholder="Ex: 12345 (opcional)"
-                      {...field}
-                      value={field.value ?? ""}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        field.onChange(value === "" ? null : parseInt(value, 10));
-                      }}
-                      disabled={loading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-sm text-muted-foreground">
-                    Registro de Qualificação de Especialista (opcional)
-                  </p>
+                      return (
+                        <div key={f.id} className="rounded-md border p-3 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <FormField
+                              control={form.control}
+                              name={`especialidades.${idx}.especialidadeId`}
+                              render={({ field: espField }) => (
+                                <FormItem>
+                                  <FormLabel>Especialidade</FormLabel>
+                                  <Select
+                                    onValueChange={(val) => {
+                                      // quando troca especialidade, limpa categoria
+                                      espField.onChange(val);
+                                      form.setValue(`especialidades.${idx}.categoriaId`, null);
+                                    }}
+                                    value={espField.value}
+                                    disabled={loading || loadingEspecialidades}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {especialidades.map((e) => (
+                                        <SelectItem key={e.id} value={e.id}>
+                                          {e.nome} {e.codigo && `(${e.codigo})`}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`especialidades.${idx}.categoriaId`}
+                              render={({ field: catField }) => (
+                                <FormItem>
+                                  <FormLabel>Categoria (opcional)</FormLabel>
+                                  <Select
+                                    onValueChange={(val) => catField.onChange(val === "NONE" ? null : val)}
+                                    value={catField.value ?? "NONE"}
+                                    disabled={loading || loadingCategorias || !espId}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder={espId ? "Selecione" : "Selecione a especialidade"} />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="NONE">Sem categoria</SelectItem>
+                                      {cats.map((c) => (
+                                        <SelectItem key={c.id} value={c.id}>
+                                          {c.nome} {c.codigo && `(${c.codigo})`}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name={`especialidades.${idx}.rqe`}
+                              render={({ field: rqeField }) => (
+                                <FormItem>
+                                  <FormLabel>
+                                    RQE <span className="text-destructive">*</span>
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Ex: 1234567890"
+                                      {...rqeField}
+                                      disabled={loading}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => remove(idx)}
+                              disabled={loading || fields.length === 1}
+                              className="h-8 text-xs"
+                            >
+                              Remover
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => append({ especialidadeId: "", categoriaId: null, rqe: "" })}
+                        disabled={loading}
+                        className="h-8 text-xs"
+                      >
+                        Adicionar especialidade
+                      </Button>
+                    </div>
+                  </div>
                 </FormItem>
               )}
             />

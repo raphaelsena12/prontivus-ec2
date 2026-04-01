@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatTime, formatCPF } from "@/lib/utils";
+import { playPollyAnnouncement } from "@/lib/play-polly-announcement";
 import { PageHeader } from "@/components/page-header";
 
 interface Consulta {
@@ -181,6 +182,14 @@ export function FilaAtendimentoContent() {
       });
       if (!res.ok) throw new Error("Erro ao chamar paciente");
       toast.success(`${consulta.paciente.nome} chamado(a) no painel`);
+
+      const salaLabel = sala.trim();
+      const mensagem = `Atenção, ${consulta.paciente.nome}, favor se dirigir a ${salaLabel}.`;
+      void playPollyAnnouncement(mensagem).then((origem) => {
+        if (origem === "failed") {
+          toast.warning("Não foi possível reproduzir o chamado pelo alto-falante.");
+        }
+      });
     } catch {
       toast.error("Não foi possível enviar a chamada para o painel");
     } finally {
@@ -405,7 +414,7 @@ export function FilaAtendimentoContent() {
                               onClick={() => handleChamarPaciente(consulta)}
                               disabled={loadingChamar === consulta.id}
                               className="text-xs h-7 border-amber-200 text-amber-700 hover:bg-amber-50"
-                              title="Chamar paciente no painel de TV"
+                              title="Chamar no painel de TV e pelo alto-falante (Polly)"
                             >
                               {loadingChamar === consulta.id ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />

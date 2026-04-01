@@ -231,40 +231,17 @@ export async function PATCH(
 }
 
 // DELETE /api/admin-clinica/codigos-tuss/[id]
+/** Catálogo TUSS é global: clínica não pode excluir registros TUSS (apenas super-admin). */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  _context: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
-
-    const { id } = await params;
-
-    const codigoTuss = await prisma.codigoTuss.findUnique({
-      where: { id },
-    });
-
-    if (!codigoTuss) {
-      return NextResponse.json(
-        { error: "Código TUSS não encontrado" },
-        { status: 404 }
-      );
-    }
-
-    await prisma.codigoTuss.delete({
-      where: { id },
-    });
-
-    return NextResponse.json({ message: "Código TUSS excluído com sucesso" });
-  } catch (error) {
-    console.error("Erro ao deletar código TUSS:", error);
-    return NextResponse.json(
-      { error: "Erro ao deletar código TUSS" },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(
+    {
+      error:
+        "Códigos TUSS globais não podem ser excluídos pela clínica. Remova apenas itens do cadastro próprio (origem Clínica).",
+    },
+    { status: 403 }
+  );
 }
 

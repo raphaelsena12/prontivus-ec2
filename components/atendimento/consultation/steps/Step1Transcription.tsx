@@ -13,6 +13,7 @@ import {
   Info,
   ArrowRight,
   Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 
 interface TranscriptionEntry {
@@ -28,6 +29,7 @@ interface Step1TranscriptionProps {
   transcription: TranscriptionEntry[];
   sessionDuration: string;
   transcricaoFinalizada: boolean;
+  stoppedUnexpectedly?: boolean;
   editedTranscription?: string;
   setEditedTranscription?: (v: string) => void;
   startTranscription: () => Promise<void>;
@@ -40,11 +42,10 @@ interface Step1TranscriptionProps {
 }
 
 function formatTranscriptionTime(timeStr: string): string {
+  // entry.time é HH:MM:SS — exibe apenas HH:MM
   const parts = timeStr.split(":");
-  const totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1] || "0");
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${String(mins).padStart(2, "0")}m ${String(secs).padStart(2, "0")}s`;
+  if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  return timeStr;
 }
 
 export function Step1Transcription({
@@ -53,6 +54,7 @@ export function Step1Transcription({
   transcription,
   sessionDuration,
   transcricaoFinalizada,
+  stoppedUnexpectedly,
   startTranscription,
   pauseTranscription,
   resumeTranscription,
@@ -65,6 +67,28 @@ export function Step1Transcription({
 
   return (
     <div className="space-y-4">
+      {/* Banner de alerta: transcrição parou inesperadamente */}
+      {stoppedUnexpectedly && !isTranscribing && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700">Transcrição interrompida</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              O reconhecimento de voz parou inesperadamente (erro de rede ou limite de sessão).
+              Retome a gravação para continuar capturando a consulta.
+            </p>
+          </div>
+          <Button
+            onClick={startTranscription}
+            size="sm"
+            className="h-7 px-3 bg-red-600 hover:bg-red-700 text-white text-xs gap-1.5 flex-shrink-0"
+          >
+            <Play className="w-3 h-3" fill="currentColor" />
+            Retomar
+          </Button>
+        </div>
+      )}
+
       {/* Card principal de transcrição */}
       <div
         className={`bg-white border rounded-xl overflow-hidden shadow-sm transition-all ${
@@ -230,8 +254,6 @@ export function Step1Transcription({
             )}
 
             {transcription.map((entry, idx) => {
-              const parts = entry.time.split(":");
-              const totalSeconds = parseInt(parts[0]) * 60 + parseInt(parts[1] || "0");
               return (
                 <div key={idx} className="flex gap-3 group">
                   <span className="text-slate-400 tabular-nums text-xs mt-0.5 flex-shrink-0 w-16 text-right">

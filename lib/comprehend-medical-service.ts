@@ -361,14 +361,11 @@ function generateAnamnese(
   // HISTÓRIA DA DOENÇA ATUAL
   anamnese += `HISTÓRIA DA DOENÇA ATUAL:\n${transcription}\n\n`;
   
-  // ANTECEDENTES PESSOAIS PATOLÓGICOS
-  anamnese += `ANTECEDENTES PESSOAIS PATOLÓGICOS:\nN/A\n\n`;
+  // ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL
+  anamnese += `ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\nN/A\n\n`;
   
   // ANTECEDENTES FAMILIARES
   anamnese += `ANTECEDENTES FAMILIARES:\nN/A\n\n`;
-  
-  // HÁBITOS DE VIDA / HISTÓRIA SOCIAL
-  anamnese += `HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\nN/A\n\n`;
   
   // MEDICAMENTOS EM USO ATUAL
   if (medicamentos) {

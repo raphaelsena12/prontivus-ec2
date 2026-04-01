@@ -623,7 +623,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
         <SidebarTrigger className="-ml-1 hover:bg-muted text-foreground transition-all duration-200 hover:scale-105 active:scale-95" />
 
         {/* Seletor de Clínica (esquerda) */}
-        {mounted && user && (
+        {mounted && user && session?.user?.tipo !== TipoUsuario.SUPER_ADMIN && (
           <>
             <Separator orientation="vertical" className="h-6 bg-border" />
             <TenantSelector />
@@ -800,18 +800,30 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                       <IconUserCircle className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
                       Perfil
                     </DropdownMenuItem>
-                    {session?.user?.tipo === TipoUsuario.SECRETARIA && (
-                      <DropdownMenuItem
-                        onClick={() => router.push("/secretaria/painel-chamadas")}
-                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
-                      >
-                        <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
-                        Painel de Chamadas
-                      </DropdownMenuItem>
-                    )}
+                    {session?.user?.tipo === TipoUsuario.SECRETARIA &&
+                      session?.user?.clinicaId && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            const id = session?.user?.clinicaId;
+                            if (!id) return;
+                            window.open(
+                              `/painel-chamadas?clinicaId=${encodeURIComponent(id)}`,
+                              "_blank"
+                            );
+                          }}
+                          className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                        >
+                          <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
+                          Painel de Chamadas
+                        </DropdownMenuItem>
+                      )}
                     {session?.user?.tipo === TipoUsuario.ADMIN_CLINICA && session?.user?.clinicaId && (
                       <DropdownMenuItem
-                        onClick={() => window.open(`/painel-chamadas?clinicaId=${session.user.clinicaId}`, "_blank")}
+                        onClick={() => {
+                          const id = session?.user?.clinicaId;
+                          if (!id) return;
+                          window.open(`/painel-chamadas?clinicaId=${encodeURIComponent(id)}`, "_blank");
+                        }}
                         className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
                       >
                         <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />

@@ -74,6 +74,14 @@ function normalizeCategoriaExame(value: unknown): string | null {
   return null;
 }
 
+function parseBooleanFlexible(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  const s = toStr(value);
+  if (!s) return false;
+  const v = s.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return ["SIM", "S", "TRUE", "1", "YES", "Y"].includes(v);
+}
+
 async function checkAuthorization() {
   const session = await getSession();
 
@@ -99,8 +107,19 @@ async function checkAuthorization() {
  * Upload em massa do Catálogo TUSS via Excel (.xlsx/.xls)
  *
  * Colunas aceitas (nomes podem variar; normalizamos):
- * - Código do Termo (ou codigo_tuss / codigo)
- * - Termo (ou descricao)
+ * Layout novo (ANS Tabela 22 / tela "códigos_tuss" do anexo):
+ * - codigo (ou codigo_tuss / código do termo)
+ * - descricao_tuss (ou termo / descricao)
+ * - sip_grupo
+ * - categoria_prontivus
+ * - categoria_sadt
+ * - usa_guia_sadt (SIM/NÃO)
+ * - subgrupo_tuss
+ * - grupo_tuss
+ * - capitulo_tuss
+ * - fonte_ans_tabela22
+ *
+ * Layout antigo (ainda aceito):
  * - Tipo (CONSULTA / EXAME / PROCEDIMENTO_AMBULATORIAL / CIRURGIA / OUTROS)
  * - Categoria (apenas para EXAME: LABORATORIAL / IMAGEM / ANATOMOPATOLOGICO / FUNCIONAL / GENETICO / OUTROS)
  * - Data de início de vigência
@@ -155,11 +174,27 @@ export async function POST(request: NextRequest) {
               row.tuss
           )?.replace(/\s+/g, "");
 
-        const descricao = toStr(row.termo || row.descricao || row.desc);
+        const descricao = toStr(
+          row.descricao_tuss ||
+            row.descricao ||
+            row.termo ||
+            row.desc
+        );
         // Tipo e Categoria podem vir vazios na planilha; Tipo tem default para manter integridade do modelo
         const tipoProcedimento =
           normalizeTipoProcedimento(row.tipo || row.tipo_procedimento) || "OUTROS";
         const categoriaExame = normalizeCategoriaExame(row.categoria || row.categoria_exame);
+
+        const sipGrupo = toStr(row.sip_grupo || row.sipgrupo);
+        const categoriaProntivus = toStr(row.categoria_prontivus || row.categoriaprontivus);
+        const categoriaSadt = toStr(row.categoria_sadt || row.categoriasadt);
+        const usaGuiaSadt = parseBooleanFlexible(row.usa_guia_sadt || row.usaguiasadt);
+        const subgrupoTuss = toStr(row.subgrupo_tuss || row.subgrupotuss);
+        const grupoTuss = toStr(row.grupo_tuss || row.grupotuss);
+        const capituloTuss = toStr(row.capitulo_tuss || row.capitulotuss);
+        const fonteAnsTabela22 = toStr(
+          row.fonte_ans_tabela22 || row.fonteans_tabela22 || row.fonteans || row.fonte
+        );
 
         const dataInicio = parseDateFlexible(
           row.data_de_inicio_de_vigencia ||
@@ -193,13 +228,11 @@ export async function POST(request: NextRequest) {
         // preenchido mas inválido (normalize retornaria null e cairia no default). Nesse cenário,
         // o comportamento desejado é aceitar (como OUTROS), conforme solicitado.
 
-        if (!dataInicio) {
-          erros.push(`Linha ${linha}: "Data de início de vigência" inválida`);
-          ignorados++;
-          continue;
-        }
+        // No layout novo (tabela 22) pode não existir vigência; aplicar defaults seguros
+        const dataInicioFinal = dataInicio ?? new Date("2000-01-01T00:00:00.000Z");
+        const dataFimFinal = dataFim ?? null;
 
-        if (dataFim && dataFim < dataInicio) {
+        if (dataFimFinal && dataFimFinal < dataInicioFinal) {
           erros.push(`Linha ${linha}: "Data de fim de vigência" não pode ser menor que a data de início`);
           ignorados++;
           continue;
@@ -220,8 +253,16 @@ export async function POST(request: NextRequest) {
               descricao,
               tipoProcedimento,
               categoriaExame: categoriaFinal,
-              dataVigenciaInicio: dataInicio,
-              dataVigenciaFim: dataFim,
+              sipGrupo,
+              categoriaProntivus,
+              categoriaSadt,
+              usaGuiaSadt,
+              subgrupoTuss,
+              grupoTuss,
+              capituloTuss,
+              fonteAnsTabela22,
+              dataVigenciaInicio: dataInicioFinal,
+              dataVigenciaFim: dataFimFinal,
               ativo: true,
             },
           });
@@ -233,8 +274,16 @@ export async function POST(request: NextRequest) {
               descricao,
               tipoProcedimento,
               categoriaExame: categoriaFinal,
-              dataVigenciaInicio: dataInicio,
-              dataVigenciaFim: dataFim,
+              sipGrupo,
+              categoriaProntivus,
+              categoriaSadt,
+              usaGuiaSadt,
+              subgrupoTuss,
+              grupoTuss,
+              capituloTuss,
+              fonteAnsTabela22,
+              dataVigenciaInicio: dataInicioFinal,
+              dataVigenciaFim: dataFimFinal,
               ativo: true,
             },
           });

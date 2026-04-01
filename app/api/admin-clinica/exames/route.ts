@@ -9,7 +9,7 @@ const exameSchema = z.object({
   tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"], {
     message: "Tipo é obrigatório",
   }),
-  codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
+  codigoTussId: z.string().uuid("Código TUSS inválido").optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -95,7 +95,10 @@ export async function POST(request: NextRequest) {
 
     const exame = await prisma.exame.create({
       data: {
-        ...validation.data,
+        nome: validation.data.nome,
+        descricao: validation.data.descricao,
+        tipo: validation.data.tipo,
+        codigoTussId: validation.data.codigoTussId ?? null,
         clinicaId: auth.clinicaId!,
       },
     });

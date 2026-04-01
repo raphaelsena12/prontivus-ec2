@@ -68,15 +68,26 @@ export function CodigosTussClearDialog({
       }
 
       const deleted = data?.deleted as Record<string, number> | undefined;
+      const updated = data?.updated as Record<string, number> | undefined;
       const deletedText = deleted
         ? Object.entries(deleted)
             .filter(([, v]) => typeof v === "number" && v > 0)
             .map(([k, v]) => `${k}: ${v}`)
             .join(", ")
         : null;
+      const updatedText = updated
+        ? Object.entries(updated)
+            .filter(([, v]) => typeof v === "number" && v > 0)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ")
+        : null;
 
       toast.success(
-        deletedText ? `Catálogo TUSS excluído. Removidos: ${deletedText}` : "Catálogo TUSS excluído."
+        deletedText
+          ? `Catálogo TUSS excluído. Removidos: ${deletedText}${
+              updatedText ? ` · Histórico preservado (vínculos removidos): ${updatedText}` : ""
+            }`
+          : "Catálogo TUSS excluído."
       );
 
       setConfirmText("");
@@ -119,8 +130,8 @@ export function CodigosTussClearDialog({
             autoComplete="off"
           />
           <p className="text-xs text-muted-foreground">
-            Observação: se existirem consultas/guias/valores vinculados, a exclusão em massa é bloqueada para
-            preservar o histórico.
+            Observação: para preservar o histórico, consultas/guias não são excluídas — apenas o vínculo com o
+            código TUSS é removido (fica em branco).
           </p>
         </div>
 

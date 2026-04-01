@@ -69,8 +69,8 @@ export async function POST(
       return {
         tipo: "CONSULTA" as const,
         ...base,
-        codigoTuss: proc?.codigoTuss.codigoTuss ?? "",
-        descricaoProcedimento: proc?.codigoTuss.descricao ?? "",
+        codigoTuss: proc?.codigoTuss?.codigoTuss ?? "",
+        descricaoProcedimento: proc?.codigoTuss?.descricao ?? "",
       };
     }
 
@@ -78,8 +78,8 @@ export async function POST(
       tipo: "SPSADT" as const,
       ...base,
       procedimentos: guia.procedimentos.map((p) => ({
-        codigoTuss: p.codigoTuss.codigoTuss,
-        descricao: p.codigoTuss.descricao,
+        codigoTuss: p.codigoTuss?.codigoTuss ?? "",
+        descricao: p.codigoTuss?.descricao ?? "",
         quantidade: p.quantidade,
         valorUnitario: Number(p.valorUnitario),
         valorTotal: Number(p.valorTotal),

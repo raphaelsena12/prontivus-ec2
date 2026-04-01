@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const updateProcedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código é obrigatório").optional(),
+  codigo: z.string().min(1, "Código TUSS é obrigatório").optional(),
   nome: z.string().min(1, "Nome é obrigatório").optional(),
   descricao: z.string().optional(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero").optional(),

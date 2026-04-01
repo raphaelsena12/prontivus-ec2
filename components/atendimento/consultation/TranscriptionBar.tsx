@@ -2,14 +2,15 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Mic, Pause, Play, Square, Settings, Loader2 } from "lucide-react";
+import { Mic, Pause, Play, Square, Settings, AlertTriangle } from "lucide-react";
 
 interface TranscriptionBarProps {
   isTranscribing: boolean;
   isPaused: boolean;
   transcricaoFinalizada: boolean;
   hasAnamnese: boolean;
-  isProcessing?: boolean; // gerando anamnese automaticamente
+  isProcessing?: boolean;
+  stoppedUnexpectedly?: boolean;
   sessionDuration: string;
   pauseTranscription: () => void;
   resumeTranscription: () => void;
@@ -17,6 +18,7 @@ interface TranscriptionBarProps {
   setTranscricaoFinalizada: (v: boolean) => void;
   setIsMicrophoneSelectorOpen: (v: boolean) => void;
   onProcessAndAdvance: () => Promise<void>;
+  startTranscription?: () => Promise<void>;
 }
 
 export function TranscriptionBar({
@@ -25,13 +27,39 @@ export function TranscriptionBar({
   transcricaoFinalizada,
   hasAnamnese,
   isProcessing,
+  stoppedUnexpectedly,
   sessionDuration,
   pauseTranscription,
   resumeTranscription,
   stopTranscription,
   setTranscricaoFinalizada,
   setIsMicrophoneSelectorOpen,
+  startTranscription,
 }: TranscriptionBarProps) {
+  // Mostrar alerta de parada inesperada (mesmo sem estar gravando)
+  if (stoppedUnexpectedly && !isTranscribing && !transcricaoFinalizada) {
+    return (
+      <div className="fixed bottom-[72px] left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="flex items-center gap-3 rounded-2xl shadow-2xl px-4 py-2.5 bg-red-900">
+          <AlertTriangle className="w-4 h-4 text-red-300 flex-shrink-0" />
+          <span className="text-sm font-medium text-red-100 whitespace-nowrap">
+            Transcrição interrompida — clique para retomar
+          </span>
+          {startTranscription && (
+            <Button
+              size="sm"
+              onClick={startTranscription}
+              className="h-7 px-3 bg-red-500 hover:bg-red-400 text-white text-xs gap-1.5 rounded-xl border-0"
+            >
+              <Play className="w-3 h-3" fill="currentColor" />
+              Retomar
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Não mostrar a barra quando estiver processando (modal já está sendo exibido)
   const isVisible = isTranscribing && !isProcessing && !(transcricaoFinalizada && !hasAnamnese);
   if (!isVisible) return null;

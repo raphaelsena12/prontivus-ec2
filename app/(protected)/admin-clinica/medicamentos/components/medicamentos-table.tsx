@@ -55,6 +55,16 @@ interface Medicamento {
   apresentacao: string | null;
   controle: string | null;
   unidade: string | null;
+  pharmaceuticalForm?: string | null;
+  therapeuticClass?: string | null;
+  prescriptionType?: string | null;
+  controlType?: string | null;
+  pregnancyRisk?: boolean;
+  pediatricUse?: boolean;
+  hepaticAlert?: boolean;
+  renalAlert?: boolean;
+  highRisk?: boolean;
+  status?: string | null;
   ativo: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -108,16 +118,22 @@ export function MedicamentosTable({
       const nome = med.nome?.toLowerCase() || "";
       const principioAtivo = med.principioAtivo?.toLowerCase() || "";
       const laboratorio = med.laboratorio?.toLowerCase() || "";
+      const forma = med.pharmaceuticalForm?.toLowerCase() || "";
+      const classe = med.therapeuticClass?.toLowerCase() || "";
+      const presc = med.prescriptionType?.toLowerCase() || "";
+      const controlType = (med.controlType || med.controle || "")?.toLowerCase() || "";
       const concentracao = med.concentracao?.toLowerCase() || "";
-      const controle = med.controle?.toLowerCase() || "";
       const unidade = med.unidade?.toLowerCase() || "";
-      const status = med.ativo ? "ativo" : "inativo";
+      const status = (med.status || (med.ativo ? "active" : "inactive")).toLowerCase();
       return (
         nome.includes(search) || 
         principioAtivo.includes(search) || 
         laboratorio.includes(search) ||
+        forma.includes(search) ||
+        classe.includes(search) ||
+        presc.includes(search) ||
+        controlType.includes(search) ||
         concentracao.includes(search) ||
-        controle.includes(search) ||
         unidade.includes(search) ||
         status.includes(search)
       );
@@ -130,7 +146,7 @@ export function MedicamentosTable({
     () => [
       {
         accessorKey: "nome",
-        header: "Nome",
+        header: "Nome comercial",
         cell: ({ row }) => (
           <div className="font-medium max-w-[200px] truncate" title={row.original.nome}>
             {row.original.nome}
@@ -150,15 +166,20 @@ export function MedicamentosTable({
         ),
       },
       {
+        accessorKey: "pharmaceuticalForm",
+        header: "Forma",
+        cell: ({ row }) => <div>{row.original.pharmaceuticalForm || "-"}</div>,
+      },
+      {
         accessorKey: "laboratorio",
         header: "Laboratório",
         cell: ({ row }) => <div>{row.original.laboratorio || "-"}</div>,
       },
       {
-        accessorKey: "controle",
+        accessorKey: "controlType",
         header: "Controle",
         cell: ({ row }) => {
-          const controle = row.original.controle || "Simples";
+          const controle = row.original.controlType || row.original.controle || "comum";
           const getBadgeColor = (controle: string) => {
             const controleLower = controle.toLowerCase();
             if (controleLower.includes("preta") || controleLower.includes("preto")) {
@@ -188,18 +209,28 @@ export function MedicamentosTable({
         },
       },
       {
+        accessorKey: "prescriptionType",
+        header: "Prescrição",
+        cell: ({ row }) => <div>{row.original.prescriptionType || "-"}</div>,
+      },
+      {
+        accessorKey: "therapeuticClass",
+        header: "Classe terapêutica",
+        cell: ({ row }) => <div className="max-w-[180px] truncate" title={row.original.therapeuticClass || ""}>{row.original.therapeuticClass || "-"}</div>,
+      },
+      {
         accessorKey: "ativo",
         header: "Status",
         cell: ({ row }) => (
-          row.original.ativo ? (
+          (row.original.status || (row.original.ativo ? "active" : "inactive")).toLowerCase() === "active" ? (
             <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
               <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
-              Ativo
+              Active
             </Badge>
           ) : (
             <Badge variant="outline" className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight">
               <IconLoader className="mr-1 h-3 w-3" />
-              Inativo
+              Inactive
             </Badge>
           )
         ),

@@ -48,12 +48,19 @@ interface Step2AnamnesisProps {
   transcriptionText?: string;
 }
 
+const ANTECEDENTES_HABITOS_SOCIAL_LABEL =
+  "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL";
+
 const ANAMNESE_SECTIONS = [
   { key: "queixaPrincipal", label: "QUEIXA PRINCIPAL", placeholder: "Descreva o motivo principal da consulta (2-3 palavras)..." },
   { key: "hda", label: "HISTÓRIA DA DOENÇA ATUAL", placeholder: "Início, evolução, localização, intensidade, fatores de melhora e piora, sintomas associados..." },
-  { key: "antecedentesPessoais", label: "ANTECEDENTES PESSOAIS PATOLÓGICOS", placeholder: "Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos..." },
+  {
+    key: "antecedentesHabitosSocial",
+    label: ANTECEDENTES_HABITOS_SOCIAL_LABEL,
+    placeholder:
+      "Doenças prévias, internações, cirurgias, traumas, alergias, vacinação, medicamentos crônicos; tabagismo, etilismo, alimentação, atividade física, sono, ocupação e história social...",
+  },
   { key: "antecedentesFamiliares", label: "ANTECEDENTES FAMILIARES", placeholder: "Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes..." },
-  { key: "habitosVida", label: "HÁBITOS DE VIDA / HISTÓRIA SOCIAL", placeholder: "Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional..." },
   { key: "medicamentosUso", label: "MEDICAMENTOS EM USO ATUAL", placeholder: "Nome, dose, frequência, tempo de uso..." },
   { key: "examesFisicos", label: "EXAMES FÍSICOS", placeholder: "Achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)..." },
 ];
@@ -62,6 +69,7 @@ const knownTitles = [
   "ANAMNESE",
   "QUEIXA PRINCIPAL",
   "HISTÓRIA DA DOENÇA ATUAL",
+  ANTECEDENTES_HABITOS_SOCIAL_LABEL,
   "ANTECEDENTES PESSOAIS PATOLÓGICOS",
   "ANTECEDENTES FAMILIARES",
   "HÁBITOS DE VIDA / HISTÓRIA SOCIAL",
@@ -181,6 +189,29 @@ function parseAnamneseSection(anamnese: string, sectionTitle: string): string {
   return content;
 }
 
+/** Une blocos legados (IA/prontuários antigos) num único campo do modo manual. */
+function parseAntecedentesHabitosSocialMerged(anamnese: string): string {
+  const fromNew = parseAnamneseSection(anamnese, ANTECEDENTES_HABITOS_SOCIAL_LABEL).trim();
+  if (fromNew) return fromNew;
+
+  const ap = parseAnamneseSection(anamnese, "ANTECEDENTES PESSOAIS PATOLÓGICOS").trim();
+  const hvHs = parseAnamneseSection(anamnese, "HÁBITOS DE VIDA / HISTÓRIA SOCIAL").trim();
+  let habitosBlock = hvHs;
+  if (!habitosBlock) {
+    const h = parseAnamneseSection(anamnese, "HÁBITOS DE VIDA").trim();
+    const s = parseAnamneseSection(anamnese, "HISTÓRIA SOCIAL").trim();
+    habitosBlock = [h, s].filter(Boolean).join("\n\n");
+  }
+  return [ap, habitosBlock].filter(Boolean).join("\n\n");
+}
+
+function sectionValueFromAnamnese(base: string, sectionKey: string, sectionLabel: string): string {
+  if (sectionKey === "antecedentesHabitosSocial") {
+    return parseAntecedentesHabitosSocialMerged(base);
+  }
+  return parseAnamneseSection(base, sectionLabel);
+}
+
 function combineSections(values: Record<string, string>): string {
   return ANAMNESE_SECTIONS.filter((s) => values[s.key]?.trim())
     .map((s) => `${s.label.toUpperCase()}\n${values[s.key].trim()}`)
@@ -195,12 +226,28 @@ function normalizeAnamneseText(text: string): string {
     const parsed = JSON.parse(trimmed) as Record<string, string>;
     const lines: string[] = [];
     for (const section of ANAMNESE_SECTIONS) {
-      const value =
+      let value =
         parsed[section.label] ??
         Object.entries(parsed).find(
           ([k]) => k.toUpperCase() === section.label.toUpperCase()
         )?.[1] ??
         "";
+      if (section.key === "antecedentesHabitosSocial" && !(value || "").trim()) {
+        const ap =
+          parsed["ANTECEDENTES PESSOAIS PATOLÓGICOS"] ??
+          Object.entries(parsed).find(
+            ([k]) => k.toUpperCase() === "ANTECEDENTES PESSOAIS PATOLÓGICOS"
+          )?.[1] ??
+          "";
+        const hv =
+          parsed["HÁBITOS DE VIDA / HISTÓRIA SOCIAL"] ??
+          Object.entries(parsed).find(
+            ([k]) => k.toUpperCase() === "HÁBITOS DE VIDA / HISTÓRIA SOCIAL"
+          )?.[1] ??
+          "";
+        const parts = [ap, hv].map((x) => (x || "").trim()).filter((x) => x && x.toUpperCase() !== "N/A");
+        value = parts.join("\n\n");
+      }
       const v = (value || "").trim();
       lines.push(`${section.label}:\n${v && v.toUpperCase() !== "N/A" ? v : "N/A"}`);
     }
@@ -520,7 +567,10 @@ export function Step2Anamnesis({
     const base = analysisResults?.anamnese || prontuario?.anamnese || "";
     if (!base) return {};
     return Object.fromEntries(
-      ANAMNESE_SECTIONS.map((s: { key: string; label: string; placeholder: string }) => [s.key, parseAnamneseSection(base, s.label)])
+      ANAMNESE_SECTIONS.map((s: { key: string; label: string; placeholder: string }) => [
+        s.key,
+        sectionValueFromAnamnese(base, s.key, s.label),
+      ])
     );
   });
 
@@ -530,7 +580,7 @@ export function Step2Anamnesis({
     if (!base) return;
     setSectionValues(
       Object.fromEntries(
-        ANAMNESE_SECTIONS.map((s) => [s.key, parseAnamneseSection(base, s.label)])
+        ANAMNESE_SECTIONS.map((s) => [s.key, sectionValueFromAnamnese(base, s.key, s.label)])
       )
     );
     setSectionEdits({});

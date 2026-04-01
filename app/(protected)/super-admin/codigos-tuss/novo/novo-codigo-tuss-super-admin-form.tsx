@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
@@ -58,6 +59,14 @@ const novoCodigoTussSchema = z.object({
     .nullable(),
   dataVigenciaInicio: z.string().min(1, "Data de vigência é obrigatória"),
   dataVigenciaFim: z.string().optional(),
+  sipGrupo: z.string().optional(),
+  categoriaProntivus: z.string().optional(),
+  categoriaSadt: z.string().optional(),
+  usaGuiaSadt: z.boolean().optional(),
+  subgrupoTuss: z.string().optional(),
+  grupoTuss: z.string().optional(),
+  capituloTuss: z.string().optional(),
+  fonteAnsTabela22: z.string().optional(),
   observacoes: z.string().optional(),
 });
 
@@ -77,6 +86,14 @@ export function NovoCodigoTussSuperAdminForm() {
       categoriaExame: null,
       dataVigenciaInicio: "",
       dataVigenciaFim: "",
+      sipGrupo: "",
+      categoriaProntivus: "",
+      categoriaSadt: "",
+      usaGuiaSadt: false,
+      subgrupoTuss: "",
+      grupoTuss: "",
+      capituloTuss: "",
+      fonteAnsTabela22: "",
       observacoes: "",
     },
   });
@@ -233,6 +250,122 @@ export function NovoCodigoTussSuperAdminForm() {
                           <FormLabel>Descrição Detalhada</FormLabel>
                           <FormControl>
                             <Textarea {...field} rows={3} placeholder="Descrição detalhada (opcional)" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="sipGrupo"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SIP Grupo</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: A. CONSULTAS MÉDICAS" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="categoriaProntivus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Categoria Prontivus</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: CONSULTA" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="categoriaSadt"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Categoria SADT</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: NAO_SADT" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="usaGuiaSadt"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-3 md:col-span-2">
+                          <div className="space-y-0.5">
+                            <FormLabel>Usa guia SADT</FormLabel>
+                            <p className="text-xs text-muted-foreground">
+                              {field.value ? "SIM" : "NÃO"}
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="subgrupoTuss"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Subgrupo TUSS</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: CONSULTAS, VISITAS HOSPITALARES..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="grupoTuss"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Grupo TUSS</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: PROCEDIMENTOS GERAIS" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="capituloTuss"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Capítulo TUSS</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: PROCEDIMENTOS GERAIS" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fonteAnsTabela22"
+                      render={({ field }) => (
+                        <FormItem className="md:col-span-2">
+                          <FormLabel>Fonte ANS (Tabela 22)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Ex: ANS TUSS Tabela 22 versão 202501" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

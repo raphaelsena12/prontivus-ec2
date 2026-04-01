@@ -95,7 +95,7 @@ export async function PATCH(
 }
 
 // DELETE /api/super-admin/operadoras/[id]
-// (desativa, não remove)
+// (exclui do banco)
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -108,11 +108,26 @@ export async function DELETE(
     const exists = await prisma.operadora.findFirst({ where: { id, clinicaId: null }, select: { id: true } });
     if (!exists) return NextResponse.json({ error: "Operadora não encontrada" }, { status: 404 });
 
-    await prisma.operadora.update({ where: { id }, data: { ativo: false } });
-    return NextResponse.json({ message: "Operadora desativada com sucesso" });
+    try {
+      await prisma.operadora.delete({ where: { id } });
+      return NextResponse.json({ message: "Operadora excluída com sucesso" });
+    } catch (e: any) {
+      // FK constraint (ex.: já usada em consultas/guias/planos) ou outros erros de integridade
+      const code = e?.code || e?.name;
+      if (code === "P2003") {
+        return NextResponse.json(
+          {
+            error:
+              "Não foi possível excluir: esta operadora possui vínculos (ex.: consultas/guias/planos). Remova os vínculos antes ou mantenha no catálogo.",
+          },
+          { status: 409 }
+        );
+      }
+      throw e;
+    }
   } catch (error) {
     console.error("Erro ao desativar operadora (super-admin):", error);
-    return NextResponse.json({ error: "Erro ao desativar operadora" }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao excluir operadora" }, { status: 500 });
   }
 }
 

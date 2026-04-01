@@ -584,8 +584,8 @@ export async function POST(request: NextRequest) {
           medicoNome: consulta.medico.usuario.nome,
           dataHora: consulta.dataHora,
           tipoConsulta: consulta.tipoConsulta?.nome,
-          codigoTuss: consulta.codigoTuss.codigoTuss,
-          descricaoTuss: consulta.codigoTuss.descricao,
+          codigoTuss: consulta.codigoTuss?.codigoTuss,
+          descricaoTuss: consulta.codigoTuss?.descricao,
           observacoes: consulta.observacoes || undefined,
           clinicaNome: consulta.clinica.nome,
         });
@@ -595,8 +595,8 @@ export async function POST(request: NextRequest) {
           medicoNome: consulta.medico.usuario.nome,
           dataHora: consulta.dataHora,
           tipoConsulta: consulta.tipoConsulta?.nome,
-          codigoTuss: consulta.codigoTuss.codigoTuss,
-          descricaoTuss: consulta.codigoTuss.descricao,
+          codigoTuss: consulta.codigoTuss?.codigoTuss,
+          descricaoTuss: consulta.codigoTuss?.descricao,
           observacoes: consulta.observacoes || undefined,
           clinicaNome: consulta.clinica.nome,
         });

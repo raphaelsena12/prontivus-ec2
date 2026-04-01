@@ -27,6 +27,14 @@ const updateCodigoTussSchema = z.object({
     ])
     .optional()
     .nullable(),
+  sipGrupo: z.string().optional().nullable(),
+  categoriaProntivus: z.string().optional().nullable(),
+  categoriaSadt: z.string().optional().nullable(),
+  usaGuiaSadt: z.boolean().optional(),
+  subgrupoTuss: z.string().optional().nullable(),
+  grupoTuss: z.string().optional().nullable(),
+  capituloTuss: z.string().optional().nullable(),
+  fonteAnsTabela22: z.string().optional().nullable(),
   grupoId: z.string().uuid().optional().nullable(),
   dataVigenciaInicio: z.string().transform((str) => new Date(str)).optional(),
   dataVigenciaFim: z
@@ -99,6 +107,16 @@ export async function PATCH(
       updateData.categoriaExame = tipo === "EXAME" ? (data.categoriaExame ?? null) : null;
     }
     if (data.grupoId !== undefined) updateData.grupoId = data.grupoId;
+    if (data.sipGrupo !== undefined) updateData.sipGrupo = data.sipGrupo;
+    if (data.categoriaProntivus !== undefined)
+      updateData.categoriaProntivus = data.categoriaProntivus;
+    if (data.categoriaSadt !== undefined) updateData.categoriaSadt = data.categoriaSadt;
+    if (data.usaGuiaSadt !== undefined) updateData.usaGuiaSadt = data.usaGuiaSadt;
+    if (data.subgrupoTuss !== undefined) updateData.subgrupoTuss = data.subgrupoTuss;
+    if (data.grupoTuss !== undefined) updateData.grupoTuss = data.grupoTuss;
+    if (data.capituloTuss !== undefined) updateData.capituloTuss = data.capituloTuss;
+    if (data.fonteAnsTabela22 !== undefined)
+      updateData.fonteAnsTabela22 = data.fonteAnsTabela22;
     if (data.dataVigenciaInicio !== undefined)
       updateData.dataVigenciaInicio = data.dataVigenciaInicio;
     if (data.dataVigenciaFim !== undefined)
@@ -161,9 +179,6 @@ export async function DELETE(
     const auth = await checkAuthorization();
     if (!auth.authorized) return auth.response;
 
-    const { searchParams } = new URL(request.url);
-    const cascade = searchParams.get("cascade") === "true";
-
     const { id } = await params;
 
     const codigoTuss = await prisma.codigoTuss.findUnique({
@@ -177,103 +192,15 @@ export async function DELETE(
       );
     }
 
-    // Evitar violação de FK: se o código estiver em uso, não deletar (a menos que cascade=true).
-    const [valoresCount, operadorasCount, consultasCount, guiasProcCount, examesCount] =
-      await Promise.all([
-        prisma.tussValor.count({ where: { codigoTussId: id } }),
-        prisma.tussOperadora.count({ where: { codigoTussId: id } }),
-        prisma.consulta.count({ where: { codigoTussId: id } }),
-        prisma.guiaTissProcedimento.count({ where: { codigoTussId: id } }),
-        prisma.exame.count({ where: { codigoTussId: id } }),
-      ]);
-
-    const totalRefs =
-      valoresCount + operadorasCount + consultasCount + guiasProcCount + examesCount;
-
-    if (totalRefs > 0 && !cascade) {
-      return NextResponse.json(
-        {
-          error:
-            "Não é possível excluir este Código TUSS porque ele está sendo usado. Inative o código ao invés de excluir.",
-          refs: {
-            tussValores: valoresCount,
-            tussOperadoras: operadorasCount,
-            consultas: consultasCount,
-            guiasTissProcedimentos: guiasProcCount,
-            exames: examesCount,
-          },
-        },
-        { status: 409 }
-      );
-    }
-
-    if (cascade) {
-      // Exclusão em cascata (controlada): remove dependências que bloqueiam a FK e então remove o código.
-      // ATENÇÃO: isso pode remover consultas e seus dependentes (por cascata do schema).
-      const result = await prisma.$transaction(
-        async (tx) => {
-          // 1) Telemedicina: sessões referenciam Consulta (FK restritiva)
-          // Evitar IN gigante: filtrar via relações (subquery) pelo codigoTussId das consultas
-          await tx.telemedicineConsent.deleteMany({
-            where: { session: { consulta: { codigoTussId: id } } },
-          });
-          await tx.telemedicineLog.deleteMany({
-            where: { session: { consulta: { codigoTussId: id } } },
-          });
-          await tx.telemedicineParticipant.deleteMany({
-            where: { session: { consulta: { codigoTussId: id } } },
-          });
-          await tx.telemedicineSession.deleteMany({
-            where: { consulta: { codigoTussId: id } },
-          });
-
-        const deletedTussValores = await tx.tussValor.deleteMany({
-          where: { codigoTussId: id },
-        });
-        const deletedTussOperadoras = await tx.tussOperadora.deleteMany({
-          where: { codigoTussId: id },
-        });
-        const deletedTussEspecialidades = await tx.tussEspecialidade.deleteMany({
-          where: { codigoTussId: id },
-        });
-        const deletedGuiasTissProcedimentos = await tx.guiaTissProcedimento.deleteMany({
-          where: { codigoTussId: id },
-        });
-        const deletedConsultas = await tx.consulta.deleteMany({
-          where: { codigoTussId: id },
-        });
-
-        // Exames têm ON DELETE SET NULL no FK; não precisa deletar.
-
-        const deletedCodigo = await tx.codigoTuss.delete({
-          where: { id },
-        });
-
-        return {
-          deletedCodigo,
-          counts: {
-            tussValores: deletedTussValores.count,
-            tussOperadoras: deletedTussOperadoras.count,
-            tussEspecialidades: deletedTussEspecialidades.count,
-            guiasTissProcedimentos: deletedGuiasTissProcedimentos.count,
-            consultas: deletedConsultas.count,
-          },
-        };
-        },
-        // A exclusão em cascata pode ser pesada; aumentar timeout da transação interativa
-        { timeout: 600_000, maxWait: 10_000 }
-      );
-
-      return NextResponse.json({
-        message: "Código TUSS excluído com sucesso (cascade).",
-        cascade: true,
-        deleted: result.counts,
-      });
-    } else {
-      await prisma.codigoTuss.delete({
-        where: { id },
-      });
-    }
+    // Importante: Consultas/Guias NÃO devem ser deletadas. O banco deve estar com FK ON DELETE SET NULL
+    // (ver migration), para permitir excluir o CódigoTuss sem cascata.
+    // Podemos remover dependências "catálogo" (tabelas auxiliares) sem risco para histórico.
+    await prisma.$transaction(async (tx) => {
+      await tx.tussValor.deleteMany({ where: { codigoTussId: id } });
+      await tx.tussOperadora.deleteMany({ where: { codigoTussId: id } });
+      await tx.tussEspecialidade.deleteMany({ where: { codigoTussId: id } });
+      await tx.codigoTuss.delete({ where: { id } });
+    });
 
     return NextResponse.json({ message: "Código TUSS excluído com sucesso" });
   } catch (error: any) {
@@ -283,7 +210,7 @@ export async function DELETE(
       return NextResponse.json(
         {
           error:
-            "Não é possível excluir este Código TUSS porque ele está sendo usado (restrição de chave estrangeira). Inative o código ao invés de excluir.",
+            "Não foi possível excluir este Código TUSS por restrição de chave estrangeira. Aplique a migration que define ON DELETE SET NULL para Consultas/Guias e tente novamente.",
         },
         { status: 409 }
       );

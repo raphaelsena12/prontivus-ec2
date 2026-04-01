@@ -6,6 +6,28 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+/**
+ * Executa uma função com retry exponencial para erros transientes da OpenAI.
+ * Retenta em: 429 (rate limit), 500, 503 (instabilidade).
+ */
+async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isTransient = error.status === 429 || error.status === 500 || error.status === 503;
+      if (isTransient && attempt < retries) {
+        const delay = Math.pow(2, attempt) * 1000; // 2s, 4s
+        console.warn(`OpenAI erro ${error.status}, tentativa ${attempt}/${retries}. Aguardando ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export interface MedicalAnalysis {
   anamnese: string;
   cidCodes: Array<{
@@ -138,19 +160,16 @@ Descrever cronologicamente:
 - tratamentos prévios
 - impacto funcional
 
-3. "ANTECEDENTES PESSOAIS PATOLÓGICOS:"  
-Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos.
+3. "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:"  
+Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos; tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional.
 
 4. "ANTECEDENTES FAMILIARES:"  
 Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes.
 
-5. "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:"  
-Tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional.
-
-6. "MEDICAMENTOS EM USO ATUAL:"  
+5. "MEDICAMENTOS EM USO ATUAL:"  
 Nome, dose, frequência, tempo de uso.
 
-7. "EXAMES FÍSICOS:"  
+6. "EXAMES FÍSICOS:"  
 Achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais).
 
 REGRAS DA ANAMNESE:
@@ -197,21 +216,19 @@ Sempre verificar:
 
 Retorne APENAS um JSON válido, sem texto adicional.
 
-REGRAS DE QUANTIDADE OBRIGATÓRIAS:
+REGRAS DE QUANTIDADE:
 
 cidCodes:
-- mínimo 2
-- máximo 5
-
-Inclua diagnósticos diferenciais relevantes com score ≥ 0.3 se necessário.
+- Retorne apenas os CIDs realmente justificados pelos achados clínicos. Se houver apenas 1 diagnóstico claro, retorne apenas 1.
+- Máximo 5. Inclua diferenciais com score ≥ 0.3 somente se clinicamente relevantes.
 
 exames:
-- mínimo 2
-- máximo 5
+- Retorne apenas exames com indicação clínica real. Retorne array vazio [] se nenhum exame for necessário (ex: consulta de rotina sem queixas ativas).
+- Máximo 5.
 
 prescricoes:
-- mínimo 2
-- máximo 5
+- Retorne apenas medicamentos com indicação clínica real. Retorne array vazio [] se não houver indicação farmacológica.
+- Máximo 5. NUNCA prescreva medicamento apenas para atingir um número mínimo.
 
 SCORES DE DIAGNÓSTICO:
 
@@ -222,7 +239,7 @@ SCORES DE DIAGNÓSTICO:
 Formato JSON esperado:
 
 {
-  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS PATOLÓGICOS:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nHÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...\\n\\nEXAMES FÍSICOS:\\n...",
+  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...\\n\\nEXAMES FÍSICOS:\\n...",
   "cidCodes": [
     {"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}
   ],
@@ -321,13 +338,13 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
             });
 
             // Usar modelo com visão (gpt-4o ou gpt-4o-mini com visão)
-            const completion = await openai.chat.completions.create({
-              model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
+            const completion = await withRetry(() => openai.chat.completions.create({
+              model: process.env.OPENAI_VISION_MODEL || "gpt-4o",
               messages,
               response_format: { type: "json_object" },
-              temperature: 0.3,
+              temperature: 0,
               max_tokens: 2000,
-            });
+            }));
 
             const responseContent = completion.choices[0]?.message?.content;
             if (!responseContent) {
@@ -396,23 +413,23 @@ ${transcriptionText}
 ${examesContext}
 
 IMPORTANTE:
-- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS PATOLÓGICOS:", "ANTECEDENTES FAMILIARES:", "HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "MEDICAMENTOS EM USO ATUAL:", e "EXAMES FÍSICOS:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "ANTECEDENTES FAMILIARES:", "MEDICAMENTOS EM USO ATUAL:", e "EXAMES FÍSICOS:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
 - Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros.
 - Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
 - Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS".
 
 Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicional.`;
 
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    const completion = await withRetry(() => openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3, // Mais determinístico para dados médicos
+      temperature: 0,
       max_tokens: 2000,
-    });
+    }));
 
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
@@ -501,25 +518,24 @@ Sua função é estruturar a transcrição de uma consulta em uma anamnese médi
 A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos), começando direto na QUEIXA PRINCIPAL (SEM o tópico "ANAMNESE:"):
 1. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
 2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
-3. ANTECEDENTES PESSOAIS PATOLÓGICOS: — doenças prévias, internações, cirurgias, alergias, medicamentos crônicos
+3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
-5. HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — tabagismo, etilismo, atividade física, ocupação
-6. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
-7. EXAMES FÍSICOS: — achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
+5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
 
 Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
 Retorne APENAS um JSON com o campo "anamnese".`;
 
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  const completion = await withRetry(() => openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: `Estruture a seguinte transcrição em anamnese médica:\n\n${transcriptionText}\n\nRetorne APENAS o JSON: {"anamnese": "..."}` },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.3,
+    temperature: 0,
     max_tokens: 2000,
-  });
+  }));
 
   const responseContent = completion.choices[0]?.message?.content;
   if (!responseContent) throw new Error("Resposta vazia da OpenAI");
@@ -530,6 +546,40 @@ Retorne APENAS um JSON com o campo "anamnese".`;
   } catch {
     throw new Error("Resposta da OpenAI em formato inválido");
   }
+}
+
+/**
+ * Versão streaming de generateAnamneseOnly.
+ * Retorna um AsyncIterable de chunks de texto para uso em routes com ReadableStream.
+ */
+export async function generateAnamneseStream(transcriptionText: string) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
+  }
+
+  const systemPrompt = `Você é um assistente médico especializado em registros clínicos.
+Sua função é estruturar a transcrição de uma consulta em uma anamnese médica completa e profissional em português brasileiro.
+
+A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos), começando direto na QUEIXA PRINCIPAL (SEM o tópico "ANAMNESE:"):
+1. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
+2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
+3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
+4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
+5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
+6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta
+
+Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".`;
+
+  return openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL || "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica estruturada. Retorne APENAS o texto da anamnese, sem JSON, sem marcadores extras:\n\n${transcriptionText}` },
+    ],
+    temperature: 0,
+    max_tokens: 2000,
+    stream: true,
+  });
 }
 
 export interface SuggestionsContext {
@@ -599,25 +649,23 @@ export async function generateMedicalSuggestions(context: SuggestionsContext): P
 Com base na anamnese e no contexto clínico fornecido, siga este raciocínio em etapas:
 
 ETAPA 1 — CID-10:
-- Identifique os diagnósticos mais prováveis e atribua códigos CID-10 válidos e específicos com scores de confiança (0 a 1).
-- Inclua diagnósticos diferenciais relevantes para atingir o mínimo obrigatório.
-- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 códigos CID-10.
+- Identifique os diagnósticos realmente justificados pelos achados clínicos e atribua códigos CID-10 válidos com scores de confiança (0 a 1).
+- Retorne apenas CIDs que possuem base nos achados descritos. Se houver apenas 1 diagnóstico claro, retorne apenas 1. Máximo 5.
+- Inclua diferenciais com score ≥ 0.3 somente se clinicamente relevantes, não para preencher quantidade.
 
 ETAPA 2 — Protocolos vigentes por CID:
 - Para cada CID identificado, determine o protocolo de tratamento mais recente e baseado em evidências disponível (ex: Diretriz SBC 2024 para HAS, Diretriz SBD 2024 para DM2, PCDT CONITEC para DPOC, etc.).
 - Documente o protocolo com nome, principais recomendações e justificativa clínica.
 
 ETAPA 3 — Exames (baseados nos protocolos):
-- Sugira os exames complementares preconizados pelas diretrizes vigentes para cada CID: avaliação inicial, rastreamento de complicações ou monitorização de tratamento.
-- Inclua tipo (Laboratorial, Imagem, Funcional) e justificativa referenciando o protocolo.
-- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 exames.
+- Sugira apenas exames com indicação clínica real preconizados pelas diretrizes. Se o quadro não requerer exames, retorne array vazio [].
+- Inclua tipo (Laboratorial, Imagem, Funcional) e justificativa referenciando o protocolo. Máximo 5.
 
 ETAPA 4 — Prescrições (baseadas nos protocolos):
-- Prescreva medicamentos de primeira linha conforme as diretrizes vigentes para cada CID.
+- Prescreva apenas medicamentos com indicação real. Se o quadro não requerer farmacoterapia (ex: consulta de rotina), retorne array vazio [].
 - Verifique conflitos com as alergias listadas — NUNCA prescreva medicamento ao qual o paciente é alérgico.
 - Verifique interações relevantes com medicamentos em uso atual.
-- Use nomes genéricos ou comerciais comuns no Brasil; dosagem em formato padrão (ex: "50mg", "500mg"); posologia clara (ex: "1 comprimido 1x ao dia", "1 cp 8/8h"); duração precisa (ex: "7 dias", "30 dias", "uso contínuo").
-- OBRIGATÓRIO: retorne no MÍNIMO 2 e no MÁXIMO 5 prescrições.
+- Use nomes genéricos ou comerciais comuns no Brasil; dosagem em formato padrão (ex: "50mg", "500mg"); posologia clara (ex: "1 comprimido 1x ao dia", "1 cp 8/8h"); duração precisa (ex: "7 dias", "30 dias", "uso contínuo"). Máximo 5.
 
 ETAPA 5 — Raciocínio Clínico dos Exames (campo "raciocinioClinico"):
 - Este campo deve tratar EXCLUSIVAMENTE dos exames anexados analisados. NÃO contextualizar com anamnese ou sintomas.
@@ -652,16 +700,16 @@ Retorne APENAS um JSON válido no seguinte formato:
   }
 
   const model = imageUrls.length > 0
-    ? (process.env.OPENAI_VISION_MODEL || "gpt-4o-mini")
-    : (process.env.OPENAI_MODEL || "gpt-4o-mini");
+    ? (process.env.OPENAI_VISION_MODEL || "gpt-4o")
+    : (process.env.OPENAI_MODEL || "gpt-4o");
 
-  const completion = await openai.chat.completions.create({
+  const completion = await withRetry(() => openai.chat.completions.create({
     model,
     messages: userMessages,
     response_format: { type: "json_object" },
-    temperature: 0.3,
+    temperature: 0,
     max_tokens: 2500,
-  });
+  }));
 
   const responseContent = completion.choices[0]?.message?.content;
   if (!responseContent) throw new Error("Resposta vazia da OpenAI");

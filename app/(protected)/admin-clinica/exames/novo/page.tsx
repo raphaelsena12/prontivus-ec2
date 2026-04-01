@@ -5,37 +5,10 @@ import { NovoExameForm } from "./novo-exame-form";
 
 export default async function NovoExamePage() {
   const session = await getSession();
-
-  if (!session) {
-    redirect("/login");
-  }
-
+  if (!session) redirect("/login");
   const isAdminClinica = await hasUserType(TipoUsuario.ADMIN_CLINICA);
-
-  if (!isAdminClinica) {
-    redirect("/dashboard");
-  }
-
+  if (!isAdminClinica) redirect("/dashboard");
   const clinicaId = await getUserClinicaId();
-
-  if (!clinicaId) {
-    redirect("/dashboard");
-  }
-
+  if (!clinicaId) redirect("/dashboard");
   return <NovoExameForm clinicaId={clinicaId} />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

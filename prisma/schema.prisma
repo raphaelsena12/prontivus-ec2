@@ -446,7 +446,20 @@ model Medicamento {
   apresentacao   String?
   concentracao   String?
   unidade        String?
-  controle       String?  // Tipo de controle: Simples, Controlado, etc
+  controle       String?  // Tipo de controle (legado): Simples, Controlado, etc
+  // =====================================================
+  // Campos do novo modelo de cadastro (Super Admin)
+  // =====================================================
+  pharmaceuticalForm String?
+  therapeuticClass  String?
+  prescriptionType  String?
+  controlType       String?
+  pregnancyRisk     Boolean  @default(false)
+  pediatricUse      Boolean  @default(false)
+  hepaticAlert      Boolean  @default(false)
+  renalAlert        Boolean  @default(false)
+  highRisk          Boolean  @default(false)
+  status            String   @default("active")
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -729,7 +742,7 @@ model Consulta {
   observacoes       String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  codigoTussId      String
+  codigoTussId      String?
   dataAutorizacao   DateTime?
   numeroAutorizacao String?
   numeroCarteirinha String?
@@ -752,7 +765,7 @@ model Consulta {
   clinica                 Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   paciente                Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   medico                  Medico                  @relation(fields: [medicoId], references: [id], onDelete: Cascade)
-  codigoTuss              CodigoTuss              @relation(fields: [codigoTussId], references: [id])
+  codigoTuss              CodigoTuss?             @relation(fields: [codigoTussId], references: [id], onDelete: SetNull)
   operadora               Operadora?              @relation(fields: [operadoraId], references: [id])
   planoSaude              PlanoSaude?             @relation(fields: [planoSaudeId], references: [id])
   tipoConsulta            TipoConsulta?           @relation(fields: [tipoConsultaId], references: [id])
@@ -859,24 +872,60 @@ model EspecialidadeMedica {
 
   medicoEspecialidades MedicoEspecialidade[]
   tussEspecialidades   TussEspecialidade[]
+  categorias           EspecialidadeCategoriaItem[]
 
   @@index([codigo])
   @@index([ativo])
   @@map("especialidades_medicas")
 }
 
+model EspecialidadeCategoria {
+  id        String   @id @default(uuid())
+  codigo    String   @unique
+  nome      String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  especialidades EspecialidadeCategoriaItem[]
+  medicosEspecialidades MedicoEspecialidade[]
+
+  @@index([codigo])
+  @@index([ativo])
+  @@map("especialidades_categorias")
+}
+
+model EspecialidadeCategoriaItem {
+  id             String   @id @default(uuid())
+  especialidadeId String
+  categoriaId    String
+  createdAt      DateTime @default(now())
+
+  especialidade EspecialidadeMedica    @relation(fields: [especialidadeId], references: [id], onDelete: Cascade)
+  categoria     EspecialidadeCategoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+
+  @@unique([especialidadeId, categoriaId])
+  @@index([especialidadeId])
+  @@index([categoriaId])
+  @@map("especialidades_categorias_itens")
+}
+
 model MedicoEspecialidade {
   id              String   @id @default(uuid())
   medicoId        String
   especialidadeId String
+  categoriaId     String?
+  rqe             String?
   createdAt       DateTime @default(now())
 
   medico        Medico              @relation(fields: [medicoId], references: [id], onDelete: Cascade)
   especialidade EspecialidadeMedica @relation(fields: [especialidadeId], references: [id], onDelete: Cascade)
+  categoria     EspecialidadeCategoria? @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
 
-  @@unique([medicoId, especialidadeId])
+  @@unique([medicoId, especialidadeId, categoriaId])
   @@index([medicoId])
   @@index([especialidadeId])
+  @@index([categoriaId])
   @@map("medicos_especialidades")
 }
 
@@ -908,6 +957,17 @@ model CodigoTuss {
   descricaoDetalhada String?
   tipoProcedimento   String
   categoriaExame     String?
+  // =====================================================
+  // Campos adicionais (ANS Tabela 22 / layout do catálogo)
+  // =====================================================
+  sipGrupo           String?
+  categoriaProntivus String?
+  categoriaSadt      String?
+  usaGuiaSadt        Boolean   @default(false)
+  subgrupoTuss       String?
+  grupoTuss          String?
+  capituloTuss       String?
+  fonteAnsTabela22   String?
   grupoId            String?
   dataVigenciaInicio DateTime
   dataVigenciaFim    DateTime?
@@ -927,6 +987,13 @@ model CodigoTuss {
   @@index([codigoTuss])
   @@index([tipoProcedimento])
   @@index([categoriaExame])
+  @@index([sipGrupo])
+  @@index([categoriaProntivus])
+  @@index([categoriaSadt])
+  @@index([usaGuiaSadt])
+  @@index([subgrupoTuss])
+  @@index([grupoTuss])
+  @@index([capituloTuss])
   @@index([grupoId])
   @@index([dataVigenciaInicio, dataVigenciaFim])
   @@index([ativo])
@@ -1189,7 +1256,7 @@ model GuiaTissProcedimento {
   id             String   @id @default(uuid())
   clinicaId      String
   guiaId         String
-  codigoTussId   String
+  codigoTussId   String?
   quantidade     Int      @default(1)
   valorUnitario  Decimal  @db.Decimal(10, 2)
   valorTotal     Decimal  @db.Decimal(10, 2)
@@ -1198,7 +1265,7 @@ model GuiaTissProcedimento {
 
   clinica    Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   guia       GuiaTiss   @relation(fields: [guiaId], references: [id], onDelete: Cascade)
-  codigoTuss CodigoTuss @relation(fields: [codigoTussId], references: [id])
+  codigoTuss CodigoTuss? @relation(fields: [codigoTussId], references: [id], onDelete: SetNull)
 
   @@index([guiaId])
   @@index([codigoTussId])
@@ -1553,6 +1620,14 @@ model Cid {
   clinicaId    String?
   codigo       String
   descricao    String
+  // Campos "estruturados" (conforme layout do Excel: grupo/categoria/subcategoria)
+  // Mantemos `codigo`/`descricao` por compatibilidade (ex.: busca/seleção em atendimento),
+  // tipicamente mapeando para `subcategoriaCod`/`subcategoriaNome`.
+  grupoNome       String?
+  categoriaCod    String?
+  categoriaNome   String?
+  subcategoriaCod String?
+  subcategoriaNome String?
   categoria    String?
   subcategoria String?
   observacoes  String?

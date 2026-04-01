@@ -486,7 +486,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
               <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50">
                 <IconCheck className="h-2.5 w-2.5 text-blue-500 shrink-0" />
                 <span className="text-[10px] font-medium text-blue-700 uppercase leading-tight">
-                  {user.tipo === TipoUsuario.SUPER_ADMIN && "SUPER ADMIN"}
+                  {user.tipo === TipoUsuario.SUPER_ADMIN && "Admin Global"}
                   {user.tipo === TipoUsuario.ADMIN_CLINICA && "ADMIN CLÍNICA"}
                   {user.tipo === TipoUsuario.MEDICO && "MÉDICO"}
                   {user.tipo === TipoUsuario.SECRETARIA && "SECRETARIA"}

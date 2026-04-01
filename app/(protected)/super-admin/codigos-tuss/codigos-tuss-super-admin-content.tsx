@@ -20,6 +20,14 @@ interface CodigoTuss {
   descricaoDetalhada: string | null;
   tipoProcedimento: string;
   categoriaExame: string | null;
+  sipGrupo?: string | null;
+  categoriaProntivus?: string | null;
+  categoriaSadt?: string | null;
+  usaGuiaSadt?: boolean;
+  subgrupoTuss?: string | null;
+  grupoTuss?: string | null;
+  capituloTuss?: string | null;
+  fonteAnsTabela22?: string | null;
   dataVigenciaInicio: Date | string;
   dataVigenciaFim: Date | string | null;
   ativo: boolean;
@@ -192,7 +200,7 @@ export function CodigosTussSuperAdminContent() {
         onOpenChange={setUploadDialogOpen}
         endpoint="/api/super-admin/upload/codigos-tuss"
         title="Upload de Catálogo TUSS em Massa"
-        description='Faça upload de um arquivo Excel (.xlsx) com as colunas: "Código do Termo", "Termo", "Tipo", "Categoria", "Data de início de vigência", "Data de fim de vigência".'
+        description='Faça upload de um arquivo Excel (.xlsx) com as colunas: "codigo", "descricao_tuss", "sip_grupo", "categoria_prontivus", "categoria_sadt", "usa_guia_sadt", "subgrupo_tuss", "grupo_tuss", "capitulo_tuss", "fonte_ans_tabela22". (O sistema também aceita o layout antigo com "Código do Termo", "Termo", "Tipo", "Categoria", "Data de início de vigência", "Data de fim de vigência".)'
         onSuccess={handleUploadSuccess}
       />
 

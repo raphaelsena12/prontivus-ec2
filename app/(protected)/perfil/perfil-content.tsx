@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,7 +27,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { formatCPF } from "@/lib/utils";
-import { Loader2, Camera, Lock, Upload, ZoomIn, UserCircle } from "lucide-react";
+import { Loader2, Camera, Lock, Upload, ZoomIn, UserCircle, Eye as EyeIcon, Trash2, FileText, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import {
   Dialog,
@@ -37,6 +37,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useFieldArray } from "react-hook-form";
+// UX: usamos `datalist` (busca nativa) para seleção com filtro sem adicionar dependências novas
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Usuario {
   id: string;
@@ -49,6 +52,41 @@ interface Usuario {
   tipo: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface Especialidade {
+  id: string;
+  codigo: string;
+  nome: string;
+  ativo: boolean;
+}
+
+interface Categoria {
+  id: string;
+  codigo: string;
+  nome: string;
+  ativo: boolean;
+}
+
+interface RelacaoEspecialidadeCategoria {
+  especialidadeId: string;
+  categoriaId: string;
+}
+
+interface DocumentoUpload {
+  file: File;
+  tipoDocumento: string;
+  preview?: string;
+}
+
+interface DocumentoExistente {
+  id: string;
+  nomeDocumento: string;
+  tipoDocumento: string;
+  mimeType: string;
+  tamanho: number;
+  createdAt: string;
+  s3Key: string;
 }
 
 // Validação de telefone brasileiro
@@ -144,6 +182,17 @@ export function PerfilContent() {
     startOffsetY: number;
   } | null>(null);
   const AVATAR_PREVIEW_SIZE = 288;
+  const [medicoEspecialidadesLoading, setMedicoEspecialidadesLoading] = useState(false);
+  const [especialidadesCatalogo, setEspecialidadesCatalogo] = useState<Especialidade[]>([]);
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<Categoria[]>([]);
+  const [relacoesCatalogo, setRelacoesCatalogo] = useState<RelacaoEspecialidadeCategoria[]>([]);
+
+  const [documentos, setDocumentos] = useState<DocumentoUpload[]>([]);
+  const [documentosExistentes, setDocumentosExistentes] = useState<DocumentoExistente[]>([]);
+  const [loadingDocumentos, setLoadingDocumentos] = useState(false);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const [loadingUrl, setLoadingUrl] = useState<string | null>(null);
+  const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
   const getAvatarDragBounds = (zoom = avatarZoom) => {
     const baseScale = Math.max(
       AVATAR_PREVIEW_SIZE / avatarImageSize.width,
@@ -183,6 +232,42 @@ export function PerfilContent() {
   const passwordForm = useForm<PasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
   });
+
+  const medicoEspecialidadesForm = useForm<any>({
+    defaultValues: {
+      especialidades: [{ especialidadeId: "", categoriaId: null, rqe: "" }],
+    },
+  });
+
+  const { fields: meFields, append: meAppend, remove: meRemove } = useFieldArray({
+    control: medicoEspecialidadesForm.control,
+    name: "especialidades",
+  });
+
+  const categoriasPorEspecialidade = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const r of relacoesCatalogo) {
+      if (!map.has(r.especialidadeId)) map.set(r.especialidadeId, new Set());
+      map.get(r.especialidadeId)!.add(r.categoriaId);
+    }
+    return map;
+  }, [relacoesCatalogo]);
+
+  const especialidadeDisplayToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const e of especialidadesCatalogo) {
+      map.set(`${e.codigo} — ${e.nome}`.trim(), e.id);
+    }
+    return map;
+  }, [especialidadesCatalogo]);
+
+  const categoriaDisplayToId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of categoriasCatalogo) {
+      map.set(`${c.codigo} — ${c.nome}`.trim(), c.id);
+    }
+    return map;
+  }, [categoriasCatalogo]);
 
   useEffect(() => {
     loadPerfil();
@@ -243,12 +328,171 @@ export function PerfilContent() {
 
       if (data.usuario?.tipo === "MEDICO") {
         loadCertificado();
+        await Promise.all([loadMedicoEspecialidades(), loadCatalogos(), loadDocumentosMedico()]);
       }
     } catch (error) {
       console.error("Erro ao carregar perfil:", error);
       toast.error("Erro ao carregar perfil");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCatalogos = async () => {
+    try {
+      const [resEsp, resCat, resRel] = await Promise.all([
+        fetch("/api/admin-clinica/especialidades?ativo=true"),
+        fetch("/api/admin-clinica/especialidades-categorias?ativo=true"),
+        fetch("/api/admin-clinica/especialidades-categorias-itens?limit=5000"),
+      ]);
+      if (resEsp.ok) {
+        const data = await resEsp.json();
+        setEspecialidadesCatalogo(data.especialidades || []);
+      }
+      if (resCat.ok) {
+        const data = await resCat.json();
+        setCategoriasCatalogo(data.categorias || []);
+      }
+      if (resRel.ok) {
+        const data = await resRel.json();
+        setRelacoesCatalogo((data.itens || []).map((it: any) => ({ especialidadeId: it.especialidadeId, categoriaId: it.categoriaId })));
+      }
+    } catch (e) {
+      console.error("Erro ao carregar catálogos:", e);
+    }
+  };
+
+  const loadMedicoEspecialidades = async () => {
+    setMedicoEspecialidadesLoading(true);
+    try {
+      const res = await fetch("/api/medico/perfil/especialidades");
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = (data.medicoEspecialidades || []).map((me: any) => ({
+        especialidadeId: me.especialidade.id,
+        categoriaId: me.categoria?.id ?? null,
+        rqe: me.rqe || "",
+      }));
+      medicoEspecialidadesForm.reset({
+        especialidades: list.length ? list : [{ especialidadeId: "", categoriaId: null, rqe: "" }],
+      });
+    } catch (e) {
+      console.error("Erro ao carregar especialidades do médico:", e);
+    } finally {
+      setMedicoEspecialidadesLoading(false);
+    }
+  };
+
+  const handleSaveMedicoEspecialidades = async (values: any) => {
+    try {
+      setMedicoEspecialidadesLoading(true);
+      const payload = {
+        especialidades: (values.especialidades || []).map((it: any) => ({
+          especialidadeId: it.especialidadeId,
+          categoriaId: it.categoriaId || null,
+          rqe: String(it.rqe || "").trim(),
+        })),
+      };
+      const res = await fetch("/api/medico/perfil/especialidades", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao salvar especialidades");
+      toast.success("Especialidades atualizadas!");
+      await loadMedicoEspecialidades();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao salvar especialidades");
+    } finally {
+      setMedicoEspecialidadesLoading(false);
+    }
+  };
+
+  const handleFileChangeDocs = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newDocs: DocumentoUpload[] = files.map((file) => {
+      const tipoDocumento = file.name.toLowerCase().includes("certificado")
+        ? "certificado"
+        : file.name.toLowerCase().includes("diploma")
+        ? "diploma"
+        : "registro-profissional";
+      let preview: string | undefined;
+      if (file.type.startsWith("image/")) preview = URL.createObjectURL(file);
+      return { file, tipoDocumento, preview };
+    });
+    setDocumentos((prev) => [...prev, ...newDocs]);
+  };
+
+  const removeDocumento = (index: number) => {
+    const doc = documentos[index];
+    if (doc.preview) URL.revokeObjectURL(doc.preview);
+    setDocumentos(documentos.filter((_, i) => i !== index));
+  };
+
+  const loadDocumentosMedico = async () => {
+    setLoadingDocumentos(true);
+    try {
+      const res = await fetch("/api/medico/medico-documentos");
+      if (!res.ok) return;
+      const data = await res.json();
+      setDocumentosExistentes(data.documentos || []);
+    } catch (e) {
+      console.error("Erro ao carregar documentos do médico:", e);
+    } finally {
+      setLoadingDocumentos(false);
+    }
+  };
+
+  const uploadDocumentosMedico = async () => {
+    if (documentos.length === 0) return;
+    setUploadingDocs(true);
+    try {
+      for (const doc of documentos) {
+        const formData = new FormData();
+        formData.append("file", doc.file);
+        formData.append("tipoDocumento", doc.tipoDocumento);
+        const res = await fetch("/api/medico/medico-documentos", { method: "POST", body: formData });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Erro ao enviar documento");
+      }
+      toast.success("Documentos enviados!");
+      setDocumentos([]);
+      await loadDocumentosMedico();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao enviar documentos");
+    } finally {
+      setUploadingDocs(false);
+    }
+  };
+
+  const handleViewDocumentoMedico = async (doc: DocumentoExistente) => {
+    setLoadingUrl(doc.id);
+    try {
+      const res = await fetch(`/api/medico/medico-documentos/${doc.id}/url`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao buscar URL");
+      if (data.url) window.open(data.url, "_blank");
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao visualizar documento");
+    } finally {
+      setLoadingUrl(null);
+    }
+  };
+
+  const handleDeleteDocumentoMedico = async (docId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este documento?")) return;
+    setDeletingDoc(docId);
+    try {
+      const res = await fetch(`/api/medico/medico-documentos/${docId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Erro ao excluir documento");
+      toast.success("Documento excluído!");
+      await loadDocumentosMedico();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao excluir documento");
+    } finally {
+      setDeletingDoc(null);
     }
   };
 
@@ -676,10 +920,22 @@ export function PerfilContent() {
         subtitle="Gerencie suas informações pessoais, senha e certificado digital"
       />
 
-      <div className="flex flex-col">
-        <div>
-          <div className="space-y-4">
-            <Card>
+      <Tabs defaultValue="pessoal" className="w-full">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="pessoal">Informações pessoais</TabsTrigger>
+            {usuario?.tipo === "MEDICO" && (
+              <>
+                <TabsTrigger value="especialidades">Especialidades</TabsTrigger>
+                <TabsTrigger value="documentos">Documentos</TabsTrigger>
+                <TabsTrigger value="certificado">Certificado Digital</TabsTrigger>
+              </>
+            )}
+          </TabsList>
+        </div>
+
+        <TabsContent value="pessoal">
+          <Card>
               <CardHeader className="p-4 pb-2">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -903,9 +1159,12 @@ export function PerfilContent() {
                     </div>
                   </div>
                 </CardContent>
-              </Card>
-            {usuario?.tipo === "MEDICO" && (
-              <Card>
+          </Card>
+        </TabsContent>
+
+        {usuario?.tipo === "MEDICO" && (
+          <TabsContent value="certificado">
+            <Card>
                 <CardHeader className="p-4 pb-3">
                   <CardTitle className="text-xl">Certificado Digital (.pfx)</CardTitle>
                   <CardDescription className="text-xs">
@@ -1013,9 +1272,286 @@ export function PerfilContent() {
                       </Button>
                     </div>
                 </CardContent>
-              </Card>
-            )}
-          </div>
+            </Card>
+          </TabsContent>
+        )}
+
+        {usuario?.tipo === "MEDICO" && (
+          <TabsContent value="especialidades">
+          <Card>
+            <CardHeader className="p-4 pb-3">
+              <CardTitle className="text-xl">Especialidades</CardTitle>
+              <CardDescription className="text-xs">
+                Adicione quantas especialidades quiser. Para cada especialidade, informe a categoria (opcional) e o RQE (obrigatório).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {medicoEspecialidadesLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Carregando...
+                </div>
+              )}
+              <form
+                onSubmit={medicoEspecialidadesForm.handleSubmit(handleSaveMedicoEspecialidades)}
+                className="space-y-2"
+              >
+                <div className="hidden md:grid grid-cols-[1fr_1fr_220px_92px] gap-3 text-[11px] text-muted-foreground font-medium">
+                  <div>Especialidade</div>
+                  <div>Categoria (opcional)</div>
+                  <div>RQE *</div>
+                  <div className="text-right">Ações</div>
+                </div>
+
+                {meFields.map((f, idx) => {
+                  const espId = medicoEspecialidadesForm.watch(`especialidades.${idx}.especialidadeId`);
+                  const allowedCats = espId ? categoriasPorEspecialidade.get(espId) : undefined;
+                  const cats = allowedCats
+                    ? categoriasCatalogo.filter((c) => allowedCats.has(c.id))
+                    : categoriasCatalogo;
+                  const esp = espId ? especialidadesCatalogo.find((e) => e.id === espId) : null;
+                  const especialidadeLabel = esp ? `${esp.codigo} — ${esp.nome}` : "";
+                  const categoriaId = medicoEspecialidadesForm.watch(`especialidades.${idx}.categoriaId`);
+                  const cat = categoriaId ? categoriasCatalogo.find((c) => c.id === categoriaId) : null;
+                  const categoriaLabel = cat ? `${cat.codigo} — ${cat.nome}` : "";
+
+                  return (
+                    <div key={f.id} className="py-2">
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_220px_92px] gap-3 items-start">
+                        <div>
+                          <Input
+                            list="especialidades-datalist"
+                            placeholder="Especialidade (digite para buscar...)"
+                            value={especialidadeLabel}
+                            onChange={(e) => {
+                              const label = e.target.value;
+                              const id = especialidadeDisplayToId.get(label);
+                              if (id) {
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.especialidadeId`, id);
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.categoriaId`, null);
+                              } else {
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.especialidadeId`, "");
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.categoriaId`, null);
+                              }
+                            }}
+                            disabled={medicoEspecialidadesLoading}
+                          />
+                        </div>
+
+                        <div>
+                          <Input
+                            list={`categorias-datalist-${idx}`}
+                            placeholder={espId ? "Categoria (opcional)" : "Selecione a especialidade"}
+                            value={categoriaLabel}
+                            onChange={(e) => {
+                              const label = e.target.value;
+                              if (!label) {
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.categoriaId`, null);
+                                return;
+                              }
+                              const id = categoriaDisplayToId.get(label);
+                              if (id) {
+                                medicoEspecialidadesForm.setValue(`especialidades.${idx}.categoriaId`, id);
+                              }
+                            }}
+                            disabled={medicoEspecialidadesLoading || !espId}
+                          />
+                          <datalist id={`categorias-datalist-${idx}`}>
+                            {cats.map((c) => (
+                              <option key={c.id} value={`${c.codigo} — ${c.nome}`} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        <div>
+                          <Input
+                            value={medicoEspecialidadesForm.watch(`especialidades.${idx}.rqe`) || ""}
+                            onChange={(e) => medicoEspecialidadesForm.setValue(`especialidades.${idx}.rqe`, e.target.value)}
+                            placeholder="RQE (obrigatório)"
+                            disabled={medicoEspecialidadesLoading}
+                          />
+                        </div>
+
+                        <div className="flex justify-end md:justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => meRemove(idx)}
+                          disabled={medicoEspecialidadesLoading || meFields.length === 1}
+                          className="h-9 text-xs w-full md:w-auto"
+                        >
+                          Remover
+                        </Button>
+                        </div>
+                      </div>
+
+                      {idx !== meFields.length - 1 && <Separator className="mt-3" />}
+                    </div>
+                  );
+                })}
+
+                <datalist id="especialidades-datalist">
+                  {especialidadesCatalogo.map((e) => (
+                    <option key={e.id} value={`${e.codigo} — ${e.nome}`} />
+                  ))}
+                </datalist>
+
+                <div className="flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => meAppend({ especialidadeId: "", categoriaId: null, rqe: "" })}
+                    disabled={medicoEspecialidadesLoading}
+                    className="h-8 text-xs"
+                  >
+                    Adicionar especialidade
+                  </Button>
+                  <Button type="submit" disabled={medicoEspecialidadesLoading} className="h-8 text-xs">
+                    {medicoEspecialidadesLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      "Salvar especialidades"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+          </TabsContent>
+        )}
+
+        {usuario?.tipo === "MEDICO" && (
+          <TabsContent value="documentos">
+          <Card>
+            <CardHeader className="p-4 pb-3">
+              <CardTitle className="text-xl">Documentos do Médico</CardTitle>
+              <CardDescription className="text-xs">
+                Anexe certificados, diplomas e registros profissionais (imagem ou PDF).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-3">
+              {loadingDocumentos ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Carregando documentos...
+                </div>
+              ) : documentosExistentes.length > 0 ? (
+                <div className="space-y-2">
+                  {documentosExistentes.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {doc.mimeType.startsWith("image/") ? (
+                          <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
+                            <FileText className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <FileText className="h-10 w-10 text-muted-foreground" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.nomeDocumento}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(doc.tamanho / 1024).toFixed(2)} KB • {doc.tipoDocumento}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDocumentoMedico(doc)}
+                          disabled={loadingUrl === doc.id}
+                        >
+                          {loadingUrl === doc.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <EyeIcon className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteDocumentoMedico(doc.id)}
+                          disabled={deletingDoc === doc.id}
+                        >
+                          {deletingDoc === doc.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhum documento anexado ainda.</p>
+              )}
+
+              <Separator />
+
+              <div className="border-2 border-dashed rounded-lg p-4">
+                <input
+                  type="file"
+                  id="medico-documentos"
+                  multiple
+                  accept="image/*,.pdf"
+                  onChange={handleFileChangeDocs}
+                  disabled={uploadingDocs}
+                  className="hidden"
+                />
+                <label htmlFor="medico-documentos" className="flex flex-col items-center justify-center cursor-pointer">
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <span className="text-sm text-muted-foreground">
+                    Clique para anexar documentos (imagem ou PDF)
+                  </span>
+                </label>
+              </div>
+
+              {documentos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Arquivos selecionados:</p>
+                  {documentos.map((doc, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center gap-2">
+                        {doc.preview ? (
+                          <img src={doc.preview} alt={doc.file.name} className="h-10 w-10 object-cover rounded" />
+                        ) : (
+                          <FileText className="h-10 w-10 text-muted-foreground" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{doc.file.name}</p>
+                          <p className="text-xs text-muted-foreground">{(doc.file.size / 1024).toFixed(2)} KB</p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeDocumento(index)} disabled={uploadingDocs}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex justify-end">
+                    <Button type="button" onClick={uploadDocumentosMedico} disabled={uploadingDocs} className="text-xs">
+                      {uploadingDocs ? (
+                        <>
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        "Enviar documentos"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          </TabsContent>
+        )}
+      </Tabs>
 
           <Dialog open={cameraDialogOpen} onOpenChange={(open) => !open && stopCameraCapture()}>
             <DialogContent className="sm:max-w-xl">
@@ -1242,8 +1778,6 @@ export function PerfilContent() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        </div>
-      </div>
     </div>
   );
 }

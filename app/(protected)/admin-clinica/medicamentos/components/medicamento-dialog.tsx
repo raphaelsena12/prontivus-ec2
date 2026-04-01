@@ -34,6 +34,16 @@ interface Medicamento {
   apresentacao: string | null;
   concentracao: string | null;
   unidade: string | null;
+  pharmaceuticalForm?: string | null;
+  therapeuticClass?: string | null;
+  prescriptionType?: string | null;
+  controlType?: string | null;
+  pregnancyRisk?: boolean;
+  pediatricUse?: boolean;
+  hepaticAlert?: boolean;
+  renalAlert?: boolean;
+  highRisk?: boolean;
+  status?: string | null;
   ativo: boolean;
 }
 
@@ -52,6 +62,16 @@ const medicamentoSchema = z.object({
   apresentacao: z.string().optional(),
   concentracao: z.string().optional(),
   unidade: z.string().optional(),
+  pharmaceuticalForm: z.string().optional(),
+  therapeuticClass: z.string().optional(),
+  prescriptionType: z.string().optional(),
+  controlType: z.string().optional(),
+  pregnancyRisk: z.boolean().optional(),
+  pediatricUse: z.boolean().optional(),
+  hepaticAlert: z.boolean().optional(),
+  renalAlert: z.boolean().optional(),
+  highRisk: z.boolean().optional(),
+  status: z.string().optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -76,6 +96,16 @@ export function MedicamentoDialog({
       apresentacao: "",
       concentracao: "",
       unidade: "",
+      pharmaceuticalForm: "",
+      therapeuticClass: "",
+      prescriptionType: "",
+      controlType: "",
+      pregnancyRisk: false,
+      pediatricUse: false,
+      hepaticAlert: false,
+      renalAlert: false,
+      highRisk: false,
+      status: "active",
       ativo: true,
     },
   });
@@ -89,6 +119,16 @@ export function MedicamentoDialog({
         apresentacao: medicamento.apresentacao || "",
         concentracao: medicamento.concentracao || "",
         unidade: medicamento.unidade || "",
+        pharmaceuticalForm: medicamento.pharmaceuticalForm || "",
+        therapeuticClass: medicamento.therapeuticClass || "",
+        prescriptionType: medicamento.prescriptionType || "",
+        controlType: medicamento.controlType || "",
+        pregnancyRisk: medicamento.pregnancyRisk ?? false,
+        pediatricUse: medicamento.pediatricUse ?? false,
+        hepaticAlert: medicamento.hepaticAlert ?? false,
+        renalAlert: medicamento.renalAlert ?? false,
+        highRisk: medicamento.highRisk ?? false,
+        status: medicamento.status || (medicamento.ativo ? "active" : "inactive"),
         ativo: medicamento.ativo,
       });
     } else {
@@ -99,6 +139,16 @@ export function MedicamentoDialog({
         apresentacao: "",
         concentracao: "",
         unidade: "",
+        pharmaceuticalForm: "",
+        therapeuticClass: "",
+        prescriptionType: "",
+        controlType: "",
+        pregnancyRisk: false,
+        pediatricUse: false,
+        hepaticAlert: false,
+        renalAlert: false,
+        highRisk: false,
+        status: "active",
         ativo: true,
       });
     }
@@ -115,6 +165,16 @@ export function MedicamentoDialog({
         apresentacao: data.apresentacao || null,
         concentracao: data.concentracao || null,
         unidade: data.unidade || null,
+        pharmaceuticalForm: data.pharmaceuticalForm || null,
+        therapeuticClass: data.therapeuticClass || null,
+        prescriptionType: data.prescriptionType || null,
+        controlType: data.controlType || null,
+        pregnancyRisk: !!data.pregnancyRisk,
+        pediatricUse: !!data.pediatricUse,
+        hepaticAlert: !!data.hepaticAlert,
+        renalAlert: !!data.renalAlert,
+        highRisk: !!data.highRisk,
+        status: data.status || null,
       };
 
       if (isEditing) {
@@ -194,7 +254,7 @@ export function MedicamentoDialog({
                 name="principioAtivo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Princípio Ativo</FormLabel>
+                    <FormLabel>Princípio Ativo (active_ingredient)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Princípio ativo"
@@ -232,7 +292,7 @@ export function MedicamentoDialog({
                 name="apresentacao"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Apresentação</FormLabel>
+                    <FormLabel>Apresentação (presentation)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Apresentação"
@@ -250,7 +310,7 @@ export function MedicamentoDialog({
                 name="concentracao"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Concentração</FormLabel>
+                    <FormLabel>Concentração (concentration)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Concentração"
@@ -268,7 +328,7 @@ export function MedicamentoDialog({
                 name="unidade"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unidade</FormLabel>
+                    <FormLabel>Unidade (unit)</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Unidade"
@@ -277,6 +337,178 @@ export function MedicamentoDialog({
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="pharmaceuticalForm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Forma farmacêutica (pharmaceutical_form)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: comprimido, solução, cápsula..."
+                        {...field}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="therapeuticClass"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Classe terapêutica (therapeutic_class)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: anticoagulante"
+                        {...field}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="prescriptionType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo prescrição (prescription_type)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: simples" {...field} disabled={loading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="controlType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo controle (control_type)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: comum" {...field} disabled={loading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status (status)</FormLabel>
+                    <FormControl>
+                      <Input placeholder='Ex: "active" / "inactive"' {...field} disabled={loading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="pregnancyRisk"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Risco na gestação (pregnancy_risk)</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="pediatricUse"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Uso pediátrico (pediatric_use)</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="hepaticAlert"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Alerta hepático (hepatic_alert)</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="renalAlert"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Alerta renal (renal_alert)</FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="highRisk"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
+                    <FormControl>
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Alto risco (high_risk)</FormLabel>
+                    </div>
                   </FormItem>
                 )}
               />

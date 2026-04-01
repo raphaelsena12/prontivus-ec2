@@ -39,7 +39,7 @@ interface ExameAnexado {
 interface AnalysisResults {
   anamnese: string;
   raciocinioClinico?: string;
-  cidCodes: Array<{ code: string; description: string; score: number }>;
+  cidCodes: Array<{ code: string; description: string; score: number; validado?: boolean }>;
   protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
   exames: Array<{ nome: string; tipo: string; justificativa: string }>;
   prescricoes: Array<{
@@ -937,7 +937,25 @@ export function AISidebar({
                         <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
                       )}
                       <div>
-                        <p className="text-xs font-medium text-slate-600 leading-none">{cid.code}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-medium text-slate-600 leading-none">{cid.code}</p>
+                          {/* Badge de confiança do diagnóstico */}
+                          <span className={`text-[9px] font-semibold px-1 py-0.5 rounded border ${
+                            cid.score >= 0.8
+                              ? "bg-red-50 text-red-600 border-red-200"
+                              : cid.score >= 0.5
+                              ? "bg-amber-50 text-amber-600 border-amber-200"
+                              : "bg-slate-50 text-slate-500 border-slate-200"
+                          }`}>
+                            {cid.score >= 0.8 ? "Alta" : cid.score >= 0.5 ? "Média" : "Diferencial"}
+                          </span>
+                          {/* CID não encontrado no catálogo oficial */}
+                          {cid.validado === false && (
+                            <span className="text-[9px] font-semibold px-1 py-0.5 rounded border bg-orange-50 text-orange-600 border-orange-200" title="Código não encontrado no catálogo CID-10 cadastrado. Verifique antes de usar.">
+                              ⚠ Não catalogado
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-slate-400 leading-tight mt-0.5">{cid.description}</p>
                       </div>
                     </button>

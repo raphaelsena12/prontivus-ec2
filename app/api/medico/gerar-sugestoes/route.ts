@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { generateMedicalSuggestions } from "@/lib/openai-medical-service";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,30 @@ export async function POST(request: NextRequest) {
       medicamentosEmUso: medicamentosEmUso || [],
       examesIds: examesIds || [],
     });
+
+    // Validar CIDs sugeridos contra o catálogo real do banco.
+    // CIDs inexistentes no catálogo são marcados com `validado: false` para o
+    // frontend exibir aviso ao médico. Não são removidos para não perder a informação.
+    if (suggestions.cidCodes.length > 0) {
+      const codigosIA = suggestions.cidCodes.map((c) => c.code.toUpperCase());
+
+      const cidsCatalogo = await prisma.cid.findMany({
+        where: { codigo: { in: codigosIA } },
+        select: { codigo: true, descricao: true },
+      });
+
+      const catalogoMap = new Map(cidsCatalogo.map((c) => [c.codigo.toUpperCase(), c.descricao]));
+
+      suggestions.cidCodes = suggestions.cidCodes.map((cid) => {
+        const codigoUpper = cid.code.toUpperCase();
+        return {
+          ...cid,
+          validado: catalogoMap.has(codigoUpper),
+          // Usa descrição oficial do catálogo se disponível
+          description: catalogoMap.get(codigoUpper) ?? cid.description,
+        };
+      });
+    }
 
     return NextResponse.json({ success: true, ...suggestions });
   } catch (error: any) {

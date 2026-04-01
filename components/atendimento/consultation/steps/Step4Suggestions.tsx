@@ -76,15 +76,74 @@ function relevanceBadge(score: number) {
   return { label: "Baixa", className: "bg-slate-50 text-slate-600 border-slate-200" };
 }
 
+// Mapeamento de classes farmacológicas e sinônimos comuns no Brasil.
+// Chave = termo de referência (lowercase), valor = termos equivalentes.
+const DRUG_CLASS_MAP: Record<string, string[]> = {
+  // Beta-lactâmicos / penicilinas — reação cruzada clínica relevante
+  penicilina:    ["amoxicilina", "amoxicillin", "ampicilina", "ampicillin", "oxacilina", "piperacilina", "penicilina"],
+  amoxicilina:   ["amoxicilina", "amoxicillin", "amoxicillin+clavulanato", "amoxicilina+clavulanato", "amoxiclav"],
+  // Cefalosporinas
+  cefalosporina: ["cefalexina", "cefadroxila", "cefuroxima", "ceftriaxona", "cefazolina", "cefepima", "cefalosporina"],
+  // AAS / Salicilatos / Anti-inflamatórios (AINEs)
+  aas:           ["aas", "aspirina", "ácido acetilsalicílico", "acido acetilsalicilico", "aspirin"],
+  aspirina:      ["aas", "aspirina", "ácido acetilsalicílico", "acido acetilsalicilico", "aspirin"],
+  aine:          ["ibuprofeno", "ibuprofen", "diclofenaco", "naproxeno", "cetoprofeno", "meloxicam", "nimesulida",
+                  "piroxicam", "indometacina", "tenoxicam", "etoricoxibe", "celecoxibe"],
+  ibuprofeno:    ["ibuprofeno", "ibuprofen", "ibuprofeno 400mg", "ibuprofeno 600mg"],
+  dipirona:      ["dipirona", "metamizol", "novalgina", "analgina"],
+  // Sulfonamidas
+  sulfa:         ["sulfametoxazol", "sulfadiazina", "trimetoprim+sulfametoxazol", "bactrim", "sulfametoxazol+trimetoprim"],
+  // Quinolonas
+  quinolona:     ["ciprofloxacino", "levofloxacino", "norfloxacino", "moxifloxacino", "ofloxacino"],
+  // Macrolídeos
+  macrolidio:    ["azitromicina", "eritromicina", "claritromicina", "azithromycin"],
+  // Tetraciclinas
+  tetraciclina:  ["tetraciclina", "doxiciclina", "minociclina"],
+  // Opioides
+  opioide:       ["morfina", "codeína", "tramadol", "oxicodona", "fentanil", "meperidina", "buprenorfina"],
+  // Látex — reação cruzada com alguns medicamentos (relevante em alergias a látex de formulações)
+  latex:         ["látex", "latex"],
+  // Contraste iodado — pode coexistir com alergia a frutos do mar em alguns pacientes
+  iodo:          ["iodo", "povidona iodada", "contraste iodado"],
+};
+
+/**
+ * Verifica se um medicamento tem conflito com as alergias do paciente.
+ * Considera sinônimos, classes farmacológicas e nomes comerciais comuns.
+ * Retorna o nome da alergia em conflito, ou null se não houver.
+ */
 function detectAllergyConflict(medicamento: string, allergies: string[]): string | null {
-  const med = medicamento.toLowerCase();
+  const med = normalize(medicamento);
+
   for (const allergy of allergies) {
-    const al = allergy.toLowerCase();
+    const al = normalize(allergy);
+
+    // 1. Match direto (substring em ambas as direções)
     if (med.includes(al) || al.includes(med.split(" ")[0])) {
       return allergy;
     }
+
+    // 2. Verificar se a alergia bate com alguma classe que inclui este medicamento
+    for (const [classKey, members] of Object.entries(DRUG_CLASS_MAP)) {
+      const allergyMatchesClass = al.includes(classKey) || classKey.includes(al) ||
+        members.some((m) => al.includes(normalize(m)) || normalize(m).includes(al));
+      const medIsInClass = members.some((m) => med.includes(normalize(m)) || normalize(m).includes(med.split(" ")[0]));
+
+      if (allergyMatchesClass && medIsInClass) {
+        return allergy;
+      }
+    }
   }
   return null;
+}
+
+function normalize(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^a-z0-9\s+]/g, " ")
+    .trim();
 }
 
 function AccordionSection({

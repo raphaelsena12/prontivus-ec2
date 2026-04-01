@@ -7,7 +7,7 @@ const updateExameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
   descricao: z.string().min(1, "Descrição é obrigatória").optional(),
   tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"]).optional(),
-  codigoTussId: z.string().uuid("Código TUSS inválido").optional(),
+  codigoTussId: z.string().uuid("Código TUSS inválido").optional().nullable(),
   ativo: z.boolean().optional(),
 });
 

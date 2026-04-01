@@ -20,8 +20,6 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
-  IconLoader,
 } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,15 +42,6 @@ import {
 import { Edit, Trash2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-const CATEGORIA_EXAME_LABELS: Record<string, string> = {
-  LABORATORIAL: "Laboratorial",
-  IMAGEM: "Imagem",
-  ANATOMOPATOLOGICO: "Anatomopatológico",
-  FUNCIONAL: "Funcional",
-  GENETICO: "Genético",
-  OUTROS: "Outros",
-};
-
 interface CodigoTuss {
   id: string;
   codigoTuss: string;
@@ -60,6 +49,14 @@ interface CodigoTuss {
   descricaoDetalhada: string | null;
   tipoProcedimento: string;
   categoriaExame: string | null;
+  sipGrupo?: string | null;
+  categoriaProntivus?: string | null;
+  categoriaSadt?: string | null;
+  usaGuiaSadt?: boolean;
+  subgrupoTuss?: string | null;
+  grupoTuss?: string | null;
+  capituloTuss?: string | null;
+  fonteAnsTabela22?: string | null;
   dataVigenciaInicio: Date | string;
   dataVigenciaFim: Date | string | null;
   ativo: boolean;
@@ -72,21 +69,6 @@ interface CodigosTussTableProps {
   onGlobalFilterChange?: (value: string) => void;
   onDelete?: (codigoTuss: CodigoTuss) => void;
 }
-
-const formatDate = (date: Date | string | null) => {
-  if (!date) return "-";
-  try {
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    if (isNaN(dateObj.getTime())) return "-";
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(dateObj);
-  } catch {
-    return "-";
-  }
-};
 
 export function CodigosTussTableSuperAdmin({
   data: initialData,
@@ -123,7 +105,7 @@ export function CodigosTussTableSuperAdmin({
     () => [
       {
         accessorKey: "codigoTuss",
-        header: "Código TUSS",
+        header: "Código",
         cell: ({ row }) => (
           <Badge
             variant="outline"
@@ -136,67 +118,68 @@ export function CodigosTussTableSuperAdmin({
       },
       {
         accessorKey: "descricao",
-        header: "Descrição",
+        header: "Descrição TUSS",
         cell: ({ row }) => (
           <div className="max-w-md truncate font-medium">{row.original.descricao}</div>
         ),
       },
       {
-        accessorKey: "tipoProcedimento",
-        header: "Tipo",
+        accessorKey: "sipGrupo",
+        header: "SIP Grupo",
+        cell: ({ row }) => (
+          <span className="text-xs">{row.original.sipGrupo?.toString() || "—"}</span>
+        ),
+      },
+      {
+        accessorKey: "categoriaProntivus",
+        header: "Categoria Prontivus",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.categoriaProntivus || "—"}</div>
+        ),
+      },
+      {
+        accessorKey: "categoriaSadt",
+        header: "Categoria SADT",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.categoriaSadt || "—"}</div>
+        ),
+      },
+      {
+        accessorKey: "usaGuiaSadt",
+        header: "Usa guia SADT",
         cell: ({ row }) => (
           <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
-            {row.original.tipoProcedimento}
+            {row.original.usaGuiaSadt ? "SIM" : "NÃO"}
           </Badge>
         ),
       },
       {
-        accessorKey: "categoriaExame",
-        header: "Categoria",
-        cell: ({ row }) => {
-          if (row.original.tipoProcedimento !== "EXAME")
-            return <span className="text-muted-foreground">—</span>;
-          const cat = row.original.categoriaExame;
-          if (!cat)
-            return <span className="text-muted-foreground text-[10px]">Não definida</span>;
-          return (
-            <Badge variant="secondary" className="text-[10px] py-0.5 px-1.5 leading-tight">
-              {CATEGORIA_EXAME_LABELS[cat] ?? cat}
-            </Badge>
-          );
-        },
+        accessorKey: "subgrupoTuss",
+        header: "Subgrupo TUSS",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.subgrupoTuss || "—"}</div>
+        ),
       },
       {
-        accessorKey: "dataVigenciaInicio",
-        header: "Vigência Início",
-        cell: ({ row }) => formatDate(row.original.dataVigenciaInicio),
+        accessorKey: "grupoTuss",
+        header: "Grupo TUSS",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.grupoTuss || "—"}</div>
+        ),
       },
       {
-        accessorKey: "dataVigenciaFim",
-        header: "Vigência Fim",
-        cell: ({ row }) => formatDate(row.original.dataVigenciaFim),
+        accessorKey: "capituloTuss",
+        header: "Capítulo TUSS",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.capituloTuss || "—"}</div>
+        ),
       },
       {
-        accessorKey: "ativo",
-        header: "Status",
-        cell: ({ row }) =>
-          row.original.ativo ? (
-            <Badge
-              variant="outline"
-              className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight"
-            >
-              <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
-              Ativo
-            </Badge>
-          ) : (
-            <Badge
-              variant="outline"
-              className="bg-transparent border-red-500 text-red-700 dark:text-red-400 text-[10px] py-0.5 px-1.5 leading-tight"
-            >
-              <IconLoader className="mr-1 h-3 w-3" />
-              Inativo
-            </Badge>
-          ),
+        accessorKey: "fonteAnsTabela22",
+        header: "Fonte ANS Tabela 22",
+        cell: ({ row }) => (
+          <div className="max-w-xs truncate">{row.original.fonteAnsTabela22 || "—"}</div>
+        ),
       },
       {
         id: "actions",

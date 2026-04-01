@@ -15,7 +15,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const procedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código é obrigatório"),
+  codigo: z.string().min(1, "Código TUSS é obrigatório"),
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero"),
@@ -81,8 +81,8 @@ export function NovoProcedimentoForm({ clinicaId }: NovoProcedimentoFormProps) {
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField control={form.control} name="codigo" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código *</FormLabel>
-                      <FormControl><Input {...field} placeholder="Código TUSS ou interno" /></FormControl>
+                      <FormLabel>Código TUSS *</FormLabel>
+                      <FormControl><Input {...field} placeholder="Digite o código TUSS" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

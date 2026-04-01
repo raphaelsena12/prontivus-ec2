@@ -81,7 +81,7 @@ interface Insumo {
 }
 
 const procedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código é obrigatório"),
+  codigo: z.string().min(1, "Código TUSS é obrigatório"),
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   valor: z.string().refine((val) => {
@@ -364,11 +364,11 @@ export function ProcedimentoDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Código <span className="text-destructive">*</span>
+                      Código TUSS <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Digite o código do procedimento"
+                        placeholder="Digite o código TUSS"
                         {...field}
                         disabled={loading || isEditing}
                       />

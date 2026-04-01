@@ -31,6 +31,11 @@ interface Cid {
   id: string;
   codigo: string;
   descricao: string;
+  grupoNome?: string | null;
+  categoriaCod?: string | null;
+  categoriaNome?: string | null;
+  subcategoriaCod?: string | null;
+  subcategoriaNome?: string | null;
   categoria: string | null;
   subcategoria: string | null;
   observacoes: string | null;
@@ -46,10 +51,11 @@ interface CidDialogProps {
 }
 
 const cidSchema = z.object({
-  codigo: z.string().min(1, "Codigo e obrigatorio"),
-  descricao: z.string().min(3, "Descricao deve ter no minimo 3 caracteres"),
-  categoria: z.string().optional(),
-  subcategoria: z.string().optional(),
+  grupoNome: z.string().optional(),
+  categoriaCod: z.string().optional(),
+  categoriaNome: z.string().optional(),
+  subcategoriaCod: z.string().min(1, "subcategoria_cod e obrigatorio"),
+  subcategoriaNome: z.string().min(3, "subcategoria_nome deve ter no minimo 3 caracteres"),
   observacoes: z.string().optional(),
   ativo: z.boolean().optional(),
 });
@@ -69,10 +75,11 @@ export function CidDialog({
   const form = useForm<CidFormValues>({
     resolver: zodResolver(cidSchema),
     defaultValues: {
-      codigo: "",
-      descricao: "",
-      categoria: "",
-      subcategoria: "",
+      grupoNome: "",
+      categoriaCod: "",
+      categoriaNome: "",
+      subcategoriaCod: "",
+      subcategoriaNome: "",
       observacoes: "",
       ativo: true,
     },
@@ -81,19 +88,21 @@ export function CidDialog({
   useEffect(() => {
     if (cid) {
       form.reset({
-        codigo: cid.codigo,
-        descricao: cid.descricao,
-        categoria: cid.categoria || "",
-        subcategoria: cid.subcategoria || "",
+        grupoNome: cid.grupoNome || "",
+        categoriaCod: cid.categoriaCod || "",
+        categoriaNome: cid.categoriaNome || "",
+        subcategoriaCod: cid.subcategoriaCod || cid.codigo,
+        subcategoriaNome: cid.subcategoriaNome || cid.descricao,
         observacoes: cid.observacoes || "",
         ativo: cid.ativo,
       });
     } else {
       form.reset({
-        codigo: "",
-        descricao: "",
-        categoria: "",
-        subcategoria: "",
+        grupoNome: "",
+        categoriaCod: "",
+        categoriaNome: "",
+        subcategoriaCod: "",
+        subcategoriaNome: "",
         observacoes: "",
         ativo: true,
       });
@@ -105,10 +114,14 @@ export function CidDialog({
       setLoading(true);
 
       const payload = {
-        codigo: data.codigo.trim().toUpperCase(),
-        descricao: data.descricao,
-        categoria: data.categoria || null,
-        subcategoria: data.subcategoria || null,
+        // Mantém compatibilidade no backend (codigo/descricao) e grava também os campos estruturados
+        codigo: data.subcategoriaCod.trim().toUpperCase(),
+        descricao: data.subcategoriaNome,
+        grupoNome: data.grupoNome || null,
+        categoriaCod: data.categoriaCod || null,
+        categoriaNome: data.categoriaNome || null,
+        subcategoriaCod: data.subcategoriaCod || null,
+        subcategoriaNome: data.subcategoriaNome || null,
         observacoes: data.observacoes || null,
         ...(isEditing ? { ativo: data.ativo } : {}),
       };
@@ -149,15 +162,15 @@ export function CidDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormField
                 control={form.control}
-                name="codigo"
+                name="categoriaCod"
                 render={({ field }) => (
                   <FormItem className="sm:col-span-1">
-                    <FormLabel>Codigo</FormLabel>
+                    <FormLabel>categoria_cod</FormLabel>
                     <FormControl>
-                      <Input {...field} className="uppercase" disabled={loading || isEditing} />
+                      <Input {...field} className="uppercase" disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -165,10 +178,10 @@ export function CidDialog({
               />
               <FormField
                 control={form.control}
-                name="descricao"
+                name="categoriaNome"
                 render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Descricao</FormLabel>
+                  <FormItem className="sm:col-span-1">
+                    <FormLabel>categoria_nome</FormLabel>
                     <FormControl>
                       <Input {...field} disabled={loading} />
                     </FormControl>
@@ -178,15 +191,19 @@ export function CidDialog({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FormField
                 control={form.control}
-                name="categoria"
+                name="subcategoriaCod"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Categoria</FormLabel>
+                    <FormLabel>subcategoria_cod</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} disabled={loading} />
+                      <Input
+                        {...field}
+                        className="uppercase"
+                        disabled={loading || isEditing}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -194,18 +211,32 @@ export function CidDialog({
               />
               <FormField
                 control={form.control}
-                name="subcategoria"
+                name="subcategoriaNome"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subcategoria</FormLabel>
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>subcategoria_nome</FormLabel>
                     <FormControl>
-                      <Input {...field} value={field.value || ""} disabled={loading} />
+                      <Input {...field} disabled={loading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="grupoNome"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>grupo_nome</FormLabel>
+                  <FormControl>
+                    <Input {...field} value={field.value || ""} disabled={loading} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

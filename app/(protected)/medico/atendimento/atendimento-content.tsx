@@ -279,12 +279,81 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     isTranscribing,
     isPaused,
     transcription,
+    stoppedUnexpectedly,
     startTranscription,
     pauseTranscription,
     resumeTranscription,
     stopTranscription,
     processTranscription,
   } = useTranscription();
+
+  // ── Autosave / recovery de rascunho ─────────────────────────────────────────
+  const draftKey = `draft-consulta-${consultaId}`;
+
+  // Salva rascunho no localStorage sempre que estados críticos mudarem
+  useEffect(() => {
+    if (!editedAnamnese && !analysisResults && transcription.length === 0) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({
+        savedAt: new Date().toISOString(),
+        transcription,
+        editedAnamnese,
+        analysisResults,
+        currentStep,
+        prescricoes,
+        cidsManuais,
+        examesManuais,
+      }));
+    } catch {
+      // localStorage cheio ou indisponível — ignorar silenciosamente
+    }
+  }, [transcription, editedAnamnese, analysisResults, currentStep, prescricoes, cidsManuais, examesManuais]);
+
+  // Ao montar, verifica se existe rascunho e oferece restore
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      const minutesAgo = Math.round((Date.now() - new Date(draft.savedAt).getTime()) / 60000);
+      if (minutesAgo > 480) {
+        // Rascunho com mais de 8h — descarta automaticamente
+        localStorage.removeItem(draftKey);
+        return;
+      }
+      if (draft.editedAnamnese || draft.transcription?.length > 0) {
+        toast.info(
+          `Rascunho encontrado (${minutesAgo < 1 ? "agora mesmo" : `há ${minutesAgo} min`}). Restaurar?`,
+          {
+            duration: 10000,
+            action: {
+              label: "Restaurar",
+              onClick: () => {
+                if (draft.transcription?.length) {
+                  // transcription é do hook, não pode ser injetada diretamente — só anamnese e resultados
+                }
+                if (draft.editedAnamnese) setEditedAnamnese(draft.editedAnamnese);
+                if (draft.analysisResults) setAnalysisResults(draft.analysisResults);
+                if (draft.currentStep) setCurrentStep(draft.currentStep);
+                if (draft.prescricoes) setPrescricoes(draft.prescricoes);
+                if (draft.cidsManuais) setCidsManuais(draft.cidsManuais);
+                if (draft.examesManuais) setExamesManuais(draft.examesManuais);
+                toast.success("Rascunho restaurado com sucesso");
+              },
+            },
+            cancel: {
+              label: "Descartar",
+              onClick: () => localStorage.removeItem(draftKey),
+            },
+          }
+        );
+      }
+    } catch {
+      // localStorage inválido — ignorar
+    }
+  // Apenas no mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Calculate IMC if peso and altura are available
   const peso = consulta?.peso ? Number(consulta.peso) : null;
@@ -833,32 +902,34 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         throw new Error(err.error || "Erro ao gerar anamnese");
       }
 
-      const data = await response.json();
-      // Garantir que as quebras de linha sejam preservadas
-      let anamneseRaw = data.anamnese;
-      
-      // Se data.anamnese for um objeto, tentar extrair a string
-      if (anamneseRaw && typeof anamneseRaw === 'object') {
-        if ('anamnese' in anamneseRaw && typeof anamneseRaw.anamnese === 'string') {
-          anamneseRaw = anamneseRaw.anamnese;
-        } else {
-          anamneseRaw = JSON.stringify(anamneseRaw);
+      // Streaming: lê chunks progressivamente e atualiza a anamnese em tempo real
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let anamneseAccumulated = "";
+
+      if (reader) {
+        // Sai do modal de processamento assim que o primeiro chunk chega
+        setIsProcessing(false);
+        setIsEditingAnamnese(true);
+        setConsultationMode('manual');
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          anamneseAccumulated += chunk;
+          setEditedAnamnese(anamneseAccumulated);
+          setAnalysisResults({ anamnese: anamneseAccumulated, cidCodes: [], protocolos: [], exames: [], prescricoes: [] });
         }
+      } else {
+        anamneseAccumulated = await response.text();
       }
-      
-      const anamneseFormatted = anamneseRaw && typeof anamneseRaw === 'string'
-        ? anamneseRaw.replace(/\\n/g, '\n').replace(/\\r/g, '')
-        : (anamneseRaw ? String(anamneseRaw) : '');
-      
-      console.log("📋 Anamnese formatada:", anamneseFormatted.substring(0, 200));
+
+      const anamneseFormatted = anamneseAccumulated.replace(/\\n/g, '\n').replace(/\\r/g, '');
+      setEditedAnamnese(anamneseFormatted);
       setAnalysisResults({ anamnese: anamneseFormatted, cidCodes: [], protocolos: [], exames: [], prescricoes: [] });
       setProntuario((prev) => ({ ...prev, anamnese: anamneseFormatted } as Prontuario));
-      setEditedAnamnese(anamneseFormatted);
-      setIsEditingAnamnese(true); // Sempre deixar em modo de edição
-      // Resetar flag de transcrição finalizada para permitir nova gravação
       setTranscricaoFinalizada(false);
-      // Mudar para aba Manual para exibir os campos preenchidos
-      setConsultationMode('manual');
       toast.success("Anamnese gerada com sucesso!");
     } catch (error: any) {
       toast.error(error.message || "Erro ao gerar anamnese");
@@ -1796,6 +1867,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         }
       }, 800);
       
+      // Limpa rascunho ao finalizar com sucesso
+      try { localStorage.removeItem(draftKey); } catch { /* ignorar */ }
+
       // Redirecionar para a fila de atendimento após um breve delay
       setTimeout(() => {
         router.push("/medico/fila-atendimento");
@@ -2350,6 +2424,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           transcricaoFinalizada={transcricaoFinalizada}
           hasAnamnese={!!(analysisResults?.anamnese || prontuario?.anamnese)}
           isProcessing={isProcessing}
+          stoppedUnexpectedly={stoppedUnexpectedly}
           sessionDuration={sessionDuration}
           pauseTranscription={pauseTranscription}
           resumeTranscription={resumeTranscription}
@@ -2357,6 +2432,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           setTranscricaoFinalizada={setTranscricaoFinalizada}
           setIsMicrophoneSelectorOpen={setIsMicrophoneSelectorOpen}
           onProcessAndAdvance={handleStep1Complete}
+          startTranscription={startTranscription}
         />
       )}
 

@@ -61,7 +61,7 @@ const exameSchema = z.object({
   nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   tipo: z.string().min(1, "Tipo é obrigatório"),
   descricao: z.string().min(1, "Descrição é obrigatória"),
-  codigoTussId: z.string().uuid("Código TUSS inválido").optional(),
+  codigoTussId: z.string().uuid("Código TUSS inválido").optional().nullable(),
   ativo: z.boolean().optional(),
 });
 
@@ -181,57 +181,25 @@ export function ExameDialog({
     try {
       setLoading(true);
 
-      // Validar codigoTussId obrigatório apenas na criação
-      if (!isEditing) {
-        // Verificar se codigoTussId está presente e é válido
-        if (!data.codigoTussId || data.codigoTussId.trim() === "") {
-          form.setError("codigoTussId", {
-            type: "manual",
-            message: "Código TUSS é obrigatório",
-          });
-          setLoading(false);
-          return;
-        }
-        // Validar formato UUID
-        const uuidValidation = z.string().uuid().safeParse(data.codigoTussId);
-        if (!uuidValidation.success) {
-          form.setError("codigoTussId", {
-            type: "manual",
-            message: "Código TUSS inválido. Selecione um código válido.",
-          });
-          setLoading(false);
-          return;
-        }
-      }
+      const tussId =
+        data.codigoTussId && String(data.codigoTussId).trim()
+          ? data.codigoTussId
+          : null;
 
-      // Na criação, codigoTussId é obrigatório e deve ser incluído
-      // Na edição, incluir apenas se tiver valor
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         nome: data.nome,
         descricao: data.descricao || "",
         tipo: data.tipo || "",
+        codigoTussId: tussId,
       };
 
-      if (!isEditing) {
-        // Na criação, codigoTussId é obrigatório
-        payload.codigoTussId = data.codigoTussId;
-      } else if (data.codigoTussId && data.codigoTussId.trim() !== "") {
-        // Na edição, incluir apenas se tiver valor válido
-        payload.codigoTussId = data.codigoTussId;
-      }
-
-      // Incluir ativo apenas no modo de edição
       if (isEditing) {
         payload.ativo = data.ativo;
       }
 
       const url = isEditing
-        ? `/api/admin-clinica/exames/${exame.id}`
+        ? `/api/admin-clinica/exames/${exame!.id}`
         : `/api/admin-clinica/exames`;
-
-      console.log("[ExameDialog] Payload sendo enviado:", JSON.stringify(payload, null, 2));
-      console.log("[ExameDialog] isEditing:", isEditing);
-      console.log("[ExameDialog] codigoTussId:", data.codigoTussId);
 
       const response = await fetch(url, {
         method: isEditing ? "PATCH" : "POST",
@@ -302,7 +270,7 @@ export function ExameDialog({
               render={({ field }) => (
                 <FormItem className="relative">
                   <FormLabel>
-                    Código TUSS <span className="text-destructive">*</span>
+                    Código TUSS <span className="text-muted-foreground">(opcional)</span>
                   </FormLabel>
                   <FormControl>
                     <Input

@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Database, Loader2, Pill, Plus, Search } from "lucide-react";
+import { Database, Loader2, Pill, Plus, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 
 import { MedicamentosTable } from "@/app/(protected)/admin-clinica/medicamentos/components/medicamentos-table";
 import { MedicamentoDialog } from "@/app/(protected)/admin-clinica/medicamentos/components/medicamento-dialog";
@@ -22,6 +23,16 @@ interface Medicamento {
   apresentacao: string | null;
   controle: string | null;
   unidade: string | null;
+  pharmaceuticalForm?: string | null;
+  therapeuticClass?: string | null;
+  prescriptionType?: string | null;
+  controlType?: string | null;
+  pregnancyRisk?: boolean;
+  pediatricUse?: boolean;
+  hepaticAlert?: boolean;
+  renalAlert?: boolean;
+  highRisk?: boolean;
+  status?: string | null;
   ativo: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +52,7 @@ export function MedicamentosSuperAdminContent() {
   const [toDelete, setToDelete] = useState<Medicamento | null>(null);
 
   const [anvisaSyncDialogOpen, setAnvisaSyncDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const fetchMedicamentos = useCallback(async () => {
     try {
@@ -86,7 +98,7 @@ export function MedicamentosSuperAdminContent() {
               <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
               <Input
                 type="search"
-                placeholder="Buscar por nome, princípio ativo..."
+                placeholder="Buscar por nome comercial, princípio ativo..."
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 className="pl-9 h-8 text-xs bg-background w-64"
@@ -99,6 +111,15 @@ export function MedicamentosSuperAdminContent() {
             >
               <Database className="mr-1.5 h-3 w-3" />
               Integração Anvisa
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
             </Button>
             <Button
               onClick={() => {
@@ -167,6 +188,15 @@ export function MedicamentosSuperAdminContent() {
         onOpenChange={setAnvisaSyncDialogOpen}
         onSuccess={handleSuccess}
         apiPath="/api/anvisa/sync"
+      />
+
+      <UploadExcelDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        endpoint="/api/super-admin/upload/medicamentos"
+        title="Upload de Medicamentos em Massa"
+        description='Faça upload de um arquivo Excel (.xlsx) com as colunas: "active_ingredient", "commercial_name", "pharmaceutical_form", "concentration", "presentation", "unit", "therapeutic_class", "prescription_type", "control_type", "pregnancy_risk", "pediatric_use", "hepatic_alert", "renal_alert", "high_risk", "status".'
+        onSuccess={handleSuccess}
       />
     </div>
   );

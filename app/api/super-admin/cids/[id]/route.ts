@@ -6,6 +6,11 @@ import { z } from "zod";
 
 const updateCidSchema = z.object({
   descricao: z.string().min(3, "Descricao deve ter no minimo 3 caracteres").optional(),
+  grupoNome: z.string().optional().nullable(),
+  categoriaCod: z.string().optional().nullable(),
+  categoriaNome: z.string().optional().nullable(),
+  subcategoriaCod: z.string().optional().nullable(),
+  subcategoriaNome: z.string().optional().nullable(),
   categoria: z.string().optional().nullable(),
   subcategoria: z.string().optional().nullable(),
   observacoes: z.string().optional().nullable(),
@@ -72,6 +77,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: {
         ...validation.data,
         descricao: validation.data.descricao?.trim(),
+        grupoNome: validation.data.grupoNome?.trim() || null,
+        categoriaCod: validation.data.categoriaCod?.trim() || null,
+        categoriaNome: validation.data.categoriaNome?.trim() || null,
+        subcategoriaCod: validation.data.subcategoriaCod?.trim() || null,
+        subcategoriaNome: validation.data.subcategoriaNome?.trim() || null,
         categoria: validation.data.categoria?.trim() || null,
         subcategoria: validation.data.subcategoria?.trim() || null,
         observacoes: validation.data.observacoes?.trim() || null,

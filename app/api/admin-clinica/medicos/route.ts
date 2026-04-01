@@ -4,11 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 
+const medicoEspecialidadeItemSchema = z.object({
+  especialidadeId: z.string().uuid("especialidadeId inválido"),
+  categoriaId: z.string().uuid("categoriaId inválido").nullable().optional(),
+  rqe: z.string().min(1, "RQE é obrigatório"),
+});
+
 const medicoSchema = z.object({
   usuarioId: z.string().uuid("ID de usuário inválido"),
   crm: z.string().min(1, "CRM é obrigatório"),
-  especialidade: z.string().min(1, "Especialidade é obrigatória"),
-  rqe: z.number().int().min(0).nullable().optional(),
+  especialidades: z.array(medicoEspecialidadeItemSchema).min(1, "Adicione ao menos 1 especialidade"),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
 });
 
@@ -111,6 +116,14 @@ export async function GET(request: NextRequest) {
           crm: true,
           especialidade: true,
           rqe: true,
+          medicoEspecialidades: {
+            select: {
+              id: true,
+              rqe: true,
+              especialidade: { select: { id: true, codigo: true, nome: true } },
+              categoria: { select: { id: true, codigo: true, nome: true } },
+            },
+          },
           usuario: {
             select: {
               id: true,
@@ -196,14 +209,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const especialidadePrincipal = await prisma.especialidadeMedica.findUnique({
+      where: { id: data.especialidades[0].especialidadeId },
+      select: { nome: true },
+    });
+
     const medico = await prisma.medico.create({
       data: {
         usuarioId: data.usuarioId,
         crm: data.crm,
-        especialidade: data.especialidade,
-        rqe: data.rqe ?? null,
+        // legado: manter uma especialidade "principal" em texto
+        especialidade: especialidadePrincipal?.nome || "Especialidade",
+        // legado: manter rqe "principal" se possível
+        rqe: null,
         limiteMaximoRetornosPorDia: data.limiteMaximoRetornosPorDia ?? null,
         clinicaId: auth.clinicaId!,
+        medicoEspecialidades: {
+          create: data.especialidades.map((it) => ({
+            especialidadeId: it.especialidadeId,
+            categoriaId: it.categoriaId ?? null,
+            rqe: it.rqe,
+          })),
+        },
       },
       include: {
         usuario: {
@@ -213,6 +240,14 @@ export async function POST(request: NextRequest) {
             email: true,
             telefone: true,
             avatar: true,
+          },
+        },
+        medicoEspecialidades: {
+          select: {
+            id: true,
+            rqe: true,
+            especialidade: { select: { id: true, codigo: true, nome: true } },
+            categoria: { select: { id: true, codigo: true, nome: true } },
           },
         },
       },

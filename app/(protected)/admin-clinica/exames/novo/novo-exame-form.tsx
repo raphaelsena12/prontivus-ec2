@@ -36,9 +36,14 @@ import Link from "next/link";
 
 const exameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
-  descricao: z.string().optional(),
-  tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"]).optional(),
-  codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
+  descricao: z.string().min(1, "Descrição é obrigatória"),
+  tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"], {
+    message: "Tipo é obrigatório",
+  }),
+  codigoTussId: z.union([
+    z.string().uuid("Código TUSS inválido"),
+    z.literal("_none_"),
+  ]),
 });
 
 type ExameFormData = z.infer<typeof exameSchema>;
@@ -66,7 +71,7 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
       nome: "",
       descricao: "",
       tipo: undefined,
-      codigoTussId: "",
+      codigoTussId: "_none_",
     },
   });
 
@@ -76,7 +81,7 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
       try {
         setLoadingCodigosTuss(true);
         const response = await fetch(
-          "/api/admin-clinica/codigos-tuss?tipoProcedimento=EXAME&ativo=true"
+          "/api/admin-clinica/codigos-tuss?catalogoTuss=EXAMES&ativo=true&limit=500"
         );
         if (response.ok) {
           const data = await response.json();
@@ -99,12 +104,20 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
     try {
       setLoading(true);
 
+      const payload = {
+        nome: data.nome,
+        descricao: data.descricao,
+        tipo: data.tipo,
+        codigoTussId:
+          data.codigoTussId === "_none_" ? null : data.codigoTussId,
+      };
+
       const response = await fetch("/api/admin-clinica/exames", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -170,7 +183,12 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
                     name="codigoTussId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Código TUSS *</FormLabel>
+                        <FormLabel>
+                          Código TUSS{" "}
+                          <span className="text-muted-foreground font-normal">
+                            (opcional)
+                          </span>
+                        </FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           value={field.value}
@@ -182,6 +200,9 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
+                            <SelectItem value="_none_">
+                              Sem vínculo (somente clínica)
+                            </SelectItem>
                             {loadingCodigosTuss ? (
                               <SelectItem value="loading" disabled>
                                 Carregando...
@@ -209,7 +230,7 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
                     name="tipo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tipo</FormLabel>
+                        <FormLabel>Tipo *</FormLabel>
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
@@ -237,7 +258,7 @@ export function NovoExameForm({ clinicaId }: NovoExameFormProps) {
                     name="descricao"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel>Descrição</FormLabel>
+                        <FormLabel>Descrição *</FormLabel>
                         <FormControl>
                           <Textarea
                             {...field}

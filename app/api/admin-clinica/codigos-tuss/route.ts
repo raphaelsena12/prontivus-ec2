@@ -81,47 +81,87 @@ export async function GET(request: NextRequest) {
     const tipoProcedimento = searchParams.get("tipoProcedimento");
     const ativo = searchParams.get("ativo");
     const especialidadeId = searchParams.get("especialidadeId");
+    const catalogoTuss = searchParams.get("catalogoTuss");
     const limitParam = searchParams.get("limit");
     const pageParam = searchParams.get("page");
 
-    const limit = Math.min(Math.max(parseInt(limitParam || "50", 10) || 50, 1), 200);
+    const limit = Math.min(Math.max(parseInt(limitParam || "50", 10) || 50, 1), 500);
     const page = Math.max(parseInt(pageParam || "1", 10) || 1, 1);
     const skip = (page - 1) * limit;
 
-    const where: any = {
-      ...(search && {
+    const andParts: object[] = [];
+
+    if (search.trim()) {
+      andParts.push({
         OR: [
-          { codigoTuss: { contains: search, mode: "insensitive" as const } },
-          { descricao: { contains: search, mode: "insensitive" as const } },
+          { codigoTuss: { contains: search.trim(), mode: "insensitive" as const } },
+          { descricao: { contains: search.trim(), mode: "insensitive" as const } },
         ],
-      }),
-      ...(tipoProcedimento && { tipoProcedimento }),
-      ...(ativo !== null && { ativo: ativo === "true" }),
-      ...(especialidadeId && {
+      });
+    }
+
+    if (catalogoTuss === "EXAMES") {
+      // LIKE '%EXAMES%' em campos de agrupamento + tipo enum
+      andParts.push({
+        OR: [
+          { sipGrupo: { contains: "EXAMES", mode: "insensitive" as const } },
+          { grupoTuss: { contains: "EXAMES", mode: "insensitive" as const } },
+          { categoriaProntivus: { contains: "EXAMES", mode: "insensitive" as const } },
+          { tipoProcedimento: "EXAME" },
+        ],
+      });
+    } else if (catalogoTuss === "PROCEDIMENTOS") {
+      andParts.push({
+        OR: [
+          { sipGrupo: { contains: "PROCEDIMENTOS", mode: "insensitive" as const } },
+          { grupoTuss: { contains: "PROCEDIMENTOS", mode: "insensitive" as const } },
+          { categoriaProntivus: { contains: "PROCEDIMENTOS", mode: "insensitive" as const } },
+          { tipoProcedimento: "PROCEDIMENTO_AMBULATORIAL" },
+          { tipoProcedimento: "CIRURGIA" },
+        ],
+      });
+    } else if (tipoProcedimento) {
+      andParts.push({ tipoProcedimento });
+    }
+
+    if (ativo !== null && ativo !== "") {
+      andParts.push({ ativo: ativo === "true" });
+    }
+
+    if (especialidadeId) {
+      andParts.push({
         tussEspecialidades: {
           some: {
             especialidadeId,
           },
         },
-      }),
-    };
+      });
+    }
 
-    const codigosTuss = await prisma.codigoTuss.findMany({
-      where,
-      include: {
-        grupo: true,
-        tussEspecialidades: {
-          include: {
-            especialidade: true,
+    const where = andParts.length > 0 ? { AND: andParts } : {};
+
+    const [codigosTuss, total] = await Promise.all([
+      prisma.codigoTuss.findMany({
+        where,
+        include: {
+          grupo: true,
+          tussEspecialidades: {
+            include: {
+              especialidade: true,
+            },
           },
         },
-      },
-      orderBy: { codigoTuss: "asc" },
-      take: limit,
-      skip,
-    });
+        orderBy: { codigoTuss: "asc" },
+        take: limit,
+        skip,
+      }),
+      prisma.codigoTuss.count({ where }),
+    ]);
 
-    return NextResponse.json({ codigosTuss });
+    return NextResponse.json({
+      codigosTuss,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) || 1 },
+    });
   } catch (error) {
     console.error("Erro ao listar códigos TUSS:", error);
     return NextResponse.json(

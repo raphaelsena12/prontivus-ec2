@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
             { codigo: { contains: search, mode: "insensitive" } },
             { descricao: { contains: search, mode: "insensitive" } },
             { categoria: { contains: search, mode: "insensitive" } },
+            { categoriaNome: { contains: search, mode: "insensitive" } },
+            { subcategoriaNome: { contains: search, mode: "insensitive" } },
+            { grupoNome: { contains: search, mode: "insensitive" } },
           ],
         }),
       },
@@ -30,6 +33,11 @@ export async function GET(request: NextRequest) {
         codigo: true,
         descricao: true,
         categoria: true,
+        categoriaCod: true,
+        categoriaNome: true,
+        subcategoriaCod: true,
+        subcategoriaNome: true,
+        grupoNome: true,
       },
     });
 

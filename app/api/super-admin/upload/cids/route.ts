@@ -35,6 +35,13 @@ async function checkAuthorization() {
  * Upload em massa de CIDs via Excel (.xlsx/.xls)
  *
  * Colunas esperadas:
+ * - grupo_nome
+ * - categoria_cod
+ * - categoria_nome
+ * - subcategoria_cod
+ * - subcategoria_nome
+ *
+ * (Compatível também com o formato antigo)
  * - CID (ou CODIGO)
  * - DESCRICAO
  */
@@ -77,6 +84,16 @@ export async function POST(request: NextRequest) {
       const linha = i + 2; // +2 porque a linha 1 é cabeçalho
 
       try {
+        const grupoNomeRaw = row.grupo_nome || row.grupo || row.grupo_nome_cid;
+        const categoriaCodRaw =
+          row.categoria_cod || row.categoria_codigo || row.categoria_cod_cid || row.cod_categoria;
+        const categoriaNomeRaw =
+          row.categoria_nome || row.categoria || row.nome_categoria || row.categoria_nome_cid;
+        const subcategoriaCodRaw =
+          row.subcategoria_cod || row.subcategoria_codigo || row.subcategoria_cod_cid || row.cod_subcategoria;
+        const subcategoriaNomeRaw =
+          row.subcategoria_nome || row.subcategoria || row.nome_subcategoria || row.subcategoria_nome_cid;
+
         const codigoRaw =
           row.cid ||
           row.codigo ||
@@ -85,17 +102,28 @@ export async function POST(request: NextRequest) {
           row.codigo_cid;
         const descricaoRaw = row.descricao || row.desc || row.descricao_cid;
 
-        const codigo = toStr(codigoRaw)?.toUpperCase();
-        const descricao = toStr(descricaoRaw);
+        // Priorizar novo layout (subcategoria_*), mas manter compatibilidade com colunas antigas.
+        const subcategoriaCod = toStr(subcategoriaCodRaw)?.toUpperCase();
+        const subcategoriaNome = toStr(subcategoriaNomeRaw);
+        const categoriaCod = toStr(categoriaCodRaw)?.toUpperCase();
+        const categoriaNome = toStr(categoriaNomeRaw);
+        const grupoNome = toStr(grupoNomeRaw);
+
+        const codigo = (subcategoriaCod || toStr(codigoRaw))?.toUpperCase();
+        const descricao = subcategoriaNome || toStr(descricaoRaw);
 
         if (!codigo) {
-          erros.push(`Linha ${linha}: CID é obrigatório (coluna "CID")`);
+          erros.push(
+            `Linha ${linha}: Código é obrigatório (coluna "subcategoria_cod" ou "CID")`
+          );
           ignorados++;
           continue;
         }
 
         if (!descricao || descricao.length < 3) {
-          erros.push(`Linha ${linha}: Descrição é obrigatória (mín. 3 caracteres)`);
+          erros.push(
+            `Linha ${linha}: Nome é obrigatório (coluna "subcategoria_nome" ou "DESCRICAO", mín. 3 caracteres)`
+          );
           ignorados++;
           continue;
         }
@@ -112,6 +140,11 @@ export async function POST(request: NextRequest) {
             where: { id: existente.id },
             data: {
               descricao,
+              grupoNome,
+              categoriaCod,
+              categoriaNome,
+              subcategoriaCod: subcategoriaCod || codigo,
+              subcategoriaNome: subcategoriaNome || descricao,
               ativo: true,
             },
           });
@@ -122,6 +155,11 @@ export async function POST(request: NextRequest) {
               clinicaId: null,
               codigo,
               descricao,
+              grupoNome,
+              categoriaCod,
+              categoriaNome,
+              subcategoriaCod: subcategoriaCod || codigo,
+              subcategoriaNome: subcategoriaNome || descricao,
               ativo: true,
             },
           });

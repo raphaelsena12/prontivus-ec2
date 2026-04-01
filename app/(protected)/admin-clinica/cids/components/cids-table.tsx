@@ -30,6 +30,11 @@ interface Cid {
   id: string;
   codigo: string;
   descricao: string;
+  grupoNome?: string | null;
+  categoriaCod?: string | null;
+  categoriaNome?: string | null;
+  subcategoriaCod?: string | null;
+  subcategoriaNome?: string | null;
   categoria: string | null;
   subcategoria: string | null;
   observacoes: string | null;
@@ -54,6 +59,11 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
     return data.filter((item) =>
       item.codigo.toLowerCase().includes(s) ||
       item.descricao.toLowerCase().includes(s) ||
+      (item.grupoNome || "").toLowerCase().includes(s) ||
+      (item.categoriaCod || "").toLowerCase().includes(s) ||
+      (item.categoriaNome || "").toLowerCase().includes(s) ||
+      (item.subcategoriaCod || "").toLowerCase().includes(s) ||
+      (item.subcategoriaNome || "").toLowerCase().includes(s) ||
       (item.categoria || "").toLowerCase().includes(s) ||
       (item.subcategoria || "").toLowerCase().includes(s)
     );
@@ -62,23 +72,31 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
   const columns = React.useMemo<ColumnDef<Cid>[]>(
     () => [
       {
-        accessorKey: "codigo",
-        header: "Codigo",
-        cell: ({ row }) => <Badge variant="outline">{row.original.codigo}</Badge>,
+        id: "categoria_cod",
+        header: "categoria_cod",
+        cell: ({ row }) => <Badge variant="outline">{row.original.categoriaCod || "-"}</Badge>,
       },
       {
-        accessorKey: "descricao",
-        header: "Descricao",
+        id: "categoria_nome",
+        header: "categoria_nome",
+        cell: ({ row }) => row.original.categoriaNome || "-",
       },
       {
-        accessorKey: "categoria",
-        header: "Categoria",
-        cell: ({ row }) => row.original.categoria || "-",
+        id: "subcategoria_cod",
+        header: "subcategoria_cod",
+        cell: ({ row }) => (
+          <Badge variant="outline">{row.original.subcategoriaCod || row.original.codigo}</Badge>
+        ),
       },
       {
-        accessorKey: "subcategoria",
-        header: "Subcategoria",
-        cell: ({ row }) => row.original.subcategoria || "-",
+        id: "subcategoria_nome",
+        header: "subcategoria_nome",
+        cell: ({ row }) => row.original.subcategoriaNome || row.original.descricao,
+      },
+      {
+        id: "grupo_nome",
+        header: "grupo_nome",
+        cell: ({ row }) => row.original.grupoNome || "-",
       },
       {
         accessorKey: "ativo",
@@ -132,7 +150,7 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por codigo, descricao ou categoria..."
+          placeholder="Buscar por grupo/categoria/subcategoria..."
           className="pl-9"
         />
       </div>

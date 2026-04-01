@@ -12,11 +12,14 @@ export interface TranscriptionEntry {
   speakerLabel?: string; // Label do AWS (spk_0, spk_1, etc.) ou identificação automática
 }
 
+export const TRANSCRIPTION_MIN_WORDS = 20;
+
 export function useTranscription() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [transcription, setTranscription] = useState<TranscriptionEntry[]>([]);
-  const [useAWSTranscribe, setUseAWSTranscribe] = useState(false);
+  // Sinaliza que a transcrição parou inesperadamente (não por ação do usuário)
+  const [stoppedUnexpectedly, setStoppedUnexpectedly] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -28,16 +31,13 @@ export function useTranscription() {
   const isStartingRef = useRef<boolean>(false);
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionStartTimeRef = useRef<number>(0);
+  // Refs que espelham isTranscribing/isPaused para uso seguro em closures assíncronos (onend, etc.)
+  const isTranscribingRef = useRef(false);
+  const isPausedRef = useRef(false);
   // OPT-3: flag O(1) para saber se o último item do array é parcial
   const hasPartialRef = useRef(false);
   // OPT-4: ref espelhando transcription para evitar recriar determineSpeaker a cada mudança
   const transcriptionRef = useRef<TranscriptionEntry[]>([]);
-
-  // Contador para alternar entre Médico e Paciente quando não há identificação automática
-  const speakerAlternatorRef = useRef<{ lastSpeaker: string; count: number }>({
-    lastSpeaker: "Médico",
-    count: 0,
-  });
 
   // OPT-4: mantém ref sincronizada sem recalcular callbacks
   useEffect(() => {
@@ -53,23 +53,16 @@ export function useTranscription() {
     });
   };
 
-  // OPT-4: não depende mais de `transcription` — usa transcriptionRef para evitar recriações
-  const determineSpeaker = useCallback((awsSpeakerLabel?: string, awsSpeaker?: string, currentTranscription?: TranscriptionEntry[]): string => {
-    if (awsSpeaker) {
-      return awsSpeaker;
-    }
+  // Sem diarização real via Web Speech API — retorna label AWS se disponível, senão "Médico"
+  const determineSpeaker = useCallback((awsSpeakerLabel?: string, awsSpeaker?: string): string => {
+    if (awsSpeaker) return awsSpeaker;
     if (awsSpeakerLabel) {
       return awsSpeakerLabel === "spk_0" || awsSpeakerLabel.includes("0")
         ? "Médico"
         : "Paciente";
     }
-    const transcriptList = currentTranscription || transcriptionRef.current;
-    const lastEntry = transcriptList[transcriptList.length - 1];
-    if (lastEntry && !lastEntry.isPartial) {
-      return lastEntry.speaker === "Médico" ? "Paciente" : "Médico";
-    }
     return "Médico";
-  }, []); // deps vazias: lê transcription via ref
+  }, []);
 
   // Função para enviar chunk de áudio para AWS Transcribe com speaker diarization
   const sendAudioChunk = useCallback(async (audioBlob: Blob) => {
@@ -137,7 +130,9 @@ export function useTranscription() {
       recognitionStartTimeRef.current = Date.now();
       console.log("Web Speech Recognition iniciado com sucesso");
       isStartingRef.current = false;
+      isTranscribingRef.current = true;
       setIsTranscribing(true);
+      setStoppedUnexpectedly(false);
       toast.success("Transcrição iniciada");
     };
 
@@ -173,7 +168,7 @@ export function useTranscription() {
         setTranscription(prev => {
           const base = hasPartialRef.current ? prev.slice(0, -1) : prev;
           hasPartialRef.current = false;
-          const speaker = determineSpeaker(undefined, undefined, base);
+          const speaker = determineSpeaker();
           return [...base, {
             time: formatTime(new Date()),
             speaker,
@@ -198,7 +193,9 @@ export function useTranscription() {
       } else if (event.error === "network" || event.error === "service-not-allowed") {
         console.error(`Erro na transcrição: ${event.error}`);
         isStartingRef.current = false;
+        isTranscribingRef.current = false;
         setIsTranscribing(false);
+        setStoppedUnexpectedly(true);
         toast.error(`Erro na transcrição: ${event.error}`);
       } else {
         console.log(`Aviso no reconhecimento: ${event.error}`);
@@ -211,12 +208,14 @@ export function useTranscription() {
         ? endTime - recognitionStartTimeRef.current
         : 0;
 
-      console.log("Reconhecimento terminou. Duração:", duration, "ms. isTranscribing:", isTranscribing, "isPaused:", isPaused);
+      console.log("Reconhecimento terminou. Duração:", duration, "ms. isTranscribing:", isTranscribingRef.current, "isPaused:", isPausedRef.current);
 
       if (duration < 1000 && recognitionStartTimeRef.current > 0) {
         console.warn("Reconhecimento terminou muito rapidamente, possivelmente erro. Não reiniciando automaticamente.");
         isStartingRef.current = false;
+        isTranscribingRef.current = false;
         setIsTranscribing(false);
+        setStoppedUnexpectedly(true);
         recognitionStartTimeRef.current = 0;
         return;
       }
@@ -227,23 +226,26 @@ export function useTranscription() {
         clearTimeout(restartTimeoutRef.current);
       }
 
-      if (isTranscribing && !isPaused && recognitionRef.current === recognition) {
+      // Usa refs em vez de closure — evita stale isTranscribing/isPaused
+      if (isTranscribingRef.current && !isPausedRef.current && recognitionRef.current === recognition) {
         // OPT-1: reduzido de 1000ms para 100ms — elimina 900ms de janela morta entre frases
         restartTimeoutRef.current = setTimeout(() => {
           try {
             console.log("Reiniciando reconhecimento após delay...");
-            if (recognitionRef.current && isTranscribing && !isPaused) {
+            if (recognitionRef.current && isTranscribingRef.current && !isPausedRef.current) {
               recognitionRef.current.start();
             }
           } catch (error: any) {
             console.error("Erro ao reiniciar reconhecimento:", error);
             if (!error.message?.includes("already") && !error.message?.includes("started")) {
+              isTranscribingRef.current = false;
               setIsTranscribing(false);
+              setStoppedUnexpectedly(true);
             }
           }
         }, 100);
       } else {
-        console.log("Não reiniciando - isTranscribing:", isTranscribing, "isPaused:", isPaused, "recognition match:", recognitionRef.current === recognition);
+        console.log("Não reiniciando - isTranscribing:", isTranscribingRef.current, "isPaused:", isPausedRef.current, "recognition match:", recognitionRef.current === recognition);
       }
     };
 
@@ -293,7 +295,6 @@ export function useTranscription() {
       socket.on("transcription-started", () => {
         console.log("Transcrição iniciada via AWS");
         setIsTranscribing(true);
-        setUseAWSTranscribe(true);
         toast.success("Transcrição AWS iniciada com speaker diarization");
       });
 
@@ -474,6 +475,8 @@ export function useTranscription() {
 
   // Pausar transcrição
   const pauseTranscription = useCallback(() => {
+    // Atualiza ref antes de parar o recognition — evita que onend tente reiniciar
+    isPausedRef.current = true;
     setIsPaused(true);
 
     if (recognitionRef.current) {
@@ -495,6 +498,7 @@ export function useTranscription() {
 
   // Retomar transcrição
   const resumeTranscription = useCallback(() => {
+    isPausedRef.current = false;
     setIsPaused(false);
 
     if (recognitionRef.current) {
@@ -527,9 +531,12 @@ export function useTranscription() {
       restartTimeoutRef.current = null;
     }
 
+    // Atualiza refs antes de parar o recognition — onend não vai tentar reiniciar
+    isTranscribingRef.current = false;
+    isPausedRef.current = false;
     setIsTranscribing(false);
     setIsPaused(false);
-    setUseAWSTranscribe(false);
+    setStoppedUnexpectedly(false);
 
     if (socketRef.current) {
       socketRef.current.emit("stop-transcription");
@@ -606,17 +613,12 @@ export function useTranscription() {
       console.log("Processando transcrição. Total de entradas:", transcription.length);
       console.log("Entradas:", transcription);
 
-      let transcriptionText = transcription
-        .filter((entry) => !entry.isPartial)
-        .map((entry) => entry.text)
-        .join(" ");
+      const finalEntries = transcription.filter((entry) => !entry.isPartial);
+      const sourceEntries = finalEntries.length > 0 ? finalEntries : transcription;
 
-      if (!transcriptionText.trim() && transcription.length > 0) {
-        console.log("Nenhuma entrada não parcial encontrada. Usando todas as entradas...");
-        transcriptionText = transcription
-          .map((entry) => entry.text)
-          .join(" ");
-      }
+      let transcriptionText = sourceEntries
+        .map((entry) => `[${entry.time}] ${entry.text}`)
+        .join("\n");
 
       console.log("Texto da transcrição para processar:", transcriptionText);
       console.log("Tamanho do texto:", transcriptionText.length);
@@ -653,6 +655,7 @@ export function useTranscription() {
     isTranscribing,
     isPaused,
     transcription,
+    stoppedUnexpectedly,
     startTranscription,
     pauseTranscription,
     resumeTranscription,

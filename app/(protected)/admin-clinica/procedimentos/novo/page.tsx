@@ -12,18 +12,3 @@ export default async function NovoProcedimentoPage() {
   if (!clinicaId) redirect("/dashboard");
   return <NovoProcedimentoForm clinicaId={clinicaId} />;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

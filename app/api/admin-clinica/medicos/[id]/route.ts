@@ -4,10 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 
+const medicoEspecialidadeItemSchema = z.object({
+  especialidadeId: z.string().uuid("especialidadeId inválido"),
+  categoriaId: z.string().uuid("categoriaId inválido").nullable().optional(),
+  rqe: z.string().min(1, "RQE é obrigatório"),
+});
+
 const updateMedicoSchema = z.object({
   crm: z.string().min(1, "CRM é obrigatório").optional(),
-  especialidade: z.string().min(1, "Especialidade é obrigatória").optional(),
-  rqe: z.number().int().min(0).nullable().optional(),
+  especialidades: z.array(medicoEspecialidadeItemSchema).min(1).optional(),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
   ativo: z.boolean().optional(),
 });
@@ -74,6 +79,14 @@ export async function GET(
             nome: true,
             email: true,
             telefone: true,
+          },
+        },
+        medicoEspecialidades: {
+          select: {
+            id: true,
+            rqe: true,
+            especialidade: { select: { id: true, codigo: true, nome: true } },
+            categoria: { select: { id: true, codigo: true, nome: true } },
           },
         },
       },
@@ -152,9 +165,31 @@ export async function PATCH(
       }
     }
 
+    const updateData: any = {
+      ...data,
+    };
+
+    if (data.especialidades) {
+      const especialidadePrincipal = await prisma.especialidadeMedica.findUnique({
+        where: { id: data.especialidades[0].especialidadeId },
+        select: { nome: true },
+      });
+      updateData.especialidade = especialidadePrincipal?.nome || medicoExistente.especialidade;
+
+      // Substituir lista inteira
+      updateData.medicoEspecialidades = {
+        deleteMany: {},
+        create: data.especialidades.map((it) => ({
+          especialidadeId: it.especialidadeId,
+          categoriaId: it.categoriaId ?? null,
+          rqe: it.rqe,
+        })),
+      };
+    }
+
     const medico = await prisma.medico.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         usuario: {
           select: {
@@ -162,6 +197,14 @@ export async function PATCH(
             nome: true,
             email: true,
             telefone: true,
+          },
+        },
+        medicoEspecialidades: {
+          select: {
+            id: true,
+            rqe: true,
+            especialidade: { select: { id: true, codigo: true, nome: true } },
+            categoria: { select: { id: true, codigo: true, nome: true } },
           },
         },
       },

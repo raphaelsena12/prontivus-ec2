@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, FileText, Upload, Filter, Plus, ClipboardList, Search } from "lucide-react";
+import { Loader2, Filter, ClipboardList, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { ExamesTable } from "./components/exames-table";
+import {
+  CatalogoUnificadoTable,
+  type LinhaCatalogoUnificado,
+} from "../components/catalogo-unificado-table";
 import { ExameDialog } from "./components/exame-dialog";
 import { ExameDeleteDialog } from "./components/exame-delete-dialog";
-import { ExamesClearDialog } from "./components/exames-clear-dialog";
-import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+
+const PAGE_SIZE = 50;
 
 interface Exame {
   id: string;
@@ -21,7 +23,6 @@ interface Exame {
   tipo: string | null;
   codigoTussId: string | null;
   ativo: boolean;
-  createdAt: Date;
   codigoTuss?: {
     id: string;
     codigoTuss: string;
@@ -34,65 +35,80 @@ interface ExamesContentProps {
   clinicaId: string;
 }
 
-export function ExamesContent({ clinicaId }: ExamesContentProps) {
-  const router = useRouter();
-  const [exames, setExames] = useState<Exame[]>([]);
+export function ExamesContent({ clinicaId: _clinicaId }: ExamesContentProps) {
+  const [rows, setRows] = useState<LinhaCatalogoUnificado[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Dialogs
-  const [exameDialogOpen, setExameDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExame, setEditingExame] = useState<Exame | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deletingExame, setDeletingExame] = useState<Exame | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingMeta, setDeletingMeta] = useState<{
+    id: string;
+    nome: string;
+  } | null>(null);
 
-  const fetchExames = useCallback(async () => {
+  const fetchLista = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ 
-        page: "1",
-        limit: "1000", // Buscar muitos registros para paginação no cliente
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
       });
       if (search.trim().length) params.set("search", search.trim());
-      const response = await fetch(`/api/admin-clinica/exames?${params.toString()}`);
-      if (!response.ok) throw new Error("Erro ao carregar exames");
+      const response = await fetch(
+        `/api/admin-clinica/exames/lista-unificada?${params.toString()}`
+      );
+      if (!response.ok) throw new Error("Erro ao carregar lista");
       const data = await response.json();
-      setExames(data.exames || []);
+      setRows(data.items || []);
+      const tp = data.pagination?.totalPages;
+      setTotalPages(typeof tp === "number" && tp > 0 ? tp : 1);
     } catch (error) {
       toast.error("Erro ao carregar exames");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, page]);
 
   useEffect(() => {
-    fetchExames();
-  }, [fetchExames]);
+    fetchLista();
+  }, [fetchLista]);
 
-  const handleEdit = (exame: Exame) => {
-    setEditingExame(exame);
-    setExameDialogOpen(true);
+  const handleEdit = async (row: LinhaCatalogoUnificado) => {
+    if (row.origem !== "CLINICA") return;
+    try {
+      const res = await fetch(`/api/admin-clinica/exames/${row.sourceId}`);
+      if (!res.ok) throw new Error("Erro ao carregar exame");
+      const data = await res.json();
+      setEditingExame(data.exame);
+      setDialogOpen(true);
+    } catch (e) {
+      toast.error("Não foi possível abrir o exame para edição");
+    }
   };
 
-  const handleDeleteClick = (exame: Exame) => {
-    setDeletingExame(exame);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleSuccess = () => {
-    fetchExames();
-    setExameDialogOpen(false);
-    setDeleteDialogOpen(false);
-    setEditingExame(null);
-    setDeletingExame(null);
+  const handleDeleteClick = (row: LinhaCatalogoUnificado) => {
+    if (row.origem !== "CLINICA") return;
+    const nome = row.descricao.split(" — ")[0] || row.descricao;
+    setDeletingMeta({ id: row.sourceId, nome });
+    setDeleteOpen(true);
   };
 
   const handleCreate = () => {
     setEditingExame(null);
-    setExameDialogOpen(true);
+    setDialogOpen(true);
+  };
+
+  const handleSuccess = () => {
+    fetchLista();
+    setDialogOpen(false);
+    setEditingExame(null);
+    setDeleteOpen(false);
+    setDeletingMeta(null);
   };
 
   return (
@@ -100,39 +116,37 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
       <PageHeader
         icon={ClipboardList}
         title="Exames"
-        subtitle="Gerencie os exames cadastrados na clínica"
+        subtitle="Catálogo TUSS (somente leitura) e exames próprios da clínica (editáveis)"
       />
 
-      {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
           <div className="flex items-center gap-1.5">
             <Filter className="h-3 w-3 text-muted-foreground" />
-            <CardTitle className="text-sm font-semibold">Lista de Exames</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Exames — TUSS e clínica
+            </CardTitle>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
               <Input
                 type="search"
-                placeholder="Buscar por nome ou descrição..."
+                placeholder="Buscar..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
                 className="pl-9 h-7 text-xs bg-background w-64"
               />
             </div>
             <Button
-              variant="outline"
-              onClick={() => setUploadDialogOpen(true)}
-              className="h-8 w-8 p-0"
-              title="Upload em Massa"
-              aria-label="Upload em Massa"
+              onClick={handleCreate}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3"
             >
-              <Upload className="h-4 w-4" />
-            </Button>
-            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />
-              Novo Exame
+              Novo exame
             </Button>
           </div>
         </CardHeader>
@@ -141,52 +155,42 @@ export function ExamesContent({ clinicaId }: ExamesContentProps) {
             <div className="flex items-center justify-center py-12 px-6">
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Carregando exames...</p>
+                <p className="text-sm text-muted-foreground">Carregando...</p>
               </div>
             </div>
-          ) : exames.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6">
-              <p className="text-muted-foreground text-center">Nenhum exame encontrado</p>
+              <p className="text-muted-foreground text-center">
+                Nenhum registro encontrado.
+              </p>
             </div>
           ) : (
-            <ExamesTable
-            data={exames}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-            onCreate={handleCreate}
-            onUpload={() => setUploadDialogOpen(true)}
-          />
+            <CatalogoUnificadoTable
+              data={rows}
+              entityLabel="exame(s)"
+              variant="exames"
+              serverPageCount={totalPages}
+              serverPageIndex={page - 1}
+              serverPageSize={PAGE_SIZE}
+              onServerPageChange={(idx) => setPage(idx + 1)}
+              onEditClinica={handleEdit}
+              onDeleteClinica={handleDeleteClick}
+            />
           )}
         </CardContent>
       </Card>
 
-      {/* DIALOGS */}
       <ExameDialog
-        open={exameDialogOpen}
-        onOpenChange={setExameDialogOpen}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         exame={editingExame}
         onSuccess={handleSuccess}
       />
 
       <ExameDeleteDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        exame={deletingExame}
-        onSuccess={handleSuccess}
-      />
-
-      <UploadExcelDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        endpoint="/api/admin-clinica/upload/exames"
-        title="Upload de Exames em Massa"
-        description='Faça upload de um arquivo Excel (.xlsx/.xls). Colunas aceitas: "nome" (ou "Exame"), "codigo_tuss" (ou "Código TUSS"), "descricao", "tipo".'
-        onSuccess={handleSuccess}
-      />
-
-      <ExamesClearDialog
-        open={clearDialogOpen}
-        onOpenChange={setClearDialogOpen}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        exame={deletingMeta}
         onSuccess={handleSuccess}
       />
     </div>

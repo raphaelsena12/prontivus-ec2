@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Edit, FileText, Filter, Loader2, Plus, Power, Search } from "lucide-react";
+import { Edit, FileText, Filter, Loader2, Plus, Power, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/page-header";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { UploadExcelDialog } from "@/components/upload-excel-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,11 +91,14 @@ export function OperadorasSuperAdminContent() {
   const [operadoras, setOperadoras] = useState<Operadora[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Operadora | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -107,6 +112,13 @@ export function OperadorasSuperAdminContent() {
       );
     });
   }, [operadoras, search]);
+
+  const allFilteredIds = useMemo(() => filtered.map((o) => o.id), [filtered]);
+  const selectedCount = selectedIds.size;
+  const isAllSelected =
+    filtered.length > 0 && allFilteredIds.every((id) => selectedIds.has(id));
+  const isIndeterminate =
+    selectedCount > 0 && filtered.length > 0 && !isAllSelected;
 
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
   const pageCount = useMemo(
@@ -122,6 +134,11 @@ export function OperadorasSuperAdminContent() {
   useEffect(() => {
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }, [search]);
+
+  // Se a lista mudar (ex.: após import/edição), limpar seleção para evitar ações em itens "sumidos"
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [operadoras]);
 
   const fetchOperadoras = useCallback(async () => {
     try {
@@ -226,6 +243,54 @@ export function OperadorasSuperAdminContent() {
     }
   };
 
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = (checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        for (const id of allFilteredIds) next.add(id);
+      } else {
+        for (const id of allFilteredIds) next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      const res = await fetch(`${API_BASE}/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Erro ao excluir operadoras em massa");
+      }
+      const data = await res.json().catch(() => ({}));
+      toast.success(`Operadora(s) excluída(s): ${data?.excluidas ?? 0}`);
+      if (data?.erros?.length) {
+        const preview = data.erros.slice(0, 3).join("; ");
+        const more = data.erros.length > 3 ? ` e mais ${data.erros.length - 3} erro(s)` : "";
+        toast.warning(`${data.erros.length} com erro: ${preview}${more}.`, { duration: 8000 });
+      }
+      setBulkDialogOpen(false);
+      setSelectedIds(new Set());
+      await fetchOperadoras();
+    } catch (e: any) {
+      toast.error(e?.message || "Erro ao excluir operadoras em massa");
+    }
+  };
+
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
       <PageHeader
@@ -251,6 +316,24 @@ export function OperadorasSuperAdminContent() {
                 className="pl-9 h-8 text-xs bg-background w-72"
               />
             </div>
+            <Button
+              variant="outline"
+              onClick={() => setUploadDialogOpen(true)}
+              className="h-8 w-8 p-0"
+              title="Upload em Massa"
+              aria-label="Upload em Massa"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setBulkDialogOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="h-8 text-xs px-3 border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+              title={selectedIds.size ? "Excluir selecionadas" : "Selecione ao menos 1 operadora"}
+            >
+              Excluir em massa ({selectedIds.size})
+            </Button>
             <Button
               onClick={openCreate}
               className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3"
@@ -279,6 +362,15 @@ export function OperadorasSuperAdminContent() {
                 <Table>
                   <TableHeader className="bg-slate-100 sticky top-0 z-10">
                     <TableRow>
+                      <TableHead className="w-10">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={isAllSelected ? true : isIndeterminate ? "indeterminate" : false}
+                            onCheckedChange={(v) => toggleSelectAllFiltered(Boolean(v))}
+                            aria-label="Selecionar todas as operadoras filtradas"
+                          />
+                        </div>
+                      </TableHead>
                       <TableHead className="text-xs font-semibold py-3">Código ANS</TableHead>
                       <TableHead className="text-xs font-semibold py-3">Razão Social</TableHead>
                       <TableHead className="text-xs font-semibold py-3">Nome Fantasia</TableHead>
@@ -290,6 +382,15 @@ export function OperadorasSuperAdminContent() {
                   <TableBody>
                     {paged.map((o) => (
                       <TableRow key={o.id}>
+                        <TableCell className="text-xs py-3">
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={selectedIds.has(o.id)}
+                              onCheckedChange={(v) => toggleSelect(o.id, Boolean(v))}
+                              aria-label={`Selecionar operadora ${o.razaoSocial}`}
+                            />
+                          </div>
+                        </TableCell>
                         <TableCell className="text-xs py-3 font-medium">{o.codigoAns}</TableCell>
                         <TableCell className="text-xs py-3">{o.razaoSocial}</TableCell>
                         <TableCell className="text-xs py-3">{o.nomeFantasia || "-"}</TableCell>
@@ -504,6 +605,36 @@ export function OperadorasSuperAdminContent() {
             </Button>
             <Button onClick={handleSave} disabled={saving || !form.codigoAns || !form.razaoSocial}>
               {saving ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <UploadExcelDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        endpoint="/api/super-admin/upload/operadoras"
+        title="Upload de Operadoras em Massa"
+        description='Faça upload de um arquivo Excel (.xlsx) com as colunas: "codigo_ans", "razao_social" (obrigatórias) e opcionalmente "nome_fantasia", "cnpj", "telefone", "email", "cep", "endereco"/"logradouro", "numero", "complemento", "bairro", "cidade", "estado"/"uf", "pais", "ativo".'
+        onSuccess={fetchOperadoras}
+      />
+
+      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Excluir operadoras em massa</DialogTitle>
+            <DialogDescription>
+              Você está prestes a excluir <b>{selectedIds.size}</b> operadora(s) selecionada(s). Essa ação é
+              irreversível. Se alguma operadora tiver vínculos (consultas/guias/planos), ela não poderá ser excluída.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
+              Excluir agora
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -77,41 +77,31 @@ interface AgendamentosCalendarProps {
   onSlotSelect?: (slotInfo: { start: Date; end: Date }) => void;
 }
 
-// Função para obter cor por tipo de consulta
-const getTipoConsultaColor = (tipoNome: string | null | undefined): { bg: string; border: string } => {
-  if (!tipoNome) {
-    return { bg: "#6b7280", border: "#4b5563" }; // Cinza padrão
+// Função para obter cor por status da consulta
+const getStatusColor = (status: string): { bg: string; border: string } => {
+  switch (status) {
+    case "AGENDADA":
+      return { bg: "#3b82f6", border: "#2563eb" }; // Azul
+    case "CONFIRMADA":
+      return { bg: "#22c55e", border: "#16a34a" }; // Verde
+    case "CANCELADA":
+      return { bg: "#ef4444", border: "#dc2626" }; // Vermelho
+    case "REALIZADA":
+      return { bg: "#6b7280", border: "#4b5563" }; // Cinza
+    case "AGUARDANDO_APROVACAO":
+      return { bg: "#f59e0b", border: "#d97706" }; // Âmbar
+    default:
+      return { bg: "#6b7280", border: "#4b5563" }; // Cinza padrão
   }
-
-  const tipoLower = tipoNome.toLowerCase();
-  
-  if (tipoLower.includes("primeira")) {
-    return { bg: "#3b82f6", border: "#2563eb" }; // Azul
-  } else if (tipoLower.includes("retorno")) {
-    return { bg: "#ef4444", border: "#dc2626" }; // Vermelho
-  } else if (tipoLower.includes("urgência") || tipoLower.includes("urgencia")) {
-    return { bg: "#ef4444", border: "#dc2626" }; // Vermelho
-  } else if (tipoLower.includes("eletiva")) {
-    return { bg: "#8b5cf6", border: "#7c3aed" }; // Roxo
-  } else if (tipoLower.includes("seguimento")) {
-    return { bg: "#f59e0b", border: "#d97706" }; // Laranja
-  } else if (tipoLower.includes("telemedicina")) {
-    return { bg: "#06b6d4", border: "#0891b2" }; // Ciano
-  }
-  
-  return { bg: "#6b7280", border: "#4b5563" }; // Cinza padrão
 };
 
-// Função para obter todos os tipos únicos de consulta
-const getTiposConsultaUnicos = (agendamentos: Agendamento[]): string[] => {
-  const tipos = new Set<string>();
-  agendamentos.forEach((ag) => {
-    if (ag.tipoConsulta?.nome) {
-      tipos.add(ag.tipoConsulta.nome);
-    }
-  });
-  return Array.from(tipos).sort();
-};
+const STATUS_LEGENDA = [
+  { status: "AGENDADA", label: "Agendada" },
+  { status: "CONFIRMADA", label: "Confirmada" },
+  { status: "AGUARDANDO_APROVACAO", label: "Aguardando aprovação" },
+  { status: "REALIZADA", label: "Realizada" },
+  { status: "CANCELADA", label: "Cancelada" },
+];
 
 export function AgendamentosCalendar({
   agendamentos,
@@ -218,9 +208,9 @@ export function AgendamentosCalendar({
       };
     }
 
-    // Estilo para agendamentos - cor baseada no tipo de consulta
+    // Estilo para agendamentos - cor baseada no status
     const agendamento = event.resource as Agendamento;
-    const tipoCor = getTipoConsultaColor(agendamento.tipoConsulta?.nome);
+    const tipoCor = getStatusColor(agendamento.status);
 
     return {
       style: {
@@ -236,9 +226,6 @@ export function AgendamentosCalendar({
       },
     };
   };
-
-  // Obter tipos únicos para a legenda
-  const tiposUnicos = useMemo(() => getTiposConsultaUnicos(agendamentos), [agendamentos]);
 
   const handleEventClick = (event: any) => {
     // Se for um bloqueio, não fazer nada (ou mostrar informações)
@@ -280,36 +267,28 @@ export function AgendamentosCalendar({
   return (
     <div className="w-full">
       {/* Legenda */}
-      {tiposUnicos.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {tiposUnicos.map((tipo) => {
-            const cor = getTipoConsultaColor(tipo);
-            return (
-              <div key={tipo} className="flex items-center gap-1.5">
-                <div
-                  className="w-3 h-3 rounded border"
-                  style={{
-                    backgroundColor: cor.bg,
-                    borderColor: cor.border,
-                  }}
-                />
-                <span className="text-[14px] text-foreground font-medium">{tipo}</span>
-              </div>
-            );
-          })}
-          {/* Bloqueio */}
-          <div className="flex items-center gap-1.5">
-            <div
-              className="w-3 h-3 rounded border"
-              style={{
-                backgroundColor: "#000000",
-                borderColor: "#1a1a1a",
-              }}
-            />
-            <span className="text-[14px] text-foreground font-medium">Bloqueio</span>
-          </div>
+      <div className="mb-3 flex flex-wrap gap-3">
+        {STATUS_LEGENDA.map(({ status, label }) => {
+          const cor = getStatusColor(status);
+          return (
+            <div key={status} className="flex items-center gap-1.5">
+              <div
+                className="w-3 h-3 rounded border"
+                style={{ backgroundColor: cor.bg, borderColor: cor.border }}
+              />
+              <span className="text-[13px] text-foreground font-medium">{label}</span>
+            </div>
+          );
+        })}
+        {/* Bloqueio */}
+        <div className="flex items-center gap-1.5">
+          <div
+            className="w-3 h-3 rounded border"
+            style={{ backgroundColor: "#000000", borderColor: "#1a1a1a" }}
+          />
+          <span className="text-[13px] text-foreground font-medium">Bloqueio</span>
         </div>
-      )}
+      </div>
 
       {/* Calendário com estilos customizados */}
       <div className="h-[500px] w-full calendar-compact">

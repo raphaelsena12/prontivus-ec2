@@ -16,6 +16,11 @@ interface Cid {
   id: string;
   codigo: string;
   descricao: string;
+  grupoNome?: string | null;
+  categoriaCod?: string | null;
+  categoriaNome?: string | null;
+  subcategoriaCod?: string | null;
+  subcategoriaNome?: string | null;
   categoria: string | null;
   subcategoria: string | null;
   observacoes: string | null;
@@ -143,7 +148,7 @@ export function CidsSuperAdminContent() {
         onOpenChange={setUploadDialogOpen}
         endpoint="/api/super-admin/upload/cids"
         title="Upload de CIDs em Massa"
-        description='Faça upload de um arquivo Excel (.xlsx) com as colunas: "CID" e "DESCRICAO".'
+        description='Faça upload de um Excel (.xlsx) com as colunas: "grupo_nome", "categoria_cod", "categoria_nome", "subcategoria_cod", "subcategoria_nome". (Também aceita o formato antigo: "CID" e "DESCRICAO").'
         onSuccess={handleSuccess}
       />
     </div>

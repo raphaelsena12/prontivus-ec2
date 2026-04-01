@@ -11,6 +11,16 @@ const updateMedicamentoSchema = z.object({
   apresentacao: z.string().optional().nullable(),
   concentracao: z.string().optional().nullable(),
   unidade: z.string().optional().nullable(),
+  pharmaceuticalForm: z.string().optional().nullable(),
+  therapeuticClass: z.string().optional().nullable(),
+  prescriptionType: z.string().optional().nullable(),
+  controlType: z.string().optional().nullable(),
+  pregnancyRisk: z.boolean().optional(),
+  pediatricUse: z.boolean().optional(),
+  hepaticAlert: z.boolean().optional(),
+  renalAlert: z.boolean().optional(),
+  highRisk: z.boolean().optional(),
+  status: z.string().optional().nullable(),
   ativo: z.boolean().optional(),
 });
 
@@ -73,9 +83,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       );
     }
 
+    const dataToUpdate: any = { ...validation.data };
+    if (typeof dataToUpdate.status === "string") {
+      const normalizedStatus = dataToUpdate.status.trim() || "active";
+      dataToUpdate.status = normalizedStatus;
+      // Se `ativo` não veio explicitamente, deriva do status
+      if (typeof dataToUpdate.ativo !== "boolean") {
+        dataToUpdate.ativo = !["inactive", "inativo", "0", "false", "desativado"].includes(
+          normalizedStatus.toLowerCase()
+        );
+      }
+    }
+
     const medicamento = await prisma.medicamento.update({
       where: { id },
-      data: validation.data,
+      data: dataToUpdate,
     });
     return NextResponse.json({ medicamento });
   } catch (error) {

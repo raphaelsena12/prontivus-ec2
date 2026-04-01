@@ -146,8 +146,8 @@ export async function POST(
           medicoNome: agendamentoAprovado.medico.usuario.nome,
           dataHora: agendamentoAprovado.dataHora,
           tipoConsulta: agendamentoAprovado.tipoConsulta?.nome,
-          codigoTuss: agendamentoAprovado.codigoTuss.codigoTuss,
-          descricaoTuss: agendamentoAprovado.codigoTuss.descricao,
+          codigoTuss: agendamentoAprovado.codigoTuss?.codigoTuss,
+          descricaoTuss: agendamentoAprovado.codigoTuss?.descricao,
           observacoes: agendamentoAprovado.observacoes || undefined,
           clinicaNome: agendamentoAprovado.clinica.nome,
         });
@@ -157,8 +157,8 @@ export async function POST(
           medicoNome: agendamentoAprovado.medico.usuario.nome,
           dataHora: agendamentoAprovado.dataHora,
           tipoConsulta: agendamentoAprovado.tipoConsulta?.nome,
-          codigoTuss: agendamentoAprovado.codigoTuss.codigoTuss,
-          descricaoTuss: agendamentoAprovado.codigoTuss.descricao,
+          codigoTuss: agendamentoAprovado.codigoTuss?.codigoTuss,
+          descricaoTuss: agendamentoAprovado.codigoTuss?.descricao,
           observacoes: agendamentoAprovado.observacoes || undefined,
           clinicaNome: agendamentoAprovado.clinica.nome,
         });

@@ -17,11 +17,11 @@ async function checkAuthorization() {
     };
   }
 
-  if (session.user.tipo !== TipoUsuario.ADMIN_CLINICA) {
+  if (session.user.tipo !== TipoUsuario.ADMIN_CLINICA && session.user.tipo !== TipoUsuario.MEDICO) {
     return {
       authorized: false,
       response: NextResponse.json(
-        { error: "Acesso negado. Apenas Admin Clínica." },
+        { error: "Acesso negado." },
         { status: 403 }
       ),
     };
