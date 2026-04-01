@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -114,7 +115,7 @@ export function InsumoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar insumo");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar insumo");
       }
 
       toast.success(

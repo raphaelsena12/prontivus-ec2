@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -226,7 +227,7 @@ export function UsuarioDialog({
 
         if (!response.ok) {
           const error = await response.json();
-          let errorMessage = error.error || "Erro ao atualizar usuário";
+          let errorMessage = getApiErrorMessage(error) || "Erro ao atualizar usuário";
           
           // Se houver detalhes de validação, formatar e exibir
           if (error.details && Array.isArray(error.details)) {
@@ -264,7 +265,7 @@ export function UsuarioDialog({
 
         if (!response.ok) {
           const error = await response.json();
-          let errorMessage = error.error || "Erro ao criar usuário";
+          let errorMessage = getApiErrorMessage(error) || "Erro ao criar usuário";
           
           // Se houver detalhes de validação, formatar e exibir
           if (error.details && Array.isArray(error.details)) {

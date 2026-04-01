@@ -379,6 +379,7 @@ export default function DoctorTelemedicineSessionPage() {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [connectionQuality, setConnectionQuality] = useState<"excellent" | "good" | "unstable">("excellent");
+  const [patientPresent, setPatientPresent] = useState(false);
 
   // Documento
   const [docDialogOpen, setDocDialogOpen] = useState(false);
@@ -478,6 +479,13 @@ export default function DoctorTelemedicineSessionPage() {
 
       // Observer para tiles local, remoto e content share
       audioVideo.addObserver({
+        audioVideoDidStart: () => {
+          // startLocalVideoTile deve ser chamado após a sessão estar estabelecida
+          audioVideo.startLocalVideoTile();
+          // Força o play() do áudio remoto dentro do callback da sessão,
+          // evitando bloqueio de autoplay do browser (política de user gesture)
+          remoteAudioRef.current?.play().catch(() => {});
+        },
         videoTileDidUpdate: (tileState: any) => {
           if (!tileState.tileId) return;
           if (tileState.localTile && !tileState.isContent && localVideoRef.current) {
@@ -485,7 +493,15 @@ export default function DoctorTelemedicineSessionPage() {
           } else if (!tileState.localTile && remoteVideoRef.current) {
             // Camera do paciente e screen share remoto vão para remoteVideoRef
             audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
+            // Tile remoto apareceu → paciente entrou
+            if (!tileState.isContent) setPatientPresent(true);
           }
+        },
+        videoTileWasRemoved: (_tileId: number) => {
+          // Verifica se ainda há tiles remotos — se não houver, paciente saiu
+          const tiles = chimeSessionRef.current?.audioVideo?.getAllVideoTiles?.() ?? [];
+          const hasRemote = tiles.some((t: any) => !t.state().localTile && !t.state().isContent);
+          if (!hasRemote) setPatientPresent(false);
         },
         connectionDidBecomeGood: () => setConnectionQuality("excellent"),
         connectionDidBecomePoor: () => setConnectionQuality("unstable"),
@@ -526,7 +542,7 @@ export default function DoctorTelemedicineSessionPage() {
       }
 
       audioVideo.start();
-      audioVideo.startLocalVideoTile();
+      // startLocalVideoTile é iniciado dentro do audioVideoDidStart observer acima
 
       audioVideo.realtimeSubscribeToReceiveDataMessage("chat", (dataMessage: any) => {
         try {
@@ -818,6 +834,7 @@ export default function DoctorTelemedicineSessionPage() {
             remoteVideoRef={remoteVideoRef}
             patientLink={sessionData.patientLink}
             onOpenDocumentType={handleOpenDocumentType}
+            patientPresent={patientPresent}
           />
         </div>
       </div>

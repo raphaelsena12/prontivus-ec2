@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -49,7 +50,7 @@ export function NovaContaPagarForm({ clinicaId, formasPagamento }: NovaContaPaga
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar conta a pagar");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar conta a pagar");
       }
       toast.success("Conta a pagar criada com sucesso!");
       router.push("/admin-clinica/contas-pagar");

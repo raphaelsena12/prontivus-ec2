@@ -170,6 +170,7 @@ export function ProcedimentosContent({
               data={rows}
               entityLabel="procedimento(s)"
               variant="procedimentos"
+              prioritizeClinicaSort
               serverPageCount={totalPages}
               serverPageIndex={page - 1}
               serverPageSize={PAGE_SIZE}

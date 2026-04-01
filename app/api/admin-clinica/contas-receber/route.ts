@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const contaReceberSchema = z.object({
   descricao: z.string().min(1, "Descrição é obrigatória"),
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validation = contaReceberSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
+      return NextResponse.json(zodValidationErrorPayload(validation.error.issues), { status: 400 });
     }
     const conta = await prisma.contaReceber.create({
       data: { ...validation.data, clinicaId: auth.clinicaId!, status: "PENDENTE" },

@@ -103,6 +103,7 @@ interface TelemedicineViewProps {
   remoteVideoRef?: React.RefObject<HTMLVideoElement | null>;
   patientLink?: string;
   onOpenDocumentType?: (type: string) => void;
+  patientPresent?: boolean;
 }
 
 // ─── Document types config ─────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ export function TelemedicineView({
   remoteVideoRef,
   patientLink,
   onOpenDocumentType,
+  patientPresent = false,
 }: TelemedicineViewProps) {
   const [activeTab, setActiveTab]       = useState<SidebarTab>("chat");
   const [linkCopied, setLinkCopied]     = useState(false);
@@ -316,10 +318,19 @@ export function TelemedicineView({
                 className="absolute inset-0 w-full h-full object-cover z-10" />
             )}
 
-            <div className="absolute top-3 left-3 z-20">
+            <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5">
               <div className={`flex items-center gap-1.5 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 ${quality.color}`}>
                 <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${quality.dot}`} />
                 <span className="text-xs font-semibold">{quality.label}</span>
+              </div>
+              {/* Indicador de presença do paciente */}
+              <div className={`flex items-center gap-1.5 bg-black/50 backdrop-blur-sm px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${
+                patientPresent
+                  ? "border-emerald-500/40 text-emerald-400"
+                  : "border-white/10 text-slate-400"
+              }`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${patientPresent ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                {patientPresent ? "Paciente presente" : "Aguardando paciente"}
               </div>
             </div>
 

@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import {
@@ -130,7 +131,7 @@ export function AnvisaSyncDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao sincronizar");
+        throw new Error(getApiErrorMessage(error) || "Erro ao sincronizar");
       }
 
       // A resposta inicial não tem dados completos, o polling vai atualizar

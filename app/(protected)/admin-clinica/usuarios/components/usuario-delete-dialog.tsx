@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -47,7 +48,7 @@ export function UsuarioDeleteDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao desativar usuário");
+        throw new Error(getApiErrorMessage(error) || "Erro ao desativar usuário");
       }
 
       toast.success("Usuário desativado com sucesso!");

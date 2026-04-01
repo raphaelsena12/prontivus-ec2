@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createChimeAttendee } from "@/lib/chime-service";
+import { sendEmailAsync, gerarEmailTelemedicinaNovoPackiente, gerarEmailTelemedicinaNovoPackienteTexto } from "@/lib/email";
 
 // GET /api/paciente/telemedicina/sessao/[token]/chime-token
 // Rota PÚBLICA — retorna as credenciais Chime para o paciente entrar na sala
@@ -15,7 +16,19 @@ export async function GET(
     const sessao = await prisma.telemedicineSession.findUnique({
       where: { patientToken: token },
       include: {
-        consulta: { select: { pacienteId: true } },
+        consulta: {
+          select: {
+            pacienteId: true,
+            paciente: { select: { nome: true } },
+            medico: {
+              select: {
+                id: true,
+                usuario: { select: { nome: true, email: true } },
+                telemedicina: { select: { valorConsulta: true } },
+              },
+            },
+          },
+        },
         consents: { where: { consentGiven: true }, take: 1 },
       },
     });
@@ -97,11 +110,29 @@ export async function GET(
     });
 
     // Atualiza status para waiting (paciente entrou, aguardando médico)
-    if (sessao.status === "scheduled") {
+    const eraScheduled = sessao.status === "scheduled";
+    if (eraScheduled) {
       await prisma.telemedicineSession.update({
         where: { id: sessao.id },
         data: { status: "waiting" },
       });
+
+      // Notifica médico por email quando paciente entra na sala de espera (sessão agendada)
+      const medicoEmail = sessao.consulta.medico?.usuario?.email;
+      if (medicoEmail) {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+        const sessionUrl = `${baseUrl}/medico/telemedicina/sessao/${sessao.id}`;
+        const medicoNome = sessao.consulta.medico?.usuario?.nome || "Médico";
+        const pacienteNome = sessao.consulta.paciente?.nome || "Paciente";
+        const valor = (sessao.consulta.medico?.telemedicina?.valorConsulta as unknown as number) || 0;
+        sendEmailAsync({
+          to: medicoEmail,
+          subject: `Paciente aguardando na sala — ${pacienteNome}`,
+          html: gerarEmailTelemedicinaNovoPackiente({ medicoNome, pacienteNome, sessionUrl, valor }),
+          text: gerarEmailTelemedicinaNovoPackienteTexto({ medicoNome, pacienteNome, sessionUrl, valor }),
+          fromName: "Prontivus",
+        }).catch((err) => console.error("[Email] Falha ao notificar médico (chime-token):", err));
+      }
     }
 
     // Registra log

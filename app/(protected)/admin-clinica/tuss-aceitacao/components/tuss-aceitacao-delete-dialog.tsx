@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -55,7 +56,7 @@ export function TussAceitacaoDeleteDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao excluir aceitação TUSS");
+        throw new Error(getApiErrorMessage(error) || "Erro ao excluir aceitação TUSS");
       }
 
       toast.success("Aceitação TUSS excluída com sucesso!");

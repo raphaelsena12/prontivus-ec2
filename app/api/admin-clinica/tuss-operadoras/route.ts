@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const tussOperadoraSchema = z.object({
   codigoTussId: z.string().uuid("ID do código TUSS inválido"),
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

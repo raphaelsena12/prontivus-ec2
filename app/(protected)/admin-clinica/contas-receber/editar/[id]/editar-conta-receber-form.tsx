@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -62,7 +63,7 @@ export function EditarContaReceberForm({ conta, clinicaId, formasPagamento, paci
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao atualizar conta a receber");
+        throw new Error(getApiErrorMessage(error) || "Erro ao atualizar conta a receber");
       }
       toast.success("Conta a receber atualizada com sucesso!");
       router.push("/admin-clinica/contas-receber");

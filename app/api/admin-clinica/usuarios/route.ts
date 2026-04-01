@@ -3,6 +3,7 @@ import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
 
 // Schema de validação para criação de usuário
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

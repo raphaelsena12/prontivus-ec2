@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const updateInsumoSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
@@ -77,7 +78,7 @@ export async function PATCH(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

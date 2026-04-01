@@ -162,41 +162,52 @@ export function TelemedicinaDisponibilidadeContent() {
     }
   }, []);
 
-  const fetchSessoesAguardando = useCallback(async () => {
-    try {
-      const res = await fetch("/api/medico/telemedicina/sessoes-aguardando");
-      if (!res.ok) return;
-      const data = await res.json();
-      const novas: SessaoAguardando[] = data.sessoes || [];
-      // Notificar se chegaram novas sessões
-      if (novas.length > prevCountRef.current && prevCountRef.current >= 0) {
-        const diff = novas.length - prevCountRef.current;
-        if (diff > 0) {
-          toast(
-            `${diff} paciente${diff > 1 ? "s" : ""} aguardando atendimento`,
-            {
-              icon: "🔔",
-              duration: 6000,
-            }
-          );
-        }
-      }
-      prevCountRef.current = novas.length;
-      setSessoesAguardando(novas);
-    } catch {
-      // silencioso
-    }
-  }, []);
-
   useEffect(() => {
     fetchConfig();
   }, [fetchConfig]);
 
+  // P0-3: SSE em vez de polling — médico recebe notificações em ~3s (era 10s)
   useEffect(() => {
-    fetchSessoesAguardando();
-    const interval = setInterval(fetchSessoesAguardando, 10_000);
-    return () => clearInterval(interval);
-  }, [fetchSessoesAguardando]);
+    let es: EventSource | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      es = new EventSource("/api/medico/telemedicina/sessoes-stream");
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const novas: SessaoAguardando[] = data.sessoes || [];
+          if (novas.length > prevCountRef.current && prevCountRef.current >= 0) {
+            const diff = novas.length - prevCountRef.current;
+            if (diff > 0) {
+              toast(
+                `${diff} paciente${diff > 1 ? "s" : ""} aguardando atendimento`,
+                { icon: "🔔", duration: 6000 }
+              );
+            }
+          }
+          prevCountRef.current = novas.length;
+          setSessoesAguardando(novas);
+        } catch {
+          // silencioso
+        }
+      };
+
+      es.onerror = () => {
+        es?.close();
+        // Reconecta após 5s se a conexão cair
+        reconnectTimeout = setTimeout(connect, 5000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      es?.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, []);
 
   const handleSave = async () => {
     if (!config.inicioImediato && (!config.horaInicio || !config.horaFim)) {

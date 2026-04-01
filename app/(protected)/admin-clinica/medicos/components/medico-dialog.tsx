@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect, useMemo } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -337,7 +338,7 @@ export function MedicoDialog({
 
         if (!response.ok) {
           const error = await response.json();
-          throw new Error(error.error || "Erro ao fazer upload do documento");
+          throw new Error(getApiErrorMessage(error) || "Erro ao fazer upload do documento");
         }
       }
     } finally {
@@ -356,7 +357,7 @@ export function MedicoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao buscar documento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao buscar documento");
       }
 
       const data = await response.json();
@@ -391,7 +392,7 @@ export function MedicoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao excluir documento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao excluir documento");
       }
 
       toast.success("Documento excluído com sucesso!");
@@ -443,7 +444,7 @@ export function MedicoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar médico");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar médico");
       }
 
       const result = await response.json();
@@ -581,7 +582,9 @@ export function MedicoDialog({
                               name={`especialidades.${idx}.especialidadeId`}
                               render={({ field: espField }) => (
                                 <FormItem>
-                                  <FormLabel>Especialidade</FormLabel>
+                                  <FormLabel>
+                                    Especialidade <span className="text-destructive">*</span>
+                                  </FormLabel>
                                   <Select
                                     onValueChange={(val) => {
                                       // quando troca especialidade, limpa categoria

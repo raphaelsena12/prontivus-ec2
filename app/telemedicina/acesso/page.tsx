@@ -27,7 +27,7 @@ import {
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
-type Step = "loading" | "info" | "identity" | "consent" | "connecting" | "session" | "finished" | "error";
+type Step = "loading" | "info" | "identity" | "consent" | "connecting" | "waiting_for_doctor" | "session" | "finished" | "error";
 
 interface SessionInfo {
   sessionId: string;
@@ -37,6 +37,7 @@ interface SessionInfo {
   specialty: string | null;
   scheduledAt: string;
   clinicName: string | null;
+  medicoStatus: string | null;
 }
 
 interface ChimeCredentials {
@@ -85,6 +86,7 @@ function TelemedicineAccessContent() {
   const [chatMessages, setChatMessages] = useState<{ id: number; text: string; time: string; mine: boolean }[]>([]);
   const [chatMsg, setChatMsg] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [sessionDuration, setSessionDuration] = useState("00:00");
   const sessionStartRef = useRef<Date | null>(null);
@@ -193,13 +195,14 @@ function TelemedicineAccessContent() {
       if (res.ok && data.verified) {
         setStep("consent");
       } else {
-        const attempts = cpfAttempts + 1;
-        setCpfAttempts(attempts);
-        if (attempts >= 3) {
-          setErrorMsg("Número máximo de tentativas atingido. Contate a clínica.");
+        // Se backend retornou 429, é rate limiting — mostra erro crítico
+        if (res.status === 429) {
+          setErrorMsg(data.error || "Muitas tentativas. Contate a clínica.");
           setStep("error");
         } else {
-          setCpfError(`CPF incorreto. Você tem ${3 - attempts} tentativa(s) restante(s).`);
+          const attempts = cpfAttempts + 1;
+          setCpfAttempts(attempts);
+          setCpfError(data.error || "CPF incorreto. Verifique e tente novamente.");
         }
       }
     } catch {
@@ -214,6 +217,9 @@ function TelemedicineAccessContent() {
   const handleConsent = async () => {
     if (!consentChecked) return;
     setLoading(true);
+    // Ativa o elemento de áudio DENTRO do user gesture (antes do primeiro await),
+    // garantindo que browsers não bloqueiem o autoplay quando o áudio remoto chegar
+    remoteAudioRef.current?.play().catch(() => {});
 
     try {
       const res = await fetch(`/api/paciente/telemedicina/sessao/${token}/consentimento`, {
@@ -246,15 +252,20 @@ function TelemedicineAccessContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        // Sala ainda não disponível (médico não entrou)
+        // P1-1: Sala ainda não disponível (médico não entrou) → sala de espera com auto-retry
         if (res.status === 503) {
-          setStep("session");
-          setSessionInfo((prev) => prev ? { ...prev, status: "waiting" } : prev);
+          setStep("waiting_for_doctor");
           return;
         }
         setErrorMsg(data.error || "Erro ao entrar na sala.");
         setStep("error");
         return;
+      }
+
+      // Para reconectar: encerra sessão anterior se existir
+      if (chimeSessionRef.current) {
+        chimeSessionRef.current.audioVideo?.stop();
+        chimeSessionRef.current = null;
       }
 
       const chimeSession = await initChime(data);
@@ -264,6 +275,13 @@ function TelemedicineAccessContent() {
 
       // Observer para vídeo local, remoto e screen share do médico
       audioVideo.addObserver({
+        audioVideoDidStart: () => {
+          // startLocalVideoTile deve ser chamado após a sessão estar estabelecida
+          audioVideo.startLocalVideoTile();
+          // Força o play() do áudio remoto dentro do callback da sessão,
+          // evitando bloqueio de autoplay do browser (política de user gesture)
+          remoteAudioRef.current?.play().catch(() => {});
+        },
         videoTileDidUpdate: (tileState: any) => {
           if (!tileState.tileId) return;
           if (tileState.localTile && !tileState.isContent && localVideoRef.current) {
@@ -302,7 +320,7 @@ function TelemedicineAccessContent() {
       } catch {}
 
       audioVideo.start();
-      audioVideo.startLocalVideoTile();
+      // startLocalVideoTile é iniciado dentro do audioVideoDidStart observer acima
 
       // Subscrição ao chat via canal de dados Chime
       audioVideo.realtimeSubscribeToReceiveDataMessage("chat", (dataMessage: any) => {
@@ -318,15 +336,82 @@ function TelemedicineAccessContent() {
         } catch {}
       });
 
+      setSessionInfo((prev) => prev ? { ...prev, status: "in_progress" } : prev);
       setStep("session");
       startTimer();
     } catch (err) {
       console.error("Erro ao conectar Chime:", err);
-      // Coloca em modo "aguardando" mesmo sem Chime (sala não pronta)
-      setStep("session");
-      setSessionInfo((prev) => prev ? { ...prev, status: "waiting" } : prev);
+      // Sala não pronta → sala de espera com auto-retry
+      setStep("waiting_for_doctor");
     }
   };
+
+  /** Na sessão com status "waiting", tenta obter token Chime e conectar de novo (médico já na sala). */
+  const handleReconnect = async () => {
+    if (reconnecting) return;
+    setReconnecting(true);
+    remoteAudioRef.current?.play().catch(() => {});
+    try {
+      await connectToRoom();
+    } finally {
+      setReconnecting(false);
+    }
+  };
+
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    if (!confirm("Deseja cancelar a consulta? O valor pago será reembolsado em até 5 dias úteis.")) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/paciente/telemedicina/sessao/${token}/cancelar`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setErrorMsg(data.mensagem || "Consulta cancelada com sucesso.");
+        setStep("error");
+      } else {
+        alert(data.error || "Não foi possível cancelar. Tente novamente.");
+      }
+    } catch {
+      alert("Erro ao cancelar. Tente novamente.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  // P1-1: Auto-retry enquanto aguarda o médico entrar na sala (a cada 5s)
+  const waitingRetryRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (step === "waiting_for_doctor") {
+      waitingRetryRef.current = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/paciente/telemedicina/sessao/${token}/chime-token`);
+          if (res.ok) {
+            // Médico entrou — tenta conectar agora
+            clearInterval(waitingRetryRef.current!);
+            waitingRetryRef.current = null;
+            setStep("connecting");
+            await connectToRoom();
+          }
+          // Se ainda 503, continua aguardando
+        } catch {
+          // silencioso — continua aguardando
+        }
+      }, 5000);
+    } else {
+      if (waitingRetryRef.current) {
+        clearInterval(waitingRetryRef.current);
+        waitingRetryRef.current = null;
+      }
+    }
+    return () => {
+      if (waitingRetryRef.current) {
+        clearInterval(waitingRetryRef.current);
+        waitingRetryRef.current = null;
+      }
+    };
+  }, [step, token]);
 
   // ─── Controles ───────────────────────────────────────────────────────────
 
@@ -440,6 +525,58 @@ function TelemedicineAccessContent() {
           <p className="text-sm text-slate-400">
             Em caso de dúvidas, entre em contato com a clínica.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // P1-1: Tela de sala de espera (médico ainda não entrou) ──────────────────
+
+  if (step === "waiting_for_doctor") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        {hiddenAudio}
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="relative mx-auto w-20 h-20 mb-6">
+            <div className="absolute inset-0 rounded-full bg-blue-100 animate-ping opacity-60" />
+            <div className="relative flex items-center justify-center w-20 h-20 rounded-full bg-blue-50">
+              <Stethoscope className="w-9 h-9 text-blue-600" />
+            </div>
+          </div>
+          {sessionInfo?.medicoStatus === "EM_ATENDIMENTO" ? (
+            <>
+              <h1 className="text-xl font-bold text-slate-800 mb-2">Você está na fila</h1>
+              <p className="text-slate-600 mb-1 text-sm">
+                Dr(a). <span className="font-semibold">{sessionInfo.doctorName}</span> está em atendimento com outro paciente.
+              </p>
+              <p className="text-slate-400 text-xs mb-6">
+                Sua vez será chamada automaticamente assim que o médico ficar disponível.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold text-slate-800 mb-2">Aguardando o médico</h1>
+              {sessionInfo && (
+                <p className="text-slate-600 mb-1 text-sm">
+                  Dr(a). <span className="font-semibold">{sessionInfo.doctorName}</span> foi notificado e entrará em breve.
+                </p>
+              )}
+              <p className="text-slate-400 text-xs mb-6">
+                A consulta iniciará automaticamente assim que o médico entrar na sala.
+              </p>
+            </>
+          )}
+          <div className="flex items-center justify-center gap-2 text-blue-500 text-sm mb-6">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Verificando disponibilidade...</span>
+          </div>
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="text-xs text-slate-400 underline underline-offset-2 hover:text-red-500 transition-colors disabled:opacity-50"
+          >
+            {cancelling ? "Cancelando..." : "Cancelar consulta e solicitar reembolso"}
+          </button>
         </div>
       </div>
     );
@@ -730,7 +867,15 @@ function TelemedicineAccessContent() {
                   <Stethoscope className="w-10 h-10 sm:w-12 sm:h-12 text-slate-400" />
                 </div>
                 <p className="text-slate-300 font-semibold text-sm sm:text-base text-center">Aguardando o médico entrar...</p>
-                <p className="text-slate-500 text-xs sm:text-sm mt-1 text-center">Você será conectado automaticamente</p>
+                <p className="text-slate-500 text-xs sm:text-sm mt-1 mb-4 text-center">Quando o médico entrar, clique em Entrar na Sala</p>
+                <Button
+                  onClick={handleReconnect}
+                  disabled={reconnecting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2"
+                >
+                  {reconnecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {reconnecting ? "Conectando..." : "Entrar na Sala"}
+                </Button>
               </div>
             ) : (
               <video

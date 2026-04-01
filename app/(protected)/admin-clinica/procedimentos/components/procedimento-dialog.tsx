@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -81,7 +82,7 @@ interface Insumo {
 }
 
 const procedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código TUSS é obrigatório"),
+  codigo: z.string().min(1, "Código é obrigatório"),
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   valor: z.string().refine((val) => {
@@ -312,7 +313,7 @@ export function ProcedimentoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar procedimento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar procedimento");
       }
 
       toast.success(
@@ -364,11 +365,11 @@ export function ProcedimentoDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Código TUSS <span className="text-destructive">*</span>
+                      Código <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Digite o código TUSS"
+                        placeholder="Digite o código"
                         {...field}
                         disabled={loading || isEditing}
                       />
@@ -423,7 +424,9 @@ export function ProcedimentoDialog({
               name="valor"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Valor</FormLabel>
+                  <FormLabel>
+                    Valor <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="text"

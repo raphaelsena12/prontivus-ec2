@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -63,7 +64,7 @@ export function NovaMovimentacaoForm({ clinicaId, formasPagamento }: NovaMovimen
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar movimentação");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar movimentação");
       }
       toast.success("Movimentação criada com sucesso!");
       router.push("/admin-clinica/fluxo-caixa");

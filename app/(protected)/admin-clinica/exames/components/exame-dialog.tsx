@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -58,14 +59,27 @@ interface ExameDialogProps {
 }
 
 const exameSchema = z.object({
-  nome: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
-  tipo: z.string().min(1, "Tipo é obrigatório"),
+  nome: z.string().min(1, "Nome é obrigatório"),
+  tipo: z.enum(["LABORATORIAL", "IMAGEM", "OUTROS"], {
+    message: "Tipo é obrigatório",
+  }),
   descricao: z.string().min(1, "Descrição é obrigatória"),
   codigoTussId: z.string().uuid("Código TUSS inválido").optional().nullable(),
   ativo: z.boolean().optional(),
 });
 
 type ExameFormValues = z.infer<typeof exameSchema>;
+
+const TIPOS_EXAME = ["LABORATORIAL", "IMAGEM", "OUTROS"] as const;
+
+function tipoExameFromApi(
+  t: string | null | undefined
+): (typeof TIPOS_EXAME)[number] | undefined {
+  if (!t) return undefined;
+  return TIPOS_EXAME.includes(t as (typeof TIPOS_EXAME)[number])
+    ? (t as (typeof TIPOS_EXAME)[number])
+    : undefined;
+}
 
 export function ExameDialog({
   open,
@@ -153,7 +167,7 @@ export function ExameDialog({
     if (exame) {
       form.reset({
         nome: exame.nome,
-        tipo: exame.tipo || undefined,
+        tipo: tipoExameFromApi(exame.tipo),
         descricao: exame.descricao || "",
         codigoTussId: exame.codigoTussId || undefined,
         ativo: exame.ativo,
@@ -209,7 +223,7 @@ export function ExameDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar exame");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar exame");
       }
 
       toast.success(

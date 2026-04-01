@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth, checkClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const movimentacaoSchema = z.object({
   tipoEstoque: z.enum(["MEDICAMENTO", "INSUMO"]),
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validation = movimentacaoSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
+      return NextResponse.json(zodValidationErrorPayload(validation.error.issues), { status: 400 });
     }
     const data = validation.data;
 

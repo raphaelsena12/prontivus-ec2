@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const updateProcedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código TUSS é obrigatório").optional(),
+  codigo: z.string().min(1, "Código é obrigatório").optional(),
   nome: z.string().min(1, "Nome é obrigatório").optional(),
-  descricao: z.string().optional(),
+  descricao: z.string().nullish(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero").optional(),
   ativo: z.boolean().optional(),
   medicamentos: z.array(z.object({
@@ -100,7 +101,7 @@ export async function PATCH(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

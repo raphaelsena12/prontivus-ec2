@@ -25,6 +25,7 @@ export async function GET(
               select: {
                 usuario: { select: { nome: true } },
                 especialidade: true,
+                telemedicina: { select: { status: true } },
               },
             },
           },
@@ -73,6 +74,7 @@ export async function GET(
       specialty: especialidade || null,
       scheduledAt: sessao.consulta.dataHora,
       clinicName: sessao.consulta.clinica?.nome || null,
+      medicoStatus: sessao.consulta.medico?.telemedicina?.status || null,
     });
   } catch (error) {
     console.error("Erro ao validar token de telemedicina:", error);

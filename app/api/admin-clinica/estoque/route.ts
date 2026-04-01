@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth, checkClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const estoqueSchema = z.object({
   medicamentoId: z.string().uuid("ID do medicamento inválido"),
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(estoque, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Dados inválidos", details: error.issues }, { status: 400 });
+      return NextResponse.json(zodValidationErrorPayload(error.issues), { status: 400 });
     }
     console.error("Erro ao criar estoque:", error);
     return NextResponse.json({ error: "Erro ao criar estoque" }, { status: 500 });

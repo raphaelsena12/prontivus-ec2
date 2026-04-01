@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -46,7 +47,7 @@ export function NovoMedicamentoForm({ clinicaId }: NovoMedicamentoFormProps) {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar medicamento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar medicamento");
       }
       toast.success("Medicamento criado com sucesso!");
       router.push("/admin-clinica/medicamentos");

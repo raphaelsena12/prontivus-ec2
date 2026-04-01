@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -99,7 +100,7 @@ export default function ConvidarMedicoPage() {
           convidarForm.setValue("email", result.usuario.email);
         }
       } else {
-        setErrorMessage(result.error || "Erro ao buscar médico");
+        setErrorMessage(getApiErrorMessage(result) || "Erro ao buscar médico");
       }
     } catch (error) {
       setErrorMessage("Erro ao buscar médico");
@@ -128,7 +129,7 @@ export default function ConvidarMedicoPage() {
         buscarForm.reset();
         convidarForm.reset();
       } else {
-        setErrorMessage(result.error || "Erro ao convidar médico");
+        setErrorMessage(getApiErrorMessage(result) || "Erro ao convidar médico");
       }
     } catch (error) {
       setErrorMessage("Erro ao convidar médico");
@@ -191,7 +192,9 @@ export default function ConvidarMedicoPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email do Médico</FormLabel>
+                    <FormLabel>
+                      E-mail do médico <span className="text-destructive">*</span>
+                    </FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
                         <Input
@@ -264,7 +267,9 @@ export default function ConvidarMedicoPage() {
                           name="crm"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>CRM</FormLabel>
+                              <FormLabel>
+                                CRM <span className="text-destructive">*</span>
+                              </FormLabel>
                               <FormControl>
                                 <Input
                                   placeholder="12345/SP"
@@ -284,7 +289,9 @@ export default function ConvidarMedicoPage() {
                           name="especialidade"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Especialidade</FormLabel>
+                              <FormLabel>
+                                Especialidade <span className="text-destructive">*</span>
+                              </FormLabel>
                               <FormControl>
                                 <Input
                                   placeholder="Cardiologia"

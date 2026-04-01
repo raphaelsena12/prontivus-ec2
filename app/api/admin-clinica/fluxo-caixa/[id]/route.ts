@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const updateFluxoCaixaSchema = z.object({
   tipo: z.enum(["ENTRADA", "SAIDA"]).optional(),
@@ -39,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json();
     const validation = updateFluxoCaixaSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: validation.error.issues }, { status: 400 });
+      return NextResponse.json(zodValidationErrorPayload(validation.error.issues), { status: 400 });
     }
     const movimentacao = await prisma.fluxoCaixa.update({ where: { id }, data: validation.data });
     return NextResponse.json({ movimentacao });

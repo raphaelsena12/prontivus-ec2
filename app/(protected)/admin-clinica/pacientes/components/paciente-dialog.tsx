@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -240,7 +241,7 @@ export function PacienteDialog({
         
         // Tratamento específico para erro 409 (CPF já cadastrado)
         if (response.status === 409) {
-          const errorMessage = error.error || "CPF já cadastrado";
+          const errorMessage = getApiErrorMessage(error) || "CPF já cadastrado";
           console.log("Status 409 detectado. Erro:", errorMessage);
           
           // Desativa loading
@@ -258,12 +259,7 @@ export function PacienteDialog({
           return;
         }
         
-        // Se houver detalhes de validação, mostrar mensagens específicas
-        if (error.details && Array.isArray(error.details)) {
-          const mensagens = error.details.map((d: any) => `${d.path.join('.')}: ${d.message}`).join(', ');
-          throw new Error(`Erro de validação: ${mensagens}`);
-        }
-        throw new Error(error.error || "Erro ao salvar paciente");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar paciente");
       }
 
       toast.success(

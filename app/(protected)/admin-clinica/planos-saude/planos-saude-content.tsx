@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export function PlanosSaudeContent({ clinicaId }: PlanosSaudeContentProps) {
       const response = await fetch(`/api/admin-clinica/planos-saude/${deleteTarget.id}`, { method: "DELETE" });
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Erro ao excluir plano de saúde");
+        throw new Error(getApiErrorMessage(data) || "Erro ao excluir plano de saúde");
       }
       toast.success("Plano de saúde excluído com sucesso");
       setDeleteTarget(null);

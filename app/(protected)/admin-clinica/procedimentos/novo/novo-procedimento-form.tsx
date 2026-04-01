@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,7 +16,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const procedimentoSchema = z.object({
-  codigo: z.string().min(1, "Código TUSS é obrigatório"),
+  codigo: z.string().min(1, "Código é obrigatório"),
   nome: z.string().min(1, "Nome é obrigatório"),
   descricao: z.string().optional(),
   valor: z.number().min(0, "Valor deve ser maior ou igual a zero"),
@@ -45,7 +46,7 @@ export function NovoProcedimentoForm({ clinicaId }: NovoProcedimentoFormProps) {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar procedimento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar procedimento");
       }
       toast.success("Procedimento criado com sucesso!");
       router.push("/admin-clinica/procedimentos");
@@ -81,21 +82,27 @@ export function NovoProcedimentoForm({ clinicaId }: NovoProcedimentoFormProps) {
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField control={form.control} name="codigo" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código TUSS *</FormLabel>
-                      <FormControl><Input {...field} placeholder="Digite o código TUSS" /></FormControl>
+                      <FormLabel>
+                        Código <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl><Input {...field} placeholder="Digite o código" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="nome" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nome *</FormLabel>
+                      <FormLabel>
+                        Nome <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl><Input {...field} placeholder="Nome do procedimento" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="valor" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor *</FormLabel>
+                      <FormLabel>
+                        Valor <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl><Input {...field} type="number" step="0.01" placeholder="0.00" onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} value={field.value || 0} /></FormControl>
                       <FormMessage />
                     </FormItem>

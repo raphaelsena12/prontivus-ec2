@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 import { useState, useEffect, useCallback } from "react";
 import { Building2, Filter, Loader2, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -99,7 +100,9 @@ export function OperadorasContent({ clinicaId }: OperadorasContentProps) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "Erro ao atualizar aceitação da operadora");
+        throw new Error(
+          getApiErrorMessage(data) || "Erro ao atualizar aceitação da operadora"
+        );
       }
       toast.success(aceita ? "Operadora marcada como aceita" : "Operadora desmarcada");
     } catch (err: any) {

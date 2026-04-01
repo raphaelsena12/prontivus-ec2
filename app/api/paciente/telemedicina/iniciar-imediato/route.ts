@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { stripe } from "@/lib/stripe";
 import { createChimeMeeting } from "@/lib/chime-service";
+import { sendEmailAsync, gerarEmailTelemedicinaNovoPackiente, gerarEmailTelemedicinaNovoPackienteTexto } from "@/lib/email";
 import { z } from "zod";
 
 const schema = z.object({
@@ -73,16 +74,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Pagamento já utilizado" }, { status: 400 });
     }
 
-    // 3. Buscar dados do médico (sem filtrar por clinicaId do paciente — suporte cross-clinic)
+    // 3. Buscar dados do médico
     const medico = await prisma.medico.findFirst({
       where: { id: medicoId, ativo: true },
       include: {
-        usuario: { select: { nome: true } },
+        usuario: { select: { nome: true, email: true } },
         telemedicina: true,
       },
     });
     if (!medico) {
       return NextResponse.json({ error: "Médico não encontrado" }, { status: 404 });
+    }
+
+    // P0-1: Verificar se médico ainda está ONLINE no momento do processamento
+    if (!medico.telemedicina || medico.telemedicina.status !== "ONLINE") {
+      return NextResponse.json(
+        { error: "O médico não está mais disponível para atendimento imediato. Por favor, escolha outro médico ou tente novamente." },
+        { status: 409 }
+      );
     }
 
     // Usar a clínica do médico para a Consulta
@@ -109,36 +118,57 @@ export async function POST(request: NextRequest) {
 
     const agora = new Date();
 
-    // 5. Criar Consulta na clínica do médico
-    const consulta = await prisma.consulta.create({
-      data: {
-        clinicaId,
-        pacienteId: paciente.id,
-        medicoId,
-        dataHora: agora,
-        codigoTussId: codigoTuss.id,
-        tipoConsultaId: tipoConsulta?.id || null,
-        modalidade: "TELEMEDICINA",
-        status: "AGENDADA",
-        inicioAtendimento: agora,
-      },
-    });
+    // P0-2: Criar Consulta + vincular pagamento em transação atômica para evitar duplicação
+    let consulta: Awaited<ReturnType<typeof prisma.consulta.create>>;
+    try {
+      const resultado = await prisma.$transaction(async (tx) => {
+        // Re-verifica dentro da transação para garantir atomicidade
+        const pagamentoAtual = await tx.pagamentoConsulta.findUnique({
+          where: { id: pagamentoId },
+          select: { consultaId: true },
+        });
+        if (pagamentoAtual?.consultaId) {
+          throw new Error("PAGAMENTO_JA_UTILIZADO");
+        }
 
-    // 6. Vincular pagamento à consulta e marcar como PAGO
-    await prisma.pagamentoConsulta.update({
-      where: { id: pagamentoId },
-      data: {
-        consultaId: consulta.id,
-        status: "PAGO",
-        dataPagamento: agora,
-        transacaoId: paymentIntentId,
-        observacoes: `Telemedicina imediata - PaymentIntent: ${paymentIntentId}`,
-      },
-    });
+        const novaConsulta = await tx.consulta.create({
+          data: {
+            clinicaId,
+            pacienteId: paciente!.id,
+            medicoId,
+            dataHora: agora,
+            codigoTussId: codigoTuss!.id,
+            tipoConsultaId: tipoConsulta?.id || null,
+            modalidade: "TELEMEDICINA",
+            status: "AGENDADA",
+            inicioAtendimento: agora,
+          },
+        });
 
-    // 7. Criar TelemedicineSession
+        await tx.pagamentoConsulta.update({
+          where: { id: pagamentoId },
+          data: {
+            consultaId: novaConsulta.id,
+            status: "PAGO",
+            dataPagamento: agora,
+            transacaoId: paymentIntentId,
+            observacoes: `Telemedicina imediata - PaymentIntent: ${paymentIntentId}`,
+          },
+        });
+
+        return novaConsulta;
+      });
+      consulta = resultado;
+    } catch (txErr: any) {
+      if (txErr?.message === "PAGAMENTO_JA_UTILIZADO") {
+        return NextResponse.json({ error: "Pagamento já utilizado" }, { status: 400 });
+      }
+      throw txErr;
+    }
+
+    // 7. Criar TelemedicineSession — token válido por 4h (imediato não precisa de 24h)
     const patientToken = randomBytes(32).toString("hex");
-    const patientTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const patientTokenExpiresAt = new Date(Date.now() + 4 * 60 * 60 * 1000);
 
     const sessao = await prisma.telemedicineSession.create({
       data: {
@@ -219,6 +249,31 @@ export async function POST(request: NextRequest) {
       process.env.NEXTAUTH_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
       "http://localhost:3000";
+
+    // 13. Email ao médico (assíncrono, não bloqueia a resposta)
+    const medicoEmail = medico.usuario?.email;
+    if (medicoEmail) {
+      const sessionUrl = `${baseUrl}/medico/telemedicina/sessao/${sessao.id}`;
+      const medicoNome = medico.usuario?.nome || "Médico";
+      sendEmailAsync({
+        to: medicoEmail,
+        subject: `Novo paciente aguardando — ${paciente.nome}`,
+        html: gerarEmailTelemedicinaNovoPackiente({
+          medicoNome,
+          pacienteNome: paciente.nome,
+          sessionUrl,
+          valor: medico.telemedicina!.valorConsulta as unknown as number,
+        }),
+        text: gerarEmailTelemedicinaNovoPackienteTexto({
+          medicoNome,
+          pacienteNome: paciente.nome,
+          sessionUrl,
+          valor: medico.telemedicina!.valorConsulta as unknown as number,
+        }),
+        fromName: "Prontivus",
+      }).catch((err) => console.error("[Email] Falha ao notificar médico:", err));
+    }
+
     const patientLink = `${baseUrl}/telemedicina/acesso?token=${patientToken}`;
 
     return NextResponse.json({

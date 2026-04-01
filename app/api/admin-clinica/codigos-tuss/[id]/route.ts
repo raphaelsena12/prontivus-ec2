@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const updateCodigoTussSchema = z.object({
   descricao: z.string().min(1, "Descrição é obrigatória").max(500).optional(),
@@ -135,7 +136,7 @@ export async function PATCH(
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

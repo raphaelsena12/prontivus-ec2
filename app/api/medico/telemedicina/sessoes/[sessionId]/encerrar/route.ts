@@ -19,7 +19,7 @@ export async function POST(
     const sessao = await prisma.telemedicineSession.findUnique({
       where: { id: sessionId },
       include: {
-        consulta: { select: { id: true, clinicaId: true, inicioAtendimento: true } },
+        consulta: { select: { id: true, clinicaId: true, medicoId: true, inicioAtendimento: true } },
       },
     });
 
@@ -71,6 +71,12 @@ export async function POST(
         status: "REALIZADA",
         fimAtendimento: agora,
       },
+    });
+
+    // P0-4: Retorna status do médico para ONLINE após encerrar sessão
+    await prisma.medicoTelemedicina.updateMany({
+      where: { medicoId: sessao.consulta.medicoId },
+      data: { status: "ONLINE" },
     });
 
     // Registra log de encerramento

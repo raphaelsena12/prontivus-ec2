@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import * as React from "react";
@@ -86,7 +87,7 @@ export function NovaMovimentacaoEstoqueDialog({ open, onOpenChange, estoques, in
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar movimentação");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar movimentação");
       }
       toast.success("Movimentação criada com sucesso!");
       form.reset();

@@ -48,6 +48,8 @@ interface CatalogoUnificadoTableProps {
   data: LinhaCatalogoUnificado[];
   entityLabel: string;
   variant: "exames" | "procedimentos";
+  /** Mantém linhas com origem Clínica antes das TUSS ao ordenar colunas (ex.: Descrição). */
+  prioritizeClinicaSort?: boolean;
   serverPageCount: number;
   serverPageIndex: number;
   serverPageSize: number;
@@ -56,10 +58,20 @@ interface CatalogoUnificadoTableProps {
   onDeleteClinica?: (row: LinhaCatalogoUnificado) => void;
 }
 
+function compareOrigemClinicaPrimeiro(
+  a: LinhaCatalogoUnificado,
+  b: LinhaCatalogoUnificado
+): number {
+  const pa = a.origem === "CLINICA" ? 0 : 1;
+  const pb = b.origem === "CLINICA" ? 0 : 1;
+  return pa - pb;
+}
+
 export function CatalogoUnificadoTable({
   data,
   entityLabel,
   variant,
+  prioritizeClinicaSort = false,
   serverPageCount,
   serverPageIndex,
   serverPageSize,
@@ -67,7 +79,9 @@ export function CatalogoUnificadoTable({
   onEditClinica,
   onDeleteClinica,
 }: CatalogoUnificadoTableProps) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>(() =>
+    prioritizeClinicaSort ? [{ id: "descricao", desc: false }] : []
+  );
 
   const columns = React.useMemo((): ColumnDef<LinhaCatalogoUnificado>[] => {
     const base: ColumnDef<LinhaCatalogoUnificado>[] = [
@@ -92,6 +106,22 @@ export function CatalogoUnificadoTable({
       {
         accessorKey: "descricao",
         header: "Descrição",
+        ...(prioritizeClinicaSort
+          ? {
+              sortingFn: (rowA, rowB) => {
+                const o = compareOrigemClinicaPrimeiro(
+                  rowA.original,
+                  rowB.original
+                );
+                if (o !== 0) return o;
+                return rowA.original.descricao.localeCompare(
+                  rowB.original.descricao,
+                  "pt-BR",
+                  { sensitivity: "base" }
+                );
+              },
+            }
+          : {}),
         cell: ({ row }) => {
           const full = row.original.descricao?.trim() ?? "";
           return (
@@ -109,12 +139,17 @@ export function CatalogoUnificadoTable({
         header: "Tipo",
         cell: ({ row }) =>
           row.original.tipo ? (
-            <Badge
-              variant="outline"
-              className="text-[10px] py-0.5 px-1.5 leading-tight"
-            >
-              {row.original.tipo}
-            </Badge>
+            <div className="min-w-0 w-full max-w-[min(18rem,34vw)]">
+              <Badge
+                variant="outline"
+                title={row.original.tipo}
+                className="max-w-full min-w-0 w-full shrink text-[10px] py-0.5 px-1.5 leading-tight font-normal"
+              >
+                <span className="block min-w-0 truncate">
+                  {row.original.tipo}
+                </span>
+              </Badge>
+            </div>
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           ),
@@ -124,13 +159,17 @@ export function CatalogoUnificadoTable({
         header: "Categoria",
         cell: ({ row }) =>
           row.original.categoria ? (
-            <Badge
-              variant="outline"
-              className="max-w-[min(14rem,36vw)] text-[10px] py-0.5 px-1.5 leading-tight font-normal"
-              title={row.original.categoria}
-            >
-              <span className="block truncate">{row.original.categoria}</span>
-            </Badge>
+            <div className="min-w-0 w-full max-w-[min(14rem,30vw)]">
+              <Badge
+                variant="outline"
+                title={row.original.categoria}
+                className="max-w-full min-w-0 w-full shrink text-[10px] py-0.5 px-1.5 leading-tight font-normal"
+              >
+                <span className="block min-w-0 truncate">
+                  {row.original.categoria}
+                </span>
+              </Badge>
+            </div>
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           ),
@@ -172,6 +211,19 @@ export function CatalogoUnificadoTable({
       {
         accessorKey: "ativo",
         header: "Status",
+        ...(prioritizeClinicaSort
+          ? {
+              sortingFn: (rowA, rowB) => {
+                const o = compareOrigemClinicaPrimeiro(
+                  rowA.original,
+                  rowB.original
+                );
+                if (o !== 0) return o;
+                if (rowA.original.ativo === rowB.original.ativo) return 0;
+                return rowA.original.ativo ? -1 : 1;
+              },
+            }
+          : {}),
         cell: ({ row }) =>
           row.original.ativo ? (
             <Badge
@@ -230,7 +282,7 @@ export function CatalogoUnificadoTable({
     );
 
     return base;
-  }, [variant, onEditClinica, onDeleteClinica]);
+  }, [variant, prioritizeClinicaSort, onEditClinica, onDeleteClinica]);
 
   const table = useReactTable({
     data,
@@ -265,8 +317,10 @@ export function CatalogoUnificadoTable({
                       "text-xs font-semibold py-3",
                       header.column.id === "descricao" &&
                         "min-w-0 max-w-[min(28rem,42vw)]",
-                      header.column.id === "tipo" && "pr-1",
-                      header.column.id === "categoria" && "pl-1"
+                      header.column.id === "tipo" &&
+                        "min-w-0 w-[15%] max-w-[min(18rem,34vw)] pr-2 whitespace-normal",
+                      header.column.id === "categoria" &&
+                        "min-w-0 w-[13%] max-w-[min(14rem,30vw)] pl-1 whitespace-normal"
                     )}
                   >
                     {header.isPlaceholder
@@ -291,8 +345,10 @@ export function CatalogoUnificadoTable({
                         "text-xs py-3 align-top",
                         cell.column.id === "descricao" &&
                           "min-w-0 max-w-[min(28rem,42vw)] whitespace-nowrap",
-                        cell.column.id === "tipo" && "pr-1",
-                        cell.column.id === "categoria" && "pl-1"
+                        cell.column.id === "tipo" &&
+                          "min-w-0 w-[15%] max-w-[min(18rem,34vw)] pr-2 whitespace-normal align-top",
+                        cell.column.id === "categoria" &&
+                          "min-w-0 w-[13%] max-w-[min(14rem,30vw)] pl-1 whitespace-normal align-top"
                       )}
                     >
                       {flexRender(

@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -98,7 +99,7 @@ export function NovoCodigoTussForm() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar código TUSS");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar código TUSS");
       }
       toast.success("Código TUSS criado com sucesso!");
       router.push("/admin-clinica/codigos-tuss");

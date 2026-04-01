@@ -47,6 +47,21 @@ export async function POST(
       return NextResponse.json({ verified: true });
     }
 
+    // P1-4: Rate limiting baseado em logs — máximo 5 falhas na última hora por sessão
+    const falhasRecentes = await prisma.telemedicineLog.count({
+      where: {
+        sessionId: sessao.id,
+        eventType: "IDENTITY_FAILED",
+        createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+    });
+    if (falhasRecentes >= 5) {
+      return NextResponse.json(
+        { error: "Muitas tentativas incorretas. Aguarde 1 hora ou entre em contato com a clínica." },
+        { status: 429 }
+      );
+    }
+
     const paciente = sessao.consulta.paciente;
     const cpfNumeros = (paciente.cpf || "").replace(/\D/g, "");
     const cpfValido = cpfNumeros.slice(-4) === cpfLastFour;

@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -193,7 +194,7 @@ export function MedicamentoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar medicamento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar medicamento");
       }
 
       toast.success(

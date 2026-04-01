@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -109,7 +110,7 @@ export function EditarCodigoTussForm({ codigoTuss }: EditarCodigoTussFormProps) 
       );
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao atualizar código TUSS");
+        throw new Error(getApiErrorMessage(error) || "Erro ao atualizar código TUSS");
       }
       toast.success("Código TUSS atualizado com sucesso!");
       router.push("/admin-clinica/codigos-tuss");

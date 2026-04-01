@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { Loader2, AlertTriangle } from "lucide-react";
@@ -44,7 +45,7 @@ export function CidDeleteDialog({
       const response = await fetch(`${apiBasePath}/${cid.id}`, { method: "DELETE" });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao excluir CID");
+        throw new Error(getApiErrorMessage(error) || "Erro ao excluir CID");
       }
       toast.success("CID excluido com sucesso!");
       onSuccess();

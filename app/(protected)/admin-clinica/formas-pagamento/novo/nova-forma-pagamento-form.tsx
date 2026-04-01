@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,8 +16,10 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const formaPagamentoSchema = z.object({
-  nome: z.string().min(1, "Descrição é obrigatória"),
-  tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
+  nome: z.string().min(1, "Nome é obrigatório"),
+  tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"], {
+    message: "Tipo é obrigatório",
+  }),
 });
 
 type FormaPagamentoFormData = z.infer<typeof formaPagamentoSchema>;
@@ -43,7 +46,7 @@ export function NovaFormaPagamentoForm({ clinicaId }: NovaFormaPagamentoFormProp
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao criar forma de pagamento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao criar forma de pagamento");
       }
       toast.success("Forma de pagamento criada com sucesso!");
       router.push("/admin-clinica/formas-pagamento");
@@ -79,14 +82,18 @@ export function NovaFormaPagamentoForm({ clinicaId }: NovaFormaPagamentoFormProp
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField control={form.control} name="nome" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Descrição *</FormLabel>
-                      <FormControl><Input {...field} placeholder="Descrição da forma de pagamento" /></FormControl>
+                      <FormLabel>
+                        Nome <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl><Input {...field} placeholder="Ex.: PIX clínica, Cartão crédito" /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="tipo" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tipo *</FormLabel>
+                      <FormLabel>
+                        Tipo <span className="text-destructive">*</span>
+                      </FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>

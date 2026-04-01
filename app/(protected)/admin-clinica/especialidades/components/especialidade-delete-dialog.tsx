@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -48,7 +49,7 @@ export function EspecialidadeDeleteDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao excluir especialidade");
+        throw new Error(getApiErrorMessage(error) || "Erro ao excluir especialidade");
       }
 
       toast.success("Especialidade excluída com sucesso!");

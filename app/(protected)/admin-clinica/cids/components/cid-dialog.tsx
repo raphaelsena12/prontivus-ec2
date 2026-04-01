@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -137,7 +138,7 @@ export function CidDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar CID");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar CID");
       }
 
       toast.success(isEditing ? "CID atualizado com sucesso!" : "CID criado com sucesso!");

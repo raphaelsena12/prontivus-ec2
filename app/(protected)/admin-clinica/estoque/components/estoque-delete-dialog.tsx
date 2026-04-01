@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -56,7 +57,7 @@ export function EstoqueDeleteDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao excluir estoque");
+        throw new Error(getApiErrorMessage(error) || "Erro ao excluir estoque");
       }
 
       toast.success("Estoque excluído com sucesso!");

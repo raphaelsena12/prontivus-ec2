@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const schema = z.object({
   aceita: z.boolean(),
@@ -53,7 +54,7 @@ export async function PATCH(
     const body = await request.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Dados inválidos", details: parsed.error.issues }, { status: 400 });
+      return NextResponse.json(zodValidationErrorPayload(parsed.error.issues), { status: 400 });
     }
 
     // Operadora precisa existir e ser acessível (global ou legada da própria clínica)

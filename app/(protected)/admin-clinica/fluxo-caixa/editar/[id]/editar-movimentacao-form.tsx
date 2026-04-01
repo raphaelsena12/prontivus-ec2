@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -57,7 +58,7 @@ export function EditarMovimentacaoForm({ movimentacao, clinicaId, formasPagament
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao atualizar movimentação");
+        throw new Error(getApiErrorMessage(error) || "Erro ao atualizar movimentação");
       }
       toast.success("Movimentação atualizada com sucesso!");
       router.push("/admin-clinica/fluxo-caixa");

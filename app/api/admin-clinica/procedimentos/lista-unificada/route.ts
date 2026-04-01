@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
     const byDescricao = (a: { descricao: string }, b: { descricao: string }) =>
       a.descricao.localeCompare(b.descricao, "pt-BR", { sensitivity: "base" });
 
+    // Clínica sempre no topo; depois TUSS. Dentro de cada grupo, ordem alfabética.
     const merged = [
       ...[...clinicItems].sort(byDescricao),
       ...[...tussItems].sort(byDescricao),

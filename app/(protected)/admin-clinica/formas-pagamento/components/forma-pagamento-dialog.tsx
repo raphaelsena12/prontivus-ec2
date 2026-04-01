@@ -1,4 +1,5 @@
 "use client";
+import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -48,8 +49,10 @@ interface FormaPagamentoDialogProps {
 }
 
 const formaPagamentoSchema = z.object({
-  nome: z.string().min(1, "Descrição é obrigatória"),
-  tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"]),
+  nome: z.string().min(1, "Nome é obrigatório"),
+  tipo: z.enum(["DINHEIRO", "CARTAO_CREDITO", "CARTAO_DEBITO", "PIX", "BOLETO", "TRANSFERENCIA"], {
+    message: "Tipo é obrigatório",
+  }),
 });
 
 type FormaPagamentoFormValues = z.infer<typeof formaPagamentoSchema>;
@@ -107,7 +110,7 @@ export function FormaPagamentoDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar forma de pagamento");
+        throw new Error(getApiErrorMessage(error) || "Erro ao salvar forma de pagamento");
       }
 
       toast.success(
@@ -148,11 +151,11 @@ export function FormaPagamentoDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Descrição <span className="text-destructive">*</span>
+                    Nome <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Digite a descrição da forma de pagamento"
+                      placeholder="Ex.: PIX clínica, Cartão crédito"
                       {...field}
                       disabled={loading}
                     />

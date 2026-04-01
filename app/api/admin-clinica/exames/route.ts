@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
 const exameSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
@@ -81,14 +82,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    console.log("[POST /api/admin-clinica/exames] Body recebido:", JSON.stringify(body, null, 2));
-    
     const validation = exameSchema.safeParse(body);
 
     if (!validation.success) {
-      console.error("[POST /api/admin-clinica/exames] Erro de validação:", validation.error.issues);
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        zodValidationErrorPayload(validation.error.issues),
         { status: 400 }
       );
     }

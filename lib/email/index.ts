@@ -72,3 +72,7 @@ export {
   gerarEmailAlteracaoPlano,
   gerarEmailAlteracaoPlanoTexto,
 } from "./templates/alteracao-plano";
+export {
+  gerarEmailTelemedicinaNovoPackiente,
+  gerarEmailTelemedicinaNovoPackienteTexto,
+} from "./templates/telemedicina-novo-paciente";

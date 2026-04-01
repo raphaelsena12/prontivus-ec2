@@ -124,6 +124,17 @@ export async function POST(request: NextRequest) {
       await handlePaymentFailed(invoice);
       break;
     }
+    // P1-2: Confirmar pagamento de telemedicina via PaymentIntent (fluxo imediato)
+    case "payment_intent.succeeded": {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      await handleTelemedicinaPaymentIntentSucceeded(paymentIntent);
+      break;
+    }
+    case "payment_intent.payment_failed": {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      await handleTelemedicinaPaymentIntentFailed(paymentIntent);
+      break;
+    }
     default:
       console.log(`Evento não tratado: ${event.type}`);
   }
@@ -771,6 +782,49 @@ function generateTempCnpj(): string {
   const timestamp = Date.now().toString().slice(-10);
   const random = Math.floor(Math.random() * 9999).toString().padStart(4, "0");
   return timestamp + random;
+}
+
+// P1-2: Confirmar PagamentoConsulta quando PaymentIntent.succeeded chega pelo webhook
+// Garante que o status PAGO seja registrado mesmo se o frontend falhar após o pagamento
+async function handleTelemedicinaPaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent) {
+  try {
+    const pagamento = await prisma.pagamentoConsulta.findFirst({
+      where: { stripePaymentId: paymentIntent.id, status: "PENDENTE" },
+    });
+    if (!pagamento) return; // Já processado ou não é de telemedicina
+
+    await prisma.pagamentoConsulta.update({
+      where: { id: pagamento.id },
+      data: {
+        status: "PAGO",
+        dataPagamento: new Date(),
+        transacaoId: paymentIntent.id,
+      },
+    });
+
+    console.log("[Webhook] PagamentoConsulta confirmado via payment_intent.succeeded:", pagamento.id);
+  } catch (error) {
+    console.error("Erro ao processar payment_intent.succeeded:", error);
+  }
+}
+
+// Marcar pagamento como CANCELADO se PaymentIntent falhou definitivamente
+async function handleTelemedicinaPaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+  try {
+    const pagamento = await prisma.pagamentoConsulta.findFirst({
+      where: { stripePaymentId: paymentIntent.id, status: "PENDENTE" },
+    });
+    if (!pagamento) return;
+
+    await prisma.pagamentoConsulta.update({
+      where: { id: pagamento.id },
+      data: { status: "CANCELADO" },
+    });
+
+    console.log("[Webhook] PagamentoConsulta cancelado via payment_intent.payment_failed:", pagamento.id);
+  } catch (error) {
+    console.error("Erro ao processar payment_intent.payment_failed:", error);
+  }
 }
 
 // Processar pagamento de telemedicina
