@@ -83,6 +83,11 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           icon: IconFlask,
         },
         {
+          title: "Medicamentos",
+          url: "/admin-clinica/medicamentos",
+          icon: IconPill,
+        },
+        {
           title: "Insumos",
           url: "/admin-clinica/insumos",
           icon: IconPackage,

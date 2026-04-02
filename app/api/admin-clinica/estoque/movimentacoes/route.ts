@@ -67,13 +67,37 @@ export async function POST(request: NextRequest) {
     let estoqueInsumoId: string | undefined;
 
     if (data.tipoEstoque === "MEDICAMENTO") {
+      // Tenta pelo ID do estoque
       estoque = await prisma.estoqueMedicamento.findFirst({
         where: { id: data.estoqueId, clinicaId: auth.clinicaId! },
       });
+
+      // Se não encontrou, tenta pelo medicamentoId (catálogo global)
       if (!estoque) {
-        return NextResponse.json({ error: "Estoque de medicamento não encontrado" }, { status: 404 });
+        estoque = await prisma.estoqueMedicamento.findFirst({
+          where: { medicamentoId: data.estoqueId, clinicaId: auth.clinicaId! },
+        });
       }
-      estoqueMedicamentoId = data.estoqueId;
+
+      // Se ainda não existe estoque, cria automaticamente
+      if (!estoque) {
+        const medicamento = await prisma.medicamento.findFirst({
+          where: { id: data.estoqueId },
+        });
+        if (!medicamento) {
+          return NextResponse.json({ error: "Medicamento não encontrado" }, { status: 404 });
+        }
+        estoque = await prisma.estoqueMedicamento.create({
+          data: {
+            clinicaId: auth.clinicaId!,
+            medicamentoId: medicamento.id,
+            quantidadeAtual: 0,
+            quantidadeMinima: 0,
+            unidade: medicamento.unidade || "UN",
+          },
+        });
+      }
+      estoqueMedicamentoId = estoque.id;
     } else {
       // INSUMO - o estoqueId pode ser o ID do insumo ou do estoque
       // Primeiro tenta buscar pelo ID do estoque
@@ -145,7 +169,7 @@ export async function POST(request: NextRequest) {
       const [movimentacao] = await prisma.$transaction([
         prisma.movimentacaoEstoque.create({ data: movimentacaoData }),
         prisma.estoqueMedicamento.update({
-          where: { id: data.estoqueId },
+          where: { id: estoqueMedicamentoId },
           data: updateData,
         }),
       ]);

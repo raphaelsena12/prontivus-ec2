@@ -1,7 +1,7 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,82 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+
+function SearchableSelect({
+  items,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  items: Array<{ id: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  disabled?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fecha somente ao clicar fora do container (scrollbar nativa não dispara mousedown no DOM)
+  React.useEffect(() => {
+    if (!open) return;
+    function handleMouseDown(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [open]);
+
+  const selectedLabel = items.find((i) => i.id === value)?.label ?? "";
+  const filtered = search
+    ? items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase()))
+    : items;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        value={open ? search : selectedLabel}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          setSearch("");
+          setOpen(true);
+        }}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+          {filtered.map((item) => (
+            <div
+              key={item.id}
+              className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm"
+              onMouseDown={() => {
+                onChange(item.id);
+                setSearch("");
+                setOpen(false);
+              }}
+            >
+              {item.label}
+            </div>
+          ))}
+        </div>
+      )}
+      {open && filtered.length === 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg px-3 py-2 text-sm text-gray-500">
+          Nenhum resultado encontrado
+        </div>
+      )}
+    </div>
+  );
+}
 
 const movimentacaoSchema = z.object({
   tipoEstoque: z.enum(["MEDICAMENTO", "INSUMO"]),
@@ -39,13 +115,32 @@ interface NovaMovimentacaoEstoqueDialogProps {
 export function NovaMovimentacaoEstoqueDialog({ open, onOpenChange, estoques, insumos = [], estoqueIdPreSelecionado, tipoEstoquePreSelecionado, onSuccess }: NovaMovimentacaoEstoqueDialogProps) {
   const [loading, setLoading] = useState(false);
   const [loadingInsumos, setLoadingInsumos] = useState(false);
+  const [loadingMedicamentos, setLoadingMedicamentos] = useState(false);
   const [insumosList, setInsumosList] = useState<Array<{ id: string; nome: string }>>(insumos);
+  const [medicamentosList, setMedicamentosList] = useState<Array<{ id: string; nome: string }>>([]);
   const form = useForm<MovimentacaoFormData>({
     resolver: zodResolver(movimentacaoSchema),
     defaultValues: { tipoEstoque: "MEDICAMENTO", estoqueId: "", tipo: undefined, quantidade: 0, motivo: "", observacoes: "" },
   });
 
   const tipoEstoque = form.watch("tipoEstoque");
+
+  // Buscar medicamentos globais quando o tipo for MEDICAMENTO
+  React.useEffect(() => {
+    if (tipoEstoque === "MEDICAMENTO" && medicamentosList.length === 0 && !loadingMedicamentos) {
+      setLoadingMedicamentos(true);
+      fetch("/api/admin-clinica/medicamentos?limit=1000")
+        .then(res => res.json())
+        .then(data => {
+          setMedicamentosList((data.medicamentos || []).map((m: any) => ({ id: m.id, nome: m.nome })));
+        })
+        .catch(err => {
+          console.error("Erro ao buscar medicamentos:", err);
+          toast.error("Erro ao carregar medicamentos");
+        })
+        .finally(() => setLoadingMedicamentos(false));
+    }
+  }, [tipoEstoque, medicamentosList.length, loadingMedicamentos]);
 
   // Buscar insumos quando o tipo mudar para INSUMO
   React.useEffect(() => {
@@ -133,24 +228,24 @@ export function NovaMovimentacaoEstoqueDialog({ open, onOpenChange, estoques, in
             <FormField control={form.control} name="estoqueId" render={({ field }) => (
               <FormItem>
                 <FormLabel>{tipoEstoque === "MEDICAMENTO" ? "Medicamento" : "Insumo"} *</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={loadingInsumos && tipoEstoque === "INSUMO"}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={tipoEstoque === "MEDICAMENTO" ? "Selecione o medicamento" : "Selecione o insumo"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {tipoEstoque === "MEDICAMENTO" ? (
-                      estoques.map((estoque) => (
-                        <SelectItem key={estoque.id} value={estoque.id}>{estoque.medicamento.nome}</SelectItem>
-                      ))
-                    ) : (
-                      insumosList.map((insumo) => (
-                        <SelectItem key={insumo.id} value={insumo.id}>{insumo.nome}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  {(loadingMedicamentos && tipoEstoque === "MEDICAMENTO") || (loadingInsumos && tipoEstoque === "INSUMO") ? (
+                    <div className="flex items-center gap-2 h-10 px-3 border rounded-md text-sm text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      items={
+                        tipoEstoque === "MEDICAMENTO"
+                          ? medicamentosList.map((m) => ({ id: m.id, label: m.nome }))
+                          : insumosList.map((i) => ({ id: i.id, label: i.nome }))
+                      }
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={tipoEstoque === "MEDICAMENTO" ? "Digite para buscar medicamento..." : "Digite para buscar insumo..."}
+                    />
+                  )}
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />

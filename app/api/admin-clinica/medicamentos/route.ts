@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
-const medicamentoSchema = z.object({
+const medicamentoClinicaSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   principioAtivo: z.string().optional(),
   laboratorio: z.string().optional(),
@@ -72,10 +73,29 @@ export async function POST(request: NextRequest) {
       return auth.response;
     }
 
-    return NextResponse.json(
-      { error: "Medicamentos agora são gerenciados pelo Super Admin (catálogo global)." },
-      { status: 403 }
-    );
+    const body = await request.json();
+    const validation = medicamentoClinicaSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        zodValidationErrorPayload(validation.error.issues),
+        { status: 400 }
+      );
+    }
+
+    const medicamento = await prisma.medicamento.create({
+      data: {
+        nome: validation.data.nome,
+        principioAtivo: validation.data.principioAtivo ?? null,
+        laboratorio: validation.data.laboratorio ?? null,
+        apresentacao: validation.data.apresentacao ?? null,
+        concentracao: validation.data.concentracao ?? null,
+        unidade: validation.data.unidade ?? null,
+        clinicaId: auth.clinicaId!,
+      },
+    });
+
+    return NextResponse.json({ medicamento }, { status: 201 });
   } catch (error) {
     console.error("Erro ao criar medicamento:", error);
     return NextResponse.json(

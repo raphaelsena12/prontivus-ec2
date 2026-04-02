@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 
-const updateMedicamentoSchema = z.object({
+const updateMedicamentoClinicaSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório").optional(),
-  principioAtivo: z.string().optional(),
-  laboratorio: z.string().optional(),
-  apresentacao: z.string().optional(),
-  concentracao: z.string().optional(),
-  unidade: z.string().optional(),
+  principioAtivo: z.string().optional().nullable(),
+  laboratorio: z.string().optional().nullable(),
+  apresentacao: z.string().optional().nullable(),
+  concentracao: z.string().optional().nullable(),
+  unidade: z.string().optional().nullable(),
   ativo: z.boolean().optional(),
 });
 
@@ -25,10 +26,11 @@ export async function GET(
 
     const { id } = await params;
 
+    // Busca primeiro entre os medicamentos da clínica
     const medicamento = await prisma.medicamento.findFirst({
       where: {
         id,
-        clinicaId: null,
+        clinicaId: auth.clinicaId!,
       },
     });
 
@@ -59,10 +61,38 @@ export async function PATCH(
       return auth.response;
     }
 
-    return NextResponse.json(
-      { error: "Medicamentos agora são gerenciados pelo Super Admin (catálogo global)." },
-      { status: 403 }
-    );
+    const { id } = await params;
+
+    const existente = await prisma.medicamento.findFirst({
+      where: {
+        id,
+        clinicaId: auth.clinicaId!,
+      },
+    });
+
+    if (!existente) {
+      return NextResponse.json(
+        { error: "Medicamento não encontrado ou não pertence a esta clínica" },
+        { status: 404 }
+      );
+    }
+
+    const body = await request.json();
+    const validation = updateMedicamentoClinicaSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        zodValidationErrorPayload(validation.error.issues),
+        { status: 400 }
+      );
+    }
+
+    const medicamento = await prisma.medicamento.update({
+      where: { id },
+      data: validation.data,
+    });
+
+    return NextResponse.json({ medicamento });
   } catch (error) {
     console.error("Erro ao atualizar medicamento:", error);
     return NextResponse.json(
@@ -82,10 +112,25 @@ export async function DELETE(
       return auth.response;
     }
 
-    return NextResponse.json(
-      { error: "Medicamentos agora são gerenciados pelo Super Admin (catálogo global)." },
-      { status: 403 }
-    );
+    const { id } = await params;
+
+    const existente = await prisma.medicamento.findFirst({
+      where: {
+        id,
+        clinicaId: auth.clinicaId!,
+      },
+    });
+
+    if (!existente) {
+      return NextResponse.json(
+        { error: "Medicamento não encontrado ou não pertence a esta clínica" },
+        { status: 404 }
+      );
+    }
+
+    await prisma.medicamento.delete({ where: { id } });
+
+    return NextResponse.json({ message: "Medicamento excluído com sucesso" });
   } catch (error) {
     console.error("Erro ao deletar medicamento:", error);
     return NextResponse.json(
@@ -94,18 +139,3 @@ export async function DELETE(
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

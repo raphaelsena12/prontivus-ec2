@@ -192,30 +192,28 @@ export function EstoqueTable({
       },
       {
         accessorKey: "quantidadeAtual",
-        header: "Quantidade Atual",
+        header: "Qtd. Atual",
         cell: ({ row }) => (
           <div className="font-medium">
-            {row.original.quantidadeAtual} {row.original.unidade}
+            {row.original.quantidadeAtual}
           </div>
         ),
       },
       {
         accessorKey: "quantidadeMinima",
-        header: "Quantidade Mínima",
+        header: "Qtd. Mínima",
         cell: ({ row }) => (
           <div>
-            {row.original.quantidadeMinima} {row.original.unidade}
+            {row.original.quantidadeMinima}
           </div>
         ),
       },
       {
         accessorKey: "quantidadeMaxima",
-        header: "Quantidade Máxima",
+        header: "Qtd. Máxima",
         cell: ({ row }) => (
           <div>
-            {row.original.quantidadeMaxima
-              ? `${row.original.quantidadeMaxima} ${row.original.unidade}`
-              : "-"}
+            {row.original.quantidadeMaxima ?? "-"}
           </div>
         ),
       },

@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/table";
 import { cn, formatCurrency } from "@/lib/utils";
 
-export type OrigemCatalogo = "TUSS" | "CLINICA";
+export type OrigemCatalogo = "TUSS" | "CLINICA" | "GLOBAL";
 
 export interface LinhaCatalogoUnificado {
   rowId: string;
@@ -47,7 +47,7 @@ export interface LinhaCatalogoUnificado {
 interface CatalogoUnificadoTableProps {
   data: LinhaCatalogoUnificado[];
   entityLabel: string;
-  variant: "exames" | "procedimentos";
+  variant: "exames" | "procedimentos" | "medicamentos";
   /** Mantém linhas com origem Clínica antes das TUSS ao ordenar colunas (ex.: Descrição). */
   prioritizeClinicaSort?: boolean;
   serverPageCount: number;
@@ -177,14 +177,28 @@ export function CatalogoUnificadoTable({
       {
         accessorKey: "origem",
         header: "Origem",
-        cell: ({ row }) => (
-          <Badge
-            variant={row.original.origem === "TUSS" ? "secondary" : "outline"}
-            className="text-[10px] py-0.5 px-1.5 leading-tight"
-          >
-            {row.original.origem === "TUSS" ? "TUSS" : "Clínica"}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const origem = row.original.origem;
+          if (origem === "TUSS") {
+            return (
+              <Badge variant="secondary" className="text-[10px] py-0.5 px-1.5 leading-tight">
+                TUSS
+              </Badge>
+            );
+          }
+          if (origem === "GLOBAL") {
+            return (
+              <Badge variant="secondary" className="text-[10px] py-0.5 px-1.5 leading-tight">
+                Global
+              </Badge>
+            );
+          }
+          return (
+            <Badge variant="outline" className="text-[10px] py-0.5 px-1.5 leading-tight">
+              Clínica
+            </Badge>
+          );
+        },
       },
     ];
 
@@ -256,6 +270,7 @@ export function CatalogoUnificadoTable({
               </span>
             );
           }
+          // Rows com origem CLINICA sempre permitem edição/exclusão
           return (
             <div className="flex justify-end gap-1">
               <Button

@@ -1,93 +1,107 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Pill, Upload, Filter, Plus, Search, Database } from "lucide-react";
+import { Loader2, Pill, Filter, Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { MedicamentosTable } from "./components/medicamentos-table";
-import { MedicamentoDeleteDialog } from "./components/medicamento-delete-dialog";
-import { MedicamentoDialog } from "./components/medicamento-dialog";
-import { UploadExcelDialog } from "@/components/upload-excel-dialog";
-import { AnvisaSyncDialog } from "./components/anvisa-sync-dialog";
+import {
+  CatalogoUnificadoTable,
+  type LinhaCatalogoUnificado,
+} from "../components/catalogo-unificado-table";
+import { MedicamentoClinicaDialog } from "./components/medicamento-clinica-dialog";
+import { MedicamentoClinicaDeleteDialog } from "./components/medicamento-clinica-delete-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-interface Medicamento {
+const PAGE_SIZE = 50;
+
+interface MedicamentoClinica {
   id: string;
   nome: string;
   principioAtivo: string | null;
   laboratorio: string | null;
   concentracao: string | null;
   apresentacao: string | null;
-  controle: string | null;
   unidade: string | null;
   ativo: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 interface MedicamentosContentProps {
   clinicaId: string;
 }
 
-export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
-  const router = useRouter();
-  const [medicamentos, setMedicamentos] = useState<Medicamento[]>([]);
+export function MedicamentosContent({ clinicaId: _clinicaId }: MedicamentosContentProps) {
+  const [rows, setRows] = useState<LinhaCatalogoUnificado[]>([]);
   const [loading, setLoading] = useState(true);
-  const [globalFilter, setGlobalFilter] = useState<string>("");
-  const [medicamentoDialogOpen, setMedicamentoDialogOpen] = useState(false);
-  const [editingMedicamento, setEditingMedicamento] = useState<Medicamento | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [medicamentoToDelete, setMedicamentoToDelete] = useState<Medicamento | null>(null);
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [anvisaSyncDialogOpen, setAnvisaSyncDialogOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const fetchMedicamentos = useCallback(async () => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMedicamento, setEditingMedicamento] = useState<MedicamentoClinica | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingMeta, setDeletingMeta] = useState<{ id: string; nome: string } | null>(null);
+
+  const fetchLista = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ 
-        page: "1",
-        limit: "1000", // Buscar muitos registros para paginação no cliente
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
       });
-      const response = await fetch(`/api/admin-clinica/medicamentos?${params.toString()}`);
-      if (!response.ok) throw new Error("Erro ao carregar medicamentos");
+      if (search.trim().length) params.set("search", search.trim());
+      const response = await fetch(
+        `/api/admin-clinica/medicamentos/lista-unificada?${params.toString()}`
+      );
+      if (!response.ok) throw new Error("Erro ao carregar lista");
       const data = await response.json();
-      setMedicamentos(data.medicamentos || []);
+      setRows(data.items || []);
+      const tp = data.pagination?.totalPages;
+      setTotalPages(typeof tp === "number" && tp > 0 ? tp : 1);
     } catch (error) {
       toast.error("Erro ao carregar medicamentos");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [search, page]);
 
   useEffect(() => {
-    fetchMedicamentos();
-  }, [fetchMedicamentos]);
+    fetchLista();
+  }, [fetchLista]);
 
-  const handleEdit = (medicamento: Medicamento) => {
-    setEditingMedicamento(medicamento);
-    setMedicamentoDialogOpen(true);
+  const handleEdit = async (row: LinhaCatalogoUnificado) => {
+    if (row.origem !== "CLINICA") return;
+    try {
+      const res = await fetch(`/api/admin-clinica/medicamentos/${row.sourceId}`);
+      if (!res.ok) throw new Error("Erro ao carregar medicamento");
+      const data = await res.json();
+      setEditingMedicamento(data.medicamento);
+      setDialogOpen(true);
+    } catch {
+      toast.error("Não foi possível abrir o medicamento para edição");
+    }
   };
 
-  const handleDeleteClick = (medicamento: Medicamento) => {
-    setMedicamentoToDelete(medicamento);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleSuccess = () => {
-    fetchMedicamentos();
-    setMedicamentoDialogOpen(false);
-    setDeleteDialogOpen(false);
-    setEditingMedicamento(null);
-    setMedicamentoToDelete(null);
+  const handleDeleteClick = (row: LinhaCatalogoUnificado) => {
+    if (row.origem !== "CLINICA") return;
+    const nome = row.descricao.split(" — ")[0] || row.descricao;
+    setDeletingMeta({ id: row.sourceId, nome });
+    setDeleteOpen(true);
   };
 
   const handleCreate = () => {
     setEditingMedicamento(null);
-    setMedicamentoDialogOpen(true);
+    setDialogOpen(true);
+  };
+
+  const handleSuccess = () => {
+    fetchLista();
+    setDialogOpen(false);
+    setEditingMedicamento(null);
+    setDeleteOpen(false);
+    setDeletingMeta(null);
   };
 
   return (
@@ -95,47 +109,37 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
       <PageHeader
         icon={Pill}
         title="Medicamentos"
-        subtitle="Gerencie os medicamentos cadastrados na clínica"
+        subtitle="Catálogo global (somente leitura) e medicamentos próprios da clínica (editáveis)"
       />
 
-      {/* Card Branco com Tabela */}
       <Card className="bg-white border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
           <div className="flex items-center gap-1.5">
             <Filter className="h-3 w-3 text-muted-foreground" />
-            <CardTitle className="text-sm font-semibold">Lista de Medicamentos</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Medicamentos — Global e clínica
+            </CardTitle>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative max-w-md">
               <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
-              <Input 
+              <Input
                 type="search"
-                placeholder="Buscar por nome, princípio ativo, laboratório..." 
-                value={globalFilter}
-                onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-9 h-8 text-xs bg-background w-64" 
+                placeholder="Buscar..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                className="pl-9 h-7 text-xs bg-background w-64"
               />
             </div>
-            <Button 
-              variant="outline" 
-              onClick={() => setAnvisaSyncDialogOpen(true)} 
-              className="h-8 text-xs px-3 border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
-              <Database className="mr-1.5 h-3 w-3" />
-              Integração Anvisa
-            </Button>
             <Button
-              variant="outline"
-              onClick={() => setUploadDialogOpen(true)}
-              className="h-8 w-8 p-0"
-              title="Upload em Massa"
-              aria-label="Upload em Massa"
+              onClick={handleCreate}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3"
             >
-              <Upload className="h-4 w-4" />
-            </Button>
-            <Button onClick={handleCreate} className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs px-3">
               <Plus className="mr-1.5 h-3 w-3" />
-              Novo Medicamento
+              Novo medicamento
             </Button>
           </div>
         </CardHeader>
@@ -144,53 +148,42 @@ export function MedicamentosContent({ clinicaId }: MedicamentosContentProps) {
             <div className="flex items-center justify-center py-12 px-6">
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Carregando medicamentos...</p>
+                <p className="text-sm text-muted-foreground">Carregando...</p>
               </div>
             </div>
-          ) : medicamentos.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6">
-              <p className="text-muted-foreground text-center">Nenhum medicamento encontrado</p>
+              <p className="text-muted-foreground text-center">
+                Nenhum registro encontrado.
+              </p>
             </div>
           ) : (
-            <MedicamentosTable 
-            data={medicamentos} 
-            globalFilter={globalFilter}
-            onGlobalFilterChange={setGlobalFilter}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-            onCreate={handleCreate}
-            onUpload={() => setUploadDialogOpen(true)}
-          />
+            <CatalogoUnificadoTable
+              data={rows}
+              entityLabel="medicamento(s)"
+              variant="medicamentos"
+              serverPageCount={totalPages}
+              serverPageIndex={page - 1}
+              serverPageSize={PAGE_SIZE}
+              onServerPageChange={(idx) => setPage(idx + 1)}
+              onEditClinica={handleEdit}
+              onDeleteClinica={handleDeleteClick}
+            />
           )}
         </CardContent>
       </Card>
 
-      <MedicamentoDialog
-        open={medicamentoDialogOpen}
-        onOpenChange={setMedicamentoDialogOpen}
+      <MedicamentoClinicaDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
         medicamento={editingMedicamento}
         onSuccess={handleSuccess}
       />
 
-      <MedicamentoDeleteDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        medicamento={medicamentoToDelete}
-        onSuccess={handleSuccess}
-      />
-
-      <UploadExcelDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        endpoint="/api/admin-clinica/upload/medicamentos"
-        title="Upload de Medicamentos em Massa"
-        description="Faça upload de um arquivo Excel (.xlsx) com os dados dos medicamentos. O arquivo deve conter colunas: nome, principio_ativo, laboratorio, apresentacao, concentracao, unidade, etc."
-        onSuccess={handleSuccess}
-      />
-
-      <AnvisaSyncDialog
-        open={anvisaSyncDialogOpen}
-        onOpenChange={setAnvisaSyncDialogOpen}
+      <MedicamentoClinicaDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        medicamento={deletingMeta}
         onSuccess={handleSuccess}
       />
     </div>
