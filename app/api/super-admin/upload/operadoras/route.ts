@@ -6,7 +6,17 @@ import { parseExcelFile, normalizeColumnName } from "@/lib/excel-utils";
 
 function toStr(value: unknown): string | null {
   if (value === null || value === undefined) return null;
+  // Números vindos com raw:true (ex: CNPJ como float64) — converte sem notação científica
+  if (typeof value === "number") {
+    const s = Math.round(value).toString();
+    return s.length ? s : null;
+  }
   const s = String(value).trim();
+  // Notação científica residual (ex: "1.95419E+13") — converte corretamente
+  if (/^-?\d+(\.\d+)?[eE][+\-]\d+$/.test(s)) {
+    const s2 = Math.round(Number(s)).toString();
+    return s2.length ? s2 : null;
+  }
   return s.length ? s : null;
 }
 
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const rows = parseExcelFile(buffer);
+    const rows = parseExcelFile(buffer, { raw: true });
     if (rows.length === 0) return NextResponse.json({ error: "Arquivo Excel vazio" }, { status: 400 });
 
     const normalizedRows = rows.map((row) => {
@@ -89,7 +99,13 @@ export async function POST(request: NextRequest) {
       const linha = i + 2;
 
       try {
-        const codigoAns = toStr(row.codigo_ans ?? row.codigoans ?? row.ans);
+        const codigoAns = toStr(
+          row.registro_operadora ??
+          row.registro_ans ??
+          row.codigo_ans ??
+          row.codigoans ??
+          row.ans
+        );
         const razaoSocial = toStr(row.razao_social ?? row.razaosocial ?? row.razao);
 
         if (!codigoAns) {
@@ -111,7 +127,7 @@ export async function POST(request: NextRequest) {
           nomeFantasia: toStr(row.nome_fantasia ?? row.nomefantasia ?? row.fantasia),
           cnpj: toStr(row.cnpj),
           telefone: toStr(row.telefone),
-          email: toStr(row.email),
+          email: toStr(row.email ?? row.endereco_eletronico),
           cep: toStr(row.cep),
           endereco: toStr(row.endereco ?? row.logradouro),
           numero: toStr(row.numero),

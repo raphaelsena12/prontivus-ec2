@@ -28,6 +28,10 @@ export function useTranscription() {
   const socketRef = useRef<Socket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
+  // Remote audio (patient) capture
+  const remoteMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const remoteChunksRef = useRef<Blob[]>([]);
+  const remoteIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isStartingRef = useRef<boolean>(false);
   const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recognitionStartTimeRef = useRef<number>(0);
@@ -63,6 +67,84 @@ export function useTranscription() {
     }
     return "Médico";
   }, []);
+
+  // Envia chunk de áudio remoto (paciente) para transcrição via OpenAI Whisper
+  const sendPatientAudioChunk = useCallback(async (audioBlob: Blob) => {
+    if (!isTranscribingRef.current || audioBlob.size === 0) return;
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "audio.webm");
+      formData.append("speaker", "Paciente");
+
+      const res = await fetch("/api/medico/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.transcript?.trim()) {
+        setTranscription((prev) => {
+          const newEntry: TranscriptionEntry = {
+            time: formatTime(new Date()),
+            speaker: "Paciente",
+            text: data.transcript.trim(),
+          };
+          // Insere antes do último item parcial (do médico), se houver
+          if (hasPartialRef.current && prev.length > 0 && prev[prev.length - 1].isPartial) {
+            return [...prev.slice(0, -1), newEntry, prev[prev.length - 1]];
+          }
+          return [...prev, newEntry];
+        });
+      }
+    } catch (e) {
+      console.error("Erro ao transcrever áudio do paciente:", e);
+    }
+  }, []);
+
+  // Inicia captura do áudio remoto (voz do paciente via elemento <audio> do Chime)
+  const startRemoteAudioCapture = useCallback((remoteAudioEl: HTMLAudioElement) => {
+    if (typeof (remoteAudioEl as any).captureStream !== "function") {
+      console.warn("captureStream() não suportado neste navegador — voz do paciente não será transcrita");
+      return;
+    }
+    try {
+      const remoteStream: MediaStream = (remoteAudioEl as any).captureStream();
+      if (!remoteStream || remoteStream.getAudioTracks().length === 0) {
+        console.warn("Stream remoto sem faixas de áudio");
+        return;
+      }
+
+      const recorder = new MediaRecorder(remoteStream, { mimeType: "audio/webm;codecs=opus" });
+      remoteMediaRecorderRef.current = recorder;
+      remoteChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) remoteChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        if (remoteChunksRef.current.length === 0) return;
+        const blob = new Blob(remoteChunksRef.current, { type: "audio/webm" });
+        remoteChunksRef.current = [];
+        await sendPatientAudioChunk(blob);
+        // Reinicia se ainda transcrevendo
+        if (isTranscribingRef.current && !isPausedRef.current && remoteMediaRecorderRef.current) {
+          try { remoteMediaRecorderRef.current.start(); } catch (_) {}
+        }
+      };
+
+      recorder.start();
+      remoteIntervalRef.current = setInterval(() => {
+        if (remoteMediaRecorderRef.current?.state === "recording") {
+          remoteMediaRecorderRef.current.stop(); // onstop reinicia
+        }
+      }, 5000);
+
+      console.log("Captura de áudio do paciente iniciada");
+    } catch (e) {
+      console.error("Erro ao iniciar captura remota:", e);
+    }
+  }, [sendPatientAudioChunk]);
 
   // Função para enviar chunk de áudio para AWS Transcribe com speaker diarization
   const sendAudioChunk = useCallback(async (audioBlob: Blob) => {
@@ -370,7 +452,7 @@ export function useTranscription() {
   }, [isPaused]);
 
   // Iniciar transcrição
-  const startTranscription = useCallback(async () => {
+  const startTranscription = useCallback(async (remoteAudioEl?: HTMLAudioElement | null) => {
     if (isStartingRef.current) {
       console.log("Já está iniciando, ignorando chamada duplicada");
       return;
@@ -406,6 +488,7 @@ export function useTranscription() {
         console.log("AWS iniciado?", awsStarted);
         if (awsStarted) {
           isStartingRef.current = false;
+          if (remoteAudioEl) startRemoteAudioCapture(remoteAudioEl);
           return;
         }
       }
@@ -463,6 +546,9 @@ export function useTranscription() {
           }
         }, 3000);
       }
+
+      // Iniciar captura de áudio do paciente (voz remota via Chime)
+      if (remoteAudioEl) startRemoteAudioCapture(remoteAudioEl);
     } catch (error: any) {
       console.error("Erro ao iniciar transcrição:", error);
       isStartingRef.current = false;
@@ -471,7 +557,7 @@ export function useTranscription() {
       );
       setIsTranscribing(false);
     }
-  }, [startWebSpeechRecognition, sendAudioChunk, startAWSTranscription, isTranscribing, isPaused]);
+  }, [startWebSpeechRecognition, sendAudioChunk, startAWSTranscription, startRemoteAudioCapture, isTranscribing, isPaused]);
 
   // Pausar transcrição
   const pauseTranscription = useCallback(() => {
@@ -491,6 +577,10 @@ export function useTranscription() {
       streamRef.current.getTracks().forEach((track) => {
         track.enabled = false;
       });
+    }
+
+    if (remoteMediaRecorderRef.current && remoteMediaRecorderRef.current.state === "recording") {
+      remoteMediaRecorderRef.current.pause();
     }
 
     toast.info("Transcrição pausada");
@@ -517,6 +607,10 @@ export function useTranscription() {
       streamRef.current.getTracks().forEach((track) => {
         track.enabled = true;
       });
+    }
+
+    if (remoteMediaRecorderRef.current && remoteMediaRecorderRef.current.state === "paused") {
+      remoteMediaRecorderRef.current.resume();
     }
 
     toast.success("Transcrição retomada");
@@ -579,6 +673,17 @@ export function useTranscription() {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+
+    // Parar captura de áudio remoto (paciente)
+    if (remoteIntervalRef.current) {
+      clearInterval(remoteIntervalRef.current);
+      remoteIntervalRef.current = null;
+    }
+    if (remoteMediaRecorderRef.current && remoteMediaRecorderRef.current.state !== "inactive") {
+      remoteMediaRecorderRef.current.stop();
+      remoteMediaRecorderRef.current = null;
+    }
+    remoteChunksRef.current = [];
 
     // OPT-3: converte última entrada parcial em final usando hasPartialRef (sem filter)
     setTranscription((prev) => {

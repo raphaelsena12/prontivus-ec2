@@ -823,7 +823,7 @@ export default function DoctorTelemedicineSessionPage() {
             isTranscribing={isTranscribing}
             isPaused={isPaused}
             transcription={transcription}
-            startTranscription={startTranscription}
+            startTranscription={() => startTranscription(remoteAudioRef.current ?? undefined)}
             pauseTranscription={pauseTranscription}
             resumeTranscription={resumeTranscription}
             stopTranscription={stopTranscription}

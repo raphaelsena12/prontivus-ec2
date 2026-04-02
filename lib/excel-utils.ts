@@ -4,12 +4,12 @@ export interface ExcelRow {
   [key: string]: any;
 }
 
-export function parseExcelFile(buffer: Buffer): ExcelRow[] {
+export function parseExcelFile(buffer: Buffer, options?: { raw?: boolean }): ExcelRow[] {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(worksheet, {
-    raw: false,
+    raw: options?.raw ?? false,
     defval: null,
   }) as ExcelRow[];
 

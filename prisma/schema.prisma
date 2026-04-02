@@ -585,6 +585,7 @@ model FormaPagamento {
   updatedAt      DateTime @updatedAt
 
   clinica       Tenant?        @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  consultas     Consulta[]
   contasReceber ContaReceber[]
   fluxoCaixa    FluxoCaixa[]
 
@@ -753,6 +754,7 @@ model Consulta {
   valorCobrado      Decimal?  @db.Decimal(10, 2)
   valorRepassado    Decimal?  @db.Decimal(10, 2)
   procedimentoId    String?
+  formaPagamentoId  String?
   modalidade        String    @default("PRESENCIAL") // PRESENCIAL, TELEMEDICINA
   pressaoSistolica   Int?
   pressaoDiastolica  Int?
@@ -770,6 +772,7 @@ model Consulta {
   planoSaude              PlanoSaude?             @relation(fields: [planoSaudeId], references: [id])
   tipoConsulta            TipoConsulta?           @relation(fields: [tipoConsultaId], references: [id])
   procedimento            Procedimento?           @relation(fields: [procedimentoId], references: [id])
+  formaPagamento          FormaPagamento?         @relation(fields: [formaPagamentoId], references: [id])
   prontuarios             Prontuario[]
   solicitacoesExames      SolicitacaoExame[]
   prescricoesMedicamentos PrescricaoMedicamento[]

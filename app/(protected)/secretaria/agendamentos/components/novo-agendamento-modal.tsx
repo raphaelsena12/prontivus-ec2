@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { maskCPF, maskCelular, removeMask } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 import { CodigoTussSearchInput } from "./codigo-tuss-search-input";
+import { OperadoraSearchInput } from "./operadora-search-input";
 
 const agendamentoSchema = z.object({
   pacienteId: z.string().uuid("Paciente é obrigatório"),
@@ -34,6 +35,7 @@ const agendamentoSchema = z.object({
   codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
+  formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
   planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
@@ -67,12 +69,6 @@ interface TipoConsulta {
   codigo: string;
 }
 
-interface Operadora {
-  id: string;
-  nomeFantasia: string | null;
-  razaoSocial: string;
-}
-
 interface PlanoSaude {
   id: string;
   nome: string;
@@ -84,6 +80,12 @@ interface Procedimento {
   nome: string;
   descricao: string | null;
   valor: number;
+}
+
+interface FormaPagamento {
+  id: string;
+  nome: string;
+  tipo: string;
 }
 
 interface NovoAgendamentoModalProps {
@@ -507,7 +509,7 @@ export function NovoAgendamentoModal({
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [tiposConsulta, setTiposConsulta] = useState<TipoConsulta[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
-  const [operadoras, setOperadoras] = useState<Operadora[]>([]);
+  const [formasPagamento, setFormasPagamento] = useState<FormaPagamento[]>([]);
   const [planosSaude, setPlanosSaude] = useState<PlanoSaude[]>([]);
   const [pacienteSelecionado, setPacienteSelecionado] = useState<Paciente | null>(null);
   const [pacienteSearchValue, setPacienteSearchValue] = useState("");
@@ -543,6 +545,7 @@ export function NovoAgendamentoModal({
       codigoTussId: "",
       tipoConsultaId: "",
       procedimentoId: null,
+      formaPagamentoId: null,
       operadoraId: null,
       planoSaudeId: null,
       numeroCarteirinha: "",
@@ -566,12 +569,12 @@ export function NovoAgendamentoModal({
       const fetchData = async () => {
         try {
           setLoadingData(true);
-          const [medicosRes, tiposConsultaRes, procedimentosRes, operadorasRes] = await Promise.all([
+          const [medicosRes, tiposConsultaRes, procedimentosRes, formasPagamentoRes] = await Promise.all([
             // Somente médicos ativos devem aparecer para seleção no agendamento
             fetch("/api/admin-clinica/medicos?ativo=true"),
             fetch("/api/admin-clinica/tipos-consulta"),
             fetch("/api/secretaria/procedimentos?limit=1000"),
-            fetch("/api/admin-clinica/operadoras"),
+            fetch("/api/admin-clinica/formas-pagamento?limit=100"),
           ]);
 
           if (medicosRes.ok) {
@@ -589,9 +592,9 @@ export function NovoAgendamentoModal({
             setProcedimentos(data.procedimentos || []);
           }
 
-          if (operadorasRes.ok) {
-            const data = await operadorasRes.json();
-            setOperadoras(data.operadoras || []);
+          if (formasPagamentoRes.ok) {
+            const data = await formasPagamentoRes.json();
+            setFormasPagamento(data.formasPagamento || []);
           }
 
           // Definir data se fornecida no initialData
@@ -856,6 +859,7 @@ export function NovoAgendamentoModal({
         formData.append("codigoTussId", data.codigoTussId);
         if (data.tipoConsultaId) formData.append("tipoConsultaId", data.tipoConsultaId);
         if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
+        if (data.formaPagamentoId) formData.append("formaPagamentoId", data.formaPagamentoId);
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
         if (data.planoSaudeId) formData.append("planoSaudeId", data.planoSaudeId);
         if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
@@ -1176,6 +1180,34 @@ export function NovoAgendamentoModal({
 
                     <FormField
                       control={form.control}
+                      name="formaPagamentoId"
+                      render={({ field }) => (
+                        <FormItem className="flex-1 min-w-[200px]">
+                          <FormLabel className="text-xs font-medium">Forma de Pagamento</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(value || null)}
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-xs w-full">
+                                <SelectValue placeholder="Selecionar o tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {formasPagamento.map((fp) => (
+                                <SelectItem key={fp.id} value={fp.id} className="text-xs">
+                                  {fp.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="procedimentoId"
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
@@ -1211,27 +1243,16 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Convênio</FormLabel>
-                          <Select
-                            onValueChange={(value) => {
-                              field.onChange(value === "null" ? null : value);
-                              form.setValue("planoSaudeId", null);
-                            }}
-                            value={field.value === null ? "null" : field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-8 text-xs w-full">
-                                <SelectValue placeholder="Selecione o convênio" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="null" className="text-xs">Particular</SelectItem>
-                              {operadoras.map((operadora) => (
-                                <SelectItem key={operadora.id} value={operadora.id} className="text-xs">
-                                  {operadora.nomeFantasia || operadora.razaoSocial}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <OperadoraSearchInput
+                              operadoraId={field.value ?? null}
+                              onSelectOperadoraId={(id) => {
+                                field.onChange(id);
+                                if (!id) form.setValue("planoSaudeId", null);
+                              }}
+                              error={form.formState.errors.operadoraId?.message}
+                            />
+                          </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
