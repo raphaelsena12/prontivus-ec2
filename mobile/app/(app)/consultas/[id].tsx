@@ -7,7 +7,7 @@ import { useConsulta } from '../../../hooks/useConsultas';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
-import { Colors } from '../../../constants/colors';
+import { Colors, BorderRadius } from '../../../constants/colors';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -16,7 +16,7 @@ const statusLabel: Record<string, string> = {
   CONFIRMADA: 'Confirmada',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
-  NAO_COMPARECEU: 'Não compareceu',
+  NAO_COMPARECEU: 'Nao compareceu',
 };
 
 export default function ConsultaDetailScreen() {
@@ -29,76 +29,87 @@ export default function ConsultaDetailScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Detalhes da consulta</Text>
+        <Text style={styles.headerTitle}>Detalhes da consulta</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Card style={styles.mainCard}>
+        {/* Doctor card */}
+        <Card variant="elevated" style={styles.doctorCard}>
           <View style={styles.doctorRow}>
             <View style={styles.avatar}>
               <Ionicons name="person" size={28} color={Colors.primary} />
             </View>
-            <View>
-              <Text style={styles.doctorName}>Dr(a). {consulta.medico?.nome ?? '—'}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.doctorName}>Dr(a). {consulta.medico?.nome ?? '--'}</Text>
               {consulta.medico?.crm && <Text style={styles.crm}>CRM: {consulta.medico.crm}</Text>}
               {consulta.medico?.especialidade && (
-                <Text style={styles.especialidade}>{consulta.medico.especialidade}</Text>
+                <View style={styles.specBadge}>
+                  <Text style={styles.specText}>{consulta.medico.especialidade}</Text>
+                </View>
               )}
             </View>
           </View>
+        </Card>
 
-          <View style={styles.divider} />
+        {/* Info cards */}
+        <View style={styles.infoGrid}>
+          <View style={styles.infoCard}>
+            <View style={[styles.infoIcon, { backgroundColor: Colors.primaryLight }]}>
+              <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            </View>
+            <Text style={styles.infoLabel}>Data e hora</Text>
+            <Text style={styles.infoValue}>
+              {format(new Date(consulta.dataHora), "dd/MM/yyyy", { locale: ptBR })}
+            </Text>
+            <Text style={styles.infoSub}>
+              {format(new Date(consulta.dataHora), "EEEE, HH:mm", { locale: ptBR })}
+            </Text>
+          </View>
 
-          <InfoRow
-            icon="calendar-outline"
-            label="Data e hora"
-            value={format(new Date(consulta.dataHora), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", {
-              locale: ptBR,
-            })}
-          />
-
-          <InfoRow icon="pulse-outline" label="Status" value="">
+          <View style={styles.infoCard}>
+            <View style={[styles.infoIcon, { backgroundColor: Colors.successLight }]}>
+              <Ionicons name="pulse-outline" size={18} color={Colors.success} />
+            </View>
+            <Text style={styles.infoLabel}>Status</Text>
             <Badge
               label={statusLabel[consulta.status] ?? consulta.status}
               status={consulta.status}
             />
-          </InfoRow>
+          </View>
+        </View>
 
-          {consulta.clinica && (
-            <InfoRow icon="business-outline" label="Clínica" value={consulta.clinica.nome} />
-          )}
+        {consulta.clinica && (
+          <Card style={styles.detailCard}>
+            <View style={styles.detailRow}>
+              <View style={[styles.detailIcon, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="business-outline" size={18} color="#3B82F6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.detailLabel}>Clinica</Text>
+                <Text style={styles.detailValue}>{consulta.clinica.nome}</Text>
+              </View>
+            </View>
+          </Card>
+        )}
 
-          {consulta.observacoes && (
-            <InfoRow icon="chatbubble-outline" label="Observações" value={consulta.observacoes} />
-          )}
-        </Card>
+        {consulta.observacoes && (
+          <Card style={styles.detailCard}>
+            <View style={styles.detailRow}>
+              <View style={[styles.detailIcon, { backgroundColor: '#FFFBEB' }]}>
+                <Ionicons name="chatbubble-outline" size={18} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.detailLabel}>Observacoes</Text>
+                <Text style={styles.detailValue}>{consulta.observacoes}</Text>
+              </View>
+            </View>
+          </Card>
+        )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function InfoRow({
-  icon,
-  label,
-  value,
-  children,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  children?: React.ReactNode;
-}) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={18} color={Colors.primary} style={styles.infoIcon} />
-      <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        {children ?? <Text style={styles.infoValue}>{value}</Text>}
-      </View>
-    </View>
   );
 }
 
@@ -108,29 +119,81 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    paddingBottom: 8,
+    paddingBottom: 12,
     gap: 12,
   },
-  backButton: { padding: 4 },
-  title: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  container: { padding: 20, gap: 16 },
-  mainCard: { gap: 16 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: Colors.text },
+  container: { padding: 20, gap: 14 },
+
+  // Doctor card
+  doctorCard: { paddingVertical: 20 },
   doctorRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     backgroundColor: Colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  doctorName: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  crm: { fontSize: 13, color: Colors.textSecondary },
-  especialidade: { fontSize: 14, color: Colors.primary, fontWeight: '500' },
-  divider: { height: 1, backgroundColor: Colors.border },
-  infoRow: { flexDirection: 'row', gap: 12 },
-  infoIcon: { marginTop: 2 },
-  infoContent: { flex: 1, gap: 2 },
-  infoLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
-  infoValue: { fontSize: 15, color: Colors.text },
+  doctorName: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  crm: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  specBadge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  specText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
+
+  // Info grid
+  infoGrid: { flexDirection: 'row', gap: 12 },
+  infoCard: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
+    padding: 16,
+    gap: 6,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  infoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  infoLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
+  infoValue: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  infoSub: { fontSize: 12, color: Colors.textSecondary, textTransform: 'capitalize' },
+
+  // Detail card
+  detailCard: { gap: 0 },
+  detailRow: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  detailIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailLabel: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
+  detailValue: { fontSize: 15, color: Colors.text, marginTop: 2, lineHeight: 22 },
 });

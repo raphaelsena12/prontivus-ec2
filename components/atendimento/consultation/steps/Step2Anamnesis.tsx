@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +8,6 @@ import {
   Sparkles,
   Loader2,
   Mic,
-  Radio,
 } from "lucide-react";
 
 interface AnalysisResults {
@@ -562,6 +561,27 @@ export function Step2Anamnesis({
     }
   }
 
+  // ── Timer de gravação ──────────────────────────────────────────────────────
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [recordingVisible, setRecordingVisible] = useState(false);
+
+  useEffect(() => {
+    if (isTranscribing) {
+      setRecordingSeconds(0);
+      setTimeout(() => setRecordingVisible(true), 10);
+      timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    } else {
+      setRecordingVisible(false);
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setRecordingSeconds(0);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isTranscribing]);
+
+  const formatTimer = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
   const [sectionEdits, setSectionEdits] = useState<Record<number, string>>({});
   const [sectionValues, setSectionValues] = useState<Record<string, string>>(() => {
     const base = analysisResults?.anamnese || prontuario?.anamnese || "";
@@ -613,12 +633,6 @@ export function Step2Anamnesis({
               <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5">
                 Gerada por IA
               </span>
-            )}
-            {isTranscribing && (
-              <div className="flex items-center gap-1.5">
-                <Radio className="w-3 h-3 text-red-500 animate-pulse" />
-                <span className="text-xs text-red-600 font-medium">Gravando...</span>
-              </div>
             )}
           </div>
 
@@ -683,56 +697,109 @@ export function Step2Anamnesis({
                 </div>
               ))}
             </div>
-          ) : isTranscribing && transcriptionText ? (
-            /* ── Mostrar transcrição durante gravação (aba IA) ── */
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Radio className="w-4 h-4 text-red-500 animate-pulse" />
-                <span className="text-sm font-semibold text-slate-700">Gravando consulta...</span>
+          ) : isTranscribing ? (
+            /* ── Estado de gravação ativo ── */
+            <>
+              <style>{`
+                @keyframes barWave {
+                  0%, 100% { transform: scaleY(0.25); }
+                  50% { transform: scaleY(1); }
+                }
+              `}</style>
+              <div
+                className="flex flex-col items-center justify-center py-10 px-6 text-center select-none"
+                style={{
+                  opacity: recordingVisible ? 1 : 0,
+                  transform: recordingVisible ? "translateY(0)" : "translateY(12px)",
+                  transition: "opacity 0.4s ease, transform 0.4s ease",
+                }}
+              >
+                {/* Badge */}
+                <div className="flex items-center gap-1.5 mb-8">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs font-bold text-red-600 uppercase tracking-widest">Em gravação</span>
+                  <span className="ml-2 text-sm font-mono font-semibold text-slate-500 tabular-nums">{formatTimer(recordingSeconds)}</span>
+                </div>
+
+                {/* Waveform */}
+                <div className="flex items-end gap-1 h-12 mb-8">
+                  {[0.55, 0.8, 1, 0.7, 0.9, 0.5, 0.75, 0.95, 0.6, 0.85].map((h, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: 4,
+                        height: `${h * 44}px`,
+                        borderRadius: 4,
+                        background: i < 5 ? "#dc2626" : "#1E40AF",
+                        transformOrigin: "bottom",
+                        animation: `barWave ${0.6 + i * 0.07}s ease-in-out ${i * 0.08}s infinite`,
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Prévia da transcrição */}
+                {transcriptionText ? (
+                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed italic line-clamp-3 mb-2">
+                    &ldquo;{transcriptionText.slice(-180).trimStart()}&rdquo;
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-2">
+                    Aguardando fala...
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-300 mt-4">
+                  A anamnese será gerada ao encerrar a gravação
+                </p>
               </div>
-              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                <Textarea
-                  value={transcriptionText}
-                  readOnly
-                  className="text-sm min-h-[300px] resize-none bg-white border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] leading-relaxed"
-                  style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                  placeholder="Aguardando transcrição..."
-                />
-              </div>
-              <p className="text-xs text-slate-400 text-center">
-                A anamnese será gerada automaticamente ao encerrar a gravação.
-              </p>
-            </div>
+            </>
           ) : (
-            /* ── Aba IA: sempre mostra botão Iniciar Gravação ── */
-            /* A anamnese gerada é exibida apenas nos inputs da aba Manual */
-            <div className="flex flex-col items-center justify-center py-10 px-6 text-center select-none">
-              <div className="relative mb-5">
-                <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center">
-                  <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Mic className="w-5 h-5 text-[#1E40AF]" />
+            /* ── Aba IA: CTA de gravação ── */
+            <div
+              className="flex flex-col items-center justify-center py-12 px-6 text-center select-none"
+              style={{ transition: "opacity 0.3s ease", opacity: 1 }}
+            >
+              {!anamneseText && (
+                <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest mb-5">
+                  Passo 1 — Iniciar consulta
+                </p>
+              )}
+              <div className="relative mb-6">
+                {!anamneseText && (
+                  <>
+                    <div className="absolute inset-0 rounded-full bg-blue-100 animate-ping opacity-30" style={{ animationDuration: "2s" }} />
+                    <div className="absolute inset-0 rounded-full bg-blue-50 animate-ping opacity-40" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }} />
+                  </>
+                )}
+                <div className={`relative w-20 h-20 rounded-full flex items-center justify-center ${anamneseText ? "bg-emerald-50" : "bg-blue-600"}`}>
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${anamneseText ? "bg-emerald-100" : "bg-blue-500"}`}>
+                    <Mic className={`w-7 h-7 ${anamneseText ? "text-emerald-600" : "text-white"}`} />
                   </div>
                 </div>
               </div>
               {anamneseText ? (
                 <>
-                  <p className="text-base font-semibold text-slate-700 mb-2">Anamnese gerada</p>
+                  <p className="text-base font-semibold text-slate-700 mb-1.5">Anamnese gerada</p>
                   <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
-                    Os campos foram preenchidos na aba <strong>Manual</strong>. Você pode gravar novamente para atualizar.
+                    Os campos foram preenchidos na aba <strong>Manual</strong>. Grave novamente para atualizar.
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-base font-semibold text-slate-700 mb-2">Pronto para começar</p>
-                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
-                    Inicie a gravação para gerar automaticamente a anamnese estruturada com inteligência artificial.
+                  <p className="text-lg font-bold text-slate-800 mb-2">Pronto para começar</p>
+                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed mb-7">
+                    Inicie a gravação. A anamnese será gerada automaticamente ao encerrar.
                   </p>
                 </>
               )}
               {startTranscription && (
                 <Button
                   onClick={startTranscription}
-                  className="h-10 px-6 text-sm gap-2 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white shadow-md shadow-blue-200 font-semibold rounded-xl"
+                  className={`h-11 px-8 text-sm gap-2 font-semibold rounded-xl shadow-lg transition-all ${
+                    anamneseText
+                      ? "bg-slate-700 hover:bg-slate-800 text-white shadow-slate-200"
+                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:shadow-blue-300 hover:scale-[1.02]"
+                  }`}
                 >
                   <Mic className="w-4 h-4" />
                   {anamneseText ? "Gravar Novamente" : "Iniciar Gravação"}

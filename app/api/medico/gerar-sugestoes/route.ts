@@ -35,22 +35,25 @@ export async function POST(request: NextRequest) {
     // CIDs inexistentes no catálogo são marcados com `validado: false` para o
     // frontend exibir aviso ao médico. Não são removidos para não perder a informação.
     if (suggestions.cidCodes.length > 0) {
-      const codigosIA = suggestions.cidCodes.map((c) => c.code.toUpperCase());
+      // Normaliza: remove pontos para corresponder ao formato do banco (G43.0 → G430)
+      const normalize = (code: string) => code.toUpperCase().replace(/\./g, "");
+
+      const codigosIA = suggestions.cidCodes.map((c) => normalize(c.code));
 
       const cidsCatalogo = await prisma.cid.findMany({
         where: { codigo: { in: codigosIA } },
         select: { codigo: true, descricao: true },
       });
 
-      const catalogoMap = new Map(cidsCatalogo.map((c) => [c.codigo.toUpperCase(), c.descricao]));
+      const catalogoMap = new Map(cidsCatalogo.map((c) => [normalize(c.codigo), c.descricao]));
 
       suggestions.cidCodes = suggestions.cidCodes.map((cid) => {
-        const codigoUpper = cid.code.toUpperCase();
+        const codigoNorm = normalize(cid.code);
         return {
           ...cid,
-          validado: catalogoMap.has(codigoUpper),
+          validado: catalogoMap.has(codigoNorm),
           // Usa descrição oficial do catálogo se disponível
-          description: catalogoMap.get(codigoUpper) ?? cid.description,
+          description: catalogoMap.get(codigoNorm) ?? cid.description,
         };
       });
     }

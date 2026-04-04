@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   FileText,
@@ -36,12 +37,20 @@ export interface ExameSolicitado {
 
 export type PrioridadeTISS = "eletiva" | "urgencia";
 
+export interface GuiaSADTDadosAdicionais {
+  numeroCarteirinha?: string;
+  cidCodigo?: string;
+  indicacaoClinica?: string;
+}
+
 interface GuiaTissExamesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (exames: ExameSolicitado[]) => void;
+  onConfirm: (exames: ExameSolicitado[], dadosAdicionais: GuiaSADTDadosAdicionais) => void;
   examesDisponiveis: ExameSolicitado[];
   isLoading?: boolean;
+  pacienteCarteirinha?: string;
+  cidSelecionado?: string;
 }
 
 const CATEGORIA_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string; border: string }> = {
@@ -63,12 +72,17 @@ export function GuiaTissExamesModal({
   onConfirm,
   examesDisponiveis,
   isLoading = false,
+  pacienteCarteirinha,
+  cidSelecionado,
 }: GuiaTissExamesModalProps) {
   const [selected, setSelected] = useState<Set<number>>(() =>
     new Set(examesDisponiveis.map((_, i) => i))
   );
   const [justificativas, setJustificativas] = useState<Record<number, string>>({});
   const [expandedJustificativas, setExpandedJustificativas] = useState<Set<number>>(new Set());
+  const [numeroCarteirinha, setNumeroCarteirinha] = useState(pacienteCarteirinha || "");
+  const [cidCodigo, setCidCodigo] = useState(cidSelecionado || "");
+  const [indicacaoClinica, setIndicacaoClinica] = useState("");
 
   const grupos = useMemo(() => {
     const map: Record<string, number[]> = {};
@@ -110,7 +124,11 @@ export function GuiaTissExamesModal({
       codigoTussId: examesDisponiveis[idx].codigoTussId,
       codigoTuss: examesDisponiveis[idx].codigoTuss,
     }));
-    onConfirm(exames);
+    onConfirm(exames, {
+      numeroCarteirinha: numeroCarteirinha.trim() || undefined,
+      cidCodigo: cidCodigo.trim() || undefined,
+      indicacaoClinica: indicacaoClinica.trim() || undefined,
+    });
   };
 
   const totalSelecionados = selected.size;
@@ -133,6 +151,41 @@ export function GuiaTissExamesModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 min-h-0">
+
+          {/* Dados da Guia */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dados da Guia</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600">Nº Carteirinha (convênio)</label>
+                <Input
+                  placeholder="Número da carteirinha"
+                  value={numeroCarteirinha}
+                  onChange={(e) => setNumeroCarteirinha(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600">CID-10</label>
+                <Input
+                  placeholder="Ex: J06.9"
+                  value={cidCodigo}
+                  onChange={(e) => setCidCodigo(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-600">Indicação Clínica</label>
+              <Textarea
+                placeholder="Descreva a indicação clínica para os exames solicitados..."
+                value={indicacaoClinica}
+                onChange={(e) => setIndicacaoClinica(e.target.value)}
+                rows={2}
+                className="text-xs resize-none border-slate-200 focus-visible:ring-[#306953]/30 focus-visible:border-[#306953]/50"
+              />
+            </div>
+          </div>
 
           {/* Exames */}
           <div className="space-y-2">

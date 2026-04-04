@@ -1,26 +1,83 @@
 export const Colors = {
-  primary: '#6C47C9',
-  primaryLight: '#EDE9FA',
-  primaryDark: '#4A2F99',
+  // Primary palette - Vivid Violet (inspired by Nubank, Revolut)
+  primary: '#7C3AED',
+  primaryDark: '#6D28D9',
+  primaryLight: '#F5F3FF',
+  primaryMuted: '#C4B5FD',
+  primarySoft: '#EDE9FE',
 
+  // Accent - Teal for telemedicine / health
+  accent: '#0D9488',
+  accentLight: '#CCFBF1',
+
+  // Neutrals
   white: '#FFFFFF',
   black: '#000000',
-
-  background: '#F5F5F8',
+  background: '#F8FAFC',
   surface: '#FFFFFF',
-  border: '#E5E7EB',
+  surfaceElevated: '#FFFFFF',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
 
-  text: '#111827',
-  textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
+  // Text hierarchy
+  text: '#0F172A',
+  textSecondary: '#64748B',
+  textMuted: '#94A3B8',
+  textOnPrimary: '#FFFFFF',
 
+  // Status colors
   success: '#10B981',
+  successLight: '#ECFDF5',
+  successDark: '#065F46',
   warning: '#F59E0B',
+  warningLight: '#FFFBEB',
+  warningDark: '#92400E',
   error: '#EF4444',
+  errorLight: '#FEF2F2',
+  errorDark: '#991B1B',
   info: '#3B82F6',
+  infoLight: '#EFF6FF',
 
+  // Status badge colors
   statusAgendado: '#3B82F6',
   statusConfirmado: '#10B981',
   statusCancelado: '#EF4444',
-  statusRealizado: '#6B7280',
+  statusRealizado: '#64748B',
+
+  // Shadows
+  shadowLight: 'rgba(15, 23, 42, 0.04)',
+  shadowMedium: 'rgba(15, 23, 42, 0.08)',
+  shadowDark: 'rgba(15, 23, 42, 0.12)',
+
+  // Card overlay gradient simulation
+  overlay: 'rgba(124, 58, 237, 0.08)',
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  full: 9999,
+};
+
+export const FontSize = {
+  xs: 11,
+  sm: 13,
+  md: 15,
+  lg: 17,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
 };

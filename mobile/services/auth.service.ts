@@ -25,6 +25,10 @@ async function getCsrfToken(): Promise<string> {
 /**
  * Realiza login via NextAuth credentials e retorna o token de sessão
  */
+const COOKIE_NAME = BASE_URL.startsWith('https')
+  ? '__Secure-next-auth.session-token'
+  : 'next-auth.session-token';
+
 async function login(credentials: LoginCredentials): Promise<string> {
   const csrfToken = await getCsrfToken();
 
@@ -48,15 +52,18 @@ async function login(credentials: LoginCredentials): Promise<string> {
   const setCookieHeader =
     response.headers['set-cookie'] ?? [];
 
-  const sessionCookie = (Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader])
-    .find((c: string) => c.startsWith('next-auth.session-token='));
+  const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+  const sessionCookie = cookies.find((c: string) =>
+    c.startsWith('__Secure-next-auth.session-token=') ||
+    c.startsWith('next-auth.session-token=')
+  );
 
   if (!sessionCookie) {
     throw new Error('Credenciais inválidas');
   }
 
   // Extrai apenas o valor do cookie (sem os atributos)
-  const tokenValue = sessionCookie.split(';')[0].replace('next-auth.session-token=', '');
+  const tokenValue = sessionCookie.split(';')[0].replace(/^(__Secure-)?next-auth\.session-token=/, '');
   return tokenValue;
 }
 
@@ -66,7 +73,7 @@ async function login(credentials: LoginCredentials): Promise<string> {
 async function getSession(token: string): Promise<SessionUser | null> {
   try {
     const response = await axios.get(`${BASE_URL}/api/auth/session`, {
-      headers: { Cookie: `next-auth.session-token=${token}` },
+      headers: { Cookie: `${COOKIE_NAME}=${token}` },
     });
     return response.data?.user ?? null;
   } catch {
@@ -86,7 +93,7 @@ async function logout(token: string): Promise<void> {
       {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          Cookie: `next-auth.session-token=${token}`,
+          Cookie: `${COOKIE_NAME}=${token}`,
         },
         maxRedirects: 0,
         validateStatus: () => true,

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -137,111 +138,6 @@ interface AISidebarProps {
 }
 
 
-function AtestadoFormModal({
-  docId,
-  docNome,
-  isDias,
-  isMeses,
-  formDias,
-  setFormDias,
-  formMeses,
-  setFormMeses,
-  cidAuto,
-  loading,
-  onConfirm,
-  onClose,
-}: {
-  docId: string | null;
-  docNome?: string;
-  isDias: boolean;
-  isMeses: boolean;
-  formDias: string;
-  setFormDias: (v: string) => void;
-  formMeses: string;
-  setFormMeses: (v: string) => void;
-  cidAuto?: { code: string; description: string };
-  loading: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open={!!docId} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="text-sm font-bold text-slate-800">
-            {docNome || "Gerar Documento"}
-          </DialogTitle>
-          <p className="text-xs text-slate-500">Informe os dados para gerar o documento</p>
-        </DialogHeader>
-        <div className="space-y-4 py-1">
-          {isDias && (
-            <div>
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                Dias de Afastamento
-              </label>
-              <Input
-                type="number"
-                min="1"
-                max="365"
-                value={formDias}
-                onChange={(e) => setFormDias(e.target.value)}
-                className="h-9 bg-slate-50 border-slate-200 text-sm"
-                autoFocus
-              />
-            </div>
-          )}
-          {isMeses && (
-            <div>
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                Validade (meses)
-              </label>
-              <Input
-                type="number"
-                min="1"
-                max="24"
-                value={formMeses}
-                onChange={(e) => setFormMeses(e.target.value)}
-                className="h-9 bg-slate-50 border-slate-200 text-sm"
-                autoFocus
-              />
-            </div>
-          )}
-          {cidAuto && (
-            <div>
-              <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                CID-10 <span className="text-slate-400 font-normal">(diagnóstico da IA)</span>
-              </label>
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-slate-50">
-                <Badge className="bg-slate-800 text-white font-mono text-xs flex-shrink-0">
-                  {cidAuto.code}
-                </Badge>
-                <span className="text-xs text-slate-600">{cidAuto.description}</span>
-              </div>
-            </div>
-          )}
-        </div>
-        <DialogFooter className="gap-2 pt-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            size="sm"
-            className="flex-1 bg-slate-800 hover:bg-slate-900 text-white"
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading
-              ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-              : <Printer className="w-3.5 h-3.5 mr-1.5" />
-            }
-            Gerar PDF
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function AISidebar({
   isProcessing,
   analysisResults,
@@ -331,28 +227,21 @@ export function AISidebar({
   const [docDropdownOpen, setDocDropdownOpen] = useState(false);
   const [loadingDoc, setLoadingDoc] = useState<string | null>(null);
   const [documentosImpressos, setDocumentosImpressos] = useState<Set<string>>(new Set());
+  const [docDropdownRect, setDocDropdownRect] = useState<DOMRect | null>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
   const docDropdownRef = useRef<HTMLDivElement>(null);
+  const docInputWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Modal de dados extras para documentos que precisam de formulário
-  const [formDocId, setFormDocId] = useState<string | null>(null);
-  const [formDias, setFormDias] = useState("1");
-  const [formMeses, setFormMeses] = useState("6");
+  const openDocDropdown = useCallback(() => {
+    if (docInputWrapperRef.current) {
+      setDocDropdownRect(docInputWrapperRef.current.getBoundingClientRect());
+    }
+    setDocDropdownOpen(true);
+  }, []);
+
   const [examAnalysisModalOpen, setExamAnalysisModalOpen] = useState(false);
   const [selectedExamForAnalysis, setSelectedExamForAnalysis] = useState<ExameAnexado | null>(null);
 
-  const DOCS_COM_DIAS = new Set([
-    "atestado-afastamento",
-    "atestado-afastamento-cid",
-    "atestado-afastamento-sem-cid",
-    "atestado-afastamento-historico-cid",
-    "atestado-afastamento-indeterminado",
-  ]);
-  const DOCS_COM_MESES = new Set([
-    "atestado-aptidao-fisica-mental",
-    "atestado-aptidao-piscinas",
-    "atestado-aptidao-fisica",
-  ]);
 
   const filteredDocs = documentModels.filter(
     (d) =>
@@ -360,30 +249,35 @@ export function AISidebar({
       d.nome.toLowerCase().includes(docSearch.toLowerCase())
   );
 
-  // Fechar dropdown ao clicar fora
+  // Fechar dropdown ao clicar fora e atualizar posição no scroll
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
         docDropdownRef.current &&
         !docDropdownRef.current.contains(e.target as Node) &&
-        docInputRef.current &&
-        !docInputRef.current.contains(e.target as Node)
+        docInputWrapperRef.current &&
+        !docInputWrapperRef.current.contains(e.target as Node)
       ) {
         setDocDropdownOpen(false);
       }
     }
+    function handleScroll() {
+      if (docDropdownOpen && docInputWrapperRef.current) {
+        setDocDropdownRect(docInputWrapperRef.current.getBoundingClientRect());
+      }
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [docDropdownOpen]);
 
   const handleGenDoc = (id: string) => {
     setDocSearch("");
     setDocDropdownOpen(false);
-    if (DOCS_COM_DIAS.has(id) || DOCS_COM_MESES.has(id)) {
-      setFormDocId(id);
-    } else {
-      runGenDoc(id);
-    }
+    runGenDoc(id);
   };
 
   const runGenDoc = async (id: string, extraDados?: Record<string, any>) => {
@@ -393,18 +287,6 @@ export function AISidebar({
     } finally {
       setLoadingDoc(null);
     }
-  };
-
-  const handleFormConfirm = async () => {
-    if (!formDocId) return;
-    const idParaGerar = formDocId;
-    const extraDados: Record<string, any> = {};
-    if (DOCS_COM_DIAS.has(idParaGerar)) extraDados.diasAfastamento = parseInt(formDias) || 1;
-    if (DOCS_COM_MESES.has(idParaGerar)) extraDados.mesesValidade = parseInt(formMeses) || 6;
-    setFormDocId(null);
-    setFormDias("1");
-    setFormMeses("6");
-    await runGenDoc(idParaGerar, extraDados);
   };
 
   const openDoc = (doc: (typeof documentosGerados)[0]) => {
@@ -532,7 +414,7 @@ export function AISidebar({
 
   return (
     <>
-    <div className="space-y-1.5 w-full min-w-0 overflow-x-hidden">
+    <div className="w-full min-w-0 overflow-x-hidden">
     <style>{`
       @keyframes ai-slow-spin {
         from { transform: rotate(0deg); }
@@ -617,51 +499,26 @@ export function AISidebar({
       }
     `}</style>
 
-      {/* ── Box 1: IA Clínica ── */}
-      <div
-        className="border border-slate-200 rounded-lg overflow-hidden flex flex-col w-full min-w-0"
-        style={{ 
-          backgroundColor: isProcessing ? "#EEF3FF" : "#F5F8FF",
-          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)"
-        }}
-      >
+      {/* ── Box único: Assistente Clínico ── */}
+      <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col w-full min-w-0 bg-white shadow-sm">
 
-        {/* Cabeçalho azul — título do box */}
-        <div
-          className="px-3 py-2.5 flex items-center justify-between"
-          style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}
-        >
-          <div className="flex items-center gap-2.5 text-white">
-            <Sparkles
-              className="flex-shrink-0 ai-icon-highlight"
-              style={{ width: "14px", height: "14px", color: "#FBBF24" }}
-            />
-            <span className="text-xs font-bold tracking-wider">IA Prontivus</span>
+        {/* Cabeçalho premium — único no box */}
+        <div className="px-4 py-3 flex items-center justify-between border-b border-blue-900" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 flex-shrink-0 ai-icon-highlight" style={{ color: "#FBBF24" }} />
+            <div>
+              <span className="text-xs font-bold text-white tracking-wide">IA Clínica</span>
+              <span className="text-[10px] text-blue-300 ml-1.5">Prontivus</span>
+            </div>
           </div>
-          <span
-            className={`text-[9px] px-2 py-0.5 rounded-full font-semibold border transition-all duration-500 relative overflow-hidden ${
-              isProcessing
-                ? "bg-amber-400/20 border-amber-300/40 text-amber-100 animate-pulse"
-                : hasAIData
-                ? "bg-emerald-400/20 border-emerald-300/40 text-emerald-100"
-                : "bg-transparent text-white border-amber-400/60"
-            }`}
-            style={!isProcessing && !hasAIData ? {
-              animation: 'gold-glow 2s ease-in-out infinite',
-            } : {}}
-          >
-            {!isProcessing && !hasAIData && (
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
-                style={{
-                  animation: 'gold-shimmer 2s ease-in-out infinite',
-                  backgroundSize: '200% 100%',
-                }}
-              />
-            )}
-            <span className="relative z-10">
-              {isProcessing ? "Analisando..." : hasAIData ? "✦ Ativa" : "✦ Ativa"}
-            </span>
+          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-all duration-300 ${
+            isProcessing
+              ? "bg-amber-400/20 border-amber-400/40 text-amber-300 animate-pulse"
+              : hasAIData
+              ? "bg-emerald-400/20 border-emerald-400/40 text-emerald-300"
+              : "bg-amber-400/15 border-amber-400/30 text-amber-300"
+          }`}>
+            {isProcessing ? "Analisando..." : "✦ Ativa"}
           </span>
         </div>
 
@@ -830,13 +687,10 @@ export function AISidebar({
 
         {/* ── Análise de Exames ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-            <Brain
-              className="flex-shrink-0"
-              style={{ width: "14px", height: "14px", color: "#93c5fd" }}
-            />
-            <span className="text-xs font-semibold text-white">Análise de Exames</span>
-            <span className="ml-auto text-[9px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">✦ IA</span>
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <Brain className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Análise de Exames</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">✦ IA</span>
           </div>
           <div className="divide-y divide-slate-50">
             {selectedContextExams.length === 0 ? (
@@ -882,26 +736,23 @@ export function AISidebar({
           </div>
         </div>
 
-        {/* ── CID Sugerido ── */}
+        {/* ── CID-10 ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-            <Stethoscope
-              className="flex-shrink-0 ai-icon-highlight"
-              style={{ width: "14px", height: "14px", color: "#FBBF24" }}
-            />
-            <span className="text-xs font-semibold text-white">CID-10</span>
-            <div className="ml-auto flex items-center gap-2">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <Stethoscope className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">CID-10</span>
+            <div className="flex items-center gap-1">
               {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
-                <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
                   {analysisResults!.cidCodes.length}
                 </span>
               )}
               <button
                 onClick={() => setCidSearchDialogOpen(true)}
-                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                 title="Buscar CID"
               >
-                <Search className="w-3.5 h-3.5" />
+                <Search className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -960,15 +811,8 @@ export function AISidebar({
                       </div>
                     </button>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span
-                        className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600"
-                        style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
-                      >
-                        <div
-                          className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
-                          style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
-                        />
-                        <span className="relative z-10">✦ IA</span>
+                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0">
+                        ✦ IA
                       </span>
                     </div>
                   </div>
@@ -993,44 +837,33 @@ export function AISidebar({
                 ))}
               </>
             )}
-            <div className="px-3 py-2">
-              <button
-                onClick={() => setCidDialogOpen(true)}
-                className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" /> Adicionar CID manualmente
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* ── Exames Recomendados ── */}
+        {/* ── Exames ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-            <FlaskConical
-              className="flex-shrink-0 ai-icon-highlight"
-              style={{ width: "14px", height: "14px", color: "#FBBF24" }}
-            />
-            <span className="text-xs font-semibold text-white">Exames</span>
-            <div className="ml-auto flex items-center gap-2">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <FlaskConical className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Exames</span>
+            <div className="flex items-center gap-1">
               {(analysisResults?.exames?.length ?? 0) > 0 && (
-                <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
                   {analysisResults!.exames.length}
                 </span>
               )}
               <button
                 onClick={() => handleOpenRepetirDialog("exames")}
-                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                 title="Histórico de exames anteriores"
               >
-                <History className="w-3.5 h-3.5" />
+                <History className="w-3 h-3" />
               </button>
               <button
                 onClick={() => setExameSearchDialogOpen(true)}
-                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                 title="Buscar exame"
               >
-                <Search className="w-3.5 h-3.5" />
+                <Search className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -1073,14 +906,9 @@ export function AISidebar({
                       </div>
                     </div>
                     <span
-                      className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600 flex-shrink-0"
-                      style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
+                      className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0"
                     >
-                      <div
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
-                        style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
-                      />
-                      <span className="relative z-10">✦ IA</span>
+                      ✦ IA
                     </span>
                   </div>
                 ))}
@@ -1103,47 +931,36 @@ export function AISidebar({
                 ))}
               </>
             )}
-            <div className="px-3 py-2 flex items-center gap-2">
-              <button
-                onClick={() => setExameDialogOpen(true)}
-                className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" /> Adicionar exames manualmente
-              </button>
-            </div>
           </div>
         </div>
 
         {/* ── Prescrições ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 border-b border-slate-200 flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-            <Pill
-              className="flex-shrink-0 ai-icon-highlight"
-              style={{ width: "14px", height: "14px", color: "#FBBF24" }}
-            />
-            <span className="text-xs font-semibold text-white">Prescrições</span>
-            <div className="ml-auto flex items-center gap-2">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <Pill className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Prescrições</span>
+            <div className="flex items-center gap-1">
               {prescricoes.length > 0 && (
-                <span className="text-[10px] bg-white/20 text-white border border-white/30 px-1.5 py-0.5 rounded-full font-medium">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
                   {prescricoes.length}
                 </span>
               )}
               <button
                 onClick={() => handleOpenRepetirDialog("prescricoes")}
-                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                 title="Histórico de prescrições anteriores"
               >
-                <History className="w-3.5 h-3.5" />
+                <History className="w-3 h-3" />
               </button>
               <button
                 onClick={() => {
                   setSelectedPrescricaoIndex(null);
                   setMedicamentoDialogOpen(true);
                 }}
-                className="p-0.5 rounded text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
                 title="Buscar medicamento"
               >
-                <Search className="w-3.5 h-3.5" />
+                <Search className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -1196,15 +1013,8 @@ export function AISidebar({
                           )}
                         </div>
                       </div>
-                      <span
-                        className="relative overflow-hidden inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full border border-amber-400/60 text-amber-600 flex-shrink-0"
-                        style={{ animation: 'gold-glow 2s ease-in-out infinite' }}
-                      >
-                        <div
-                          className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/30 to-transparent"
-                          style={{ animation: 'gold-shimmer 2s ease-in-out infinite', backgroundSize: '200% 100%' }}
-                        />
-                        <span className="relative z-10">✦ IA</span>
+                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0">
+                        ✦ IA
                       </span>
                     </div>
                   );
@@ -1245,18 +1055,157 @@ export function AISidebar({
                 })}
               </>
             )}
-            <div className="px-3 py-2">
-              <button
-                onClick={() => {
-                  setSelectedPrescricaoIndex(null);
-                  setMedicamentoDialogOpen(true);
-                }}
-                className="text-xs text-slate-400 hover:text-slate-600 font-medium flex items-center gap-1"
-              >
-                <Plus className="w-3 h-3" /> Adicionar prescrição manualmente
-              </button>
-            </div>
           </div>
+        </div>
+
+        {/* ── Documentos ── */}
+        <div className="border-t border-slate-100 flex flex-col min-h-[160px]">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Documentos</span>
+            {documentosGerados.length > 0 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white">
+                {documentosGerados.length}
+              </span>
+            )}
+          </div>
+
+          {/* Picklist digitável */}
+          <div className="px-3 pt-2 pb-2.5">
+            <div ref={docInputWrapperRef} className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2 py-2 bg-white focus-within:border-blue-400 transition-colors">
+              <Search className="w-3 h-3 text-slate-400 flex-shrink-0" />
+              <input
+                ref={docInputRef}
+                type="text"
+                value={docSearch}
+                onChange={(e) => {
+                  setDocSearch(e.target.value);
+                  openDocDropdown();
+                }}
+                onFocus={openDocDropdown}
+                placeholder="Buscar documento..."
+                className="flex-1 text-xs text-slate-700 bg-transparent outline-none placeholder:text-slate-400 min-w-0"
+              />
+              {loadingDoc && <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />}
+            </div>
+
+            {/* Dropdown via portal para escapar do overflow-hidden */}
+            {docDropdownOpen && filteredDocs.length > 0 && docDropdownRect && typeof document !== "undefined" && createPortal(
+              <div
+                ref={docDropdownRef}
+                className="bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
+                style={{
+                  position: "fixed",
+                  top: docDropdownRect.bottom + 4,
+                  left: docDropdownRect.left,
+                  width: docDropdownRect.width,
+                  maxHeight: 220,
+                  zIndex: 9999,
+                }}
+              >
+                {filteredDocs.slice(0, 14).map((doc) => {
+                  const alreadyGenerated = documentosGerados.some((d) => d.tipoDocumento === doc.id);
+                  return (
+                    <button
+                      key={doc.id}
+                      onClick={() => handleGenDoc(doc.id)}
+                      disabled={loadingDoc === doc.id}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-left transition-colors border-b border-slate-50 last:border-0"
+                    >
+                      {loadingDoc === doc.id ? (
+                        <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />
+                      ) : alreadyGenerated ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                      )}
+                      <span className="text-xs text-slate-700 truncate">{doc.nome}</span>
+                    </button>
+                  );
+                })}
+              </div>,
+              document.body
+            )}
+          </div>
+
+          {/* Lista de documentos gerados */}
+          {documentosGerados.length > 0 && (
+            <div className="px-3 pb-3">
+              <div className="space-y-1.5">
+                {documentosGerados.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700 truncate flex-1">{doc.nomeDocumento}</span>
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {doc.pdfBlob && (
+                        <>
+                          <button
+                            onClick={() => openDoc(doc)}
+                            title="Abrir"
+                            className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => printDoc(doc)}
+                            title="Imprimir"
+                            className={`p-1.5 rounded-md transition-colors ${
+                              documentosImpressos.has(doc.id)
+                                ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            }`}
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {doc.erroAssinatura && (
+                        <span title={doc.erroAssinatura} className="p-1.5 rounded-md text-red-500 bg-red-50">
+                          <AlertCircle className="w-4 h-4" />
+                        </span>
+                      )}
+                      {onSignDocument && doc.pdfBlob && (
+                        <button
+                          onClick={() => onSignDocument(doc.id)}
+                          title={doc.assinando ? "Assinando..." : doc.assinado ? "Documento já assinado" : "Assinar digitalmente"}
+                          disabled={!!doc.assinado || !!doc.assinando}
+                          className={`p-1.5 rounded-md transition-colors ${
+                            doc.assinado ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                          } ${doc.assinando ? "opacity-70 cursor-not-allowed" : ""}`}
+                        >
+                          {doc.assinado ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                          ) : doc.assinando ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <FileCheck className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                      {onDeleteDocument && (
+                        <button
+                          onClick={() => onDeleteDocument(doc.id)}
+                          title="Remover"
+                          className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {documentosGerados.length === 0 && (
+            <div className="px-3 pb-3">
+              <p className="text-xs text-slate-400 text-center">Busque e clique para gerar</p>
+            </div>
+          )}
         </div>
 
         </div> {/* fim scroll wrapper */}
@@ -1460,215 +1409,8 @@ export function AISidebar({
         </DialogContent>
       </Dialog>
 
-      {/* ── Box 2: Documentos ── */}
-      <div className="border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col w-full min-w-0" style={{ backgroundColor: "#F5F8FF" }}>
-
-        {/* Cabeçalho — mesmo estilo do box IA Clínica */}
-        <div
-          className="px-3 py-2.5 flex items-center justify-between"
-          style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}
-        >
-          <div className="flex items-center gap-2 text-white">
-            <FileText className="w-4 h-4" />
-            <span className="text-xs font-bold tracking-wider ">Documentos</span>
-          </div>
-          <span
-            className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border ${
-              documentosGerados.length > 0
-                ? "bg-emerald-400/20 border-emerald-300/40 text-emerald-100"
-                : "bg-white/10 border-white/20 text-white/70"
-            }`}
-          >
-            {documentosGerados.length > 0
-              ? `${documentosGerados.length} gerado${documentosGerados.length !== 1 ? "s" : ""}`
-              : "Vazio"}
-          </span>
-        </div>
-
-        {/* Conteúdo scrollável */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-[320px] max-h-[4800px]">
-
-        {/* Picklist digitável */}
-        <div className="px-3 pt-3 pb-2.5">
-          <div className="relative">
-            <div className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2 py-2 bg-white focus-within:border-[#1E40AF] transition-colors">
-              <Search className="w-3 h-3 text-slate-400 flex-shrink-0" />
-              <input
-                ref={docInputRef}
-                type="text"
-                value={docSearch}
-                onChange={(e) => {
-                  setDocSearch(e.target.value);
-                  setDocDropdownOpen(true);
-                }}
-                onFocus={() => setDocDropdownOpen(true)}
-                placeholder="Buscar documento..."
-                className="flex-1 text-xs text-slate-700 bg-transparent outline-none placeholder:text-slate-400 min-w-0"
-              />
-              {loadingDoc && <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />}
-            </div>
-
-            {/* Dropdown de resultados - posicionado fixo para não ser cortado */}
-            {docDropdownOpen && filteredDocs.length > 0 && (
-              <div
-                ref={docDropdownRef}
-                className="absolute z-[100] top-full mt-1 left-0 right-0 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"
-              >
-                {filteredDocs.slice(0, 12).map((doc) => {
-                  const alreadyGenerated = documentosGerados.some(
-                    (d) => d.tipoDocumento === doc.id
-                  );
-                  return (
-                    <button
-                      key={doc.id}
-                      onClick={() => handleGenDoc(doc.id)}
-                      disabled={loadingDoc === doc.id}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 text-left transition-colors"
-                    >
-                      {loadingDoc === doc.id ? (
-                        <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />
-                      ) : alreadyGenerated ? (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                      ) : (
-                        <FileText className="w-3 h-3 text-slate-300 flex-shrink-0" />
-                      )}
-                      <span className="text-xs text-slate-700 truncate">{doc.nome}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Lista de documentos gerados */}
-        {documentosGerados.length > 0 && (
-          <div className="px-3 pb-3">
-            <div className="space-y-1">
-              {documentosGerados.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-100"
-                >
-                  <FileText className="w-3 h-3 text-[#1E40AF] flex-shrink-0" />
-                  <span className="text-xs text-slate-700 truncate flex-1">
-                    {doc.nomeDocumento}
-                  </span>
-                  <span
-                    className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium border flex-shrink-0 ${
-                      doc.assinado
-                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                        : "bg-amber-50 border-amber-200 text-amber-700"
-                    }`}
-                    title={doc.assinado ? "Assinado" : "Não assinado"}
-                  >
-                    {doc.assinado ? "Assinado" : "Não assinado"}
-                  </span>
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    {doc.pdfBlob && (
-                      <>
-                        <button
-                          onClick={() => openDoc(doc)}
-                          title="Abrir"
-                          className="p-0.5 rounded text-slate-400 hover:text-[#1E40AF] hover:bg-blue-50 transition-colors"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => printDoc(doc)}
-                          title="Imprimir"
-                          className={`p-0.5 rounded transition-colors ${
-                            documentosImpressos.has(doc.id)
-                              ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                              : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                          }`}
-                        >
-                          <Printer className="w-3 h-3" />
-                        </button>
-                      </>
-                    )}
-                    {doc.erroAssinatura && (
-                      <span
-                        title={doc.erroAssinatura}
-                        className="p-0.5 rounded text-red-500 bg-red-50"
-                      >
-                        <AlertCircle className="w-3 h-3" />
-                      </span>
-                    )}
-                    {onSignDocument && doc.pdfBlob && (
-                      <button
-                        onClick={() => onSignDocument(doc.id)}
-                        title={
-                          doc.assinando
-                            ? "Assinando..."
-                            : doc.assinado
-                              ? "Documento já assinado"
-                              : "Assinar digitalmente"
-                        }
-                        disabled={!!doc.assinado || !!doc.assinando}
-                        className={`p-0.5 rounded transition-colors ${
-                          doc.assinado
-                            ? "text-emerald-600 bg-emerald-50"
-                            : "text-slate-400 hover:text-[#1E40AF] hover:bg-blue-50"
-                        } ${doc.assinando ? "opacity-70 cursor-not-allowed" : ""}`}
-                      >
-                        {doc.assinado ? (
-                          <CheckCircle2 className="w-3 h-3" />
-                        ) : doc.assinando ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <FileCheck className="w-3 h-3" />
-                        )}
-                      </button>
-                    )}
-                    {onDeleteDocument && (
-                      <button
-                        onClick={() => onDeleteDocument(doc.id)}
-                        title="Remover"
-                        className="p-0.5 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {documentosGerados.length === 0 && (
-          <div className="px-3 pb-3">
-            <p className="text-xs text-slate-400 text-center">
-              Busque e clique em um documento para gerá-lo
-            </p>
-          </div>
-        )}
-
-        </div>
-      </div>
-
-      {/* ── Rodapé branding ── */}
-      <div className="pt-1 pb-0.5 flex items-center justify-center gap-1.5">
-
-      </div>
     </div>
 
-    {/* ── Modal de dados para atestados ── */}
-    <AtestadoFormModal
-      docId={formDocId}
-      docNome={documentModels.find(d => d.id === formDocId)?.nome}
-      isDias={formDocId !== null && DOCS_COM_DIAS.has(formDocId) && formDocId !== "atestado-afastamento-indeterminado"}
-      isMeses={formDocId !== null && DOCS_COM_MESES.has(formDocId)}
-      formDias={formDias}
-      setFormDias={setFormDias}
-      formMeses={formMeses}
-      setFormMeses={setFormMeses}
-      cidAuto={analysisResults?.cidCodes?.[0]}
-      loading={!!loadingDoc}
-      onConfirm={handleFormConfirm}
-      onClose={() => { setFormDocId(null); setFormDias("1"); setFormMeses("6"); }}
-    />
     <Dialog
       open={examAnalysisModalOpen && hasExamAnalysisReady}
       onOpenChange={(open) => {

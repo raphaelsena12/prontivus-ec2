@@ -90,7 +90,11 @@ export async function POST(request: NextRequest) {
         },
         procedimentosInsumos: {
           include: {
-            insumo: true,
+            insumo: {
+              include: {
+                estoqueInsumo: true,
+              },
+            },
           },
         },
       },
@@ -103,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar estoque de medicamentos
+    // Verificar estoque de medicamentos e insumos
     const estoqueInsuficiente: string[] = [];
     for (const procMed of procedimento.procedimentosMedicamentos) {
       const estoque = procMed.medicamento.estoqueMedicamentos[0];
@@ -118,6 +122,24 @@ export async function POST(request: NextRequest) {
       if (estoque.quantidadeAtual < quantidadeNecessaria) {
         estoqueInsuficiente.push(
           `${procMed.medicamento.nome} - Estoque insuficiente (disponível: ${estoque.quantidadeAtual}, necessário: ${quantidadeNecessaria})`
+        );
+      }
+    }
+
+    // Verificar estoque de insumos
+    for (const procInsumo of procedimento.procedimentosInsumos) {
+      const estoque = procInsumo.insumo.estoqueInsumo;
+      if (!estoque) {
+        estoqueInsuficiente.push(
+          `${procInsumo.insumo.nome} - Estoque não cadastrado`
+        );
+        continue;
+      }
+
+      const quantidadeNecessaria = Number(procInsumo.quantidade || 0);
+      if (estoque.quantidadeAtual < quantidadeNecessaria) {
+        estoqueInsuficiente.push(
+          `${procInsumo.insumo.nome} (insumo) - Estoque insuficiente (disponível: ${estoque.quantidadeAtual}, necessário: ${quantidadeNecessaria})`
         );
       }
     }
@@ -165,20 +187,30 @@ export async function POST(request: NextRequest) {
 
     // Executar em transação: baixar estoque, criar fluxo de caixa e registrar execução
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Baixar estoque de medicamentos
       const movimentacoes = [];
-      for (const procMed of procedimento.procedimentosMedicamentos) {
-        const estoque = procMed.medicamento.estoqueMedicamentos[0];
-        if (estoque) {
-          const quantidade = Number(procMed.quantidade || 0);
-          const novaQuantidade = estoque.quantidadeAtual - quantidade;
 
-          // Criar movimentação
+      // 1. Baixar estoque de medicamentos (re-lê dentro da transação para evitar race condition)
+      for (const procMed of procedimento.procedimentosMedicamentos) {
+        const estoqueRef = procMed.medicamento.estoqueMedicamentos[0];
+        if (estoqueRef) {
+          const quantidade = Number(procMed.quantidade || 0);
+
+          // Re-ler estoque dentro da transação para garantir consistência
+          const estoqueAtual = await tx.estoqueMedicamento.findUniqueOrThrow({
+            where: { id: estoqueRef.id },
+          });
+
+          if (estoqueAtual.quantidadeAtual < quantidade) {
+            throw new Error(
+              `Estoque insuficiente para ${procMed.medicamento.nome} (disponível: ${estoqueAtual.quantidadeAtual}, necessário: ${quantidade})`
+            );
+          }
+
           const movimentacao = await tx.movimentacaoEstoque.create({
             data: {
               clinicaId: auth.clinicaId!,
               tipoEstoque: "MEDICAMENTO",
-              estoqueMedicamentoId: estoque.id,
+              estoqueMedicamentoId: estoqueRef.id,
               tipo: "SAIDA",
               quantidade,
               motivo: "Execução de procedimento",
@@ -186,17 +218,53 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Atualizar estoque
           await tx.estoqueMedicamento.update({
-            where: { id: estoque.id },
-            data: { quantidadeAtual: novaQuantidade },
+            where: { id: estoqueRef.id },
+            data: { quantidadeAtual: estoqueAtual.quantidadeAtual - quantidade },
           });
 
           movimentacoes.push(movimentacao);
         }
       }
 
-      // 2. Criar entrada no fluxo de caixa
+      // 2. Baixar estoque de insumos (re-lê dentro da transação para evitar race condition)
+      for (const procInsumo of procedimento.procedimentosInsumos) {
+        const estoqueRef = procInsumo.insumo.estoqueInsumo;
+        if (estoqueRef) {
+          const quantidade = Number(procInsumo.quantidade || 0);
+
+          const estoqueAtual = await tx.estoqueInsumo.findUniqueOrThrow({
+            where: { id: estoqueRef.id },
+          });
+
+          if (estoqueAtual.quantidadeAtual < quantidade) {
+            throw new Error(
+              `Estoque insuficiente para ${procInsumo.insumo.nome} (disponível: ${estoqueAtual.quantidadeAtual}, necessário: ${quantidade})`
+            );
+          }
+
+          const movimentacao = await tx.movimentacaoEstoque.create({
+            data: {
+              clinicaId: auth.clinicaId!,
+              tipoEstoque: "INSUMO",
+              estoqueInsumoId: estoqueRef.id,
+              tipo: "SAIDA",
+              quantidade,
+              motivo: "Execução de procedimento",
+              observacoes: `Procedimento: ${procedimento.nome} - Paciente: ${paciente.nome}`,
+            },
+          });
+
+          await tx.estoqueInsumo.update({
+            where: { id: estoqueRef.id },
+            data: { quantidadeAtual: estoqueAtual.quantidadeAtual - quantidade },
+          });
+
+          movimentacoes.push(movimentacao);
+        }
+      }
+
+      // 3. Criar entrada no fluxo de caixa
       const fluxoCaixa = await tx.fluxoCaixa.create({
         data: {
           clinicaId: auth.clinicaId!,
@@ -209,7 +277,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // 3. Criar conta a receber (se necessário, para controle financeiro)
+      // 4. Criar conta a receber (se necessário, para controle financeiro)
       const contaReceber = await tx.contaReceber.create({
         data: {
           clinicaId: auth.clinicaId!,

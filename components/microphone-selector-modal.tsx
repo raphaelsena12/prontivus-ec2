@@ -180,7 +180,7 @@ export function MicrophoneSelectorModal({
           {devices.map((device) => {
             const isSelected = selectedDeviceId === device.deviceId;
             const audioLevel = audioLevels[device.deviceId] || 0;
-            
+
             return (
               <div
                 key={device.deviceId}
@@ -192,31 +192,30 @@ export function MicrophoneSelectorModal({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <Mic className="w-5 h-5 text-emerald-600" />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? "bg-blue-100" : "bg-slate-100"}`}>
+                    <Mic className={`w-5 h-5 ${isSelected ? "text-blue-600" : "text-slate-400"}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-slate-800 mb-1 truncate">
+                    <h4 className="font-semibold text-slate-800 truncate">
                       {device.label}
                     </h4>
-                    <p className="text-xs text-emerald-600 font-medium">
-                      Captando áudio
-                    </p>
+                    {isSelected && (
+                      <p className="text-xs text-emerald-600 font-medium mt-0.5">
+                        Captando áudio
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, i) => {
-                      const barHeight = Math.max(4, (audioLevel / 100) * 20 * (i + 1));
-                      return (
-                        <div
-                          key={i}
-                          className="w-1 bg-slate-300 rounded-full transition-all"
-                          style={{
-                            height: `${barHeight}px`,
-                            backgroundColor: audioLevel > i * 20 ? "#3b82f6" : "#cbd5e1",
-                          }}
-                        />
-                      );
-                    })}
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 rounded-full transition-all"
+                        style={{
+                          height: `${Math.max(4, (audioLevel / 100) * 20 * (i + 1))}px`,
+                          backgroundColor: audioLevel > i * 20 ? "#3b82f6" : "#cbd5e1",
+                        }}
+                      />
+                    ))}
                   </div>
                   {isSelected && (
                     <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
@@ -229,57 +228,16 @@ export function MicrophoneSelectorModal({
           })}
         </div>
 
-        {selectedDevice && (
-          <div className="border-t border-slate-200 pt-4 mt-4">
-            <p className="text-xs font-semibold text-slate-600 mb-2">
-              Microfone selecionado:
-            </p>
-            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <Mic className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-slate-800 text-sm truncate">
-                    {selectedDevice.label}
-                  </h4>
-                  <p className="text-xs text-emerald-600 font-medium">
-                    Captando áudio
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const audioLevel = audioLevels[selectedDevice.deviceId] || 0;
-                    const barHeight = Math.max(4, (audioLevel / 100) * 20 * (i + 1));
-                    return (
-                      <div
-                        key={i}
-                        className="w-1 bg-slate-300 rounded-full transition-all"
-                        style={{
-                          height: `${barHeight}px`,
-                          backgroundColor: audioLevel > i * 20 ? "#3b82f6" : "#cbd5e1",
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-4">
-              <Checkbox
-                id="remember"
-                checked={rememberChoice}
-                onCheckedChange={(checked) => setRememberChoice(checked === true)}
-              />
-              <label
-                htmlFor="remember"
-                className="text-xs text-slate-600 cursor-pointer"
-              >
-                Lembrar minha escolha
-              </label>
-            </div>
-          </div>
-        )}
+        <div className="flex items-center gap-2 mt-2">
+          <Checkbox
+            id="remember"
+            checked={rememberChoice}
+            onCheckedChange={(checked) => setRememberChoice(checked === true)}
+          />
+          <label htmlFor="remember" className="text-xs text-slate-600 cursor-pointer">
+            Lembrar minha escolha
+          </label>
+        </div>
 
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={onClose}>

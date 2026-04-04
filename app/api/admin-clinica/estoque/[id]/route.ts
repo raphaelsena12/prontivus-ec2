@@ -55,13 +55,57 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
     if (estoqueMedicamento) {
-      const estoque = await prisma.estoqueMedicamento.update({ where: { id }, data: validation.data });
+      const novaQuantidade = validation.data.quantidadeAtual;
+      const quantidadeMudou = novaQuantidade !== undefined && novaQuantidade !== estoqueMedicamento.quantidadeAtual;
+
+      const [estoque] = await prisma.$transaction(async (tx) => {
+        const updated = await tx.estoqueMedicamento.update({ where: { id }, data: validation.data });
+
+        if (quantidadeMudou) {
+          await tx.movimentacaoEstoque.create({
+            data: {
+              clinicaId: auth.clinicaId!,
+              tipoEstoque: "MEDICAMENTO",
+              estoqueMedicamentoId: id,
+              tipo: "AJUSTE",
+              quantidade: novaQuantidade!,
+              motivo: "Ajuste manual via edição de estoque",
+              observacoes: `Quantidade anterior: ${estoqueMedicamento.quantidadeAtual} → Nova: ${novaQuantidade}`,
+            },
+          });
+        }
+
+        return [updated];
+      });
+
       return NextResponse.json({ estoque, tipoEstoque: "MEDICAMENTO" });
     }
 
     const estoqueInsumo = await prisma.estoqueInsumo.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
     if (estoqueInsumo) {
-      const estoque = await prisma.estoqueInsumo.update({ where: { id }, data: validation.data });
+      const novaQuantidade = validation.data.quantidadeAtual;
+      const quantidadeMudou = novaQuantidade !== undefined && novaQuantidade !== estoqueInsumo.quantidadeAtual;
+
+      const [estoque] = await prisma.$transaction(async (tx) => {
+        const updated = await tx.estoqueInsumo.update({ where: { id }, data: validation.data });
+
+        if (quantidadeMudou) {
+          await tx.movimentacaoEstoque.create({
+            data: {
+              clinicaId: auth.clinicaId!,
+              tipoEstoque: "INSUMO",
+              estoqueInsumoId: id,
+              tipo: "AJUSTE",
+              quantidade: novaQuantidade!,
+              motivo: "Ajuste manual via edição de estoque",
+              observacoes: `Quantidade anterior: ${estoqueInsumo.quantidadeAtual} → Nova: ${novaQuantidade}`,
+            },
+          });
+        }
+
+        return [updated];
+      });
+
       return NextResponse.json({ estoque, tipoEstoque: "INSUMO" });
     }
 
@@ -78,14 +122,48 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!auth.authorized) return auth.response;
     const { id } = await params;
 
-    const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    const estoqueMedicamento = await prisma.estoqueMedicamento.findFirst({
+      where: { id, clinicaId: auth.clinicaId! },
+      include: { medicamento: true },
+    });
     if (estoqueMedicamento) {
+      // Verificar se medicamento está vinculado a procedimentos ativos
+      const procedimentosVinculados = await prisma.procedimentoMedicamento.count({
+        where: {
+          medicamentoId: estoqueMedicamento.medicamentoId,
+          procedimento: { clinicaId: auth.clinicaId!, ativo: true },
+        },
+      });
+      if (procedimentosVinculados > 0) {
+        return NextResponse.json(
+          { error: `Não é possível deletar: ${estoqueMedicamento.medicamento.nome} está vinculado a ${procedimentosVinculados} procedimento(s) ativo(s)` },
+          { status: 400 }
+        );
+      }
+
       await prisma.estoqueMedicamento.delete({ where: { id } });
       return NextResponse.json({ message: "Estoque deletado com sucesso", tipoEstoque: "MEDICAMENTO" });
     }
 
-    const estoqueInsumo = await prisma.estoqueInsumo.findFirst({ where: { id, clinicaId: auth.clinicaId! } });
+    const estoqueInsumo = await prisma.estoqueInsumo.findFirst({
+      where: { id, clinicaId: auth.clinicaId! },
+      include: { insumo: true },
+    });
     if (estoqueInsumo) {
+      // Verificar se insumo está vinculado a procedimentos ativos
+      const procedimentosVinculados = await prisma.procedimentoInsumo.count({
+        where: {
+          insumoId: estoqueInsumo.insumoId,
+          procedimento: { clinicaId: auth.clinicaId!, ativo: true },
+        },
+      });
+      if (procedimentosVinculados > 0) {
+        return NextResponse.json(
+          { error: `Não é possível deletar: ${estoqueInsumo.insumo.nome} está vinculado a ${procedimentosVinculados} procedimento(s) ativo(s)` },
+          { status: 400 }
+        );
+      }
+
       await prisma.estoqueInsumo.delete({ where: { id } });
       return NextResponse.json({ message: "Estoque deletado com sucesso", tipoEstoque: "INSUMO" });
     }

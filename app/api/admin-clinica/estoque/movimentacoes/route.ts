@@ -134,58 +134,81 @@ export async function POST(request: NextRequest) {
       estoqueInsumoId = estoque.id;
     }
 
-    // Atualizar quantidade do estoque
-    let novaQuantidade = estoque.quantidadeAtual;
-    if (data.tipo === "ENTRADA") {
-      novaQuantidade += data.quantidade;
-    } else if (data.tipo === "SAIDA") {
-      if (estoque.quantidadeAtual < data.quantidade) {
-        return NextResponse.json({ error: "Quantidade insuficiente em estoque" }, { status: 400 });
+    // Executar validação e atualização em transação interativa para evitar race condition
+    const resultado = await prisma.$transaction(async (tx) => {
+      // Re-ler estoque dentro da transação para garantir consistência
+      let estoqueAtual: any;
+      if (data.tipoEstoque === "MEDICAMENTO") {
+        estoqueAtual = await tx.estoqueMedicamento.findUniqueOrThrow({ where: { id: estoqueMedicamentoId } });
+      } else {
+        estoqueAtual = await tx.estoqueInsumo.findUniqueOrThrow({ where: { id: estoqueInsumoId } });
       }
-      novaQuantidade -= data.quantidade;
-    } else if (data.tipo === "AJUSTE") {
-      novaQuantidade = data.quantidade;
-    }
 
-    // Criar movimentação e atualizar estoque em transação
-    const movimentacaoData: any = {
-      clinicaId: auth.clinicaId!,
-      tipoEstoque: data.tipoEstoque,
-      tipo: data.tipo,
-      quantidade: data.quantidade,
-      motivo: data.motivo || null,
-      observacoes: data.observacoes || null,
-    };
+      let novaQuantidade = estoqueAtual.quantidadeAtual;
+      if (data.tipo === "ENTRADA") {
+        novaQuantidade += data.quantidade;
+        // Validar quantidade máxima
+        if (estoqueAtual.quantidadeMaxima !== null && novaQuantidade > estoqueAtual.quantidadeMaxima) {
+          throw new Error(
+            `Quantidade máxima excedida. Máximo permitido: ${estoqueAtual.quantidadeMaxima}, resultado da entrada: ${novaQuantidade}`
+          );
+        }
+      } else if (data.tipo === "SAIDA") {
+        if (estoqueAtual.quantidadeAtual < data.quantidade) {
+          throw new Error("Quantidade insuficiente em estoque");
+        }
+        novaQuantidade -= data.quantidade;
+      } else if (data.tipo === "AJUSTE") {
+        novaQuantidade = data.quantidade;
+      }
 
-    if (estoqueMedicamentoId) {
-      movimentacaoData.estoqueMedicamentoId = estoqueMedicamentoId;
-    } else if (estoqueInsumoId) {
-      movimentacaoData.estoqueInsumoId = estoqueInsumoId;
-    }
+      const movimentacaoData: any = {
+        clinicaId: auth.clinicaId!,
+        tipoEstoque: data.tipoEstoque,
+        tipo: data.tipo,
+        quantidade: data.quantidade,
+        motivo: data.motivo || null,
+        observacoes: data.observacoes || null,
+      };
 
-    const updateData: any = { quantidadeAtual: novaQuantidade };
+      if (estoqueMedicamentoId) {
+        movimentacaoData.estoqueMedicamentoId = estoqueMedicamentoId;
+      } else if (estoqueInsumoId) {
+        movimentacaoData.estoqueInsumoId = estoqueInsumoId;
+      }
 
-    if (data.tipoEstoque === "MEDICAMENTO") {
-      const [movimentacao] = await prisma.$transaction([
-        prisma.movimentacaoEstoque.create({ data: movimentacaoData }),
-        prisma.estoqueMedicamento.update({
+      const movimentacao = await tx.movimentacaoEstoque.create({ data: movimentacaoData });
+
+      if (data.tipoEstoque === "MEDICAMENTO") {
+        await tx.estoqueMedicamento.update({
           where: { id: estoqueMedicamentoId },
-          data: updateData,
-        }),
-      ]);
-      return NextResponse.json({ movimentacao }, { status: 201 });
-    } else {
-      const [movimentacao] = await prisma.$transaction([
-        prisma.movimentacaoEstoque.create({ data: movimentacaoData }),
-        prisma.estoqueInsumo.update({
+          data: { quantidadeAtual: novaQuantidade },
+        });
+      } else {
+        await tx.estoqueInsumo.update({
           where: { id: estoqueInsumoId },
-          data: updateData,
-        }),
-      ]);
-      return NextResponse.json({ movimentacao }, { status: 201 });
+          data: { quantidadeAtual: novaQuantidade },
+        });
+      }
+
+      // Verificar alerta de estoque mínimo
+      const abaixoDoMinimo = novaQuantidade <= estoqueAtual.quantidadeMinima && estoqueAtual.quantidadeMinima > 0;
+
+      return { movimentacao, novaQuantidade, abaixoDoMinimo, quantidadeMinima: estoqueAtual.quantidadeMinima };
+    });
+
+    const response: any = { movimentacao: resultado.movimentacao };
+    if (resultado.abaixoDoMinimo) {
+      response.alerta = `Atenção: estoque abaixo do mínimo! Quantidade atual: ${resultado.novaQuantidade}, mínimo configurado: ${resultado.quantidadeMinima}`;
     }
-  } catch (error) {
+
+    return NextResponse.json(response, { status: 201 });
+  } catch (error: any) {
     console.error("Erro ao criar movimentação:", error);
+    const message = error?.message || "";
+    if (message.includes("insuficiente") || message.includes("máxima excedida")) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
     return NextResponse.json({ error: "Erro ao criar movimentação" }, { status: 500 });
   }
 }

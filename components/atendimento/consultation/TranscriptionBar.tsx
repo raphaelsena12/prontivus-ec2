@@ -73,20 +73,11 @@ export function TranscriptionBar({
         }`}
       >
         {/* Indicador de estado */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Mic className={`w-4 h-4 ${isPaused ? "text-amber-400" : "text-white"}`} />
-            {!isPaused && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            )}
-          </div>
-          <span
-            className={`text-sm font-medium whitespace-nowrap ${
-              isPaused ? "text-amber-200" : "text-white"
-            }`}
-          >
-            {isPaused ? "Pausado" : "Gravando"}
-          </span>
+        <div className="relative">
+          <Mic className={`w-4 h-4 ${isPaused ? "text-amber-400" : "text-white"}`} />
+          {!isPaused && (
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          )}
         </div>
 
         {/* Timer */}

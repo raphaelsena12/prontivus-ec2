@@ -1,8 +1,10 @@
-import { Tabs, router } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
+import { Platform, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/auth.store';
 import { Colors } from '../../constants/colors';
+import { router } from 'expo-router';
 
 export default function AppLayout() {
   const { token, isLoading } = useAuthStore();
@@ -22,26 +24,40 @@ export default function AppLayout() {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 6,
+          backgroundColor: Colors.white,
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 88 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          paddingTop: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.06,
+          shadowRadius: 12,
+          elevation: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 11,
           fontWeight: '600',
           marginTop: 2,
+        },
+        tabBarIconStyle: {
+          marginBottom: -2,
         },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Início',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+          title: 'Inicio',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? {
+              backgroundColor: Colors.primaryLight,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+            } : undefined}>
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -49,8 +65,15 @@ export default function AppLayout() {
         name="agendamentos"
         options={{
           title: 'Agenda',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? {
+              backgroundColor: Colors.primaryLight,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+            } : undefined}>
+              <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -58,17 +81,31 @@ export default function AppLayout() {
         name="consultas"
         options={{
           title: 'Consultas',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'medical' : 'medical-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? {
+              backgroundColor: Colors.primaryLight,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+            } : undefined}>
+              <Ionicons name={focused ? 'medical' : 'medical-outline'} size={22} color={color} />
+            </View>
           ),
         }}
       />
       <Tabs.Screen
         name="prescricoes"
         options={{
-          title: 'Prescrições',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={size} color={color} />
+          title: 'Receitas',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? {
+              backgroundColor: Colors.primaryLight,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+            } : undefined}>
+              <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={22} color={color} />
+            </View>
           ),
         }}
       />
@@ -76,19 +113,18 @@ export default function AppLayout() {
         name="perfil"
         options={{
           title: 'Perfil',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? {
+              backgroundColor: Colors.primaryLight,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+            } : undefined}>
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+            </View>
           ),
         }}
       />
-
-      {/* Rotas ocultas da navbar */}
-      <Tabs.Screen name="agendamentos/novo" options={{ href: null }} />
-      <Tabs.Screen name="agendamentos/telemedicina" options={{ href: null }} />
-      <Tabs.Screen name="agendamentos/consulta-web" options={{ href: null }} />
-      <Tabs.Screen name="agendamentos/pagamento-telemedicina" options={{ href: null }} />
-      <Tabs.Screen name="consultas/[id]" options={{ href: null }} />
-      <Tabs.Screen name="prescricoes/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -2,7 +2,6 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Mic,
@@ -220,53 +219,45 @@ export function Step1Transcription({
         </div>
 
         {/* Área de transcrição */}
-        <ScrollArea
-          className={`transition-all ${
-            isTranscribing || hasTranscription ? "h-72" : "h-44"
-          }`}
-        >
-          <div className="p-5 space-y-3">
-            {!hasTranscription && !isTranscribing && (
-              <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                  <Mic className="w-8 h-8 text-slate-300" />
-                </div>
-                <p className="text-sm font-medium text-slate-500">Pronto para iniciar a consulta</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Clique em "Iniciar Gravação" para transcrever a conversa
-                </p>
+        <div className="p-5 space-y-3">
+          {!hasTranscription && !isTranscribing && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <Mic className="w-8 h-8 text-slate-300" />
               </div>
-            )}
+              <p className="text-sm font-medium text-slate-500">Pronto para iniciar a consulta</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Clique em "Iniciar Gravação" para transcrever a conversa
+              </p>
+            </div>
+          )}
 
-            {isTranscribing && !hasTranscription && (
-              <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-10">
-                <div className="flex gap-1">
-                  {[0, 150, 300].map((d) => (
-                    <div
-                      key={d}
-                      className="w-2 h-2 bg-slate-800 rounded-full animate-bounce"
-                      style={{ animationDelay: `${d}ms` }}
-                    />
-                  ))}
-                </div>
-                <span className="ml-2">Ouvindo...</span>
+          {isTranscribing && !hasTranscription && (
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-500 py-10">
+              <div className="flex gap-1">
+                {[0, 150, 300].map((d) => (
+                  <div
+                    key={d}
+                    className="w-2 h-2 bg-slate-800 rounded-full animate-bounce"
+                    style={{ animationDelay: `${d}ms` }}
+                  />
+                ))}
               </div>
-            )}
+              <span className="ml-2">Ouvindo...</span>
+            </div>
+          )}
 
-            {transcription.map((entry, idx) => {
-              return (
-                <div key={idx} className="flex gap-3 group">
-                  <span className="text-slate-400 tabular-nums text-xs mt-0.5 flex-shrink-0 w-16 text-right">
-                    {formatTranscriptionTime(entry.time)}
-                  </span>
-                  <div className="flex-1 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 group-hover:bg-slate-100 transition-colors">
-                    {entry.text}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
+          {transcription.map((entry, idx) => (
+            <div key={idx} className="flex gap-3 group">
+              <span className="text-slate-400 tabular-nums text-xs mt-0.5 flex-shrink-0 w-16 text-right">
+                {formatTranscriptionTime(entry.time)}
+              </span>
+              <div className="flex-1 text-sm text-slate-700 leading-relaxed bg-slate-50 rounded-lg px-3 py-2 group-hover:bg-slate-100 transition-colors">
+                {entry.text}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Aviso e botão de avanço — só aparecem após finalizar */}

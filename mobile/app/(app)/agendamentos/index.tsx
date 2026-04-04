@@ -8,8 +8,7 @@ import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Button } from '../../../components/ui/Button';
-import { Colors } from '../../../constants/colors';
+import { Colors, BorderRadius } from '../../../constants/colors';
 import { Agendamento } from '../../../types/api.types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,7 +28,7 @@ export default function AgendamentosScreen() {
 
   function handleCancelar(id: string) {
     Alert.alert('Cancelar consulta', 'Tem certeza que deseja cancelar este agendamento?', [
-      { text: 'Não', style: 'cancel' },
+      { text: 'Nao', style: 'cancel' },
       {
         text: 'Sim, cancelar',
         style: 'destructive',
@@ -41,12 +40,17 @@ export default function AgendamentosScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>Agendamentos</Text>
+        <View>
+          <Text style={styles.title}>Agendamentos</Text>
+          <Text style={styles.subtitle}>{agendamentos?.length ?? 0} registros</Text>
+        </View>
         <TouchableOpacity
           style={styles.newButton}
           onPress={() => router.push('/(app)/agendamentos/novo')}
+          activeOpacity={0.7}
         >
-          <Ionicons name="add" size={22} color={Colors.white} />
+          <Ionicons name="add" size={20} color={Colors.white} />
+          <Text style={styles.newButtonText}>Novo</Text>
         </TouchableOpacity>
       </View>
 
@@ -59,7 +63,7 @@ export default function AgendamentosScreen() {
           <EmptyState
             icon="calendar-outline"
             title="Nenhum agendamento"
-            description="Toque em + para agendar uma consulta"
+            description="Toque em '+ Novo' para agendar uma consulta"
           />
         }
         renderItem={({ item }) => (
@@ -78,42 +82,45 @@ function AgendamentoCard({
   onCancelar: (id: string) => void;
 }) {
   const podeCancel = agendamento.status === 'AGENDADA' || agendamento.status === 'CONFIRMADA';
+  const dataFormatada = format(new Date(agendamento.dataHora), "dd MMM", { locale: ptBR });
+  const horaFormatada = format(new Date(agendamento.dataHora), "HH:mm");
+  const diaFormatado = format(new Date(agendamento.dataHora), "EEEE", { locale: ptBR });
 
   return (
     <Card style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.doctorInfo}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={20} color={Colors.primary} />
-          </View>
-          <View>
-            <Text style={styles.doctorName}>Dr(a). {agendamento.medico?.nome ?? '—'}</Text>
-            {agendamento.medico?.especialidade && (
-              <Text style={styles.especialidade}>{agendamento.medico.especialidade}</Text>
-            )}
-          </View>
+      <View style={styles.cardBody}>
+        {/* Date pill */}
+        <View style={styles.datePill}>
+          <Text style={styles.datePillDay}>{dataFormatada}</Text>
+          <Text style={styles.datePillTime}>{horaFormatada}</Text>
         </View>
+
+        {/* Info */}
+        <View style={styles.cardInfo}>
+          <Text style={styles.doctorName}>Dr(a). {agendamento.medico?.nome ?? '--'}</Text>
+          {agendamento.medico?.especialidade && (
+            <Text style={styles.especialidade}>{agendamento.medico.especialidade}</Text>
+          )}
+          <Text style={styles.dayText}>{diaFormatado}</Text>
+        </View>
+
+        {/* Status */}
         <Badge
           label={statusLabel[agendamento.status] ?? agendamento.status}
           status={agendamento.status}
+          size="sm"
         />
-      </View>
-
-      <View style={styles.dateRow}>
-        <Ionicons name="calendar-outline" size={14} color={Colors.textSecondary} />
-        <Text style={styles.date}>
-          {format(new Date(agendamento.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-        </Text>
       </View>
 
       {podeCancel && (
-        <Button
-          title="Cancelar"
-          onPress={() => onCancelar(agendamento.id)}
-          variant="outline"
+        <TouchableOpacity
           style={styles.cancelBtn}
-          textStyle={styles.cancelText}
-        />
+          onPress={() => onCancelar(agendamento.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close-circle-outline" size={16} color={Colors.error} />
+          <Text style={styles.cancelText}>Cancelar agendamento</Text>
+        </TouchableOpacity>
       )}
     </Card>
   );
@@ -128,31 +135,77 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 8,
   },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  title: { fontSize: 24, fontWeight: '800', color: Colors.text },
+  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   newButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  newButtonText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
   list: { padding: 20, paddingTop: 8, gap: 12 },
-  card: { gap: 12 },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  doctorInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  card: { gap: 0, padding: 0, overflow: 'hidden' },
+  cardBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 14,
+  },
+  datePill: {
+    width: 56,
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.md,
+    gap: 2,
+  },
+  datePillDay: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primary,
+    textTransform: 'capitalize',
+  },
+  datePillTime: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primaryDark,
+  },
+  cardInfo: { flex: 1, gap: 2 },
+  doctorName: { fontSize: 15, fontWeight: '700', color: Colors.text },
+  especialidade: { fontSize: 13, color: Colors.textSecondary },
+  dayText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    textTransform: 'capitalize',
+    marginTop: 2,
+  },
+  cancelBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    backgroundColor: Colors.errorLight,
   },
-  doctorName: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  especialidade: { fontSize: 13, color: Colors.textSecondary },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  date: { fontSize: 13, color: Colors.textSecondary },
-  cancelBtn: { height: 36, borderColor: Colors.error },
-  cancelText: { color: Colors.error, fontSize: 14 },
+  cancelText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.error,
+  },
 });

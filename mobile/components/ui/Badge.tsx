@@ -1,15 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Colors, BorderRadius } from '../../constants/colors';
 
-type BadgeVariant = 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'default';
+type BadgeVariant = 'agendado' | 'confirmado' | 'cancelado' | 'realizado' | 'default' | 'success' | 'warning' | 'info';
 
-const variantColors: Record<BadgeVariant, { bg: string; text: string }> = {
-  agendado: { bg: '#EFF6FF', text: Colors.statusAgendado },
-  confirmado: { bg: '#ECFDF5', text: Colors.statusConfirmado },
-  cancelado: { bg: '#FEF2F2', text: Colors.statusCancelado },
-  realizado: { bg: '#F3F4F6', text: Colors.statusRealizado },
-  default: { bg: Colors.primaryLight, text: Colors.primary },
+const variantColors: Record<BadgeVariant, { bg: string; text: string; dot: string }> = {
+  agendado: { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6' },
+  confirmado: { bg: '#ECFDF5', text: '#065F46', dot: '#10B981' },
+  cancelado: { bg: '#FEF2F2', text: '#991B1B', dot: '#EF4444' },
+  realizado: { bg: '#F1F5F9', text: '#475569', dot: '#94A3B8' },
+  default: { bg: Colors.primaryLight, text: Colors.primary, dot: Colors.primary },
+  success: { bg: '#ECFDF5', text: '#065F46', dot: '#10B981' },
+  warning: { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' },
+  info: { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6' },
 };
 
 function getVariant(status: string): BadgeVariant {
@@ -18,6 +21,7 @@ function getVariant(status: string): BadgeVariant {
     CONFIRMADA: 'confirmado',
     CANCELADA: 'cancelado',
     REALIZADA: 'realizado',
+    NAO_COMPARECEU: 'cancelado',
   };
   return map[status] ?? 'default';
 }
@@ -26,28 +30,56 @@ interface BadgeProps {
   label: string;
   status?: string;
   variant?: BadgeVariant;
+  showDot?: boolean;
+  size?: 'sm' | 'md';
 }
 
-export function Badge({ label, status, variant }: BadgeProps) {
+export function Badge({ label, status, variant, showDot = true, size = 'md' }: BadgeProps) {
   const v = variant ?? (status ? getVariant(status) : 'default');
   const colors = variantColors[v];
 
   return (
-    <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.text, { color: colors.text }]}>{label}</Text>
+    <View style={[
+      styles.badge,
+      { backgroundColor: colors.bg },
+      size === 'sm' && styles.badgeSm,
+    ]}>
+      {showDot && <View style={[styles.dot, { backgroundColor: colors.dot }]} />}
+      <Text style={[
+        styles.text,
+        { color: colors.text },
+        size === 'sm' && styles.textSm,
+      ]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 99,
+    paddingVertical: 5,
+    borderRadius: BorderRadius.full,
     alignSelf: 'flex-start',
+    gap: 6,
+  },
+  badgeSm: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   text: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  textSm: {
+    fontSize: 10,
   },
 });

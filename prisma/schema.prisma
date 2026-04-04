@@ -69,6 +69,7 @@ model Tenant {
   pais                     String?       @default("Brasil")
   site                     String?
   logoUrl                  String?       @map("logourl")
+  codigoCnes               String?  // Código CNES do estabelecimento
   whatsappPhoneNumberId    String?
   whatsappAccessToken      String?
 
@@ -116,6 +117,10 @@ model Tenant {
   consultaPrescricoes         ConsultaPrescricao[]
   lotesTiss                   LoteTiss[]
   guiaTissProcedimentos       GuiaTissProcedimento[]
+  retornosLotes               RetornoLote[]
+  glosas                      Glosa[]
+  recebimentosConvenio        RecebimentoConvenio[]
+  faturamentosConvenio        FaturamentoConvenio[]
   medicosTelemedicina         MedicoTelemedicina[]
   medicosEscalasAgenda        MedicoEscalaAgenda[]         @relation("TenantToMedicoEscalaAgenda")
   medicosEscalasAgendaExcecoes MedicoEscalaAgendaExcecao[] @relation("TenantToMedicoEscalaAgendaExcecao")
@@ -257,8 +262,10 @@ model Paciente {
   nomePai          String?
   profissao        String?
   estadoCivil      String?
-  observacoes      String?
-  ativo            Boolean  @default(true)
+  observacoes        String?
+  cns                String?  // Cartão Nacional de Saúde (CNS)
+  numeroCarteirinha  String?  // Número da carteirinha do convênio
+  ativo              Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -287,7 +294,9 @@ model Medico {
   clinicaId                  String
   usuarioId                  String
   crm                        String
+  ufCrm                      String?  // UF do CRM (ex: SP, RJ)
   especialidade              String
+  codigoCbo                  String?  // Código CBO-S da especialidade
   rqe                        Int?
   ativo                      Boolean  @default(true)
   createdAt                  DateTime @default(now())
@@ -1065,8 +1074,11 @@ model Operadora {
   planosSaude    PlanoSaude[]
   tussOperadoras TussOperadora[]
   tussValores    TussValor[]
-  guiasTiss      GuiaTiss[]
-  lotesTiss      LoteTiss[]
+  guiasTiss              GuiaTiss[]
+  lotesTiss              LoteTiss[]
+  retornosLotes          RetornoLote[]
+  recebimentosConvenio   RecebimentoConvenio[]
+  faturamentosConvenio   FaturamentoConvenio[]
 
   @@index([clinicaId])
   @@index([codigoAns])
@@ -1221,6 +1233,7 @@ model GuiaTiss {
   operadora     Operadora              @relation(fields: [operadoraId], references: [id])
   planoSaude    PlanoSaude?            @relation(fields: [planoSaudeId], references: [id])
   procedimentos GuiaTissProcedimento[]
+  glosas        Glosa[]
 
   @@index([clinicaId])
   @@index([consultaId])
@@ -1245,9 +1258,11 @@ model LoteTiss {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  clinica   Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
-  operadora Operadora @relation(fields: [operadoraId], references: [id])
-  guias     GuiaTiss[]
+  clinica              Tenant               @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  operadora            Operadora            @relation(fields: [operadoraId], references: [id])
+  guias                GuiaTiss[]
+  retornosLotes        RetornoLote[]
+  recebimentosConvenio RecebimentoConvenio[]
 
   @@index([clinicaId])
   @@index([operadoraId])
@@ -1269,10 +1284,128 @@ model GuiaTissProcedimento {
   clinica    Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   guia       GuiaTiss   @relation(fields: [guiaId], references: [id], onDelete: Cascade)
   codigoTuss CodigoTuss? @relation(fields: [codigoTussId], references: [id], onDelete: SetNull)
+  glosas     Glosa[]
 
   @@index([guiaId])
   @@index([codigoTussId])
   @@map("guias_tiss_procedimentos")
+}
+
+// =====================================================================
+// RETORNO DE LOTE (resposta da operadora)
+// =====================================================================
+model RetornoLote {
+  id               String    @id @default(uuid())
+  clinicaId        String
+  loteId           String?
+  operadoraId      String
+  numeroProtocolo  String?
+  dataRecebimento  DateTime  @default(now())
+  xmlRetorno       String?   @db.Text
+  status           String    @default("RECEBIDO") // RECEBIDO, PROCESSADO
+  observacoes      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  clinica   Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  lote      LoteTiss?  @relation(fields: [loteId], references: [id])
+  operadora Operadora  @relation(fields: [operadoraId], references: [id])
+  glosas    Glosa[]
+
+  @@index([clinicaId])
+  @@index([loteId])
+  @@index([operadoraId])
+  @@index([status])
+  @@map("retornos_lotes")
+}
+
+// =====================================================================
+// GLOSA (negativa/contestação de procedimento)
+// =====================================================================
+model Glosa {
+  id                       String    @id @default(uuid())
+  clinicaId                String
+  guiaId                   String
+  procedimentoId           String?
+  retornoLoteId            String?
+  codigoGlosa              String?   // Código da glosa TISS
+  descricaoGlosa           String?
+  valorGlosado             Decimal   @db.Decimal(10, 2)
+  status                   String    @default("GLOSADA") // GLOSADA, CONTESTADA, ACEITA, REVERTIDA, MANTIDA
+  justificativaContestacao String?   @db.Text
+  dataGlosa                DateTime  @default(now())
+  dataContestacao          DateTime?
+  dataResolucao            DateTime?
+  observacoes              String?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  clinica      Tenant                @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  guia         GuiaTiss              @relation(fields: [guiaId], references: [id])
+  procedimento GuiaTissProcedimento? @relation(fields: [procedimentoId], references: [id])
+  retornoLote  RetornoLote?          @relation(fields: [retornoLoteId], references: [id])
+
+  @@index([clinicaId])
+  @@index([guiaId])
+  @@index([procedimentoId])
+  @@index([retornoLoteId])
+  @@index([status])
+  @@map("glosas")
+}
+
+// =====================================================================
+// RECEBIMENTO DE CONVÊNIO (pagamento da operadora)
+// =====================================================================
+model RecebimentoConvenio {
+  id              String    @id @default(uuid())
+  clinicaId       String
+  operadoraId     String
+  loteId          String?
+  valorRecebido   Decimal   @db.Decimal(10, 2)
+  dataRecebimento DateTime
+  dataPrevista    DateTime?
+  numeroDocumento String?
+  metodoPagamento String?
+  observacoes     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  clinica   Tenant     @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  operadora Operadora  @relation(fields: [operadoraId], references: [id])
+  lote      LoteTiss?  @relation(fields: [loteId], references: [id])
+
+  @@index([clinicaId])
+  @@index([operadoraId])
+  @@index([loteId])
+  @@index([dataRecebimento])
+  @@map("recebimentos_convenio")
+}
+
+// =====================================================================
+// FATURAMENTO MENSAL POR CONVÊNIO
+// =====================================================================
+model FaturamentoConvenio {
+  id             String   @id @default(uuid())
+  clinicaId      String
+  operadoraId    String
+  mesReferencia  DateTime
+  valorFaturado  Decimal  @db.Decimal(10, 2) @default(0)
+  valorRecebido  Decimal  @db.Decimal(10, 2) @default(0)
+  valorGlosado   Decimal  @db.Decimal(10, 2) @default(0)
+  status         String   @default("ABERTO") // ABERTO, FECHADO, CONCILIADO
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  clinica   Tenant    @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  operadora Operadora @relation(fields: [operadoraId], references: [id])
+
+  @@unique([clinicaId, operadoraId, mesReferencia])
+  @@index([clinicaId])
+  @@index([operadoraId])
+  @@index([mesReferencia])
+  @@index([status])
+  @@map("faturamentos_convenio")
 }
 
 model Mensagem {

@@ -28,6 +28,10 @@ import {
   IconFiles,
   IconStack2,
   IconSettings,
+  IconFileAlert,
+  IconArrowBack,
+  IconCashBanknote,
+  IconFileInvoice,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -119,6 +123,16 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Contas a Receber",
           url: "/admin-clinica/contas-receber",
           icon: IconReceipt,
+        },
+        {
+          title: "Recebimentos Convênio",
+          url: "/admin-clinica/recebimentos-convenio",
+          icon: IconCashBanknote,
+        },
+        {
+          title: "Faturamento Convênio",
+          url: "/admin-clinica/faturamento-convenio",
+          icon: IconFileInvoice,
         },
         {
           title: "Fluxo de Caixa",
@@ -232,6 +246,16 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           title: "Lotes",
           url: "/secretaria/tiss/lotes",
           icon: IconStack2,
+        },
+        {
+          title: "Retornos",
+          url: "/secretaria/tiss/retornos",
+          icon: IconArrowBack,
+        },
+        {
+          title: "Glosas",
+          url: "/secretaria/tiss/glosas",
+          icon: IconFileAlert,
         },
         {
           title: "Relatórios",

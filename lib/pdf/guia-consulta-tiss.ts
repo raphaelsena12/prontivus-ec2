@@ -1,6 +1,5 @@
 import jsPDF from "jspdf";
 import { getInterFonts } from "./load-inter-font";
-import { BaseDocumentData } from "./pdf-base";
 
 // =====================================================================
 // GUIA DE SERVIÇO PROFISSIONAL / SP/SADT — IAMSPE
@@ -257,12 +256,37 @@ function drawIamspe(doc: jsPDF, x: number, y: number, _areaW: number, areaH: num
 // =====================================================================
 // GERADOR PRINCIPAL
 // =====================================================================
-interface ExameSolicitado { nome: string; tipo?: string; justificativa?: string; }
+export interface ExameSolicitadoSADT {
+  nome: string;
+  tipo?: string;
+  justificativa?: string;
+  codigoTuss?: string | null;
+  quantidade?: number;
+}
+
+export interface GuiaSADTInput {
+  // Beneficiário
+  pacienteNome: string;
+  pacienteCns?: string;
+  numeroCarteirinha?: string;
+  // Contratado Solicitante
+  clinicaNome: string;
+  clinicaCnpj: string;
+  clinicaCodigoCnes?: string;
+  medicoNome: string;
+  medicoCrm: string;
+  medicoUf?: string;
+  medicoCodigoCbo?: string;
+  // Solicitação
+  dataEmissao: string;
+  cidCodigo?: string;
+  indicacaoClinica?: string;
+}
 
 export function generateGuiaConsultaTISSPDF(
-  _data: BaseDocumentData,
+  data: GuiaSADTInput,
   logoBase64?: string,
-  examesSolicitados: ExameSolicitado[] = [],
+  examesSolicitados: ExameSolicitadoSADT[] = [],
   prioridade: "eletiva" | "urgencia" = "eletiva",
 ): ArrayBuffer {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -317,7 +341,7 @@ export function generateGuiaConsultaTISSPDF(
   // ── Campo 2 – Nº (à direita, centralizado verticalmente) ──
   {
     const f2x = M + LOGO_W + TITLE_W + 1;
-    const field2 = { x: f2x, n: "2", value: "202401010001" };
+    const field2 = { x: f2x, n: "2", value: "" };
     // label "2- Nº" grande, centralizado verticalmente com o título
     doc.setFont(_font, "bold");
     doc.setFontSize(11);
@@ -341,12 +365,12 @@ export function generateGuiaConsultaTISSPDF(
   // ===================================================================
   {
     const cols = [
-      { n: "1", l: "Registro ANS",            w: 50,  value: "1234567" },
-      { n: "3", l: "Nº Guia de Solicitação",  w: 97,  value: "202401010001" },
-      { n: "4", l: "Data da Autorização",      w: 40,  value: "15/01/2024" },
-      { n: "5", l: "Senha",                   w: 30,  value: "ABC12345" },
-      { n: "6", l: "Data Validade da Senha",  w: 40,  value: "31/12/2024" },
-      { n: "7", l: "Data de Emissão da Guia", w: 30,  value: "20/01/2024" },
+      { n: "1", l: "Registro ANS",            w: 50,  value: "" },
+      { n: "3", l: "Nº Guia de Solicitação",  w: 97,  value: "" },
+      { n: "4", l: "Data da Autorização",      w: 40,  value: "" },
+      { n: "5", l: "Senha",                   w: 30,  value: "" },
+      { n: "6", l: "Data Validade da Senha",  w: 40,  value: "" },
+      { n: "7", l: "Data de Emissão da Guia", w: 30,  value: data.dataEmissao },
     ];
     let cx = M;
     for (const c of cols) {
@@ -379,11 +403,11 @@ export function generateGuiaConsultaTISSPDF(
   {
     // 8 | 9 | 10 | 11 | 12 → 70+25+35+90+67 = 287
     const cols = [
-      { n: "8",  l: "Número da Carteira",              w: 70, value: "123456789012" },
-      { n: "9",  l: "Plano",                           w: 25, value: "01" },
-      { n: "10", l: "Validade da Carteira",            w: 35, value: "31/12/2025" },
-      { n: "11", l: "Nome",                            w: 90, value: "Maria Silva Santos" },
-      { n: "12", l: "Número do Cartão Nacional de Saúde", w: 67, value: "123456789012345" },
+      { n: "8",  l: "Número da Carteira",              w: 70, value: data.numeroCarteirinha || "" },
+      { n: "9",  l: "Plano",                           w: 25, value: "" },
+      { n: "10", l: "Validade da Carteira",            w: 35, value: "" },
+      { n: "11", l: "Nome",                            w: 90, value: data.pacienteNome },
+      { n: "12", l: "Número do Cartão Nacional de Saúde", w: 67, value: data.pacienteCns || "" },
     ];
     let cx = M;
     for (const c of cols) {
@@ -414,9 +438,9 @@ export function generateGuiaConsultaTISSPDF(
   {
     // Row 1: 13 | 14 | 15 → 100+148+39 = 287
     const r1 = [
-      { n: "13", l: "Código na Operadora / CNPJ / CPF", w: 100, value: "98765432000111" },
-      { n: "14", l: "Nome do Contratado",               w: 148, value: "Clínica Médica Exemplo" },
-      { n: "15", l: "Código CNES",                      w: 39,  value: "7654321" },
+      { n: "13", l: "Código na Operadora / CNPJ / CPF", w: 100, value: data.clinicaCnpj },
+      { n: "14", l: "Nome do Contratado",               w: 148, value: data.clinicaNome },
+      { n: "15", l: "Código CNES",                      w: 39,  value: data.clinicaCodigoCnes || "" },
     ];
     let cx = M;
     for (const c of r1) { 
@@ -429,12 +453,14 @@ export function generateGuiaConsultaTISSPDF(
     y += RH;
 
     // Row 2: 16 | 17 | 18 | 19 | 20 → 147+40+55+15+30 = 287
+    // Extrair apenas o número do CRM (remove prefixo "CRM/XX " se houver)
+    const crmNumero = data.medicoCrm.replace(/^CRM\/?[A-Z]{0,2}\s*/i, "").trim() || data.medicoCrm;
     const r2 = [
-      { n: "16", l: "Nome do Profissional  Solicitante", w: 147, value: "Dr. Carlos Oliveira" },
+      { n: "16", l: "Nome do Profissional  Solicitante", w: 147, value: data.medicoNome },
       { n: "17", l: "Conselho Profissional",             w: 40,  value: "CRM" },
-      { n: "18", l: "Número no Conselho",                w: 55,  value: "987654" },
-      { n: "19", l: "UF",                               w: 15,  value: "SP" },
-      { n: "20", l: "Código CBO-S",                     w: 30,  value: "225110" },
+      { n: "18", l: "Número no Conselho",                w: 55,  value: crmNumero },
+      { n: "19", l: "UF",                               w: 15,  value: data.medicoUf || "" },
+      { n: "20", l: "Código CBO-S",                     w: 30,  value: data.medicoCodigoCbo || "" },
     ];
     cx = M;
     for (const c of r2) { 
@@ -459,11 +485,14 @@ export function generateGuiaConsultaTISSPDF(
     const f23x = M + 117, f23w = 35;
     const f24x = M + 152, f24w = 135;
 
+    // Formatar data/hora atual da solicitação
+    const now = new Date();
+    const dataSolicitacao = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const field21_24 = [
-      { x: f21x, w: f21w, n: "21", l: "Data/Hora da Solicitação", value: "15/01/2024 14:30" },
-      { x: f22x, w: f22w, n: "22", l: "Caráter da Solicitação", value: "E" },
-      { x: f23x, w: f23w, n: "23", l: "CID 10", value: "J06.9" },
-      { x: f24x, w: f24w, n: "24", l: "Indicação Clínica (obrigatório se pequena cirurgia, terapia, consulta de referência e alto custo)", value: "Consulta médica para avaliação clínica" },
+      { x: f21x, w: f21w, n: "21", l: "Data/Hora da Solicitação", value: dataSolicitacao },
+      { x: f22x, w: f22w, n: "22", l: "Caráter da Solicitação", value: "" },
+      { x: f23x, w: f23w, n: "23", l: "CID 10", value: data.cidCodigo || "" },
+      { x: f24x, w: f24w, n: "24", l: "Indicação Clínica (obrigatório se pequena cirurgia, terapia, consulta de referência e alto custo)", value: data.indicacaoClinica || "" },
     ];
 
     // Desenhar campos (sem valores ainda)
@@ -520,17 +549,8 @@ export function generateGuiaConsultaTISSPDF(
     for (const c of pCols) { fc(doc, cx, y, c.w, THH, c.n, c.l); cx += c.w; }
     y += THH;
 
-    // Divide o texto do campo 27 pelas 5 linhas existentes da tabela
-    const descricaoExames = examesSolicitados.map((e) => e.nome).join(", ");
-    const f27w = pCols.find((c) => c.n === "27")!.w;
-    doc.setFontSize(5);
-    doc.setFont(_font, "normal");
-    const f27Lines: string[] = descricaoExames
-      ? (doc.splitTextToSize(descricaoExames, f27w - 2) as string[])
-      : [];
-
     for (let r = 0; r < 5; r++) {
-      const descricaoLinha = f27Lines[r] ?? "";
+      const exame = examesSolicitados[r];
       cx = M;
       for (const c of pCols) {
         doc.setFillColor(...WHITE);
@@ -540,18 +560,27 @@ export function generateGuiaConsultaTISSPDF(
         if (c.n === "25") {
           tealText(doc, String(r + 1), cx + 0.8, y + 2.5, 4);
           dbox(doc, cx + 3.5, y + 1.0, "XXXX", 2.0, 2.0);
+          if (exame?.codigoTuss) {
+            fillDbox(doc, cx + 3.5, y + 1.0, "XXXX", "22", 2.0, 2.0); // Tabela 22 = TUSS
+          }
         }
         if (c.n === "26") {
           dbox(doc, cx + 1, y + 1.0, "XXXXXXXX", 2.0, 2.0);
+          if (exame?.codigoTuss) {
+            fillDbox(doc, cx + 1, y + 1.0, "XXXXXXXX", exame.codigoTuss, 2.0, 2.0);
+          }
         }
-        if (c.n === "27" && descricaoLinha) {
+        if (c.n === "27" && exame) {
           doc.setFontSize(5);
           doc.setFont(_font, "normal");
           doc.setTextColor(...TEAL);
-          doc.text(descricaoLinha, cx + 1, y + 3);
+          doc.text(exame.nome, cx + 1, y + 3, { maxWidth: c.w - 2 });
         }
         if (c.n === "28") {
           dbox(doc, cx + 1, y + 1.0, "XXXX", 2.0, 2.0);
+          if (exame) {
+            fillDbox(doc, cx + 1, y + 1.0, "XXXX", String(exame.quantidade ?? 1), 2.0, 2.0);
+          }
         }
         if (c.n === "29") {
           dbox(doc, cx + 1, y + 1.0, "XXXX", 2.0, 2.0);
@@ -569,9 +598,9 @@ export function generateGuiaConsultaTISSPDF(
   {
     // Row 1: 30 | 31 | 32 → 100+158+29 = 287
     const r1 = [
-      { n: "30", l: "Código na Operadora / CNPJ / CPF", w: 100, value: "12345678000190" },
-      { n: "31", l: "Nome do Contratado",               w: 158, value: "IAMSPE" },
-      { n: "32", l: "T.L.",                             w: 29,  value: "01" },
+      { n: "30", l: "Código na Operadora / CNPJ / CPF", w: 100, value: "" },
+      { n: "31", l: "Nome do Contratado",               w: 158, value: "" },
+      { n: "32", l: "T.L.",                             w: 29,  value: "" },
     ];
     let cx = M;
     for (const c of r1) { 
@@ -585,12 +614,12 @@ export function generateGuiaConsultaTISSPDF(
 
     // Row 2: 33-34-35 | 36 | 37 | 38 | 39 | 40 → 120+60+17+30+30+30 = 287
     const r2 = [
-      { n: "33-34-35", l: "Logradouro - Número - Complemento", w: 120, value: "Av. Paulista, 1000 - Sala 101" },
-      { n: "36",       l: "Município",                         w: 60,  value: "São Paulo" },
-      { n: "37",       l: "UF",                               w: 17,  value: "SP" },
-      { n: "38",       l: "Cód. IBGE",                        w: 30,  value: "3550308" },
-      { n: "39",       l: "CEP",                              w: 30,  value: "01310100" },
-      { n: "40",       l: "Código CNES",                      w: 30,  value: "1234567" },
+      { n: "33-34-35", l: "Logradouro - Número - Complemento", w: 120, value: "" },
+      { n: "36",       l: "Município",                         w: 60,  value: "" },
+      { n: "37",       l: "UF",                               w: 17,  value: "" },
+      { n: "38",       l: "Cód. IBGE",                        w: 30,  value: "" },
+      { n: "39",       l: "CEP",                              w: 30,  value: "" },
+      { n: "40",       l: "Código CNES",                      w: 30,  value: "" },
     ];
     cx = M;
     for (const c of r2) { 
@@ -604,8 +633,8 @@ export function generateGuiaConsultaTISSPDF(
 
     // Row 3: 40a | 41 → 100+187 = 287
     const r3 = [
-      { n: "40a", l: "Código na Operadora / CPF do exec. complementar", w: 100, value: "12345678901" },
-      { n: "41",  l: "Nome do Profissional  Executante/Complementar",   w: 187, value: "Dr. João Silva" },
+      { n: "40a", l: "Código na Operadora / CPF do exec. complementar", w: 100, value: "" },
+      { n: "41",  l: "Nome do Profissional  Executante/Complementar",   w: 187, value: "" },
     ];
     cx = M;
     for (const c of r3) { 
@@ -619,11 +648,11 @@ export function generateGuiaConsultaTISSPDF(
 
     // Row 4: 42 | 43 | 44 | 45 | 45a → 55+77+17+70+68 = 287
     const r4 = [
-      { n: "42",  l: "Conselho Profissional",  w: 55, value: "CRM" },
-      { n: "43",  l: "Número no Conselho",     w: 77, value: "123456" },
-      { n: "44",  l: "UF",                    w: 17, value: "SP" },
-      { n: "45",  l: "Código CBO S",          w: 70, value: "225110" },
-      { n: "45a", l: "Grau de Participação",  w: 68, value: "100" },
+      { n: "42",  l: "Conselho Profissional",  w: 55, value: "" },
+      { n: "43",  l: "Número no Conselho",     w: 77, value: "" },
+      { n: "44",  l: "UF",                    w: 17, value: "" },
+      { n: "45",  l: "Código CBO S",          w: 70, value: "" },
+      { n: "45a", l: "Grau de Participação",  w: 68, value: "" },
     ];
     cx = M;
     for (const c of r4) { 
@@ -650,7 +679,7 @@ export function generateGuiaConsultaTISSPDF(
     fc(doc, f48x, y, f48w, ATH, "48", "Tipo de Saída");
 
     // Campo 46 – campo UU à esquerda + legendas à direita na mesma linha
-    const field46Value = "04"; // valor selecionado (código de 2 dígitos)
+    const field46Value = ""; // preenchido pelo executante
     
     // Campo de entrada UU à esquerda
     const uuX = M + 1;
@@ -691,7 +720,7 @@ export function generateGuiaConsultaTISSPDF(
     }
 
     // Campo 47 – Indicação de Acidente (campo U à esquerda + legendas à direita na mesma linha)
-    const field47Value = "9"; // valor selecionado
+    const field47Value = ""; // preenchido pelo executante
     
     // Campo de entrada U à esquerda
     const uu47X = f47x + 1;
@@ -723,7 +752,7 @@ export function generateGuiaConsultaTISSPDF(
     }
 
     // Campo 48 – Tipo de Saída (campo U à esquerda + legendas à direita na mesma linha)
-    const field48Value = "5"; // valor selecionado
+    const field48Value = ""; // preenchido pelo executante
     
     // Campo de entrada U à esquerda
     const uu48X = f48x + 1;
@@ -768,8 +797,8 @@ export function generateGuiaConsultaTISSPDF(
     const RFH = 6;
     // 49 | 50 → 100+187 = 287
     const field49_50 = [
-      { x: M, w: 100, n: "49", l: "Tipo de Doença", value: "A" },
-      { x: M + 100, w: 187, n: "50", l: "Tempo de Doença", value: "M - 03" },
+      { x: M, w: 100, n: "49", l: "Tipo de Doença", value: "" },
+      { x: M + 100, w: 187, n: "50", l: "Tempo de Doença", value: "" },
     ];
 
     for (const f of field49_50) {
@@ -780,13 +809,12 @@ export function generateGuiaConsultaTISSPDF(
     const cb49Y = y + 5.2;
     cbox(doc, M + 1,  cb49Y); tealText(doc, "A - Aguda",   M + 4.2,  cb49Y, 4.2);
     cbox(doc, M + 24, cb49Y); tealText(doc, "C - Crônica", M + 27.2, cb49Y, 4.2);
-    // Marcar "A - Aguda"
-    markCheckbox(doc, M + 1, cb49Y);
+    // Não marcar — preenchido manualmente
 
     // Campo 50 — dbox e texto alinhados verticalmente
     const f50Y = y + 5.2;
     let tx = M + 101;
-    const tempoData = { L: "", A: "", M: "03", D: "" }; // 3 meses
+    const tempoData = { L: "", A: "", M: "", D: "" };
     for (const [prefix, label] of [["L", ""], ["A", "Anos"], ["M", "Meses"], ["D", "Dias"]]) {
       const prefixTxt = label ? `${prefix} - ${label}` : `${prefix} -`;
       tealText(doc, prefixTxt, tx, f50Y, 4.2);
@@ -827,14 +855,9 @@ export function generateGuiaConsultaTISSPDF(
     for (const c of pCols) { fc(doc, cx, y, c.w, THH, c.n, c.l); cx += c.w; }
     y += THH;
 
-    // Dados de teste para procedimentos realizados
-    const procedimentosRealizadosData = [
-      { data: "20/01/2024", horaIni: "14:30", horaFim: "15:00", tabela: "TUSS", codigo: "31001013", descricao: "Consulta médica", qtde: "1", via: "", tec: "", redAcresc: "", valorUnit: "150.00", valorTotal: "150.00" },
-      { data: "20/01/2024", horaIni: "15:00", horaFim: "15:15", tabela: "TUSS", codigo: "40301012", descricao: "Hemograma completo", qtde: "1", via: "", tec: "", redAcresc: "", valorUnit: "45.00", valorTotal: "45.00" },
-      { data: "", horaIni: "", horaFim: "", tabela: "", codigo: "", descricao: "", qtde: "", via: "", tec: "", redAcresc: "", valorUnit: "", valorTotal: "" },
-      { data: "", horaIni: "", horaFim: "", tabela: "", codigo: "", descricao: "", qtde: "", via: "", tec: "", redAcresc: "", valorUnit: "", valorTotal: "" },
-      { data: "", horaIni: "", horaFim: "", tabela: "", codigo: "", descricao: "", qtde: "", via: "", tec: "", redAcresc: "", valorUnit: "", valorTotal: "" },
-    ];
+    // Seção preenchida pelo executante (laboratório) — todas as linhas vazias
+    const emptyProc: Record<string, string> = { data: "", horaIni: "", horaFim: "", tabela: "", codigo: "", descricao: "", qtde: "", via: "", tec: "", redAcresc: "", valorUnit: "", valorTotal: "" };
+    const procedimentosRealizadosData = [emptyProc, emptyProc, emptyProc, emptyProc, emptyProc];
 
     for (let r = 0; r < 5; r++) {
       const procData = procedimentosRealizadosData[r] || {};
@@ -903,10 +926,8 @@ export function generateGuiaConsultaTISSPDF(
     const F63H = 10;
     fc(doc, M, y, CW, F63H, "63", "Data e Assinatura de Procedimentos em Série");
 
-    // Dados de teste para campo 63 (10 slots)
-    const field63Data = [
-      "20/01/24", "20/01/24", "", "", "", "", "", "", "", ""
-    ];
+    // Preenchido pelo executante
+    const field63Data = ["", "", "", "", "", "", "", "", "", ""];
 
     const slotW = CW / 10;
     for (let i = 0; i < 10; i++) {
@@ -956,13 +977,13 @@ export function generateGuiaConsultaTISSPDF(
     const TOTH = 7;
     // 7 colunas iguais: 287 / 7 = 41 mm
     const totCols = [
-      { n: "65", l: "Total Procedimentos R$",    w: 41, value: "195.00" },
-      { n: "66", l: "Total Taxas e Aluguéis R$", w: 41, value: "0.00" },
-      { n: "67", l: "Total  Materiais R$",        w: 41, value: "0.00" },
-      { n: "68", l: "Total Medicamentos R$",      w: 41, value: "0.00" },
-      { n: "69", l: "Total Diárias R$",           w: 41, value: "0.00" },
-      { n: "70", l: "Total  Gases Medicinais R$", w: 41, value: "0.00" },
-      { n: "71", l: "Total Geral da Guia R$",     w: 41, value: "195.00" },
+      { n: "65", l: "Total Procedimentos R$",    w: 41, value: "" },
+      { n: "66", l: "Total Taxas e Aluguéis R$", w: 41, value: "" },
+      { n: "67", l: "Total  Materiais R$",        w: 41, value: "" },
+      { n: "68", l: "Total Medicamentos R$",      w: 41, value: "" },
+      { n: "69", l: "Total Diárias R$",           w: 41, value: "" },
+      { n: "70", l: "Total  Gases Medicinais R$", w: 41, value: "" },
+      { n: "71", l: "Total Geral da Guia R$",     w: 41, value: "" },
     ];
     let cx = M;
     for (const c of totCols) {
@@ -983,10 +1004,10 @@ export function generateGuiaConsultaTISSPDF(
     const sigH = H - M - y; // altura disponível até a margem inferior
     // 86 | 87 | 88 | 89 → 71+72+72+72 = 287
     const sigCols = [
-      { n: "86", l: "Data e Assinatura do Solicitante",                  w: 71, value: "20/01/2024" },
-      { n: "87", l: "Data e Assinatura do Responsável pela Autorização", w: 72, value: "20/01/2024" },
-      { n: "88", l: "Data e Assinatura do Beneficiário  ou Responsável", w: 72, value: "20/01/2024" },
-      { n: "89", l: "Data e Assinatura do Prestador Executante",         w: 72, value: "20/01/2024" },
+      { n: "86", l: "Data e Assinatura do Solicitante",                  w: 71, value: "" },
+      { n: "87", l: "Data e Assinatura do Responsável pela Autorização", w: 72, value: "" },
+      { n: "88", l: "Data e Assinatura do Beneficiário  ou Responsável", w: 72, value: "" },
+      { n: "89", l: "Data e Assinatura do Prestador Executante",         w: 72, value: "" },
     ];
     let cx = M;
     for (const c of sigCols) {

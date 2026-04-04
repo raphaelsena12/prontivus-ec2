@@ -6,15 +6,20 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  View,
 } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, BorderRadius } from '../../constants/colors';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'outline' | 'ghost' | 'danger' | 'success';
+  size?: 'sm' | 'md' | 'lg';
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconRight?: keyof typeof Ionicons.glyphMap;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
@@ -25,22 +30,80 @@ export function Button({
   loading = false,
   disabled = false,
   variant = 'primary',
+  size = 'md',
+  icon,
+  iconRight,
   style,
   textStyle,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
 
+  const sizeStyles = {
+    sm: { height: 38, paddingHorizontal: 16 },
+    md: { height: 50, paddingHorizontal: 24 },
+    lg: { height: 56, paddingHorizontal: 32 },
+  };
+
+  const textSizes = {
+    sm: 13,
+    md: 15,
+    lg: 17,
+  };
+
+  const iconSize = size === 'sm' ? 16 : size === 'md' ? 18 : 20;
+
+  const variantTextColor: Record<string, string> = {
+    primary: Colors.white,
+    outline: Colors.primary,
+    ghost: Colors.primary,
+    danger: Colors.white,
+    success: Colors.white,
+  };
+
   return (
     <TouchableOpacity
-      style={[styles.base, styles[variant], isDisabled && styles.disabled, style]}
+      style={[
+        styles.base,
+        sizeStyles[size],
+        styles[variant],
+        isDisabled && styles.disabled,
+        style,
+      ]}
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? Colors.white : Colors.primary} />
+        <ActivityIndicator color={variantTextColor[variant]} size="small" />
       ) : (
-        <Text style={[styles.text, styles[`${variant}Text`], textStyle]}>{title}</Text>
+        <View style={styles.content}>
+          {icon && (
+            <Ionicons
+              name={icon}
+              size={iconSize}
+              color={variantTextColor[variant]}
+              style={{ marginRight: 8 }}
+            />
+          )}
+          <Text
+            style={[
+              styles.text,
+              { fontSize: textSizes[size] },
+              styles[`${variant}Text` as keyof typeof styles],
+              textStyle,
+            ]}
+          >
+            {title}
+          </Text>
+          {iconRight && (
+            <Ionicons
+              name={iconRight}
+              size={iconSize}
+              color={variantTextColor[variant]}
+              style={{ marginLeft: 8 }}
+            />
+          )}
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -48,14 +111,23 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    height: 48,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    flexDirection: 'row',
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   primary: {
     backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   outline: {
     backgroundColor: 'transparent',
@@ -65,12 +137,27 @@ const styles = StyleSheet.create({
   ghost: {
     backgroundColor: 'transparent',
   },
+  danger: {
+    backgroundColor: Colors.error,
+    shadowColor: Colors.error,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  success: {
+    backgroundColor: Colors.success,
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   text: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   primaryText: {
     color: Colors.white,
@@ -80,5 +167,11 @@ const styles = StyleSheet.create({
   },
   ghostText: {
     color: Colors.primary,
+  },
+  dangerText: {
+    color: Colors.white,
+  },
+  successText: {
+    color: Colors.white,
   },
 });

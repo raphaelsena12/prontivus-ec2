@@ -1,8 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  TextInput, ScrollView, Modal, Alert, ActivityIndicator,
-  Image,
+  TextInput, ScrollView, Modal, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,13 +13,13 @@ import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
-import { Colors } from '../../../constants/colors';
+import { Colors, BorderRadius } from '../../../constants/colors';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
+// ── Avatar ──────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ['#6C47C9', '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899'];
+const AVATAR_COLORS = ['#7C3AED', '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899'];
 
 function getAvatarColor(id: string) {
   const hash = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -55,7 +54,7 @@ function MedicoAvatar({ medico, size = 48 }: { medico: MedicoOnline; size?: numb
   );
 }
 
-// ── Modal de Confirmação ──────────────────────────────────────────────────────
+// ── Modal de Confirmacao ─────────────────────────────────────────────────────
 
 function ConsultaModal({
   medico, visible, onClose,
@@ -87,7 +86,7 @@ function ConsultaModal({
         },
       });
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.error ?? 'Não foi possível iniciar o pagamento.');
+      Alert.alert('Erro', e?.response?.data?.error ?? 'Nao foi possivel iniciar o pagamento.');
     } finally {
       setCriandoPI(false);
     }
@@ -99,15 +98,15 @@ function ConsultaModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={modal.backdrop}>
         <View style={modal.sheet}>
-          {/* Barra de cor */}
-          <View style={[modal.colorBar, { backgroundColor: getAvatarColor(medico.id) }]} />
+          <View style={modal.handle} />
 
           <View style={modal.content}>
+            {/* Title */}
             <Text style={modal.titulo}>Confirmar consulta</Text>
 
-            {/* Card médico */}
+            {/* Doctor card */}
             <View style={modal.medicoCard}>
-              <MedicoAvatar medico={medico} size={52} />
+              <MedicoAvatar medico={medico} size={56} />
               <View style={{ flex: 1 }}>
                 <Text style={modal.medicoNome}>{medico.nome}</Text>
                 <Text style={modal.medicoEsp}>{medico.especialidade}</Text>
@@ -122,14 +121,20 @@ function ConsultaModal({
               </View>
             </View>
 
-            {/* Valor + duração */}
+            {/* Value + duration */}
             <View style={modal.infoRow}>
               <View style={modal.infoBox}>
+                <View style={modal.infoIconWrap}>
+                  <Ionicons name="card-outline" size={16} color={Colors.primary} />
+                </View>
                 <Text style={modal.infoLabel}>Valor da consulta</Text>
                 <Text style={modal.infoValue}>R$ {medico.valorConsulta.toFixed(2).replace('.', ',')}</Text>
               </View>
               <View style={modal.infoBox}>
-                <Text style={modal.infoLabel}>Duração estimada</Text>
+                <View style={[modal.infoIconWrap, { backgroundColor: Colors.accentLight }]}>
+                  <Ionicons name="time-outline" size={16} color={Colors.accent} />
+                </View>
+                <Text style={modal.infoLabel}>Duracao estimada</Text>
                 <Text style={modal.infoValue}>{medico.tempoConsultaMin} min</Text>
               </View>
             </View>
@@ -139,21 +144,35 @@ function ConsultaModal({
               <Text style={modal.bio} numberOfLines={3}>{medico.bio}</Text>
             )}
 
-            {/* Aviso */}
+            {/* Notice */}
             <View style={modal.aviso}>
-              <Ionicons name="flash" size={14} color="#10B981" />
+              <View style={modal.avisoIcon}>
+                <Ionicons name="videocam" size={14} color={Colors.accent} />
+              </View>
               <Text style={modal.avisoText}>
-                Consulta por vídeo. Após o pagamento, você terá acesso imediato à sala.
+                Consulta por video dentro do app. Apos o pagamento, voce tera acesso imediato a sala.
               </Text>
+            </View>
+
+            {/* Flow info */}
+            <View style={modal.flowRow}>
+              <FlowStep icon="card-outline" label="Pagar" active />
+              <View style={modal.flowLine} />
+              <FlowStep icon="videocam-outline" label="Consultar" />
+              <View style={modal.flowLine} />
+              <FlowStep icon="checkmark-circle-outline" label="Concluir" />
             </View>
 
             <Button
               title={criandoPI ? 'Aguarde...' : 'Continuar para pagamento'}
               onPress={handleContinuar}
               disabled={criandoPI}
+              loading={criandoPI}
+              size="lg"
+              icon="arrow-forward-outline"
             />
-            <TouchableOpacity onPress={onClose} style={{ alignItems: 'center', marginTop: 10 }}>
-              <Text style={{ color: Colors.textSecondary, fontSize: 14 }}>Cancelar</Text>
+            <TouchableOpacity onPress={onClose} style={modal.cancelBtn}>
+              <Text style={modal.cancelText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -162,13 +181,23 @@ function ConsultaModal({
   );
 }
 
-// ── Card Médico ───────────────────────────────────────────────────────────────
+function FlowStep({ icon, label, active }: { icon: keyof typeof Ionicons.glyphMap; label: string; active?: boolean }) {
+  return (
+    <View style={modal.flowStep}>
+      <View style={[modal.flowStepIcon, active && modal.flowStepIconActive]}>
+        <Ionicons name={icon} size={16} color={active ? Colors.white : Colors.textMuted} />
+      </View>
+      <Text style={[modal.flowStepLabel, active && modal.flowStepLabelActive]}>{label}</Text>
+    </View>
+  );
+}
+
+// ── Card Medico ─────────────────────────────────────────────────────────────
 
 function MedicoCard({ medico, onPress }: { medico: MedicoOnline; onPress: () => void }) {
   const online = medico.status === 'ONLINE';
   return (
     <Card style={styles.medicoCard}>
-      <View style={[styles.medicoCardBar, { backgroundColor: getAvatarColor(medico.id) }]} />
       <View style={styles.medicoCardBody}>
         <View style={styles.medicoCardHeader}>
           <View style={{ position: 'relative' }}>
@@ -209,6 +238,7 @@ function MedicoCard({ medico, onPress }: { medico: MedicoOnline; onPress: () => 
             style={[styles.iniciarBtn, !online && styles.iniciarBtnDisabled]}
             onPress={onPress}
             disabled={!online}
+            activeOpacity={0.7}
           >
             <Ionicons name="videocam" size={15} color={online ? '#fff' : Colors.textMuted} />
             <Text style={[styles.iniciarBtnText, !online && { color: Colors.textMuted }]}>
@@ -221,7 +251,7 @@ function MedicoCard({ medico, onPress }: { medico: MedicoOnline; onPress: () => 
   );
 }
 
-// ── Tela Principal ────────────────────────────────────────────────────────────
+// ── Tela Principal ──────────────────────────────────────────────────────────
 
 export default function TelemedicinaScreen() {
   const [tab, setTab] = useState<'medicos' | 'sessoes'>('medicos');
@@ -278,8 +308,8 @@ export default function TelemedicinaScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Telemedicina</Text>
         {tab === 'medicos' && (
@@ -292,35 +322,53 @@ export default function TelemedicinaScreen() {
         )}
       </View>
 
+      {/* Info banner */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle" size={16} color={Colors.accent} />
+        <Text style={styles.infoBannerText}>
+          Pague pelo app e realize sua consulta por video sem sair
+        </Text>
+      </View>
+
       {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, tab === 'medicos' && styles.tabActive]}
           onPress={() => setTab('medicos')}
         >
+          <Ionicons
+            name={tab === 'medicos' ? 'people' : 'people-outline'}
+            size={16}
+            color={tab === 'medicos' ? Colors.primary : Colors.textSecondary}
+          />
           <Text style={[styles.tabText, tab === 'medicos' && styles.tabTextActive]}>
-            Médicos Online
+            Medicos Online
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'sessoes' && styles.tabActive]}
           onPress={() => setTab('sessoes')}
         >
+          <Ionicons
+            name={tab === 'sessoes' ? 'list' : 'list-outline'}
+            size={16}
+            color={tab === 'sessoes' ? Colors.primary : Colors.textSecondary}
+          />
           <Text style={[styles.tabText, tab === 'sessoes' && styles.tabTextActive]}>
-            Minhas Sessões
+            Minhas Sessoes
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Aba: Médicos Online */}
+      {/* Tab: Medicos Online */}
       {tab === 'medicos' && (
         <>
-          {/* Search + filtros */}
+          {/* Search */}
           <View style={styles.searchBox}>
             <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar médico, especialidade..."
+              placeholder="Buscar medico, especialidade..."
               placeholderTextColor={Colors.textMuted}
               value={search}
               onChangeText={setSearch}
@@ -332,6 +380,7 @@ export default function TelemedicinaScreen() {
             )}
           </View>
 
+          {/* Specialty filters */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
             {especialidades.map(esp => (
               <TouchableOpacity
@@ -360,13 +409,17 @@ export default function TelemedicinaScreen() {
                 onlineList.length > 0 ? (
                   <View style={styles.sectionHeader}>
                     <View style={[styles.sectionDot, { backgroundColor: '#10B981' }]} />
-                    <Text style={styles.sectionTitle}>Disponíveis Agora</Text>
-                    <View style={styles.sectionBadge}><Text style={styles.sectionBadgeText}>{onlineList.length}</Text></View>
+                    <Text style={styles.sectionTitle}>Disponiveis Agora</Text>
+                    <View style={styles.sectionBadge}>
+                      <Text style={styles.sectionBadgeText}>{onlineList.length}</Text>
+                    </View>
                   </View>
                 ) : null
               }
               renderItem={({ item, index }) => {
-                const showOcupadoHeader = item.status === 'EM_ATENDIMENTO' && (index === 0 || filtered[index - 1]?.status !== 'EM_ATENDIMENTO');
+                const sortedList = [...onlineList, ...ocupadoList];
+                const showOcupadoHeader = item.status === 'EM_ATENDIMENTO' &&
+                  (index === 0 || sortedList[index - 1]?.status !== 'EM_ATENDIMENTO');
                 return (
                   <>
                     {showOcupadoHeader && (
@@ -385,7 +438,7 @@ export default function TelemedicinaScreen() {
               ListEmptyComponent={
                 <EmptyState
                   icon="videocam-outline"
-                  title={medicos.length === 0 ? 'Nenhum médico online' : 'Nenhum médico encontrado'}
+                  title={medicos.length === 0 ? 'Nenhum medico online' : 'Nenhum medico encontrado'}
                   description={medicos.length === 0
                     ? 'Tente novamente mais tarde ou agende uma consulta'
                     : 'Ajuste os filtros ou a busca'}
@@ -396,7 +449,7 @@ export default function TelemedicinaScreen() {
         </>
       )}
 
-      {/* Aba: Minhas Sessões */}
+      {/* Tab: Sessions */}
       {tab === 'sessoes' && (
         loadingSessoes ? <LoadingSpinner /> : (
           <FlatList
@@ -407,20 +460,20 @@ export default function TelemedicinaScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon="videocam-outline"
-                title="Nenhuma sessão disponível"
-                description="Suas consultas de telemedicina aparecerão aqui"
+                title="Nenhuma sessao disponivel"
+                description="Suas consultas de telemedicina aparecerao aqui"
               />
             }
             renderItem={({ item }) => (
               <Card style={styles.sessaoCard}>
                 <View style={styles.sessaoHeader}>
                   <View style={styles.sessaoIconWrap}>
-                    <Ionicons name="videocam" size={20} color={Colors.primary} />
+                    <Ionicons name="videocam" size={20} color={Colors.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.sessaoDoctorName}>Dr(a). {item.consulta?.medico?.nome ?? '—'}</Text>
+                    <Text style={styles.sessaoDoctorName}>Dr(a). {item.consulta?.medico?.nome ?? '--'}</Text>
                     <Text style={styles.sessaoDate}>
-                      {item.consulta?.dataHora ? format(new Date(item.consulta.dataHora), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
+                      {item.consulta?.dataHora ? format(new Date(item.consulta.dataHora), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR }) : '--'}
                     </Text>
                   </View>
                 </View>
@@ -428,6 +481,8 @@ export default function TelemedicinaScreen() {
                   <Button
                     title="Entrar na consulta"
                     onPress={() => entrarNaSessao(item.linkAcesso!, item.consulta.medico.nome)}
+                    icon="videocam-outline"
+                    variant="success"
                   />
                 )}
               </Card>
@@ -439,78 +494,276 @@ export default function TelemedicinaScreen() {
   );
 }
 
+// ── Styles ──────────────────────────────────────────────────────────────────
+
 const modal = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
-  colorBar: { height: 4, width: '100%' },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
   content: { padding: 24, gap: 16 },
-  titulo: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  medicoCard: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', borderWidth: 1, borderColor: Colors.border, borderRadius: 12, padding: 14 },
-  medicoNome: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  medicoEsp: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  titulo: { fontSize: 20, fontWeight: '800', color: Colors.text },
+  medicoCard: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.lg,
+    padding: 14,
+  },
+  medicoNome: { fontSize: 15, fontWeight: '800', color: Colors.text },
+  medicoEsp: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   medicoCrm: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-  tag: { backgroundColor: Colors.background, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
-  tagText: { fontSize: 10, color: Colors.textSecondary },
+  tag: { backgroundColor: Colors.background, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  tagText: { fontSize: 10, color: Colors.textSecondary, fontWeight: '500' },
   infoRow: { flexDirection: 'row', gap: 10 },
-  infoBox: { flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 12 },
-  infoLabel: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  infoValue: { fontSize: 18, fontWeight: '800', color: Colors.text, marginTop: 2 },
-  bio: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
-  aviso: { flexDirection: 'row', gap: 8, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, padding: 12, alignItems: 'flex-start' },
-  avisoText: { flex: 1, fontSize: 12, color: '#065F46', lineHeight: 17 },
+  infoBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: BorderRadius.md,
+    padding: 12,
+    gap: 4,
+  },
+  infoIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  infoLabel: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  infoValue: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  bio: { fontSize: 13, color: Colors.textSecondary, lineHeight: 19 },
+  aviso: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: Colors.accentLight,
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    alignItems: 'flex-start',
+  },
+  avisoIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(13,148,136,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avisoText: { flex: 1, fontSize: 13, color: '#115E59', lineHeight: 18 },
+  flowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
+  },
+  flowStep: { alignItems: 'center', gap: 4 },
+  flowStepIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flowStepIconActive: { backgroundColor: Colors.primary },
+  flowStepLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500' },
+  flowStepLabelActive: { color: Colors.primary, fontWeight: '700' },
+  flowLine: { width: 32, height: 2, backgroundColor: Colors.border, marginHorizontal: 4 },
+  cancelBtn: { alignItems: 'center', marginTop: 4, paddingVertical: 8 },
+  cancelText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '600' },
 });
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingBottom: 8, gap: 12 },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: Colors.text },
-  onlinePill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  headerTitle: { flex: 1, fontSize: 20, fontWeight: '800', color: Colors.text },
+  onlinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
   onlinePillText: { fontSize: 11, fontWeight: '600', color: '#065F46' },
-  tabs: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 4, backgroundColor: Colors.border, borderRadius: 12, padding: 3 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
-  tabActive: { backgroundColor: Colors.surface },
+
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: Colors.accentLight,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+  },
+  infoBannerText: { flex: 1, fontSize: 12, color: '#115E59', fontWeight: '500' },
+
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 4,
+    backgroundColor: Colors.borderLight,
+    borderRadius: BorderRadius.md,
+    padding: 3,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  tabActive: { backgroundColor: Colors.white },
   tabText: { fontSize: 13, fontWeight: '500', color: Colors.textSecondary },
   tabTextActive: { fontWeight: '700', color: Colors.text },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: 12, marginHorizontal: 16, marginTop: 8, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: Colors.border },
+
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.md,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   searchInput: { flex: 1, fontSize: 14, color: Colors.text },
+
   filterScroll: { marginTop: 8 },
   filterContent: { paddingHorizontal: 16, gap: 6, paddingVertical: 4 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
   filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterChipText: { fontSize: 12, fontWeight: '500', color: Colors.textSecondary },
+  filterChipText: { fontSize: 12, fontWeight: '600', color: Colors.textSecondary },
   filterChipTextActive: { color: '#fff' },
+
   list: { padding: 16, gap: 12 },
+
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginTop: 4 },
   sectionDot: { width: 8, height: 8, borderRadius: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.text },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: Colors.text },
   sectionBadge: { backgroundColor: '#ECFDF5', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
   sectionBadgeText: { fontSize: 11, fontWeight: '700', color: '#065F46' },
+
   medicoCard: { padding: 0, overflow: 'hidden', gap: 0 },
-  medicoCardBar: { height: 3, width: '100%' },
-  medicoCardBody: { padding: 14, gap: 10 },
-  medicoCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  statusDot: { position: 'absolute', bottom: -2, right: -2, width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#fff' },
-  medicoNome: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  medicoEsp: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  medicoCardBody: { padding: 16, gap: 10 },
+  medicoCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  statusDot: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    borderColor: '#fff',
+  },
+  medicoNome: { fontSize: 15, fontWeight: '800', color: Colors.text },
+  medicoEsp: { fontSize: 13, color: Colors.textSecondary, marginTop: 1 },
   medicoCrm: { fontSize: 11, color: Colors.textMuted },
-  badge: { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  badge: {
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
   badgeDot: { width: 6, height: 6, borderRadius: 3 },
   badgeText: { fontSize: 11, fontWeight: '600' },
-  medicosBio: { fontSize: 12, color: Colors.textSecondary, lineHeight: 17 },
+  medicosBio: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  tag: { backgroundColor: Colors.background, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { fontSize: 10, color: Colors.textSecondary, fontWeight: '500' },
-  medicoCardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 10, marginTop: 2 },
-  footerLabel: { fontSize: 10, color: Colors.textMuted },
-  footerValor: { fontSize: 16, fontWeight: '800', color: Colors.text },
-  iniciarBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.success, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  iniciarBtnDisabled: { backgroundColor: Colors.background },
+  tag: { backgroundColor: Colors.background, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  tagText: { fontSize: 11, color: Colors.textSecondary, fontWeight: '500' },
+  medicoCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+    paddingTop: 12,
+    marginTop: 2,
+  },
+  footerLabel: { fontSize: 10, color: Colors.textMuted, fontWeight: '500' },
+  footerValor: { fontSize: 17, fontWeight: '800', color: Colors.text },
+  iniciarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.success,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  iniciarBtnDisabled: {
+    backgroundColor: Colors.background,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
   iniciarBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
   sessaoCard: { gap: 14 },
   sessaoHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sessaoIconWrap: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  sessaoDoctorName: { fontSize: 15, fontWeight: '600', color: Colors.text },
+  sessaoIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: Colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessaoDoctorName: { fontSize: 15, fontWeight: '700', color: Colors.text },
   sessaoDate: { fontSize: 13, color: Colors.textSecondary },
 });

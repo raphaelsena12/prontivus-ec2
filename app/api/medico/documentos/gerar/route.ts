@@ -27,7 +27,7 @@ import { generateJustificativaPedidosExamesPDF } from "@/lib/pdf/justificativa-e
 import { generateControleDiabetesPDF, generateControleDiabetesAnaliticoPDF } from "@/lib/pdf/controle-diabetes";
 import { generateControlePressaoPDF, generateControlePressaoAnaliticoPDF } from "@/lib/pdf/controle-pressao";
 import { generateFichaAtendimentoPDF } from "@/lib/pdf/ficha-atendimento";
-import { generateGuiaConsultaTISSPDF } from "@/lib/pdf/guia-consulta-tiss";
+import { generateGuiaConsultaTISSPDF, type GuiaSADTInput } from "@/lib/pdf/guia-consulta-tiss";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
       medicoCrm: consulta.medico.crm,
       medicoEspecialidade: consulta.medico.especialidade,
       pacienteNome: consulta.paciente.nome,
-      pacienteCpf: consulta.paciente.cpf,
+      pacienteCpf: dados?.ocultarCpf ? "" : consulta.paciente.cpf,
       pacienteDataNascimento: dataNascFormatada,
       dataEmissao,
       cidade: dados?.cidade || undefined,
@@ -444,7 +444,7 @@ export async function POST(request: NextRequest) {
         }));
         pdfBuffer = generateReceitaSimplesPDF({
           ...baseData,
-          pacienteEndereco: (consulta.paciente as any).endereco || dados?.pacienteEndereco || undefined,
+          pacienteEndereco: dados?.incluirEndereco ? ((consulta.paciente as any).endereco || dados?.pacienteEndereco || undefined) : undefined,
           pacienteNumero: (consulta.paciente as any).numero || undefined,
           pacienteBairro: (consulta.paciente as any).bairro || undefined,
           pacienteCidade: (consulta.paciente as any).cidade || undefined,
@@ -699,19 +699,24 @@ export async function POST(request: NextRequest) {
       // GUIA CONSULTA - TISS
       // =====================================================
       case "guia-consulta-tiss": {
-        let iamspeLogoBase64: string | undefined;
-        try {
-          const { readFileSync } = await import("fs");
-          const { join } = await import("path");
-          const logoPath = join(process.cwd(), "public", "iamspe-logo.png");
-          const logoBuffer = readFileSync(logoPath);
-          iamspeLogoBase64 = `data:image/png;base64,${logoBuffer.toString("base64")}`;
-        } catch {
-          // Logo não encontrado — usa desenho vetorial como fallback
-        }
+        const guiaSADTData: GuiaSADTInput = {
+          pacienteNome: consulta.paciente.nome,
+          pacienteCns: (consulta.paciente as any).cns || undefined,
+          numeroCarteirinha: dados?.numeroCarteirinha || (consulta.paciente as any).numeroCarteirinha || undefined,
+          clinicaNome: consulta.clinica.nome,
+          clinicaCnpj: consulta.clinica.cnpj,
+          clinicaCodigoCnes: (consulta.clinica as any).codigoCnes || undefined,
+          medicoNome: consulta.medico.usuario.nome,
+          medicoCrm: consulta.medico.crm,
+          medicoUf: (consulta.medico as any).ufCrm || consulta.clinica.estado || undefined,
+          medicoCodigoCbo: (consulta.medico as any).codigoCbo || undefined,
+          dataEmissao,
+          cidCodigo: dados?.cidCodigo || undefined,
+          indicacaoClinica: dados?.indicacaoClinica || undefined,
+        };
         pdfBuffer = generateGuiaConsultaTISSPDF(
-          { ...baseData },
-          iamspeLogoBase64,
+          guiaSADTData,
+          logoBase64,
           dados?.examesSolicitados ?? [],
           dados?.prioridade ?? "eletiva",
         );

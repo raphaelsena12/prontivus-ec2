@@ -69,8 +69,9 @@ import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
 import { MicrophoneSelectorModal } from '@/components/microphone-selector-modal';
 import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialog';
-import { GuiaTissExamesModal, type ExameSolicitado, type PrioridadeTISS } from '@/components/guia-tiss-exames-modal';
+import { GuiaTissExamesModal, type ExameSolicitado, type PrioridadeTISS, type GuiaSADTDadosAdicionais } from '@/components/guia-tiss-exames-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search } from 'lucide-react';
@@ -273,6 +274,16 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
   const [loadingFichaPreview, setLoadingFichaPreview] = useState(false);
+  const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
+  const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
+  const [docConfigModelId, setDocConfigModelId] = useState<string>("");
+  const [docConfigOpts, setDocConfigOpts] = useState({
+    cpf: true, endereco: false, assinar: false,
+    diasAfastamento: 1, observacoes: "",
+    mesesValidade: "", horaInicio: "", horaFim: "",
+    nomeAcompanhante: "", uf: "", dataValidade: "",
+    convenio: "", justificativa: "",
+  });
 
   // Hook de transcrição
   const {
@@ -1941,6 +1952,14 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   }, [documentoSearch, documentModels]);
 
   const handleGenerateDocument = async (modelId: string, extraDados?: Record<string, any>, examesSolicitados?: ExameSolicitado[], prioridade?: PrioridadeTISS) => {
+    // Abrir modal de configuração antes de gerar (exceto guia-tiss que tem modal próprio)
+    if (modelId !== "guia-consulta-tiss" && !extraDados?._fromDocConfigModal) {
+      setDocConfigModelId(modelId);
+      setDocConfigOpts(prev => ({ ...prev, horaInicio: new Date().toTimeString().slice(0, 5) }));
+      setDocConfigModalOpen(true);
+      return;
+    }
+
     // Guia TISS: abrir modal primeiro para coletar exames
     if (modelId === "guia-consulta-tiss" && !examesSolicitados) {
       setTissModalOpen(true);
@@ -1958,21 +1977,25 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         dados: { ...extraDados },
       };
 
-      // Adicionar prescrições se for receita médica
-      if (modelId === "receita-medica" && prescricoes.length > 0) {
-        const prescricoesValidas = prescricoes.filter(
-          (p) => p.medicamento && p.medicamento.trim() !== ""
-        );
-        if (prescricoesValidas.length > 0) {
-          requestData.dados.prescricoes = prescricoesValidas;
+      // Adicionar prescrições se for receita (manuais + selecionadas da IA)
+      if (modelId === "receita-medica" || modelId === "receita-controle-especial" || modelId === "receita-tipo-ba") {
+        const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
+        const todasPrescricoes = [
+          ...prescricoes,
+          ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+        ].filter(p => p.medicamento && p.medicamento.trim() !== "");
+        if (todasPrescricoes.length > 0) {
+          requestData.dados.prescricoes = todasPrescricoes;
         }
       }
 
-      // Adicionar CID se necessário
-      const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
-      if (selectedCidsList.length > 0) {
-        requestData.dados.cidCodigo = selectedCidsList[0].code;
-        requestData.dados.cidDescricao = selectedCidsList[0].description;
+      // Adicionar CID se necessário (não sobrescrever se já veio do modal da guia TISS)
+      if (!requestData.dados.cidCodigo) {
+        const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
+        if (selectedCidsList.length > 0) {
+          requestData.dados.cidCodigo = selectedCidsList[0].code;
+          requestData.dados.cidDescricao = selectedCidsList[0].description;
+        }
       }
 
       // Adicionar exames solicitados (Guia TISS)
@@ -1997,8 +2020,30 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         throw new Error(error.error || "Erro ao gerar documento");
       }
 
-      // Obter o blob do PDF (mas não abrir)
-      const pdfBlob = await response.blob();
+      // Obter o blob do PDF
+      let pdfBlob = await response.blob();
+      let assinado = false;
+
+      // Assinar digitalmente inline se solicitado
+      if (extraDados?.assinarAposGerar) {
+        try {
+          const formData = new FormData();
+          formData.append("consultaId", consultaId);
+          formData.append("tipoDocumento", modelId);
+          formData.append("nomeDocumento", nomeDocumento);
+          formData.append("pdfFile", pdfBlob, `${modelId}.pdf`);
+          const signRes = await fetch("/api/medico/documentos/assinar", { method: "POST", body: formData });
+          if (signRes.ok) {
+            pdfBlob = await signRes.blob();
+            assinado = true;
+            toast.success("Documento gerado e assinado digitalmente!");
+          } else {
+            toast.warning("Documento gerado, mas não foi possível assinar digitalmente.");
+          }
+        } catch {
+          toast.warning("Documento gerado, mas não foi possível assinar digitalmente.");
+        }
+      }
 
       // Adicionar à lista de documentos gerados
       const novoDocumento = {
@@ -2007,24 +2052,29 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         nomeDocumento,
         createdAt: new Date().toISOString(),
         pdfBlob,
-        assinado: false,
+        assinado,
       };
 
       setDocumentosGerados([...documentosGerados, novoDocumento]);
       setDocumentoSearch("");
       setDocumentoSuggestions([]);
-      toast.success("Documento adicionado com sucesso!");
+      if (!extraDados?.assinarAposGerar) toast.success("Documento adicionado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar documento:", error);
       toast.error(error.message || "Erro ao gerar documento");
     }
   };
 
-  const handleTissConfirm = async (exames: ExameSolicitado[]) => {
+  const handleTissConfirm = async (exames: ExameSolicitado[], dadosAdicionais?: GuiaSADTDadosAdicionais) => {
     setTissModalOpen(false);
     setTissGerandoGuia(true);
     try {
-      await handleGenerateDocument("guia-consulta-tiss", undefined, exames, examesPrioridade);
+      await handleGenerateDocument("guia-consulta-tiss", {
+        _fromDocConfigModal: true,
+        numeroCarteirinha: dadosAdicionais?.numeroCarteirinha,
+        cidCodigo: dadosAdicionais?.cidCodigo,
+        indicacaoClinica: dadosAdicionais?.indicacaoClinica,
+      }, exames, examesPrioridade);
     } finally {
       setTissGerandoGuia(false);
     }
@@ -2278,7 +2328,67 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           formatDate={formatDate}
         />
 
-        {/* Zona 3 — Consulta Atual */}
+        {/* Zona 3 — Stepper de Progresso */}
+        {!isTelemedicina && (() => {
+          const hasTranscription = isTranscribing || transcricaoFinalizada || transcription.length > 0;
+          const hasAnamnese = !!(analysisResults?.anamnese || prontuario?.anamnese);
+          const hasAnamnDiv = anamneseConfirmed || hasAnamnese;
+          const hasDiag = (selectedCids.size > 0 || cidsManuais.length > 0 || prescricoes.length > 0 || selectedExamesAI.size > 0 || examesManuais.length > 0);
+          const hasDocs = documentosGerados.length > 0;
+
+          const steps = [
+            { label: "Gravação", done: hasTranscription },
+            { label: "Anamnese", done: hasAnamnDiv },
+            { label: "Diagnóstico", done: hasDiag },
+            { label: "Documentos", done: hasDocs },
+          ];
+
+          const currentStep = steps.findIndex(s => !s.done);
+          const activeIdx = currentStep === -1 ? steps.length - 1 : currentStep;
+
+          return (
+            <div className="bg-white border border-slate-200 rounded-xl px-5 py-3 flex items-center gap-0 shadow-sm">
+              {steps.map((step, i) => {
+                const isCompleted = step.done;
+                const isActive = i === activeIdx && !step.done;
+                const isPending = !isCompleted && !isActive;
+                return (
+                  <div key={i} className="flex items-center flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-all ${
+                        isCompleted
+                          ? "bg-emerald-500 text-white"
+                          : isActive
+                          ? "bg-blue-600 text-white ring-2 ring-blue-200 ring-offset-1"
+                          : "bg-slate-100 text-slate-400"
+                      }`}>
+                        {isCompleted ? (
+                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        ) : (
+                          i + 1
+                        )}
+                      </div>
+                      <span className={`text-xs font-medium transition-colors whitespace-nowrap ${
+                        isCompleted ? "text-emerald-600" : isActive ? "text-blue-700 font-semibold" : "text-slate-400"
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {i < steps.length - 1 && (
+                      <div className={`flex-1 h-px mx-3 min-w-[16px] transition-all ${
+                        steps[i].done ? "bg-emerald-300" : "bg-slate-200"
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Zona 4 — Consulta Atual */}
         {isTelemedicina ? (
           <TelemedicineView
             patient={patient}
@@ -2312,9 +2422,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           />
         ) : (
           <>
-          <div className="grid grid-cols-12 gap-4 items-stretch w-full min-w-0">
+          <div className="grid grid-cols-10 gap-4 items-stretch w-full min-w-0">
             {/* Coluna Anamnese */}
-            <div className="col-span-8 h-full flex flex-col min-w-0 overflow-x-hidden">
+            <div className="col-span-7 h-full flex flex-col min-w-0 overflow-x-hidden">
               <Step2Anamnesis
                 isProcessing={isProcessing}
                 analysisResults={analysisResults}
@@ -2341,7 +2451,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             </div>
 
             {/* Sidebar IA */}
-            <div className="col-span-4 min-w-0 overflow-x-hidden">
+            <div className="col-span-3 min-w-0 overflow-x-hidden">
               <AISidebar
                   isProcessing={isProcessing}
                   analysisResults={analysisResults}
@@ -2405,7 +2515,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
 
           <button
-            onClick={handleFinalizarAtendimento}
+            onClick={() => setFinalizarModalOpen(true)}
             disabled={saving}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
@@ -2436,6 +2546,283 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         />
       )}
 
+
+      {/* ====== MODAL: CONFIGURAR DOCUMENTO ====== */}
+      {(() => {
+        const nomeDoc = documentModels.find(m => m.id === docConfigModelId)?.nome || docConfigModelId;
+        const id = docConfigModelId;
+        const opts = docConfigOpts;
+        const set = (patch: Partial<typeof docConfigOpts>) => setDocConfigOpts(o => ({ ...o, ...patch }));
+
+        const hasDias = ["atestado-afastamento","atestado-afastamento-sem-cid","atestado-afastamento-cid"].includes(id);
+        const hasObs = id.startsWith("atestado-") || id.startsWith("declaracao-");
+        const hasValidade = ["atestado-aptidao-fisica-mental","atestado-aptidao-piscinas","atestado-aptidao-fisica"].includes(id);
+        const hasHorario = id.startsWith("declaracao-comparecimento");
+        const hasAcomp = ["declaracao-comparecimento-acompanhante","declaracao-comparecimento-horario-cid"].includes(id);
+        const hasUfValidade = id === "receita-controle-especial";
+        const hasConvenio = id === "justificativa-exames-plano";
+        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio;
+
+        return (
+          <Dialog open={docConfigModalOpen} onOpenChange={setDocConfigModalOpen}>
+            <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
+              <DialogTitle className="sr-only">Configurar {nomeDoc}</DialogTitle>
+              <div className="px-5 py-4 border-b border-slate-100">
+                <p className="text-sm font-semibold text-slate-800">{nomeDoc}</p>
+                <p className="text-xs text-slate-400 mt-0.5">Configure as opções antes de gerar</p>
+              </div>
+
+              <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                {/* ── Campos específicos do documento ── */}
+                {hasSpecific && (
+                  <>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Opções do documento</p>
+                    {hasDias && (
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Dias de afastamento</p>
+                        </div>
+                        <input
+                          type="number" min={1} max={365}
+                          value={opts.diasAfastamento}
+                          onChange={e => set({ diasAfastamento: Number(e.target.value) })}
+                          className="w-20 text-center text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                    {hasValidade && (
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-sm font-medium text-slate-700">Validade (meses)</p>
+                        <input
+                          type="number" min={1} max={24} placeholder="—"
+                          value={opts.mesesValidade}
+                          onChange={e => set({ mesesValidade: e.target.value })}
+                          className="w-20 text-center text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    )}
+                    {hasHorario && (
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-500 mb-1">Hora início</p>
+                          <input type="time" value={opts.horaInicio} onChange={e => set({ horaInicio: e.target.value })}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-500 mb-1">Hora fim</p>
+                          <input type="time" value={opts.horaFim} onChange={e => set({ horaFim: e.target.value })}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                      </div>
+                    )}
+                    {hasAcomp && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Nome do acompanhante</p>
+                        <input type="text" placeholder="Nome completo" value={opts.nomeAcompanhante} onChange={e => set({ nomeAcompanhante: e.target.value })}
+                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                      </div>
+                    )}
+                    {hasUfValidade && (
+                      <div className="flex items-center gap-3">
+                        <div className="w-24">
+                          <p className="text-xs text-slate-500 mb-1">UF</p>
+                          <input type="text" maxLength={2} placeholder="SP" value={opts.uf} onChange={e => set({ uf: e.target.value.toUpperCase() })}
+                            className="w-full text-sm text-center border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs text-slate-500 mb-1">Data validade</p>
+                          <input type="date" value={opts.dataValidade} onChange={e => set({ dataValidade: e.target.value })}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                      </div>
+                    )}
+                    {hasConvenio && (
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Convênio</p>
+                          <input type="text" placeholder="Nome do plano" value={opts.convenio} onChange={e => set({ convenio: e.target.value })}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Justificativa</p>
+                          <textarea rows={3} placeholder="Justificativa clínica..." value={opts.justificativa} onChange={e => set({ justificativa: e.target.value })}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
+                        </div>
+                      </div>
+                    )}
+                    {hasObs && (
+                      <div>
+                        <p className="text-xs text-slate-500 mb-1">Observações <span className="text-slate-300">(opcional)</span></p>
+                        <textarea rows={2} placeholder="Observações adicionais..." value={opts.observacoes} onChange={e => set({ observacoes: e.target.value })}
+                          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
+                      </div>
+                    )}
+                    <div className="border-t border-slate-100 pt-1">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-3">Opções gerais</p>
+                    </div>
+                  </>
+                )}
+
+                {/* ── Opções comuns ── */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Exibir CPF do paciente</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Imprime o CPF no documento</p>
+                  </div>
+                  <Switch checked={opts.cpf} onCheckedChange={v => set({ cpf: v })} />
+                </div>
+                <div className="border-t border-slate-100" />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Exibir endereço do paciente</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Imprime o endereço cadastrado</p>
+                  </div>
+                  <Switch checked={opts.endereco} onCheckedChange={v => set({ endereco: v })} />
+                </div>
+                <div className="border-t border-slate-100" />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Assinar digitalmente</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Aplica certificado digital ao PDF</p>
+                  </div>
+                  <Switch checked={opts.assinar} onCheckedChange={v => set({ assinar: v })} />
+                </div>
+              </div>
+
+              <div className="px-5 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                <button onClick={() => setDocConfigModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-500 font-medium rounded-lg hover:bg-slate-100 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setDocConfigModalOpen(false);
+                    handleGenerateDocument(docConfigModelId, {
+                      _fromDocConfigModal: true,
+                      ocultarCpf: !opts.cpf,
+                      incluirEndereco: opts.endereco,
+                      assinarAposGerar: opts.assinar,
+                      diasAfastamento: opts.diasAfastamento,
+                      observacoes: opts.observacoes || undefined,
+                      mesesValidade: opts.mesesValidade ? Number(opts.mesesValidade) : undefined,
+                      horaInicio: opts.horaInicio || undefined,
+                      horaFim: opts.horaFim || undefined,
+                      nomeAcompanhante: opts.nomeAcompanhante || undefined,
+                      uf: opts.uf || undefined,
+                      dataValidade: opts.dataValidade || undefined,
+                      convenio: opts.convenio || undefined,
+                      justificativa: opts.justificativa || undefined,
+                    });
+                  }}
+                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all"
+                  style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Gerar Documento
+                </button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* ====== MODAL: RESUMO PRÉ-FINALIZAÇÃO ====== */}
+      <Dialog open={finalizarModalOpen} onOpenChange={setFinalizarModalOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden gap-0">
+          <DialogTitle className="sr-only">Resumo pré-finalização do atendimento</DialogTitle>
+          {(() => {
+            const cidsIA = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)) || [];
+            const allCids = [...cidsIA, ...cidsManuais];
+            const examesIA = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)) || [];
+            const allExames = [...examesIA, ...examesManuais];
+            const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
+            const allRx = [...prescricoes, ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento))];
+            const temReceita = documentosGerados.some(d => d.tipoDocumento?.includes("receita"));
+            const temDocumento = documentosGerados.length > 0;
+
+            // Montar lista de avisos
+            const avisos: Array<{ nivel: "erro" | "aviso" | "info"; texto: string }> = [];
+            if (allCids.length === 0) avisos.push({ nivel: "erro", texto: "Nenhum diagnóstico (CID-10) registrado" });
+            if (allRx.length > 0 && !temReceita) avisos.push({ nivel: "aviso", texto: "Há prescrições mas nenhuma receita foi gerada" });
+            if (allRx.length === 0) avisos.push({ nivel: "info", texto: "Nenhuma prescrição adicionada" });
+            if (allExames.length === 0) avisos.push({ nivel: "info", texto: "Nenhum exame solicitado" });
+            if (!temDocumento) avisos.push({ nivel: "aviso", texto: "Nenhum documento gerado" });
+
+            const erros = avisos.filter(a => a.nivel === "erro");
+            const alertas = avisos.filter(a => a.nivel === "aviso");
+            const infos = avisos.filter(a => a.nivel === "info");
+            const totalAvisos = erros.length + alertas.length;
+            const tudoOk = totalAvisos === 0;
+
+            return (
+              <>
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <p className="text-sm font-semibold text-slate-800">Resumo do atendimento</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {tudoOk
+                      ? "Tudo certo. Confirme para finalizar."
+                      : `${totalAvisos} pend${totalAvisos > 1 ? "ências" : "ência"} encontrada${totalAvisos > 1 ? "s" : ""}. Você ainda pode finalizar.`}
+                  </p>
+                </div>
+
+                <div className="px-5 py-4 space-y-3 max-h-[55vh] overflow-y-auto">
+
+                  {/* Resumo compacto */}
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { icon: Stethoscope, label: "CIDs", count: allCids.length },
+                      { icon: FileText, label: "Exames", count: allExames.length },
+                      { icon: Pill, label: "Receitas", count: allRx.length },
+                      { icon: FileCheck, label: "Docs", count: documentosGerados.length },
+                    ].map(({ icon: Icon, label, count }) => (
+                      <div key={label} className="flex flex-col items-center gap-1 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                        <Icon className={`w-3.5 h-3.5 ${count > 0 ? "text-slate-500" : "text-slate-300"}`} />
+                        <p className={`text-base font-bold leading-none ${count > 0 ? "text-slate-800" : "text-slate-300"}`}>{count}</p>
+                        <p className="text-[10px] text-slate-400">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Avisos */}
+                  {avisos.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      {avisos.map((a, i) => (
+                        <div key={i} className="flex items-start gap-2.5 py-2 border-b border-slate-100 last:border-0">
+                          <div className={`w-1 h-1 rounded-full mt-1.5 flex-shrink-0 ${a.nivel === "erro" ? "bg-red-400" : a.nivel === "aviso" ? "bg-amber-400" : "bg-slate-300"}`} />
+                          <span className="text-xs text-slate-500">{a.texto}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-5 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => setFinalizarModalOpen(false)}
+                    className="px-4 py-2 text-xs text-slate-500 font-medium rounded-lg hover:bg-slate-100 transition-colors"
+                  >
+                    Voltar e Revisar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFinalizarModalOpen(false);
+                      handleFinalizarAtendimento();
+                    }}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    {erros.length > 0 || alertas.length > 0 ? "Finalizar mesmo assim" : "Confirmar e Finalizar"}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* ====== DIALOG: GERENCIAR EXAMES ====== */}
       <Dialog open={examesDrawerOpen} onOpenChange={setExamesDrawerOpen}>
@@ -2595,6 +2982,10 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         onClose={() => setTissModalOpen(false)}
         onConfirm={handleTissConfirm}
         isLoading={tissGerandoGuia}
+        cidSelecionado={
+          (analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i))?.[0]?.code) ||
+          ([...selectedCidsCatalogoIds].length > 0 ? undefined : undefined)
+        }
         examesDisponiveis={[
           ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)) ?? []),
           ...examesManuais.map((e) => ({
@@ -3096,11 +3487,19 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               )}
             </ScrollArea>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={handleCancelarCidsCatalogo}>Cancelar</Button>
-            <Button onClick={handleConfirmarCidsCatalogo} disabled={selectedCidsCatalogoIds.size === 0}>
-              Adicionar selecionados
-            </Button>
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => { setCidSearchDialogOpen(false); setCidDialogOpen(true); }}
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1.5 hover:underline"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar manualmente
+            </button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCancelarCidsCatalogo}>Cancelar</Button>
+              <Button onClick={handleConfirmarCidsCatalogo} disabled={selectedCidsCatalogoIds.size === 0}>
+                Adicionar selecionados
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -3304,19 +3703,27 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             </Tabs>
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-slate-200 flex-shrink-0">
-            <span className="text-sm text-slate-500">
-              {(selectedExamesIds.size + selectedGruposIds.size) > 0
-                ? `${selectedExamesIds.size + selectedGruposIds.size} selecionado${(selectedExamesIds.size + selectedGruposIds.size) > 1 ? "s" : ""}`
-                : "Nenhum selecionado"}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCancelarExames}>Cancelar</Button>
-              <Button
-                onClick={handleConfirmarExames}
-                disabled={(selectedExamesIds.size + selectedGruposIds.size) === 0}
-              >
-                Confirmar
-              </Button>
+            <button
+              onClick={() => { setExameSearchDialogOpen(false); setExameDialogOpen(true); }}
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1.5 hover:underline"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar manualmente
+            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-slate-500">
+                {(selectedExamesIds.size + selectedGruposIds.size) > 0
+                  ? `${selectedExamesIds.size + selectedGruposIds.size} selecionado${(selectedExamesIds.size + selectedGruposIds.size) > 1 ? "s" : ""}`
+                  : "Nenhum selecionado"}
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleCancelarExames}>Cancelar</Button>
+                <Button
+                  onClick={handleConfirmarExames}
+                  disabled={(selectedExamesIds.size + selectedGruposIds.size) === 0}
+                >
+                  Confirmar
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>
