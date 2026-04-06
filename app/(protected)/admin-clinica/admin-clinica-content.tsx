@@ -18,7 +18,6 @@ import {
 import {
   TrendingUp, TrendingDown, FileText, Clock,
   DollarSign, Activity, Stethoscope, Zap,
-  CheckCircle2,
 } from "lucide-react";
 
 interface AdminClinicaContentProps {
@@ -156,11 +155,6 @@ export function AdminClinicaContent({ data }: AdminClinicaContentProps) {
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg font-bold text-slate-800">{data.clinica.nome}</h1>
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
-                {data.clinica.telemedicineHabilitada && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                    <Zap className="h-3 w-3" /> Telemedicina
-                  </span>
-                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">Plano {planoLabel[data.clinica.plano.nome]} · {data.clinica.email}</p>
             </div>
@@ -328,28 +322,6 @@ export function AdminClinicaContent({ data }: AdminClinicaContentProps) {
         </ChartCard>
       </div>
 
-      {/* Status counts */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {([
-          { label: "Agendadas", key: "agendadas", color: "text-indigo-600", bg: "bg-indigo-50" },
-          { label: "Confirmadas", key: "confirmadas", color: "text-sky-600", bg: "bg-sky-50" },
-          { label: "Em Atendimento", key: "emAtendimento", color: "text-amber-600", bg: "bg-amber-50" },
-          { label: "Realizadas", key: "realizadas", color: "text-emerald-600", bg: "bg-emerald-50" },
-        ] as const).map((item) => (
-          <div key={item.key} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-slate-500">{item.label}</p>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.bg} ${item.color}`}>
-                <CheckCircle2 className="h-4 w-4" />
-              </div>
-            </div>
-            {loading ? <Sk className="h-6 w-12" /> : (
-              <p className="text-2xl font-bold text-slate-800">{ov?.statusBreakdown[item.key] ?? 0}</p>
-            )}
-            <p className="text-xs text-slate-400 mt-0.5">no total</p>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

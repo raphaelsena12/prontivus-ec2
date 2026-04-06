@@ -30,10 +30,10 @@ async function main() {
     update: {},
     create: {
       nome: TipoPlano.BASICO,
-      tokensMensais: 2000,
+      tokensMensais: 100000,
       telemedicineHabilitada: false,
       preco: 299.0,
-      descricao: "Plano básico com 2000 tokens mensais",
+      descricao: "Plano básico com 100.000 tokens mensais de IA",
       ativo: true,
     },
   });
@@ -43,10 +43,10 @@ async function main() {
     update: {},
     create: {
       nome: TipoPlano.INTERMEDIARIO,
-      tokensMensais: 5000,
+      tokensMensais: 500000,
       telemedicineHabilitada: false,
       preco: 599.0,
-      descricao: "Plano intermediário com 5000 tokens mensais",
+      descricao: "Plano intermediário com 500.000 tokens mensais de IA",
       ativo: true,
     },
   });
@@ -56,10 +56,10 @@ async function main() {
     update: {},
     create: {
       nome: TipoPlano.PROFISSIONAL,
-      tokensMensais: 10000,
+      tokensMensais: 2000000,
       telemedicineHabilitada: true,
       preco: 999.0,
-      descricao: "Plano profissional com 10000 tokens mensais e telemedicina",
+      descricao: "Plano profissional com 2.000.000 tokens mensais de IA e telemedicina",
       ativo: true,
     },
   });

@@ -68,7 +68,7 @@ export interface MedicalAnalysis {
 export async function processTranscriptionWithOpenAI(
   transcriptionText: string,
   examesIds: string[] = []
-): Promise<MedicalAnalysis> {
+): Promise<MedicalAnalysis & { _usage?: number }> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error(
       "Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env"
@@ -394,9 +394,10 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
             console.log("Total de protocolos:", validatedAnalysis.protocolos.length);
             console.log("Total de exames:", validatedAnalysis.exames.length);
             console.log("Total de prescrições:", validatedAnalysis.prescricoes.length);
+            console.log("Tokens usados:", completion.usage?.total_tokens);
             console.log("=========================");
 
-            return validatedAnalysis;
+            return { ...validatedAnalysis, _usage: completion.usage?.total_tokens };
           }
         }
       } catch (error) {
@@ -480,9 +481,10 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     console.log("Total de protocolos:", validatedAnalysis.protocolos.length);
     console.log("Total de exames:", validatedAnalysis.exames.length);
     console.log("Total de prescrições:", validatedAnalysis.prescricoes.length);
+    console.log("Tokens usados:", completion.usage?.total_tokens);
     console.log("=========================");
 
-    return validatedAnalysis;
+    return { ...validatedAnalysis, _usage: completion.usage?.total_tokens };
   } catch (error: any) {
     console.error("Erro ao processar com OpenAI:", error);
 
@@ -579,6 +581,7 @@ Se alguma seção não for mencionada na transcrição, escreva o título seguid
     temperature: 0,
     max_tokens: 2000,
     stream: true,
+    stream_options: { include_usage: true },
   });
 }
 
@@ -601,7 +604,7 @@ export interface MedicalSuggestions {
  * Fase 2 — Gera sugestões clínicas (CID, exames e prescrições) a partir
  * da anamnese já confirmada e do contexto selecionado pelo médico.
  */
-export async function generateMedicalSuggestions(context: SuggestionsContext): Promise<MedicalSuggestions> {
+export async function generateMedicalSuggestions(context: SuggestionsContext): Promise<MedicalSuggestions & { _usage?: number }> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
   }
@@ -722,6 +725,7 @@ Retorne APENAS um JSON válido no seguinte formato:
   }
 
   return {
+    _usage: completion.usage?.total_tokens,
     raciocinioClinico: typeof data.raciocinioClinico === "string" ? data.raciocinioClinico : "",
     cidCodes: (data.cidCodes || [])
       .map((cid: any) => ({

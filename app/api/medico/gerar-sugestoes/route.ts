@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { generateMedicalSuggestions } from "@/lib/openai-medical-service";
 import { prisma } from "@/lib/prisma";
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,6 +23,17 @@ export async function POST(request: NextRequest) {
         { error: "Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env" },
         { status: 500 }
       );
+    }
+
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
     }
 
     const suggestions = await generateMedicalSuggestions({
@@ -58,7 +70,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, ...suggestions });
+    if (clinicaId) {
+      await consumeTokens(clinicaId, "gerar-sugestoes", suggestions._usage);
+    }
+
+    const { _usage, ...suggestionsData } = suggestions;
+    return NextResponse.json({ success: true, ...suggestionsData });
   } catch (error: any) {
     console.error("Erro ao gerar sugestões:", error);
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth-helpers";
 import OpenAI from 'openai';
 import { prisma } from '@/lib/prisma';
 import { getSignedUrlFromS3 } from '@/lib/s3-service';
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -34,6 +35,17 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
     }
 
     // Buscar exames do banco
@@ -183,6 +195,10 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
       sugestoes: Array.isArray(analise.sugestoes) ? analise.sugestoes : [],
       recomendacoes: Array.isArray(analise.recomendacoes) ? analise.recomendacoes : [],
     };
+
+    if (clinicaId) {
+      await consumeTokens(clinicaId, "analisar-exames", completion.usage?.total_tokens);
+    }
 
     return NextResponse.json({
       success: true,

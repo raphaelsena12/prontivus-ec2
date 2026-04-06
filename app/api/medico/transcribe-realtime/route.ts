@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 export async function POST() {
   const session = await getSession();
@@ -9,6 +10,17 @@ export async function POST() {
 
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "OPENAI_API_KEY não configurada" }, { status: 500 });
+  }
+
+  const clinicaId = session.user.clinicaId;
+  if (clinicaId) {
+    const tokenCheck = await checkTokens(clinicaId);
+    if (!tokenCheck.allowed) {
+      return NextResponse.json(
+        { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+        { status: 429 }
+      );
+    }
   }
 
   try {
@@ -47,6 +59,11 @@ export async function POST() {
     }
 
     const data = await res.json();
+
+    if (clinicaId) {
+      consumeTokens(clinicaId, "transcribe-realtime").catch(console.error);
+    }
+
     // Retorna apenas o token efêmero — a API key nunca sai do servidor
     return NextResponse.json({ token: data.client_secret?.value });
   } catch (error: any) {

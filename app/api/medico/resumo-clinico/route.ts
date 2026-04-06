@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import OpenAI from 'openai';
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -60,6 +61,16 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    if (auth.clinicaId) {
+      const tokenCheck = await checkTokens(auth.clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
     }
 
     // Buscar dados do paciente
@@ -380,6 +391,10 @@ IMPORTANTE:
     const resumoClinico = completion.choices[0]?.message?.content;
     if (!resumoClinico) {
       throw new Error("Resposta vazia da OpenAI");
+    }
+
+    if (auth.clinicaId) {
+      await consumeTokens(auth.clinicaId, "resumo-clinico", completion.usage?.total_tokens);
     }
 
     return NextResponse.json({

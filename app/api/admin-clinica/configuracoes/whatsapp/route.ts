@@ -33,20 +33,26 @@ export async function PUT(request: Request) {
   const body = await request.json();
   const { whatsappPhoneNumberId, whatsappAccessToken, whatsappContatoNumero } = body;
 
-  if (!whatsappPhoneNumberId?.trim() || !whatsappAccessToken?.trim()) {
+  if (!whatsappPhoneNumberId?.trim()) {
     return NextResponse.json(
-      { error: "Phone Number ID e Access Token são obrigatórios" },
+      { error: "Phone Number ID é obrigatório" },
       { status: 400 }
     );
   }
 
+  const updateData: any = {
+    whatsappPhoneNumberId: whatsappPhoneNumberId.trim(),
+    whatsappContatoNumero: whatsappContatoNumero?.trim() || null,
+  };
+
+  // Só atualiza o token se foi enviado (permite salvar sem re-digitar)
+  if (whatsappAccessToken?.trim()) {
+    updateData.whatsappAccessToken = whatsappAccessToken.trim();
+  }
+
   await prisma.tenant.update({
     where: { id: auth.clinicaId },
-    data: {
-      whatsappPhoneNumberId: whatsappPhoneNumberId.trim(),
-      whatsappAccessToken: whatsappAccessToken.trim(),
-      whatsappContatoNumero: whatsappContatoNumero?.trim() || null,
-    },
+    data: updateData,
   });
 
   return NextResponse.json({ success: true });

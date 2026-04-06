@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { processTranscriptionWithOpenAI } from "@/lib/openai-medical-service";
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,12 +36,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
+    }
+
     // Processar com OpenAI GPT (incluindo exames se fornecidos)
     const analysis = await processTranscriptionWithOpenAI(transcriptionText, examesIds);
 
+    if (clinicaId) {
+      await consumeTokens(clinicaId, "process-transcription", analysis._usage);
+    }
+
+    const { _usage, ...analysisData } = analysis;
     return NextResponse.json({
       success: true,
-      analysis,
+      analysis: analysisData,
     });
   } catch (error: any) {
     console.error("Erro ao processar transcrição:", error);

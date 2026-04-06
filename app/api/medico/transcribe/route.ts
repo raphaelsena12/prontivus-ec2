@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import OpenAI from "openai";
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +15,17 @@ export async function POST(request: NextRequest) {
         { error: "OPENAI_API_KEY não configurada" },
         { status: 500 }
       );
+    }
+
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
     }
 
     const formData = await request.formData();
@@ -34,6 +46,10 @@ export async function POST(request: NextRequest) {
       model: "whisper-1",
       language: "pt",
     });
+
+    if (clinicaId) {
+      await consumeTokens(clinicaId, "transcribe");
+    }
 
     return NextResponse.json({
       transcript: transcription.text,

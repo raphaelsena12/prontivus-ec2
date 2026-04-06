@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getSession } from '@/lib/auth-helpers';
+import { checkTokens, consumeTokens } from '@/lib/token-usage';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const body = await req.json();
     const {
       paciente,
@@ -20,6 +27,17 @@ export async function POST(req: NextRequest) {
         { error: 'OPENAI_API_KEY não configurado' },
         { status: 500 }
       );
+    }
+
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: 'Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica.' },
+          { status: 429 }
+        );
+      }
     }
 
     // Montar contexto clínico para o modelo
@@ -89,6 +107,11 @@ INSTRUÇÕES:
     }
 
     const summary = JSON.parse(content);
+
+    if (clinicaId) {
+      await consumeTokens(clinicaId, 'resumo-paciente', response.usage?.total_tokens);
+    }
+
     return NextResponse.json(summary);
   } catch (error: any) {
     console.error('[resumo-paciente] Erro:', error);

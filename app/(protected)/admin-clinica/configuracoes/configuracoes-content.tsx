@@ -47,7 +47,7 @@ export function ConfiguracoesContent() {
   }, [fetchConfig]);
 
   async function handleSave() {
-    if (!phoneNumberId.trim() || !accessToken.trim()) {
+    if (!phoneNumberId.trim() || (!accessToken.trim() && !config?.whatsappConfigurado)) {
       toast.error("Preencha o Phone Number ID e o Access Token");
       return;
     }

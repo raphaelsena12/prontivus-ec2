@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { generateAnamneseStream } from "@/lib/openai-medical-service";
+import { checkTokens, consumeTokens } from "@/lib/token-usage";
 
 const MIN_WORDS = 20;
 
@@ -33,9 +34,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const clinicaId = session.user.clinicaId;
+    if (clinicaId) {
+      const tokenCheck = await checkTokens(clinicaId);
+      if (!tokenCheck.allowed) {
+        return NextResponse.json(
+          { error: "Limite de tokens de IA atingido para este mês. Entre em contato com o administrador da clínica." },
+          { status: 429 }
+        );
+      }
+    }
+
     // Streaming: retorna text/plain — cliente lê progressivamente e monta a anamnese em tempo real
     const stream = await generateAnamneseStream(transcription);
 
+    let totalUsage: number | undefined;
     const readable = new ReadableStream({
       async start(controller) {
         try {
@@ -44,6 +57,14 @@ export async function POST(request: NextRequest) {
             if (text) {
               controller.enqueue(new TextEncoder().encode(text));
             }
+            // O último chunk com stream_options: include_usage traz o usage
+            if (chunk.usage?.total_tokens) {
+              totalUsage = chunk.usage.total_tokens;
+            }
+          }
+          // Consumir tokens reais após stream completo
+          if (clinicaId) {
+            consumeTokens(clinicaId, "gerar-anamnese", totalUsage).catch(console.error);
           }
           controller.close();
         } catch (err) {
