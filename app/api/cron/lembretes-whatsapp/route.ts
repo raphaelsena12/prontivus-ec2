@@ -20,12 +20,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  // Janela: consultas entre 1h50 e 2h10 a partir de agora
+  // Janela: consultas entre 23h50 e 24h10 a partir de agora
   // Cron roda a cada 15min — janela de 20min garante que nenhuma consulta é perdida
   const agora = new Date();
 
-  const inicioDia = new Date(agora.getTime() + 110 * 60 * 1000); // +1h50
-  const fimDia = new Date(agora.getTime() + 130 * 60 * 1000);   // +2h10
+  const inicioDia = new Date(agora.getTime() + 1430 * 60 * 1000); // +23h50
+  const fimDia = new Date(agora.getTime() + 1450 * 60 * 1000);   // +24h10
 
   const consultas = await prisma.consulta.findMany({
     where: {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     include: {
       paciente: true,
       medico: { include: { usuario: true } },
-      clinica: { select: { id: true, nome: true } },
+      clinica: { select: { id: true, nome: true, whatsappContatoNumero: true, telefone: true } },
     },
   });
 
@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
         timeZone: "America/Sao_Paulo",
       });
 
+      const numeroContatoClinica = (consulta.clinica.whatsappContatoNumero || consulta.clinica.telefone || "").replace(/\D/g, "");
+
       await service.sendTemplateMessage({
         to: celular,
         message: "",
@@ -71,6 +73,7 @@ export async function GET(request: NextRequest) {
           horaFormatada,
           consulta.clinica.nome,
           consulta.medico.usuario.nome,
+          numeroContatoClinica,
         ],
       });
 

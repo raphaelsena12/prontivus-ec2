@@ -11,6 +11,7 @@ export async function GET() {
     select: {
       whatsappPhoneNumberId: true,
       whatsappAccessToken: true,
+      whatsappContatoNumero: true,
     },
   });
 
@@ -20,6 +21,7 @@ export async function GET() {
 
   return NextResponse.json({
     whatsappPhoneNumberId: clinica.whatsappPhoneNumberId ?? "",
+    whatsappContatoNumero: clinica.whatsappContatoNumero ?? "",
     whatsappConfigurado: !!clinica.whatsappAccessToken,
   });
 }
@@ -29,7 +31,7 @@ export async function PUT(request: Request) {
   if (!auth.authorized) return auth.response!;
 
   const body = await request.json();
-  const { whatsappPhoneNumberId, whatsappAccessToken } = body;
+  const { whatsappPhoneNumberId, whatsappAccessToken, whatsappContatoNumero } = body;
 
   if (!whatsappPhoneNumberId?.trim() || !whatsappAccessToken?.trim()) {
     return NextResponse.json(
@@ -43,6 +45,7 @@ export async function PUT(request: Request) {
     data: {
       whatsappPhoneNumberId: whatsappPhoneNumberId.trim(),
       whatsappAccessToken: whatsappAccessToken.trim(),
+      whatsappContatoNumero: whatsappContatoNumero?.trim() || null,
     },
   });
 
@@ -58,6 +61,7 @@ export async function DELETE() {
     data: {
       whatsappPhoneNumberId: null,
       whatsappAccessToken: null,
+      whatsappContatoNumero: null,
     },
   });
 

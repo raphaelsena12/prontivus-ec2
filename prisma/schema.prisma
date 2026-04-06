@@ -72,6 +72,7 @@ model Tenant {
   codigoCnes               String?  // Código CNES do estabelecimento
   whatsappPhoneNumberId    String?
   whatsappAccessToken      String?
+  whatsappContatoNumero    String?  // Número WhatsApp de atendimento (ex: 5511999999999)
 
   // Relations
   plano                       Plano                        @relation(fields: [planoId], references: [id])

@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/page-header";
 
 interface WhatsAppConfig {
   whatsappPhoneNumberId: string;
+  whatsappContatoNumero: string;
   whatsappConfigurado: boolean;
 }
 
@@ -24,6 +25,7 @@ export function ConfiguracoesContent() {
 
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [contatoNumero, setContatoNumero] = useState("");
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -32,6 +34,7 @@ export function ConfiguracoesContent() {
       const data: WhatsAppConfig = await res.json();
       setConfig(data);
       setPhoneNumberId(data.whatsappPhoneNumberId);
+      setContatoNumero(data.whatsappContatoNumero);
     } catch {
       toast.error("Erro ao carregar configurações");
     } finally {
@@ -54,7 +57,7 @@ export function ConfiguracoesContent() {
       const res = await fetch("/api/admin-clinica/configuracoes/whatsapp", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ whatsappPhoneNumberId: phoneNumberId, whatsappAccessToken: accessToken }),
+        body: JSON.stringify({ whatsappPhoneNumberId: phoneNumberId, whatsappAccessToken: accessToken, whatsappContatoNumero: contatoNumero }),
       });
 
       if (!res.ok) {
@@ -94,6 +97,7 @@ export function ConfiguracoesContent() {
       toast.success("Integração WhatsApp removida");
       setPhoneNumberId("");
       setAccessToken("");
+      setContatoNumero("");
       await fetchConfig();
     } catch {
       toast.error("Erro ao remover integração");
@@ -188,6 +192,21 @@ export function ConfiguracoesContent() {
                 Token permanente gerado em: Configurações → Usuários do Sistema → Tokens
               </p>
             </div>
+          </div>
+
+          {/* Número de contato WhatsApp */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="contatoNumero">Número WhatsApp de Atendimento</Label>
+            <Input
+              id="contatoNumero"
+              placeholder="Ex: 5511999999999"
+              value={contatoNumero}
+              onChange={(e) => setContatoNumero(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Número exibido nas mensagens de lembrete para o paciente entrar em contato (formato: 55 + DDD + número, sem espaços)
+            </p>
           </div>
 
           {/* Ações */}

@@ -81,7 +81,7 @@ async function resolveClinicaByPhoneNumberId(phoneNumberId: string): Promise<str
 async function processIncomingMessage(message: any, value: any, clinicaId: string | null) {
   try {
     const from = message.from;
-    const messageText = message.text?.body || message.button?.text || message.interactive?.button_reply?.title || "";
+    const messageText = message.text?.body || message.button?.text || message.button?.payload || message.interactive?.button_reply?.title || message.interactive?.button_reply?.id || "";
 
     console.log(`📨 Mensagem recebida de ${from}: ${messageText}`);
 
@@ -125,14 +125,19 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
     const consulta = paciente.consultas[0];
 
     // Processar resposta de confirmação/cancelamento
+    // Suporta: botões de template (quick reply), respostas interativas e texto livre
     const resposta = messageText.trim();
-    if (consulta && (resposta === "1" || /^(sim|confirmo|confirmar)/i.test(resposta))) {
+    const respostaLower = resposta.toLowerCase();
+    const isConfirmacao = respostaLower === "confirmar" || respostaLower === "1" || /^(sim|confirmo|confirmar)/i.test(resposta);
+    const isCancelamento = respostaLower === "não poderei comparecer" || respostaLower === "nao poderei comparecer" || respostaLower === "2" || /^(não|nao|cancelar|cancelo|não poderei|nao poderei)/i.test(resposta);
+
+    if (consulta && isConfirmacao) {
       await prisma.consulta.update({
         where: { id: consulta.id },
         data: { status: "CONFIRMADA" },
       });
       console.log(`✅ Consulta ${consulta.id} confirmada pelo paciente ${paciente.nome}`);
-    } else if (consulta && (resposta === "2" || /^(não|nao|cancelar|cancelo)/i.test(resposta))) {
+    } else if (consulta && isCancelamento) {
       await prisma.consulta.update({
         where: { id: consulta.id },
         data: { status: "CANCELADA" },
