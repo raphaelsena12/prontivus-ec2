@@ -429,7 +429,7 @@ model Exame {
   nome         String
   descricao    String?
   tipo         String?
-  codigoTussId String? // Nullable no banco para manter dados existentes, mas obrigatório na aplicação
+  codigoTussId String? // Opcional - obrigatório apenas quando há convênio
   ativo        Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

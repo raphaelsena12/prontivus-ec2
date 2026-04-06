@@ -6,7 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban, AlertCircle } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban, AlertCircle, Printer, Settings } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,6 +43,7 @@ import { BloqueioAgendaModal } from "./components/bloqueio-agenda-modal";
 import { NovoAgendamentoModal } from "./components/novo-agendamento-modal";
 import { PageHeader } from "@/components/page-header";
 import { EscalaMedicoModal } from "./components/escala-medico-modal";
+import { ImprimirAgendaModal } from "./components/imprimir-agenda-modal";
 
 interface Agendamento {
   id: string;
@@ -121,6 +128,7 @@ export function AgendamentosContent() {
   const [bloqueioModalOpen, setBloqueioModalOpen] = useState(false);
   const [novoAgendamentoModalOpen, setNovoAgendamentoModalOpen] = useState(false);
   const [escalaModalOpen, setEscalaModalOpen] = useState(false);
+  const [imprimirModalOpen, setImprimirModalOpen] = useState(false);
   const [escalasMedico, setEscalasMedico] = useState<EscalaHorario[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
@@ -473,20 +481,35 @@ export function AgendamentosContent() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={() => setEscalaModalOpen(true)}
-                className="text-xs h-8 border-border/60 hover:bg-muted/80 transition-colors"
+                size="icon"
+                onClick={() => setImprimirModalOpen(true)}
+                disabled={!medicoSelecionado}
+                className="h-8 w-8 border-border/60 hover:bg-muted/80 transition-colors"
+                title="Imprimir Agenda"
               >
-                <Clock className="mr-1.5 h-3.5 w-3.5" />
-                Escala
+                <Printer className="h-3.5 w-3.5" />
               </Button>
-              <Button 
-                variant="outline"
-                onClick={() => setBloqueioModalOpen(true)}
-                className="text-xs h-8 border-border/60 hover:bg-muted/80 transition-colors"
-              >
-                <Ban className="mr-1.5 h-3.5 w-3.5" />
-                Bloqueio
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 border-border/60 hover:bg-muted/80 transition-colors"
+                  >
+                    <Settings className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEscalaModalOpen(true)}>
+                    <Clock className="mr-2 h-3.5 w-3.5" />
+                    Escala
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setBloqueioModalOpen(true)}>
+                    <Ban className="mr-2 h-3.5 w-3.5" />
+                    Bloqueio
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button 
                 onClick={() => {
                   setNovoAgendamentoInitialData({
@@ -815,6 +838,13 @@ export function AgendamentosContent() {
         onOpenChange={setEscalaModalOpen}
         medicoId={medicoSelecionado || undefined}
         medicoNome={medicos.find((m) => m.id === medicoSelecionado)?.usuario.nome}
+      />
+
+      <ImprimirAgendaModal
+        open={imprimirModalOpen}
+        onOpenChange={setImprimirModalOpen}
+        medicoNome={medicos.find((m) => m.id === medicoSelecionado)?.usuario.nome || ""}
+        agendamentos={agendamentos}
       />
     </div>
   );

@@ -19,7 +19,7 @@ const agendamentoSchema = z.object({
   medicoId: z.string().uuid(),
   dataHora: z.string().transform((str) => new Date(str)),
   dataHoraFim: z.string().transform((str) => new Date(str)).optional(),
-  codigoTussId: z.string().uuid(),
+  codigoTussId: z.string().uuid().optional().nullable(),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
   formaPagamentoId: z.string().uuid().optional().nullable(),
@@ -249,38 +249,40 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
 
-    // Validar vigência do código TUSS
-    const validacaoVigencia = await validarVigenciaTuss(
-      data.codigoTussId,
-      data.dataHora
-    );
-
-    if (!validacaoVigencia.valido) {
-      return NextResponse.json(
-        {
-          error: "Código TUSS inválido",
-          motivo: validacaoVigencia.motivo,
-        },
-        { status: 400 }
+    // Validar vigência do código TUSS (apenas quando informado)
+    if (data.codigoTussId) {
+      const validacaoVigencia = await validarVigenciaTuss(
+        data.codigoTussId,
+        data.dataHora
       );
-    }
 
-    // Verificar se código TUSS é aceito pela operadora/plano
-    const aceitacao = await verificarAceitacaoTuss(
-      auth.clinicaId!,
-      data.codigoTussId,
-      data.operadoraId || null,
-      data.planoSaudeId || null
-    );
+      if (!validacaoVigencia.valido) {
+        return NextResponse.json(
+          {
+            error: "Código TUSS inválido",
+            motivo: validacaoVigencia.motivo,
+          },
+          { status: 400 }
+        );
+      }
 
-    if (!aceitacao.aceito) {
-      return NextResponse.json(
-        {
-          error: "Código TUSS não aceito",
-          motivo: aceitacao.motivo,
-        },
-        { status: 400 }
+      // Verificar se código TUSS é aceito pela operadora/plano
+      const aceitacao = await verificarAceitacaoTuss(
+        auth.clinicaId!,
+        data.codigoTussId,
+        data.operadoraId || null,
+        data.planoSaudeId || null
       );
+
+      if (!aceitacao.aceito) {
+        return NextResponse.json(
+          {
+            error: "Código TUSS não aceito",
+            motivo: aceitacao.motivo,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Verificar se paciente e médico pertencem à clínica
@@ -545,7 +547,7 @@ export async function POST(request: NextRequest) {
         medicoId: data.medicoId,
         dataHora: data.dataHora,
         dataHoraFim: data.dataHoraFim ?? dataHoraFim,
-        codigoTussId: data.codigoTussId,
+        codigoTussId: data.codigoTussId || null,
         tipoConsultaId: data.tipoConsultaId,
         procedimentoId: data.procedimentoId,
         formaPagamentoId: data.formaPagamentoId,

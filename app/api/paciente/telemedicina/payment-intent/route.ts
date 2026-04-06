@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(valor * 100),
       currency: "brl",
-      automatic_payment_methods: { enabled: true },
+      automatic_payment_methods: { enabled: true, allow_redirects: "never" },
       description: `Consulta Telemedicina - ${medicoNome}${especialidade ? ` (${especialidade})` : ""}`,
       receipt_email: pacienteEmail || undefined,
       metadata: {

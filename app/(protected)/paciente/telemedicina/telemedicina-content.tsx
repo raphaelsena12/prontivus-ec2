@@ -141,6 +141,8 @@ function PaymentForm({
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
+  const [elementReady, setElementReady] = useState(false);
+  const [elementError, setElementError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,7 +153,9 @@ function PaymentForm({
     // Confirmar pagamento sem redirect
     const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
-      confirmParams: {},
+      confirmParams: {
+        return_url: `${window.location.origin}/paciente/telemedicina`,
+      },
       redirect: "if_required",
     });
 
@@ -221,16 +225,34 @@ function PaymentForm({
           <Lock className="h-3 w-3" />
           Dados do cartão
         </label>
-        <PaymentElement
-          options={{
-            layout: "tabs",
-          }}
-        />
+        {elementError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 p-4 text-center">
+            <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+              Erro ao carregar formulário de pagamento
+            </p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+              {elementError}
+            </p>
+          </div>
+        ) : (
+          <PaymentElement
+            options={{
+              layout: "tabs",
+            }}
+            onReady={() => setElementReady(true)}
+            onLoadError={(event) => {
+              console.error("Stripe PaymentElement load error:", event);
+              setElementError(
+                "Não foi possível carregar o formulário de pagamento. Verifique sua conexão e tente novamente."
+              );
+            }}
+          />
+        )}
       </div>
 
       <Button
         type="submit"
-        disabled={!stripe || submitting}
+        disabled={!stripe || !elementReady || submitting || !!elementError}
         className="w-full h-11 font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
       >
         {submitting ? (

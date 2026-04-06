@@ -45,6 +45,63 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
+          // Auto-vincular Paciente ao Usuario (por CPF) se ainda não estiver vinculado
+          if (usuario.tipo === TipoUsuario.PACIENTE) {
+            try {
+              const pacienteVinculado = await prisma.paciente.findFirst({
+                where: { usuarioId: usuario.id },
+                select: { id: true },
+              });
+
+              if (!pacienteVinculado) {
+                // Buscar paciente órfão pelo CPF
+                const pacientePorCpf = await prisma.paciente.findFirst({
+                  where: {
+                    cpf: usuario.cpf,
+                    usuarioId: null,
+                    ativo: true,
+                  },
+                  select: { id: true },
+                  orderBy: { createdAt: "desc" },
+                });
+
+                if (pacientePorCpf) {
+                  await prisma.paciente.update({
+                    where: { id: pacientePorCpf.id },
+                    data: { usuarioId: usuario.id },
+                  });
+                  if (process.env.NODE_ENV === "development") {
+                    console.log(`[AUTH] Paciente ${pacientePorCpf.id} auto-vinculado ao usuario ${usuario.id} via CPF`);
+                  }
+                } else if (usuario.email) {
+                  // Fallback: buscar por email
+                  const pacientePorEmail = await prisma.paciente.findFirst({
+                    where: {
+                      email: usuario.email,
+                      usuarioId: null,
+                      ativo: true,
+                    },
+                    select: { id: true },
+                    orderBy: { createdAt: "desc" },
+                  });
+
+                  if (pacientePorEmail) {
+                    await prisma.paciente.update({
+                      where: { id: pacientePorEmail.id },
+                      data: { usuarioId: usuario.id },
+                    });
+                    if (process.env.NODE_ENV === "development") {
+                      console.log(`[AUTH] Paciente ${pacientePorEmail.id} auto-vinculado ao usuario ${usuario.id} via email`);
+                    }
+                  }
+                }
+              }
+            } catch (error) {
+              // Não bloquear login se a auto-vinculação falhar
+              console.error("[AUTH] Erro ao auto-vincular paciente:", error);
+            }
+          }
+
           // SUPER_ADMIN não precisa de tenant
           if (usuario.tipo === TipoUsuario.SUPER_ADMIN) {
             await prisma.usuario.update({

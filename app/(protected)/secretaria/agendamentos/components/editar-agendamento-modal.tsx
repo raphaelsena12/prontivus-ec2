@@ -41,7 +41,7 @@ const agendamentoSchema = z.object({
   data: z.string().min(1, "Data é obrigatória"),
   hora: z.string().min(1, "Hora início é obrigatória"),
   horaFim: z.string().min(1, "Hora fim é obrigatória"),
-  codigoTussId: z.string().uuid("Código TUSS é obrigatório"),
+  codigoTussId: z.string().uuid().optional().nullable(),
   tipoConsultaId: z.string().uuid().optional(),
   procedimentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
@@ -374,7 +374,7 @@ export function EditarAgendamentoModal({
       data: "",
       hora: "",
       horaFim: "",
-      codigoTussId: "",
+      codigoTussId: null,
       tipoConsultaId: "",
       procedimentoId: null,
       operadoraId: null,
@@ -706,7 +706,7 @@ export function EditarAgendamentoModal({
         formData.append("medicoId", data.medicoId);
         formData.append("dataHora", dataHora);
         formData.append("dataHoraFim", dataHoraFim);
-        formData.append("codigoTussId", data.codigoTussId);
+        if (data.codigoTussId) formData.append("codigoTussId", data.codigoTussId);
         if (data.tipoConsultaId) formData.append("tipoConsultaId", data.tipoConsultaId);
         if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
@@ -730,6 +730,7 @@ export function EditarAgendamentoModal({
             ...data,
             dataHora,
             dataHoraFim,
+            codigoTussId: data.codigoTussId || null,
             procedimentoId: data.procedimentoId || null,
             operadoraId: data.operadoraId || null,
             planoSaudeId: data.planoSaudeId || null,
@@ -861,7 +862,7 @@ export function EditarAgendamentoModal({
                     </Alert>
                   )}
 
-                  {/* Row 1: Médico e Código TUSS */}
+                  {/* Row 1: Médico */}
                   <div className="flex flex-wrap items-start gap-2.5">
                     <FormField
                       control={form.control}
@@ -875,7 +876,7 @@ export function EditarAgendamentoModal({
                                 <SelectValue placeholder="Selecione o médico" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-60">
                               {medicos.map((medico) => (
                                 <SelectItem key={medico.id} value={medico.id} className="text-xs">
                                   {medico.usuario.nome}
@@ -883,24 +884,6 @@ export function EditarAgendamentoModal({
                               ))}
                             </SelectContent>
                           </Select>
-                          <FormMessage className="text-xs" />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="codigoTussId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1 min-w-[200px]">
-                          <FormLabel className="text-xs font-medium">Código TUSS *</FormLabel>
-                            <FormControl>
-                              <CodigoTussSearchInput
-                                codigoTussId={field.value || ""}
-                                onSelectCodigoTussId={field.onChange}
-                                error={form.formState.errors.codigoTussId?.message}
-                              />
-                            </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -1007,7 +990,7 @@ export function EditarAgendamentoModal({
                                 <SelectValue placeholder="Selecione o tipo" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-60">
                               {tiposConsulta.map((tipo) => (
                                 <SelectItem key={tipo.id} value={tipo.id} className="text-xs">
                                   {tipo.nome}
@@ -1037,7 +1020,7 @@ export function EditarAgendamentoModal({
                                 <SelectValue placeholder="Selecione o procedimento" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-60">
                               <SelectItem value="null" className="text-xs">Nenhum</SelectItem>
                               {procedimentos.map((procedimento) => (
                                 <SelectItem key={procedimento.id} value={procedimento.id} className="text-xs">
@@ -1069,7 +1052,7 @@ export function EditarAgendamentoModal({
                                 <SelectValue placeholder="Selecione o convênio" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
+                            <SelectContent position="popper" className="max-h-60">
                               <SelectItem value="null" className="text-xs">Particular</SelectItem>
                               {operadoras.map((operadora) => (
                                 <SelectItem key={operadora.id} value={operadora.id} className="text-xs">
@@ -1118,7 +1101,7 @@ export function EditarAgendamentoModal({
                                   <SelectValue placeholder="Selecione o plano" />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
+                              <SelectContent position="popper" className="max-h-60">
                                 {planosSaude.map((plano) => (
                                   <SelectItem key={plano.id} value={plano.id} className="text-xs">
                                     {plano.nome}
@@ -1130,10 +1113,47 @@ export function EditarAgendamentoModal({
                           </FormItem>
                         )}
                       />
+                      <FormField
+                        control={form.control}
+                        name="codigoTussId"
+                        render={({ field }) => (
+                          <FormItem className="flex-1 min-w-[200px]">
+                            <FormLabel className="text-xs font-medium">Código TUSS</FormLabel>
+                              <FormControl>
+                                <CodigoTussSearchInput
+                                  codigoTussId={field.value || ""}
+                                  onSelectCodigoTussId={field.onChange}
+                                  error={form.formState.errors.codigoTussId?.message}
+                                />
+                              </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
                     </div>
                   )}
 
-                  {/* Row 5: Anexo de Documentos */}
+                  {/* Observações */}
+                  <FormField
+                    control={form.control}
+                    name="observacoes"
+                    render={({ field }) => (
+                      <FormItem className="w-full">
+                        <FormLabel className="text-xs font-medium">Observações</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Observações (opcional)"
+                            className="min-h-16 text-xs"
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Anexos */}
                   <div className="w-full">
                     <input
                       ref={fileInputRef}
@@ -1147,32 +1167,31 @@ export function EditarAgendamentoModal({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex flex-col items-center justify-center py-3 text-center border border-dashed border-slate-200 rounded-lg hover:border-slate-400 hover:bg-slate-50 transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2 py-2 px-3 text-left border border-slate-200 rounded-md hover:border-slate-300 hover:bg-slate-50/50 transition-colors cursor-pointer"
                       >
-                        <FileCheck className="w-8 h-8 text-slate-300 mb-1.5" />
-                        <p className="text-xs text-slate-500 font-medium">Nenhum documento anexado</p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">Clique aqui para adicionar documentos</p>
+                        <FileCheck className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                        <span className="text-xs text-slate-400">Anexar documentos (opcional)</span>
                       </button>
                     ) : (
-                      <div className="border border-dashed border-slate-200 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs text-slate-600 font-medium">
-                            {documentosExistentes.length + anexos.length} documento(s) anexado(s)
+                      <div className="border border-slate-200 rounded-md p-2.5">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[11px] text-slate-500">
+                            {documentosExistentes.length + anexos.length} documento(s)
                           </p>
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             className="text-[10px] text-blue-500 hover:text-blue-700"
                           >
-                            + Adicionar mais
+                            + Adicionar
                           </button>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {documentosExistentes.map((doc) => (
-                            <div key={doc.id} className="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
+                            <div key={doc.id} className="flex items-center justify-between bg-slate-50 rounded px-2 py-0.5">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <FileCheck className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                                <span className="text-xs text-slate-600 truncate">{doc.nomeDocumento}</span>
+                                <FileCheck className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                <span className="text-[11px] text-slate-500 truncate">{doc.nomeDocumento}</span>
                                 <span className="text-[10px] text-slate-400 flex-shrink-0">
                                   {doc.dados?.fileSize ? `(${(doc.dados.fileSize / 1024).toFixed(0)} KB)` : ""}
                                 </span>
@@ -1187,10 +1206,10 @@ export function EditarAgendamentoModal({
                             </div>
                           ))}
                           {anexos.map((file, index) => (
-                            <div key={`new-${index}`} className="flex items-center justify-between bg-blue-50 rounded px-2 py-1">
+                            <div key={`new-${index}`} className="flex items-center justify-between bg-blue-50 rounded px-2 py-0.5">
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <FileCheck className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                                <span className="text-xs text-slate-600 truncate">{file.name}</span>
+                                <FileCheck className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                                <span className="text-[11px] text-slate-500 truncate">{file.name}</span>
                                 <span className="text-[10px] text-slate-400 flex-shrink-0">({(file.size / 1024).toFixed(0)} KB)</span>
                               </div>
                               <button
@@ -1206,26 +1225,6 @@ export function EditarAgendamentoModal({
                       </div>
                     )}
                   </div>
-
-                  {/* Observações */}
-                  <FormField
-                    control={form.control}
-                    name="observacoes"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel className="text-xs font-medium">Observações</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            {...field}
-                            value={field.value || ""}
-                            placeholder="Observações (opcional)"
-                            className="min-h-20 text-xs"
-                          />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
 
                   {/* Row 6: Valor */}
                   <div className="flex flex-wrap items-start gap-2.5 justify-end">
