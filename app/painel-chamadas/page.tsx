@@ -16,6 +16,67 @@ interface ChamadaPainel {
 
 const MAX_CHAMADAS = 9;
 
+type AnnouncementSource = "polly" | "webspeech" | "failed";
+
+async function tryWebSpeech(text: string): Promise<AnnouncementSource> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return "failed";
+  }
+  window.speechSynthesis.cancel();
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "pt-BR";
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    utterance.onend = () => resolve("webspeech");
+    utterance.onerror = () => resolve("failed");
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+async function playPollyForPainel(
+  text: string,
+  clinicaId: string
+): Promise<AnnouncementSource> {
+  try {
+    const res = await fetch("/api/public/text-to-speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, clinicaId }),
+    });
+
+    if (res.ok) {
+      const ct = res.headers.get("content-type");
+      if (ct?.includes("audio")) {
+        const blob = await res.blob();
+        if (blob.size === 0) return tryWebSpeech(text);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        try {
+          await new Promise<void>((resolve, reject) => {
+            audio.onended = () => {
+              URL.revokeObjectURL(url);
+              resolve();
+            };
+            audio.onerror = () => {
+              URL.revokeObjectURL(url);
+              reject(new Error("audio"));
+            };
+            void audio.play().then(undefined, reject);
+          });
+          return "polly";
+        } catch {
+          return tryWebSpeech(text);
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return tryWebSpeech(text);
+}
+
 function playBeep() {
   try {
     const Ctx =
@@ -417,12 +478,23 @@ function PainelContent() {
       }
     );
 
-    socket.on("nova-chamada", ({ chamada }: { chamada: ChamadaPainel }) => {
-      if (soundEnabledRef.current) playBeep();
-      setNewCallId(chamada.id);
-      setTimeout(() => setNewCallId(null), 3000);
-      setChamadas((prev) => [chamada, ...prev].slice(0, MAX_CHAMADAS));
-    });
+    socket.on(
+      "nova-chamada",
+      ({ chamada, mensagem }: { chamada: ChamadaPainel; mensagem?: string }) => {
+        if (soundEnabledRef.current) {
+          playBeep();
+          if (mensagem && clinicaId) {
+            // Toca o anúncio Polly após o beep (delay para não sobrepor)
+            setTimeout(() => {
+              void playPollyForPainel(mensagem, clinicaId);
+            }, 600);
+          }
+        }
+        setNewCallId(chamada.id);
+        setTimeout(() => setNewCallId(null), 3000);
+        setChamadas((prev) => [chamada, ...prev].slice(0, MAX_CHAMADAS));
+      }
+    );
 
     socket.on(
       "atualizar-chamada",

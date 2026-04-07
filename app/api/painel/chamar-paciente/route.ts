@@ -32,8 +32,10 @@ export async function POST(req: NextRequest) {
     painelChamadas.set(clinicaId, [chamada, ...atual].slice(0, 10));
   }
 
+  const mensagem = `Atenção, ${pacienteNome}, favor se dirigir a ${sala}.`;
+
   if (io) {
-    io.to(`painel:${clinicaId}`).emit("nova-chamada", { chamada });
+    io.to(`painel:${clinicaId}`).emit("nova-chamada", { chamada, mensagem });
   }
 
   return NextResponse.json({ success: true, chamada });
