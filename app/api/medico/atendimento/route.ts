@@ -139,6 +139,20 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Buscar CIDs, exames e prescrições já salvos para esta consulta
+    const savedCids = await prisma.consultaCid.findMany({
+      where: { consultaId },
+      select: { code: true, description: true },
+    });
+    const savedExames = await prisma.consultaExame.findMany({
+      where: { consultaId },
+      select: { nome: true, tipo: true },
+    });
+    const savedPrescricoes = await prisma.consultaPrescricao.findMany({
+      where: { consultaId },
+      select: { medicamento: true, dosagem: true, posologia: true, duracao: true },
+    });
+
     // Buscar avatar do paciente da mesma forma que o perfil faz
     // O perfil usa session.user.id, aqui tentamos pelo usuarioId primeiro
     // Se não encontrar, tentamos por CPF ou email (caso o avatar esteja em outro usuario)
@@ -294,6 +308,9 @@ export async function GET(request: NextRequest) {
       {
         consulta,
         prontuario,
+        savedCids,
+        savedExames,
+        savedPrescricoes,
       },
       { status: 200 }
     );
@@ -315,7 +332,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { consultaId, anamnese, exameFisico, diagnostico, conduta, orientacoesConduta, evolucao, cids, exames, prescricoes } = body;
+    const { consultaId, anamnese, exameFisico, diagnostico, conduta, orientacoesConduta, orientacoes, evolucao, cids, exames, prescricoes, finalizar, retornoAgendado, retornoDias } = body;
 
     if (!consultaId) {
       return NextResponse.json(
@@ -363,6 +380,7 @@ export async function POST(request: NextRequest) {
           diagnostico: diagnostico || null,
           conduta: conduta || null,
           orientacoesConduta: orientacoesConduta || null,
+          orientacoes: orientacoes || null,
           evolucao: evolucao || null,
         },
       });
@@ -386,70 +404,81 @@ export async function POST(request: NextRequest) {
           diagnostico: diagnostico || null,
           conduta: conduta || null,
           orientacoesConduta: orientacoesConduta || null,
+          orientacoes: orientacoes || null,
           evolucao: evolucao || null,
         },
       });
     }
 
-    // Salvar CIDs, exames e prescrições da consulta
+    // Salvar CIDs, exames e prescrições da consulta (tanto em save parcial quanto final)
     try {
       const clinicaId = auth.clinicaId!;
 
-      if (Array.isArray(cids) && cids.length > 0) {
+      if (Array.isArray(cids)) {
         await prisma.consultaCid.deleteMany({ where: { consultaId } });
-        await prisma.consultaCid.createMany({
-          data: cids.map((c: { code: string; description: string }) => ({
-            consultaId,
-            clinicaId,
-            code: c.code,
-            description: c.description,
-          })),
-        });
+        if (cids.length > 0) {
+          await prisma.consultaCid.createMany({
+            data: cids.map((c: { code: string; description: string }) => ({
+              consultaId,
+              clinicaId,
+              code: c.code,
+              description: c.description,
+            })),
+          });
+        }
       }
 
-      if (Array.isArray(exames) && exames.length > 0) {
+      if (Array.isArray(exames)) {
         await prisma.consultaExame.deleteMany({ where: { consultaId } });
-        await prisma.consultaExame.createMany({
-          data: exames.map((e: { nome: string; tipo?: string }) => ({
-            consultaId,
-            clinicaId,
-            nome: e.nome,
-            tipo: e.tipo || null,
-          })),
-        });
+        if (exames.length > 0) {
+          await prisma.consultaExame.createMany({
+            data: exames.map((e: { nome: string; tipo?: string }) => ({
+              consultaId,
+              clinicaId,
+              nome: e.nome,
+              tipo: e.tipo || null,
+            })),
+          });
+        }
       }
 
-      if (Array.isArray(prescricoes) && prescricoes.length > 0) {
+      if (Array.isArray(prescricoes)) {
         await prisma.consultaPrescricao.deleteMany({ where: { consultaId } });
-        await prisma.consultaPrescricao.createMany({
-          data: prescricoes.map((p: { medicamento: string; dosagem?: string; posologia: string; duracao?: string }) => ({
-            consultaId,
-            clinicaId,
-            medicamento: p.medicamento,
-            dosagem: p.dosagem || null,
-            posologia: p.posologia,
-            duracao: p.duracao || null,
-          })),
-        });
+        if (prescricoes.length > 0) {
+          await prisma.consultaPrescricao.createMany({
+            data: prescricoes.map((p: { medicamento: string; dosagem?: string; posologia: string; duracao?: string }) => ({
+              consultaId,
+              clinicaId,
+              medicamento: p.medicamento,
+              dosagem: p.dosagem || null,
+              posologia: p.posologia,
+              duracao: p.duracao || null,
+            })),
+          });
+        }
       }
     } catch (err) {
       console.error("Erro ao salvar CIDs/exames/prescrições:", err);
     }
 
-    // Atualizar status da consulta para REALIZADA e salvar momento do fim
-    const agora = new Date();
-    await prisma.consulta.update({
-      where: {
-        id: consultaId,
-      },
-      data: {
-        status: "REALIZADA",
-        fimAtendimento: agora,
-      },
-    });
+    // Só finalizar a consulta quando explicitamente solicitado
+    if (finalizar) {
+      // Atualizar status da consulta para REALIZADA e salvar momento do fim
+      const agora = new Date();
+      await prisma.consulta.update({
+        where: {
+          id: consultaId,
+        },
+        data: {
+          status: "REALIZADA",
+          fimAtendimento: agora,
+          retornoAgendado: retornoAgendado === true,
+          retornoDias: retornoAgendado === true && retornoDias ? Number(retornoDias) : null,
+        },
+      });
 
-    // Gerar PDF do prontuário e fazer upload para S3
-    try {
+      // Gerar PDF do prontuário e fazer upload para S3
+      try {
       const { generateProntuarioPDF } = await import("@/lib/pdf/prontuario");
       
       // Buscar dados completos para o PDF
@@ -569,6 +598,7 @@ export async function POST(request: NextRequest) {
           diagnostico: prontuario.diagnostico || "",
           conduta: prontuario.conduta || "",
           orientacoesConduta: prontuario.orientacoesConduta || "",
+          orientacoes: prontuario.orientacoes || "",
           evolucao: prontuario.evolucao || "",
         });
 
@@ -592,15 +622,16 @@ export async function POST(request: NextRequest) {
 
         console.log("✅ Prontuário salvo no S3:", s3Key);
       }
-    } catch (error) {
-      // Não falhar o processo se o upload do PDF falhar
-      console.error("Erro ao gerar e fazer upload do PDF do prontuário:", error);
-    }
+      } catch (error) {
+        // Não falhar o processo se o upload do PDF falhar
+        console.error("Erro ao gerar e fazer upload do PDF do prontuário:", error);
+      }
+    } // fim if (finalizar)
 
     return NextResponse.json(
       {
         prontuario,
-        message: "Prontuário salvo com sucesso",
+        message: finalizar ? "Atendimento finalizado com sucesso" : "Prontuário salvo com sucesso",
       },
       { status: 200 }
     );

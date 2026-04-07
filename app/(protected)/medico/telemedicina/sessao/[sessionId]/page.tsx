@@ -201,7 +201,7 @@ function DocumentGeneratorDialog({ open, documentType, consultaId, onClose }: Do
                       onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, dosagem: e.target.value } : x))}
                     />
                     <Input
-                      placeholder="Duração (ex: 7 dias)"
+                      placeholder="Quantidade (ex: 30 comprimidos)"
                       value={p.duracao}
                       onChange={e => setPrescricoes(prev => prev.map((x, idx) => idx === i ? { ...x, duracao: e.target.value } : x))}
                     />

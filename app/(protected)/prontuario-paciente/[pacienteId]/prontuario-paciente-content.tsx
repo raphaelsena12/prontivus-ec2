@@ -574,7 +574,7 @@ function ConsultaRow({
                       <p className="text-xs font-semibold text-slate-700">{p.medicamento}</p>
                       {p.dosagem && <p className="text-[10px] text-slate-400 mt-0.5">{p.dosagem}</p>}
                       <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Posologia:</span> {p.posologia}</p>
-                      {p.duracao && <p className="text-xs text-slate-500 mt-1"><span className="font-medium">Duração:</span> {p.duracao}</p>}
+                      {p.duracao && <p className="text-xs text-slate-500 mt-1"><span className="font-medium">Quantidade:</span> {p.duracao}</p>}
                     </div>
                   </div>
                 ))}

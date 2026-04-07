@@ -17,6 +17,7 @@ interface FichaAtendimentoData extends BaseDocumentData {
   exames?: Array<{ nome: string; tipo: string }>;
   protocolos?: Array<{ nome: string; descricao?: string }>;
   prescricoes?: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string }>;
+  orientacoes?: string;
   atestados?: Array<{ nome: string }>;
 }
 
@@ -253,13 +254,13 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
         doc.text(linha1, MARGIN + 4, y);
         y += 4;
 
-        // Linha 2: posologia + duração
+        // Linha 2: posologia + quantidade
         if (presc.posologia || presc.duracao) {
           doc.setFont(PDF_FONT, "normal");
           doc.setTextColor(...COLORS.slate600);
           const linha2Parts: string[] = [];
           if (presc.posologia) linha2Parts.push(presc.posologia);
-          if (presc.duracao) linha2Parts.push(presc.duracao);
+          if (presc.duracao) linha2Parts.push(`Qtd: ${presc.duracao}`);
           const linha2 = linha2Parts.join(" — ");
           const linhaWrapped = doc.splitTextToSize(linha2, CONTENT_WIDTH - 12);
           for (const l of linhaWrapped) {
@@ -288,6 +289,23 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
       }
       y += 3;
     }
+  }
+
+  // =====================================================
+  // SEÇÃO 4: ORIENTAÇÕES
+  // =====================================================
+  if (data.orientacoes && data.orientacoes.trim()) {
+    y = drawSectionTitle(doc, "ORIENTAÇÕES", y);
+    doc.setFontSize(8);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate800);
+    const wrapped = doc.splitTextToSize(data.orientacoes, CONTENT_WIDTH - 4);
+    for (const line of wrapped) {
+      y = checkPageBreak(doc, y, 4);
+      doc.text(line, MARGIN + 2, y);
+      y += 4;
+    }
+    y += 3;
   }
 
   // ── Assinatura (sem traço e sem data, alinhada no bottom) ──

@@ -433,14 +433,13 @@ export async function POST(request: NextRequest) {
       // RECEITAS
       // =====================================================
       case "receita-medica": {
-        // O frontend envia "prescricoes" com {medicamento, dosagem, posologia, duracao}
+        // O frontend envia "prescricoes" com {medicamento, dosagem, posologia, duracao (quantidade)}
         // O PDF espera "medicamentos" com {nome, quantidade, posologia}
         const medicamentosReceita = (dados?.prescricoes || dados?.medicamentos || []).map((p: any) => ({
           nome: p.medicamento || p.nome || "",
           dosagem: p.dosagem || undefined,
           posologia: p.posologia || "",
-          duracao: p.duracao || undefined,
-          quantidade: p.quantidade || undefined,
+          quantidade: p.duracao || p.quantidade || undefined,
         }));
         pdfBuffer = generateReceitaSimplesPDF({
           ...baseData,
@@ -690,6 +689,7 @@ export async function POST(request: NextRequest) {
           exames,
           protocolos,
           prescricoes,
+          orientacoes: prontuario?.orientacoes || dados?.orientacoes || "",
           atestados: dados?.atestados || [],
         });
         break;

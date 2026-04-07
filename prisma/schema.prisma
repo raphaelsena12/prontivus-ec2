@@ -773,6 +773,8 @@ model Consulta {
   temperatura        Decimal?  @db.Decimal(4, 1)
   peso               Decimal?  @db.Decimal(5, 2)
   altura             Decimal?  @db.Decimal(4, 2)
+  retornoAgendado    Boolean   @default(false) @map("retorno_agendado")
+  retornoDias        Int?      @map("retorno_dias")
 
   clinica                 Tenant                  @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
   paciente                Paciente                @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -816,6 +818,7 @@ model Prontuario {
   diagnostico String?
   conduta            String?
   orientacoesConduta String?  @map("orientacoes_conduta")
+  orientacoes        String?  @db.VarChar(255)
   evolucao           String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

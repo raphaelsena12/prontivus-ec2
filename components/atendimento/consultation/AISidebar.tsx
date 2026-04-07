@@ -25,6 +25,7 @@ import {
   History,
   Check,
   Brain,
+  ClipboardList,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,9 @@ interface AISidebarProps {
   setMedicamentoDialogOpen: (v: boolean) => void;
   selectedPrescricaoIndex: number | null;
   setSelectedPrescricaoIndex: (v: number | null) => void;
+  // Orientações
+  orientacoes: string;
+  setOrientacoes: (v: string) => void;
   allergies: string[];
   // Documents
   documentModels: Array<{ id: string; nome: string }>;
@@ -164,6 +168,8 @@ export function AISidebar({
   setMedicamentoDialogOpen,
   selectedPrescricaoIndex,
   setSelectedPrescricaoIndex,
+  orientacoes,
+  setOrientacoes,
   allergies,
   documentModels,
   documentosGerados,
@@ -1059,6 +1065,25 @@ export function AISidebar({
           </div>
         </div>
 
+        {/* ── Orientações ── */}
+        <div className="border-t border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+            <ClipboardList className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Orientações</span>
+          </div>
+          <div className="px-3 py-2">
+            <textarea
+              value={orientacoes}
+              onChange={(e) => setOrientacoes(e.target.value.slice(0, 255))}
+              maxLength={255}
+              rows={3}
+              placeholder="Digite orientações ao paciente..."
+              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none text-slate-700 placeholder:text-slate-300"
+            />
+            <p className="text-[10px] text-slate-400 text-right mt-0.5">{orientacoes.length}/255</p>
+          </div>
+        </div>
+
         {/* ── Documentos ── */}
         <div className="border-t border-slate-100 flex flex-col min-h-[160px]">
           <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
@@ -1301,7 +1326,7 @@ export function AISidebar({
                             />
                             <div>
                               <p className="text-xs font-medium text-slate-700">{p.medicamento}{p.dosagem ? ` ${p.dosagem}` : ""}</p>
-                              <p className="text-xs text-slate-400">{p.posologia}{p.duracao ? ` · ${p.duracao}` : ""}</p>
+                              <p className="text-xs text-slate-400">{p.posologia}{p.duracao ? ` · Qtd: ${p.duracao}` : ""}</p>
                             </div>
                           </label>
                         ))}

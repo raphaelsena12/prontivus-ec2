@@ -654,7 +654,7 @@ export function TelemedicineView({
                             <div key={i} className="bg-slate-900/50 rounded-lg p-2">
                               <p className="text-xs text-slate-200 font-semibold">{p.medicamento}</p>
                               <p className="text-[11px] text-slate-400">{p.dosagem} · {p.posologia}</p>
-                              {p.duracao && <p className="text-[11px] text-slate-500">Duração: {p.duracao}</p>}
+                              {p.duracao && <p className="text-[11px] text-slate-500">Qtd: {p.duracao}</p>}
                             </div>
                           ))}
                         </div>

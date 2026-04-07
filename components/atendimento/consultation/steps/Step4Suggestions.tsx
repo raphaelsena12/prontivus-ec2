@@ -456,7 +456,7 @@ export function Step4Suggestions({
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">
                         {p.posologia}
-                        {p.duracao && ` · ${p.duracao}`}
+                        {p.duracao && ` · Qtd: ${p.duracao}`}
                       </p>
                       {conflict && (
                         <p className="text-xs text-red-700 font-medium mt-1">

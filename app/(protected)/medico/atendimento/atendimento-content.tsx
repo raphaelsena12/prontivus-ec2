@@ -74,7 +74,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Search } from 'lucide-react';
+import { Search, CalendarDays } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 // ─── Novos componentes do redesign ───────────────────────────────────────────
 import { PatientHistory } from '@/components/atendimento/patient/PatientHistory';
@@ -125,6 +126,7 @@ interface Prontuario {
   diagnostico: string | null;
   conduta: string | null;
   orientacoesConduta: string | null;
+  orientacoes: string | null;
   evolucao: string | null;
 }
 
@@ -180,6 +182,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [isMicrophoneSelectorOpen, setIsMicrophoneSelectorOpen] = useState(false);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState<string | undefined>();
   const [prescricoes, setPrescricoes] = useState<Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string }>>([]);
+  const [orientacoes, setOrientacoes] = useState("");
   const [selectedCids, setSelectedCids] = useState<Set<number>>(new Set());
   const [selectedProtocolosAI, setSelectedProtocolosAI] = useState<Set<number>>(new Set());
   const [selectedExamesAI, setSelectedExamesAI] = useState<Set<number>>(new Set());
@@ -276,6 +279,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
   const [loadingFichaPreview, setLoadingFichaPreview] = useState(false);
   const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
+  const [retornoModalOpen, setRetornoModalOpen] = useState(false);
+  const [retornoAgendado, setRetornoAgendado] = useState(false);
+  const [retornoDias, setRetornoDias] = useState<number>(30);
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
   const [docConfigOpts, setDocConfigOpts] = useState({
@@ -366,6 +372,81 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   // Apenas no mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Autosave periódico no backend (a cada 60s se houver dados) ──────────────
+  const autoSaveRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastAutoSaveRef = React.useRef<string>("");
+
+  useEffect(() => {
+    autoSaveRef.current = setInterval(async () => {
+      // Só salvar se existe anamnese ou dados preenchidos
+      const hasData = prontuario?.anamnese || editedAnamnese || analysisResults?.anamnese ||
+        cidsManuais.length > 0 || examesManuais.length > 0 || prescricoes.length > 0 ||
+        (analysisResults?.cidCodes && selectedCids.size > 0) ||
+        (analysisResults?.exames && selectedExamesAI.size > 0);
+
+      if (!hasData) return;
+
+      // Evitar saves duplicados comparando hash simples dos dados
+      const dataHash = JSON.stringify({
+        anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+        exameFisico: prontuario?.exameFisico || "",
+        diagnostico: prontuario?.diagnostico || "",
+        conduta: prontuario?.conduta || "",
+        orientacoesConduta: prontuario?.orientacoesConduta || "",
+        orientacoes,
+        evolucao: prontuario?.evolucao || "",
+        cidsManuais,
+        examesManuais: examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo })),
+        prescricoes,
+        selectedCids: Array.from(selectedCids),
+        selectedExamesAI: Array.from(selectedExamesAI),
+        selectedPrescricoesAI: Array.from(selectedPrescricoesAI),
+      });
+
+      if (dataHash === lastAutoSaveRef.current) return;
+      lastAutoSaveRef.current = dataHash;
+
+      try {
+        await fetch("/api/medico/atendimento", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            consultaId,
+            anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+            exameFisico: prontuario?.exameFisico || "",
+            diagnostico: prontuario?.diagnostico || "",
+            conduta: prontuario?.conduta || "",
+            orientacoesConduta: prontuario?.orientacoesConduta || "",
+            orientacoes,
+            evolucao: prontuario?.evolucao || "",
+            cids: [
+              ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
+              ...cidsManuais,
+            ],
+            exames: [
+              ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || []),
+              ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo })),
+            ],
+            prescricoes: [
+              ...prescricoes,
+              ...(analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [])
+                .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+            ],
+            finalizar: false,
+          }),
+        });
+        console.log("💾 Autosave realizado com sucesso");
+      } catch {
+        // Falha silenciosa — o localStorage ainda serve de backup
+      }
+    }, 60000);
+
+    return () => {
+      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consultaId, prontuario, editedAnamnese, analysisResults, cidsManuais, examesManuais, prescricoes, orientacoes, selectedCids, selectedExamesAI, selectedPrescricoesAI]);
 
   // Calculate IMC if peso and altura are available
   const peso = consulta?.peso ? Number(consulta.peso) : null;
@@ -650,17 +731,20 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   }, [cidSearchDialogOpen, cidSearch]);
 
-  // Buscar exames quando o dialog abrir
+  // Buscar exames apenas quando digitar 3+ caracteres
   useEffect(() => {
-    if (exameSearchDialogOpen) {
+    if (exameSearchDialogOpen && exameSearch.trim().length >= 3) {
       fetchExamesCadastrados();
-      fetchGruposExames();
+      if (activeExameTab === "grupos") fetchGruposExames();
+    } else if (exameSearchDialogOpen) {
+      setExamesCadastrados([]);
+      setGruposExames([]);
     }
   }, [exameSearchDialogOpen, exameSearch]);
 
-  // Buscar grupos de exames quando a tab mudar
+  // Buscar grupos de exames quando a tab mudar (se já tem busca suficiente)
   useEffect(() => {
-    if (exameSearchDialogOpen && activeExameTab === "grupos") {
+    if (exameSearchDialogOpen && activeExameTab === "grupos" && exameSearch.trim().length >= 3) {
       fetchGruposExames();
     }
   }, [exameSearchDialogOpen, activeExameTab]);
@@ -813,12 +897,13 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     examesCadastrados
       .filter(e => selectedExamesIds.has(e.id))
       .forEach(exame => {
+        const isTuss = exame.id.startsWith("tuss:");
         novosExames.push({
           nome: exame.nome,
           tipo: exame.tipo,
           codigoTussId: exame.codigoTuss?.id ?? null,
           codigoTuss: exame.codigoTuss?.codigoTuss ?? null,
-          exameId: exame.id,
+          exameId: isTuss ? undefined : exame.id,
         });
       });
 
@@ -1036,7 +1121,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         cidCodes: data.cidCodes || [],
         protocolos: data.protocolos || [],
         exames: data.exames || [],
-        prescricoes: data.prescricoes || [],
+        prescricoes: (data.prescricoes || []).map((p: any) => ({ ...p, duracao: p.quantidade || p.duracao || "" })),
       }));
       toast.success("Sugestões geradas com sucesso!");
     } catch (error: any) {
@@ -1298,9 +1383,38 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       }
       
       setConsulta(data.consulta);
-      
+
       if (data.prontuario) {
         setProntuario(data.prontuario);
+        // Se já existia anamnese salva, preencher o campo editado também
+        if (data.prontuario.anamnese) {
+          setEditedAnamnese(data.prontuario.anamnese);
+        }
+        if (data.prontuario.orientacoes) {
+          setOrientacoes(data.prontuario.orientacoes);
+        }
+      }
+
+      // Restaurar CIDs, exames e prescrições salvos anteriormente
+      if (data.savedCids?.length > 0) {
+        setCidsManuais(data.savedCids.map((c: { code: string; description: string }) => ({
+          code: c.code,
+          description: c.description,
+        })));
+      }
+      if (data.savedExames?.length > 0) {
+        setExamesManuais(data.savedExames.map((e: { nome: string; tipo: string | null }) => ({
+          nome: e.nome,
+          tipo: e.tipo || "",
+        })));
+      }
+      if (data.savedPrescricoes?.length > 0) {
+        setPrescricoes(data.savedPrescricoes.map((p: { medicamento: string; dosagem: string | null; posologia: string; duracao: string | null }) => ({
+          medicamento: p.medicamento,
+          dosagem: p.dosagem || "",
+          posologia: p.posologia,
+          duracao: p.duracao || "",
+        })));
       }
 
       // Definir aba inicial baseado no tipo de consulta
@@ -1537,7 +1651,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           cidCodes: results.cidCodes || [],
           protocolos: (results as any).protocolos || [],
           exames: results.exames || [],
-          prescricoes: (results as any).prescricoes || [],
+          prescricoes: ((results as any).prescricoes || []).map((p: any) => ({ ...p, duracao: p.quantidade || p.duracao || "" })),
         });
         // Mudar para aba Manual para exibir os campos preenchidos
         setConsultationMode('manual');
@@ -1605,6 +1719,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                 .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
             ],
             atestados,
+            orientacoes,
           },
         }),
       });
@@ -1668,7 +1783,22 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
           orientacoesConduta: prontuario?.orientacoesConduta || "",
+          orientacoes,
           evolucao: prontuario?.evolucao || "",
+          cids: [
+            ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
+            ...cidsManuais,
+          ],
+          exames: [
+            ...(analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || []),
+            ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo })),
+          ],
+          prescricoes: [
+            ...prescricoes,
+            ...(analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [])
+              .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+          ],
+          finalizar: false,
         }),
       });
 
@@ -1703,6 +1833,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
           orientacoesConduta: prontuario?.orientacoesConduta || "",
+          orientacoes,
           evolucao: prontuario?.evolucao || "",
           cids: [
             ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
@@ -1717,6 +1848,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             ...(analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [])
               .filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
           ],
+          finalizar: true,
+          retornoAgendado,
+          retornoDias: retornoAgendado ? retornoDias : null,
         }),
       });
 
@@ -1747,6 +1881,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
             exames: allExames,
             protocolos: allProtocolos,
             prescricoes: prescricoes,
+            orientacoes,
           },
         };
 
@@ -1863,6 +1998,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           }
         }
       }
+
+      // Limpar rascunho local após finalização bem-sucedida
+      try { localStorage.removeItem(draftKey); } catch {}
 
       toast.success("Atendimento finalizado com sucesso!", {
         description: `Prontuário do paciente ${consulta?.paciente?.nome || 'o paciente'} foi atualizado.`,
@@ -2473,6 +2611,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   setMedicamentoDialogOpen={setMedicamentoDialogOpen}
                   selectedPrescricaoIndex={selectedPrescricaoIndex}
                   setSelectedPrescricaoIndex={setSelectedPrescricaoIndex}
+                  orientacoes={orientacoes}
+                  setOrientacoes={setOrientacoes}
                   allergies={patient.allergies}
                   documentModels={documentModels}
                   documentosGerados={documentosGerados}
@@ -2801,7 +2941,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   <button
                     onClick={() => {
                       setFinalizarModalOpen(false);
-                      handleFinalizarAtendimento();
+                      setRetornoModalOpen(true);
                     }}
                     disabled={saving}
                     className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
@@ -2814,6 +2954,105 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
               </>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ====== DIALOG: RETORNO DO PACIENTE ====== */}
+      <Dialog open={retornoModalOpen} onOpenChange={(open) => {
+        if (!open && !saving) {
+          // Se fechar sem confirmar, finaliza sem retorno
+          setRetornoAgendado(false);
+          setRetornoModalOpen(false);
+          handleFinalizarAtendimento();
+        }
+      }}>
+        <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
+          <DialogTitle className="sr-only">Retorno do paciente</DialogTitle>
+
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-blue-600" />
+              <p className="text-sm font-semibold text-slate-800">Retorno do Paciente</p>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">Defina se o paciente precisa retornar para consulta de acompanhamento.</p>
+          </div>
+
+          {/* Content */}
+          <div className="px-5 py-5 space-y-5">
+            {/* Switch retorno */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="retorno-switch" className="text-sm text-slate-700 font-medium">Haverá retorno?</Label>
+              <Switch
+                id="retorno-switch"
+                checked={retornoAgendado}
+                onCheckedChange={setRetornoAgendado}
+              />
+            </div>
+
+            {/* Dias de retorno */}
+            {retornoAgendado && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <Label htmlFor="retorno-dias" className="text-sm text-slate-700 font-medium">Retorno em quantos dias?</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="retorno-dias"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={retornoDias}
+                    onChange={(e) => setRetornoDias(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-24 text-center"
+                  />
+                  <span className="text-sm text-slate-500">dias</span>
+                </div>
+                {/* Atalhos rápidos */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[7, 15, 30, 60, 90].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setRetornoDias(d)}
+                      className={`px-2.5 py-1 text-xs rounded-md border transition-colors ${
+                        retornoDias === d
+                          ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                          : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                setRetornoAgendado(false);
+                setRetornoModalOpen(false);
+                handleFinalizarAtendimento();
+              }}
+              disabled={saving}
+              className="px-4 py-2 text-xs text-slate-500 font-medium rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              Pular
+            </button>
+            <button
+              onClick={() => {
+                setRetornoModalOpen(false);
+                handleFinalizarAtendimento();
+              }}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Finalizar Atendimento
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -3106,9 +3345,9 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Duração</label>
+                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Quantidade</label>
                   <Input
-                    placeholder="Ex: 7 dias, 1 mês"
+                    placeholder="Ex: 30 comprimidos, 1 caixa"
                     value={pendingMedicamento.duracao}
                     onChange={(e) => setPendingMedicamento((p) => p ? { ...p, duracao: e.target.value } : p)}
                   />
@@ -3588,14 +3827,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                 <Input
                   placeholder={activeExameTab === "exames" ? "Buscar exame por nome ou descrição..." : "Buscar grupo de exames por nome ou descrição..."}
                   value={exameSearch}
-                  onChange={(e) => {
-                    setExameSearch(e.target.value);
-                    if (activeExameTab === "exames") {
-                      fetchExamesCadastrados();
-                    } else {
-                      fetchGruposExames();
-                    }
-                  }}
+                  onChange={(e) => setExameSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
@@ -3608,9 +3840,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   ) : examesCadastrados.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                       <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
-                      <p className="text-sm text-slate-500 font-medium">Nenhum exame encontrado</p>
+                      <p className="text-sm text-slate-500 font-medium">
+                        {exameSearch.trim().length < 3 ? "Digite pelo menos 3 letras para buscar" : "Nenhum exame encontrado"}
+                      </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        {exameSearch ? "Tente uma busca diferente" : "Digite para buscar exames cadastrados"}
+                        {exameSearch.trim().length >= 3 ? "Tente uma busca diferente" : "Ex: hemograma, glicose, ultrassom..."}
                       </p>
                     </div>
                   ) : (
@@ -3655,9 +3889,11 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   ) : gruposExames.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-center px-4">
                       <ClipboardList className="w-10 h-10 text-slate-200 mb-3" />
-                      <p className="text-sm text-slate-500 font-medium">Nenhum grupo de exames encontrado</p>
+                      <p className="text-sm text-slate-500 font-medium">
+                        {exameSearch.trim().length < 3 ? "Digite pelo menos 3 letras para buscar" : "Nenhum grupo encontrado"}
+                      </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        {exameSearch ? "Tente uma busca diferente" : "Digite para buscar grupos de exames cadastrados"}
+                        {exameSearch.trim().length >= 3 ? "Tente uma busca diferente" : "Ex: hemograma, check-up..."}
                       </p>
                     </div>
                   ) : (

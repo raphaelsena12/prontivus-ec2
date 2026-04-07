@@ -49,7 +49,7 @@ export interface MedicalAnalysis {
     medicamento: string;
     dosagem: string;
     posologia: string;
-    duracao: string;
+    quantidade: string;
     justificativa?: string;
   }>;
   entities: Array<{
@@ -251,7 +251,7 @@ Formato JSON esperado:
     {"nome": "Creatinina sérica e TFG estimada", "tipo": "Laboratorial", "justificativa": "Avaliação de lesão de órgão-alvo renal — protocolo SBC 2024 para hipertensão arterial"}
   ],
   "prescricoes": [
-    {"medicamento": "Losartana potássica", "dosagem": "50mg", "posologia": "1 comprimido 1x ao dia", "duracao": "uso contínuo", "justificativa": "BRA de primeira linha para hipertensão — Diretriz SBC 2024"}
+    {"medicamento": "Losartana potássica", "dosagem": "50mg", "posologia": "1 comprimido 1x ao dia", "quantidade": "30 comprimidos", "justificativa": "BRA de primeira linha para hipertensão — Diretriz SBC 2024"}
   ],
   "entities": []
 }`;
@@ -383,7 +383,7 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
                 medicamento: presc.medicamento || "",
                 dosagem: presc.dosagem || "",
                 posologia: presc.posologia || "",
-                duracao: presc.duracao || "",
+                quantidade: presc.quantidade || presc.duracao || "",
                 justificativa: presc.justificativa || "",
               })).filter((presc: any) => presc.medicamento),
               entities: analysis.entities || [],
@@ -470,7 +470,7 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
         medicamento: presc.medicamento || "",
         dosagem: presc.dosagem || "",
         posologia: presc.posologia || "",
-        duracao: presc.duracao || "",
+        quantidade: presc.quantidade || presc.duracao || "",
         justificativa: presc.justificativa || "",
       })).filter((presc: any) => presc.medicamento),
       entities: analysis.entities || [],
@@ -690,7 +690,7 @@ Retorne APENAS um JSON válido no seguinte formato:
   "cidCodes": [{"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}],
   "protocolos": [{"nome": "Diretriz SBC 2024 — Hipertensão Arterial Sistêmica", "descricao": "Meta <130/80 mmHg; iniciar com IECA/BRA associado a diurético tiazídico ou BCC", "justificativa": "CID I10 — diretriz de primeira linha SBC 2024"}],
   "exames": [{"nome": "Creatinina sérica e TFG estimada", "tipo": "Laboratorial", "justificativa": "Avaliação de lesão de órgão-alvo renal — Diretriz SBC 2024 para HAS"}],
-  "prescricoes": [{"medicamento": "Losartana potássica", "dosagem": "50mg", "posologia": "1 comprimido 1x ao dia", "duracao": "uso contínuo", "justificativa": "BRA de primeira linha para HAS — Diretriz SBC 2024"}]
+  "prescricoes": [{"medicamento": "Losartana potássica", "dosagem": "50mg", "posologia": "1 comprimido 1x ao dia", "quantidade": "30 comprimidos", "justificativa": "BRA de primeira linha para HAS — Diretriz SBC 2024"}]
 }`;
 
   // Montar mensagem com ou sem imagens
@@ -757,7 +757,7 @@ Retorne APENAS um JSON válido no seguinte formato:
         medicamento: p.medicamento || "",
         dosagem: p.dosagem || "",
         posologia: p.posologia || "",
-        duracao: p.duracao || "",
+        quantidade: p.quantidade || p.duracao || "",
         justificativa: p.justificativa || "",
       }))
       .filter((p: any) => p.medicamento)

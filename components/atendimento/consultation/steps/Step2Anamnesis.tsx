@@ -24,6 +24,7 @@ interface Prontuario {
   diagnostico: string | null;
   conduta: string | null;
   orientacoesConduta: string | null;
+  orientacoes: string | null;
   evolucao: string | null;
 }
 

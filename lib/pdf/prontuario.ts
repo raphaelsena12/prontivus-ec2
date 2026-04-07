@@ -14,6 +14,7 @@ interface ProntuarioData extends BaseDocumentData {
   diagnostico?: string;
   conduta?: string;
   orientacoesConduta?: string;
+  orientacoes?: string;
   evolucao?: string;
 }
 
