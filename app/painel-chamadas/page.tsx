@@ -77,6 +77,31 @@ async function playPollyForPainel(
   return tryWebSpeech(text);
 }
 
+// ─── Fila de áudio (evita que chamadas simultâneas se sobreponham) ───────────
+
+const audioQueue: Array<{ mensagem: string; clinicaId: string }> = [];
+let audioPlaying = false;
+
+async function processAudioQueue() {
+  if (audioPlaying) return;
+  const next = audioQueue.shift();
+  if (!next) return;
+  audioPlaying = true;
+  try {
+    playBeep();
+    await new Promise((r) => setTimeout(r, 600));
+    await playPollyForPainel(next.mensagem, next.clinicaId);
+  } finally {
+    audioPlaying = false;
+    processAudioQueue();
+  }
+}
+
+function enqueueAnnouncement(mensagem: string, clinicaId: string) {
+  audioQueue.push({ mensagem, clinicaId });
+  processAudioQueue();
+}
+
 function playBeep() {
   try {
     const Ctx =
@@ -259,10 +284,10 @@ function CardSecundario({ chamada }: { chamada: ChamadaPainel }) {
         className={`h-1 w-full ${chamando ? "bg-emerald-400" : "bg-blue-400"}`}
       />
 
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-3 gap-2">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-4 gap-2">
           <span
-            className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${
+            className={`text-sm font-bold px-3 py-1.5 rounded-full shrink-0 ${
               chamando
                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                 : "bg-blue-50 text-blue-700 border border-blue-200"
@@ -270,17 +295,17 @@ function CardSecundario({ chamada }: { chamada: ChamadaPainel }) {
           >
             {chamando ? "CHAMANDO" : "EM ATENDIMENTO"}
           </span>
-          <span className="font-mono text-slate-400 text-base tabular-nums">
+          <span className="font-mono text-slate-400 text-lg tabular-nums">
             {formatTime(chamada.horario)}
           </span>
         </div>
         <p
-          className="font-bold text-slate-800 leading-tight mb-2 truncate"
-          style={{ fontSize: "clamp(1.25rem, 2vw, 1.875rem)" }}
+          className="font-bold text-slate-800 leading-tight mb-3 truncate"
+          style={{ fontSize: "clamp(1.5rem, 2.2vw, 2.25rem)" }}
         >
           {formatNome(chamada.pacienteNome)}
         </p>
-        <div className="flex items-center gap-2 text-slate-400 text-sm truncate">
+        <div className="flex items-center gap-3 text-slate-400 text-base truncate">
           <span className="truncate">{chamada.medicoNome}</span>
           <span className="text-slate-300 shrink-0">·</span>
           <span className="shrink-0">{chamada.sala}</span>
@@ -478,23 +503,25 @@ function PainelContent() {
       }
     );
 
-    socket.on(
-      "nova-chamada",
-      ({ chamada, mensagem }: { chamada: ChamadaPainel; mensagem?: string }) => {
-        if (soundEnabledRef.current) {
-          playBeep();
-          if (mensagem && clinicaId) {
-            // Toca o anúncio Polly após o beep (delay para não sobrepor)
-            setTimeout(() => {
-              void playPollyForPainel(mensagem, clinicaId);
-            }, 600);
-          }
-        }
-        setNewCallId(chamada.id);
-        setTimeout(() => setNewCallId(null), 3000);
-        setChamadas((prev) => [chamada, ...prev].slice(0, MAX_CHAMADAS));
+    const handleChamada = ({ chamada, mensagem }: { chamada: ChamadaPainel; mensagem?: string }) => {
+      if (soundEnabledRef.current && mensagem && clinicaId) {
+        enqueueAnnouncement(mensagem, clinicaId);
+      } else if (soundEnabledRef.current) {
+        playBeep();
       }
-    );
+      setNewCallId(chamada.id);
+      setTimeout(() => setNewCallId(null), 3000);
+      setChamadas((prev) => {
+        // Remove duplicatas do mesmo paciente (por nome, case-insensitive)
+        const semDuplicata = prev.filter(
+          (c) => c.pacienteNome.toLowerCase() !== chamada.pacienteNome.toLowerCase()
+        );
+        return [chamada, ...semDuplicata].slice(0, MAX_CHAMADAS);
+      });
+    };
+
+    socket.on("nova-chamada", handleChamada);
+    socket.on("rechamar-paciente", handleChamada);
 
     socket.on(
       "atualizar-chamada",
