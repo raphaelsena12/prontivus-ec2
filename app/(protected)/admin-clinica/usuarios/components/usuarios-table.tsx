@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Trash2, Plus, Upload } from "lucide-react";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { formatCPF } from "@/lib/utils";
+import { formatCPF, formatDate } from "@/lib/utils";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 
 interface Usuario {
@@ -80,14 +80,6 @@ const getTipoLabel = (tipo: TipoUsuario) => {
   return labels[tipo] || tipo;
 };
 
-const formatDate = (date: Date | string | null) => {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 export function UsuariosTable({
   data: initialData,

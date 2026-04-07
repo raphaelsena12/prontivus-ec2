@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateToInput } from "@/lib/utils";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -96,10 +97,10 @@ export function EditarCodigoTussSuperAdminForm({ codigoTuss }: EditarCodigoTussF
       capituloTuss: codigoTuss.capituloTuss || "",
       fonteAnsTabela22: codigoTuss.fonteAnsTabela22 || "",
       dataVigenciaInicio: codigoTuss.dataVigenciaInicio
-        ? new Date(codigoTuss.dataVigenciaInicio).toISOString().split("T")[0]
+        ? formatDateToInput(codigoTuss.dataVigenciaInicio)
         : "",
       dataVigenciaFim: codigoTuss.dataVigenciaFim
-        ? new Date(codigoTuss.dataVigenciaFim).toISOString().split("T")[0]
+        ? formatDateToInput(codigoTuss.dataVigenciaFim)
         : "",
       ativo: codigoTuss.ativo,
       observacoes: codigoTuss.observacoes || "",

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/utils";
 import * as React from "react";
 import {
   flexRender,
@@ -81,13 +82,6 @@ const getTipoLabel = (tipo: string | null) => {
   return labels[tipo] || tipo;
 };
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 export function ExamesTable({
   data: initialData,

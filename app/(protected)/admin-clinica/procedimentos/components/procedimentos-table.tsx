@@ -43,7 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { Edit, Trash2, Plus, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -66,13 +66,6 @@ interface ProcedimentosTableProps {
   onUpload?: () => void;
 }
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 export function ProcedimentosTable({
   data: initialData,

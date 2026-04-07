@@ -57,6 +57,7 @@ interface Prontuario {
   exameFisico: string | null;
   diagnostico: string | null;
   conduta: string | null;
+  orientacoesConduta: string | null;
   evolucao: string | null;
 }
 

@@ -41,9 +41,10 @@ async function getPagamentosData(clinicaId: string) {
   ]);
 
   // Verificar se há pagamento pendente para o mês atual
-  const hoje = new Date();
-  const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-  const proximoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+  const hojeStr = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const [y, m] = hojeStr.split("-").map(Number);
+  const mesAtual = new Date(`${y}-${String(m).padStart(2, "0")}-01T00:00:00-03:00`);
+  const proximoMes = new Date(`${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01T00:00:00-03:00`);
 
   const pagamentoPendente = await prisma.pagamento.findFirst({
     where: {
@@ -66,7 +67,7 @@ async function getPagamentosData(clinicaId: string) {
   const pagamentosVencidos = pagamentos.filter(
     (p) =>
       p.status === StatusPagamento.PENDENTE &&
-      new Date(p.dataVencimento) < hoje
+      new Date(p.dataVencimento) < new Date()
   ).length;
 
   return {

@@ -1,5 +1,6 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -82,8 +83,7 @@ export function AgendamentosContent() {
 
   const handleAutorizarFechamentoCaixa = async () => {
     try {
-      const hoje = new Date();
-      const dataFormatada = hoje.toISOString().split("T")[0];
+      const dataFormatada = brazilToday();
 
       const response = await fetch("/api/medico/fechamento-caixa/autorizar", {
         method: "POST",

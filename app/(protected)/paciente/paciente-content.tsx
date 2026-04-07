@@ -21,7 +21,9 @@ interface PacienteContentProps {
 }
 
 function getGreeting(firstName: string) {
-  const hour = new Date().getHours();
+  const hour = parseInt(
+    new Intl.DateTimeFormat("en-US", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(new Date())
+  );
   if (hour < 12) return `Bom dia, ${firstName}`;
   if (hour < 18) return `Boa tarde, ${firstName}`;
   return `Boa noite, ${firstName}`;

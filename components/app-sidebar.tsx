@@ -401,6 +401,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
     });
 
     items.push({
+      title: "Histórico de Atendimentos",
+      url: "/secretaria/historico-atendimentos",
+      icon: IconHistory,
+    });
+    items.push({
       title: "Procedimentos",
       url: "/secretaria/executar-procedimento",
       icon: IconFileText,

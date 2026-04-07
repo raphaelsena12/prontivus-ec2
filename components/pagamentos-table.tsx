@@ -158,6 +158,7 @@ export function PagamentosTable({ data, onConfirmar }: PagamentosTableProps) {
             {new Intl.DateTimeFormat("pt-BR", {
               month: "long",
               year: "numeric",
+              timeZone: "America/Sao_Paulo",
             }).format(new Date(row.original.mesReferencia))}
           </div>
         ),

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { brazilToday } from "@/lib/timezone-utils";
 
 interface Clinica {
   id: string;
@@ -99,10 +100,11 @@ export function PagamentoDialog({
         label: new Intl.DateTimeFormat("pt-BR", {
           month: "long",
           year: "numeric",
+          timeZone: "America/Sao_Paulo",
         }).format(data),
       });
     }
-    
+
     // Mês atual e próximos 3 meses
     for (let i = 0; i <= 3; i++) {
       const data = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
@@ -111,6 +113,7 @@ export function PagamentoDialog({
         label: new Intl.DateTimeFormat("pt-BR", {
           month: "long",
           year: "numeric",
+          timeZone: "America/Sao_Paulo",
         }).format(data),
       });
     }
@@ -122,9 +125,9 @@ export function PagamentoDialog({
 
   // Calcular data de vencimento padrão (7 dias a partir de hoje)
   const getDefaultVencimento = () => {
-    const data = new Date();
-    data.setDate(data.getDate() + 7);
-    return data.toISOString().split("T")[0];
+    const [y, m, d] = brazilToday().split("-").map(Number);
+    const data = new Date(Date.UTC(y, m - 1, d + 7));
+    return `${data.getUTCFullYear()}-${String(data.getUTCMonth() + 1).padStart(2, "0")}-${String(data.getUTCDate()).padStart(2, "0")}`;
   };
 
   const onSubmit = async (data: PagamentoFormValues) => {

@@ -315,7 +315,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { consultaId, anamnese, exameFisico, diagnostico, conduta, evolucao, cids, exames, prescricoes } = body;
+    const { consultaId, anamnese, exameFisico, diagnostico, conduta, orientacoesConduta, evolucao, cids, exames, prescricoes } = body;
 
     if (!consultaId) {
       return NextResponse.json(
@@ -362,6 +362,7 @@ export async function POST(request: NextRequest) {
           exameFisico: exameFisico || null,
           diagnostico: diagnostico || null,
           conduta: conduta || null,
+          orientacoesConduta: orientacoesConduta || null,
           evolucao: evolucao || null,
         },
       });
@@ -384,6 +385,7 @@ export async function POST(request: NextRequest) {
           exameFisico: exameFisico || null,
           diagnostico: diagnostico || null,
           conduta: conduta || null,
+          orientacoesConduta: orientacoesConduta || null,
           evolucao: evolucao || null,
         },
       });
@@ -566,6 +568,7 @@ export async function POST(request: NextRequest) {
           exameFisico: prontuario.exameFisico || "",
           diagnostico: prontuario.diagnostico || "",
           conduta: prontuario.conduta || "",
+          orientacoesConduta: prontuario.orientacoesConduta || "",
           evolucao: prontuario.evolucao || "",
         });
 

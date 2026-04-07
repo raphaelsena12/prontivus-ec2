@@ -120,37 +120,128 @@ async function importarOperadoraGlobalPorRegistro(registroAns: string) {
   return prisma.operadora.create({ data });
 }
 
-async function main() {
-  console.log("🏥 Seed SOMENTE OPERADORAS — importando principais operadoras via ANS...");
+const OPERADORAS_MANUAIS = [
+  {
+    codigoAns: "000000",
+    razaoSocial: "Laluce Plano de Assistencia Familiar LTDA",
+    nomeFantasia: "Funerária Laluce",
+    cnpj: "01876126000197",
+    telefone: null,
+    email: null,
+    cep: "16015-153",
+    endereco: "Praça Doutor Jaime de Oliveira",
+    numero: "903",
+    complemento: "Sala 03",
+    bairro: "Vila Mendonça",
+    cidade: "Araçatuba",
+    estado: "SP",
+  },
+  {
+    codigoAns: "000000",
+    razaoSocial: "Instituto de Assistência Médica ao Servidor Público Estadual",
+    nomeFantasia: "IAMSPE",
+    cnpj: "60747318000162",
+    telefone: null,
+    email: null,
+    cep: "04029-000",
+    endereco: "Avenida Ibirapuera",
+    numero: "981",
+    complemento: null,
+    bairro: "Indianópolis",
+    cidade: "São Paulo",
+    estado: "SP",
+  },
+  {
+    codigoAns: "000000",
+    razaoSocial: "AJMM Administradora de Serviços LTDA",
+    nomeFantasia: "Santa Rita / Cardassi",
+    cnpj: "46837827000155",
+    telefone: null,
+    email: null,
+    cep: null,
+    endereco: "Rua Tiradentes",
+    numero: "1208",
+    complemento: null,
+    bairro: "Vila Mendonça",
+    cidade: "Araçatuba",
+    estado: "SP",
+  },
+  {
+    codigoAns: "000000",
+    razaoSocial: "Bom Pastor Plano de Assistência Funerária LTDA",
+    nomeFantasia: "Bom Pastor",
+    cnpj: "53068672000103",
+    telefone: "1836524500",
+    email: null,
+    cep: "16300-027",
+    endereco: "Avenida Santa Casa",
+    numero: "307",
+    complemento: "Sala 1",
+    bairro: "Centro",
+    cidade: "Penápolis",
+    estado: "SP",
+  },
+  {
+    codigoAns: "000000",
+    razaoSocial: "V M Pimentel Administração e Vendas de Cartões LTDA",
+    nomeFantasia: "Beneficiar",
+    cnpj: "10349095000107",
+    telefone: null,
+    email: null,
+    cep: "16010-090",
+    endereco: "Rua Bandeirantes",
+    numero: "304",
+    complemento: "Loja 3",
+    bairro: "Centro",
+    cidade: "Araçatuba",
+    estado: "SP",
+  },
+];
 
-  const PRINCIPAIS_TERMOS = [
-    "BRADESCO SAUDE",
-    "SULAMERICA",
-    "AMIL",
-    "HAPVIDA",
-    "NOTREDAME INTERMEDICA",
-    "PORTO SEGURO",
-    "PREVENT SENIOR",
-    "ASSIM SAUDE",
-    "UNIMED",
-    "ALLIANZ",
-  ];
+async function upsertOperadorasManuais() {
+  console.log("🏥 Inserindo operadoras manuais (sem registro ANS)...");
+  const resultados: any[] = [];
 
-  const catalogoAns = await listarOperadorasAns();
-  const importadas: any[] = [];
+  for (const op of OPERADORAS_MANUAIS) {
+    const existente = await prisma.operadora.findFirst({
+      where: { clinicaId: null, cnpj: op.cnpj },
+    });
 
-  for (const termo of PRINCIPAIS_TERMOS) {
-    const item = acharOperadoraPorTermoNoCatalogo(catalogoAns, termo);
-    if (!item) {
-      console.warn(`⚠️ Não encontrei na ANS (ativa) para termo: ${termo}`);
-      continue;
+    const data = {
+      clinicaId: null,
+      codigoAns: op.codigoAns,
+      razaoSocial: op.razaoSocial,
+      nomeFantasia: op.nomeFantasia,
+      cnpj: op.cnpj,
+      telefone: op.telefone,
+      email: op.email,
+      cep: op.cep,
+      endereco: op.endereco,
+      numero: op.numero,
+      complemento: op.complemento,
+      bairro: op.bairro,
+      cidade: op.cidade,
+      estado: op.estado,
+      pais: "Brasil",
+      ativo: true,
+    };
+
+    if (existente) {
+      const updated = await prisma.operadora.update({ where: { id: existente.id }, data });
+      resultados.push(updated);
+    } else {
+      const created = await prisma.operadora.create({ data });
+      resultados.push(created);
     }
-    const op = await importarOperadoraGlobalPorRegistro(item.registro_ans);
-    importadas.push(op);
-    console.log(`✅ Operadora importada: ${op.codigoAns} - ${op.nomeFantasia ?? op.razaoSocial}`);
+    console.log(`✅ ${op.nomeFantasia} (${op.cnpj})`);
   }
 
-  console.log("✅ Seed operadoras concluído:", { total: importadas.length });
+  console.log(`✅ Operadoras manuais: ${resultados.length} inseridas/atualizadas`);
+  return resultados;
+}
+
+async function main() {
+  await upsertOperadorasManuais();
 }
 
 main()

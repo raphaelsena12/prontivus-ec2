@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Trash2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface TussValor {
   id: string;
@@ -80,14 +80,6 @@ interface TussValoresTableProps {
   newButtonUrl?: string;
 }
 
-const formatDate = (date: Date | null) => {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 export function TussValoresTable({
   data: initialData,

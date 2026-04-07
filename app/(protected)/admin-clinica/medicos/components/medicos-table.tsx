@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/utils";
 import * as React from "react";
 import {
   flexRender,
@@ -68,21 +69,6 @@ interface MedicosTableProps {
   onCreate?: () => void;
   onUpload?: () => void;
 }
-
-const formatDate = (date: Date | string | null | undefined) => {
-  if (!date) return "-";
-  try {
-    const dateObj = typeof date === "string" ? new Date(date) : date;
-    if (isNaN(dateObj.getTime())) return "-";
-    return new Intl.DateTimeFormat("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    }).format(dateObj);
-  } catch (error) {
-    return "-";
-  }
-};
 
 export function MedicosTable({
   data: initialData,

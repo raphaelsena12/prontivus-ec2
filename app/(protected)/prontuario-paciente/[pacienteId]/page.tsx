@@ -25,5 +25,11 @@ export default async function ProntuarioPacientePage({
 
   const { pacienteId } = await params;
 
-  return <ProntuarioPacienteContent pacienteId={pacienteId} />;
+  const userType = isMedico
+    ? "MEDICO"
+    : isSecretaria
+      ? "SECRETARIA"
+      : "ADMIN_CLINICA";
+
+  return <ProntuarioPacienteContent pacienteId={pacienteId} userType={userType} />;
 }

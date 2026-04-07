@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateToInput } from "@/lib/utils";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -310,13 +311,13 @@ function PacienteSearchInput({
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleSelectPaciente = useCallback((paciente: Paciente) => {
     if (!paciente.id) return;
-    
+
     setSelectedPaciente(paciente);
-    // Mostrar o nome do paciente no campo, mas ainda permitir editar
-    setSearchTerm(paciente.nome);
+    setSearchTerm("");
     setShowResults(false);
     setPacientes([]);
     onChange(paciente.nome);
@@ -327,68 +328,76 @@ function PacienteSearchInput({
   useEffect(() => {
     if (externalSelectedPaciente) {
       setSelectedPaciente(externalSelectedPaciente);
-      setSearchTerm(externalSelectedPaciente.nome);
+      setSearchTerm("");
     }
   }, [externalSelectedPaciente]);
 
-  // Sincronizar searchTerm com value quando mudar externamente
+  // Limpar quando value é resetado externamente (ex: modal reaberto)
   useEffect(() => {
-    if (value && value !== searchTerm) {
-      setSearchTerm(value);
-    } else if (!value && searchTerm) {
-      // Se o value foi limpo, limpar também o searchTerm
+    if (!value && !externalSelectedPaciente) {
       setSearchTerm("");
       setSelectedPaciente(null);
     }
-  }, [value]);
+  }, [value, externalSelectedPaciente]);
 
   // Buscar pacientes quando o termo de busca mudar
   useEffect(() => {
-    const searchPacientes = async () => {
-      const term = searchTerm.trim();
-      
-      // Se já tem um paciente selecionado e o termo não mudou, não buscar
-      if (selectedPaciente && term === selectedPaciente.nome) {
-        return;
-      }
+    // Não buscar se tem paciente selecionado
+    if (selectedPaciente) return;
 
-      // Buscar por CPF (3+ dígitos) ou por nome (3+ caracteres)
-      const cpfLimpo = removeMask(term);
-      // Se contém apenas números e tem 3+ caracteres, pode ser busca por CPF
-      const isCPF = cpfLimpo.length >= 3 && /^\d+$/.test(cpfLimpo);
-      // Se contém letras ou não é apenas números, é busca por nome
-      const isNome = term.length >= 3 && !/^\d+$/.test(term);
+    const term = searchTerm.trim();
 
-      if (!isCPF && !isNome) {
-        setPacientes([]);
-        setShowResults(false);
-        return;
+    const cpfLimpo = removeMask(term);
+    const isCPF = cpfLimpo.length >= 3 && /^\d+$/.test(cpfLimpo);
+    const isNome = term.length >= 3 && !/^\d+$/.test(term);
+
+    if (!isCPF && !isNome) {
+      setPacientes([]);
+      setShowResults(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
 
       try {
         setLoading(true);
-        // Buscar pelo CPF limpo se for CPF, senão buscar pelo termo original
         const searchQuery = isCPF ? cpfLimpo : term;
-        const response = await fetch(`/api/secretaria/pacientes?search=${encodeURIComponent(searchQuery)}`);
+        const response = await fetch(
+          `/api/secretaria/pacientes?search=${encodeURIComponent(searchQuery)}`,
+          { signal: controller.signal }
+        );
         if (response.ok) {
           const data = await response.json();
           setPacientes(data.pacientes || []);
           setShowResults(true);
-          
-          // Se buscar por CPF completo (11 dígitos) e encontrar exatamente um resultado, selecionar automaticamente
+
           if (isCPF && cpfLimpo.length === 11 && data.pacientes?.length === 1) {
             handleSelectPaciente(data.pacientes[0]);
           }
         }
-      } catch (error) {
-        console.error("Erro ao buscar pacientes:", error);
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Erro ao buscar pacientes:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }, 400);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
-
-    const timeoutId = setTimeout(searchPacientes, 300);
-    return () => clearTimeout(timeoutId);
   }, [searchTerm, selectedPaciente, handleSelectPaciente]);
 
   // Fechar resultados ao clicar fora
@@ -408,44 +417,66 @@ function PacienteSearchInput({
     setSelectedPaciente(null);
     setPacientes([]);
     setShowResults(false);
+    setLoading(false);
     onChange("");
     onSelect({ id: "", nome: "", cpf: "" } as Paciente);
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    
-    // Se o campo foi limpo, limpar seleção
-    if (!value) {
+    const val = e.target.value;
+
+    if (!val) {
       handleClear();
       return;
     }
-    
-    // Se há um paciente selecionado e o usuário começou a digitar, limpar seleção imediatamente
-    if (selectedPaciente) {
-      const nomeSelecionado = selectedPaciente.nome;
-      if (value !== nomeSelecionado) {
-        setSelectedPaciente(null);
-        setPacientes([]);
-        setShowResults(false);
-        onSelect({ id: "", nome: "", cpf: "" } as Paciente);
-      }
-    }
-    
-    // Verificar se contém apenas números (sem letras ou caracteres especiais além da máscara)
-    const cpfLimpo = removeMask(value);
+
+    const cpfLimpo = removeMask(val);
     const contemApenasNumeros = /^\d+$/.test(cpfLimpo);
-    
-    // Se contém apenas números, aplicar máscara de CPF
-    // Se contém letras ou outros caracteres, permitir digitação livre (busca por nome)
+
     const maskedValue = contemApenasNumeros && cpfLimpo.length > 0
-      ? maskCPF(value) 
-      : value;
-    
+      ? maskCPF(val)
+      : val;
+
     setSearchTerm(maskedValue);
     onChange(maskedValue);
   };
 
+  // Modo selecionado: mostra o paciente como um "chip"
+  if (selectedPaciente) {
+    return (
+      <div ref={containerRef} className="relative">
+        <div
+          className={cn(
+            "flex items-center gap-2 h-8 px-2 border rounded-md bg-background text-xs",
+            error ? "border-destructive" : "border-input"
+          )}
+        >
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary shrink-0">
+              <span className="text-[10px] font-semibold">
+                {selectedPaciente.nome.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <span className="font-medium truncate">{selectedPaciente.nome}</span>
+            <span className="text-muted-foreground shrink-0">
+              · CPF: {maskCPF(selectedPaciente.cpf)}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleClear}
+            className="text-muted-foreground hover:text-foreground shrink-0 p-0.5 rounded hover:bg-accent transition-colors"
+            title="Alterar paciente"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Modo busca: input com dropdown
   return (
     <div ref={containerRef} className="relative">
       <div className="relative">
@@ -453,16 +484,22 @@ function PacienteSearchInput({
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Digite o CPF ou nome do paciente"
+          placeholder="Buscar por nome ou CPF..."
           value={searchTerm}
           onChange={handleInputChange}
+          onFocus={() => {
+            if (pacientes.length > 0) setShowResults(true);
+          }}
           className={cn(
             "h-8 text-xs pl-8 pr-8",
             error && "border-destructive"
           )}
           maxLength={50}
         />
-        {searchTerm && (
+        {loading && (
+          <Loader2 className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+        )}
+        {!loading && searchTerm && (
           <button
             type="button"
             onClick={handleClear}
@@ -471,11 +508,8 @@ function PacienteSearchInput({
             <X className="h-3.5 w-3.5" />
           </button>
         )}
-        {loading && (
-          <Loader2 className="absolute right-8 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
-        )}
       </div>
-      
+
       {showResults && pacientes.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg max-h-60 overflow-auto">
           {pacientes.map((paciente) => (
@@ -488,10 +522,18 @@ function PacienteSearchInput({
               <div className="font-medium">{paciente.nome}</div>
               <div className="text-muted-foreground text-[10px]">
                 CPF: {maskCPF(paciente.cpf)}
-                {paciente.email && ` • ${paciente.email}`}
+                {paciente.email && ` · ${paciente.email}`}
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {showResults && pacientes.length === 0 && !loading && searchTerm.trim().length >= 3 && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-lg">
+          <div className="px-3 py-3 text-xs text-muted-foreground text-center">
+            Nenhum paciente encontrado
+          </div>
         </div>
       )}
     </div>
@@ -625,7 +667,7 @@ export function NovoAgendamentoModal({
                     email: paciente.email || undefined,
                     telefone: paciente.telefone || undefined,
                     celular: paciente.celular || undefined,
-                    dataNascimento: paciente.dataNascimento ? new Date(paciente.dataNascimento).toISOString().split('T')[0] : undefined,
+                    dataNascimento: paciente.dataNascimento ? formatDateToInput(paciente.dataNascimento) : undefined,
                   };
                   setPacienteSelecionado(pacienteFormatted);
                   setPacienteSearchValue(paciente.nome);

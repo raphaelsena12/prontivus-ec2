@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, User, Calendar, Phone, Mail, MapPin, FileText } from 'lucide-react';
-import { formatDate, formatCPF } from '@/lib/utils';
+import { formatDate, formatCPF, calcularIdade } from '@/lib/utils';
 
 interface DadosPessoaisSectionProps {
   paciente: {
@@ -36,17 +36,6 @@ interface DadosPessoaisSectionProps {
 }
 
 export function DadosPessoaisSection({ paciente, expanded, onToggle }: DadosPessoaisSectionProps) {
-  const calcularIdade = (dataNascimento: string) => {
-    const hoje = new Date();
-    const nascimento = new Date(dataNascimento);
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const mes = hoje.getMonth() - nascimento.getMonth();
-    if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
-      idade--;
-    }
-    return idade;
-  };
-
   const idade = calcularIdade(paciente.dataNascimento);
 
   return (

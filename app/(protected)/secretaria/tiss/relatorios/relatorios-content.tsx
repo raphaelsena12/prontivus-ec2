@@ -1,5 +1,6 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -60,11 +61,10 @@ export function RelatoriosContent() {
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataInicio, setDataInicio] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d.toISOString().split("T")[0];
+    const [y, m] = brazilToday().split("-");
+    return `${y}-${m}-01`;
   });
-  const [dataFim, setDataFim] = useState(new Date().toISOString().split("T")[0]);
+  const [dataFim, setDataFim] = useState(brazilToday());
   const [stats, setStats] = useState<Stats>({
     total: 0, rascunho: 0, validada: 0, emLote: 0, gerada: 0, enviada: 0, totalValue: 0,
   });

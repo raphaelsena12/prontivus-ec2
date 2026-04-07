@@ -1,5 +1,7 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
+import { formatDateToInput } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -204,13 +206,12 @@ export function NovoAgendamentoContent() {
     setMounted(true);
     
     // Calcular datas apenas no cliente
-    const hoje = new Date();
-    const dataMin = hoje.toISOString().split("T")[0];
+    const dataMin = brazilToday();
     setDataMinima(dataMin);
 
     const dataMax = new Date();
     dataMax.setDate(dataMax.getDate() + 30);
-    const dataMaxStr = dataMax.toISOString().split("T")[0];
+    const dataMaxStr = formatDateToInput(dataMax);
     setDataMaximaStr(dataMaxStr);
 
     // Verificar se há session_id na URL (retorno do pagamento)

@@ -1,5 +1,6 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -65,19 +66,16 @@ const META: Record<TipoRelatorio, { titulo: string; subtitulo: string; icon: Luc
   },
 };
 
-/** Formata Date para "YYYY-MM-DD" sem conversão UTC */
-function toLocalISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+/** Formata Date para "YYYY-MM-DD" no fuso de Brasília */
+function toLocalISO(_d?: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(_d ?? new Date());
 }
 
 function getDefaultDates() {
-  const hoje = new Date();
-  // Últimos 3 meses por padrão para cobrir dados existentes
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
-  return { inicio: toLocalISO(inicio), fim: toLocalISO(hoje) };
+  const hoje = brazilToday();
+  const [y, m] = hoje.split("-").map(Number);
+  const inicio = new Date(Date.UTC(y, m - 1 - 2, 1));
+  return { inicio: toLocalISO(inicio), fim: hoje };
 }
 
 const QUICK_RANGES = [
@@ -98,30 +96,31 @@ export function RelatorioContent({ tipo }: RelatorioContentProps) {
   const [loading, setLoading] = useState(false);
 
   const setQuickRange = (range: (typeof QUICK_RANGES)[number]["key"]) => {
-    const hoje = new Date();
+    const hoje = brazilToday();
+    const [y, m] = hoje.split("-").map(Number);
     switch (range) {
       case "hoje":
-        setDataInicio(toLocalISO(hoje));
-        setDataFim(toLocalISO(hoje));
+        setDataInicio(hoje);
+        setDataFim(hoje);
         break;
       case "mes":
-        setDataInicio(toLocalISO(new Date(hoje.getFullYear(), hoje.getMonth(), 1)));
-        setDataFim(toLocalISO(hoje));
+        setDataInicio(`${y}-${String(m).padStart(2, "0")}-01`);
+        setDataFim(hoje);
         break;
       case "mes-anterior": {
-        const ini = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-        const fim = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-        setDataInicio(toLocalISO(ini));
-        setDataFim(toLocalISO(fim));
+        const iniDate = new Date(Date.UTC(y, m - 2, 1));
+        const fimDate = new Date(Date.UTC(y, m - 1, 0));
+        setDataInicio(toLocalISO(iniDate));
+        setDataFim(toLocalISO(fimDate));
         break;
       }
       case "trimestre":
-        setDataInicio(toLocalISO(new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)));
-        setDataFim(toLocalISO(hoje));
+        setDataInicio(toLocalISO(new Date(Date.UTC(y, m - 4, 1))));
+        setDataFim(hoje);
         break;
       case "ano":
-        setDataInicio(toLocalISO(new Date(hoje.getFullYear(), 0, 1)));
-        setDataFim(toLocalISO(hoje));
+        setDataInicio(`${y}-01-01`);
+        setDataFim(hoje);
         break;
     }
   };

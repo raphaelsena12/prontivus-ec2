@@ -12,13 +12,36 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function formatDate(date: Date | null | undefined): string {
+export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "-";
   return new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    timeZone: "America/Sao_Paulo",
   }).format(new Date(date));
+}
+
+/** Converte uma data UTC para string "YYYY-MM-DD" no fuso de São Paulo */
+export function formatDateToInput(date: Date | string): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+  }).format(new Date(date));
+}
+
+/** Calcula idade com base em data de nascimento, usando timezone de Brasília */
+export function calcularIdade(dataNascimento: string | Date): number {
+  const [hy, hm, hd] = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  const [ny, nm, nd] = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" })
+    .format(new Date(dataNascimento))
+    .split("-")
+    .map(Number);
+  let idade = hy - ny;
+  if (hm < nm || (hm === nm && hd < nd)) idade--;
+  return idade;
 }
 
 export function formatTime(date: Date | string | null | undefined): string {
@@ -27,6 +50,7 @@ export function formatTime(date: Date | string | null | undefined): string {
   return new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(dateObj);
 }
 

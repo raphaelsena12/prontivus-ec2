@@ -23,6 +23,7 @@ interface Prontuario {
   exameFisico: string | null;
   diagnostico: string | null;
   conduta: string | null;
+  orientacoesConduta: string | null;
   evolucao: string | null;
 }
 
@@ -582,6 +583,22 @@ export function Step2Anamnesis({
   const formatTimer = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
+  const [orientacoesConduta, setOrientacoesConduta] = useState(prontuario?.orientacoesConduta || "");
+
+  // Sincronizar com prontuário carregado
+  useEffect(() => {
+    if (prontuario?.orientacoesConduta && !orientacoesConduta) {
+      setOrientacoesConduta(prontuario.orientacoesConduta);
+    }
+  }, [prontuario?.orientacoesConduta]);
+
+  function handleOrientacoesCondutaChange(value: string) {
+    setOrientacoesConduta(value);
+    if (prontuario) {
+      setProntuario({ ...prontuario, orientacoesConduta: value } as Prontuario);
+    }
+  }
+
   const [sectionEdits, setSectionEdits] = useState<Record<number, string>>({});
   const [sectionValues, setSectionValues] = useState<Record<string, string>>(() => {
     const base = analysisResults?.anamnese || prontuario?.anamnese || "";
@@ -696,6 +713,18 @@ export function Step2Anamnesis({
                   />
                 </div>
               ))}
+              {/* Campo manual exclusivo do médico */}
+              <div className="space-y-1.5 pt-4">
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  ORIENTAÇÕES E CONDUTA
+                </label>
+                <Textarea
+                  value={orientacoesConduta}
+                  onChange={(e) => handleOrientacoesCondutaChange(e.target.value)}
+                  placeholder="Orientações ao paciente, plano terapêutico, encaminhamentos, retorno..."
+                  className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                />
+              </div>
             </div>
           ) : isTranscribing ? (
             /* ── Estado de gravação ativo ── */
@@ -804,6 +833,20 @@ export function Step2Anamnesis({
                   <Mic className="w-4 h-4" />
                   {anamneseText ? "Gravar Novamente" : "Iniciar Gravação"}
                 </Button>
+              )}
+              {/* Campo manual exclusivo do médico - também no modo IA */}
+              {anamneseText && (
+                <div className="w-full mt-6 px-2 text-left">
+                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    ORIENTAÇÕES E CONDUTA
+                  </label>
+                  <Textarea
+                    value={orientacoesConduta}
+                    onChange={(e) => handleOrientacoesCondutaChange(e.target.value)}
+                    placeholder="Orientações ao paciente, plano terapêutico, encaminhamentos, retorno..."
+                    className="mt-1.5 text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                  />
+                </div>
               )}
             </div>
           )}

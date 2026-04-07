@@ -36,7 +36,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { formatDate, formatTime } from "@/lib/utils";
+import { formatDate, formatTime, formatDateToInput } from "@/lib/utils";
+import { brazilToday } from "@/lib/timezone-utils";
 import { Badge } from "@/components/ui/badge";
 import { EditarAgendamentoModal } from "./components/editar-agendamento-modal";
 import { BloqueioAgendaModal } from "./components/bloqueio-agenda-modal";
@@ -192,11 +193,12 @@ export function AgendamentosContent() {
       console.log("Buscando agendamentos para médico:", medicoSelecionado);
 
       // Buscar bloqueios para um período maior (mês atual) para garantir que apareçam no calendário
-      const hoje = new Date();
-      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-      const dataInicioBusca = primeiroDiaMes.toISOString().split("T")[0];
-      const dataFimBusca = ultimoDiaMes.toISOString().split("T")[0];
+      const hoje = brazilToday();
+      const [y, m] = hoje.split("-").map(Number);
+      const primeiroDiaMes = new Date(Date.UTC(y, m - 1, 1));
+      const ultimoDiaMes = new Date(Date.UTC(y, m, 0));
+      const dataInicioBusca = formatDateToInput(primeiroDiaMes);
+      const dataFimBusca = formatDateToInput(ultimoDiaMes);
 
       const bloqueiosParams = new URLSearchParams({
         dataInicio: dataInicioBusca,
@@ -551,9 +553,11 @@ export function AgendamentosContent() {
                         setEditModalOpen(true);
                       }}
                       onSlotSelect={(slotInfo) => {
-                        const startDate = slotInfo.start.toISOString().split("T")[0];
-                        const startTime = slotInfo.start.toTimeString().split(" ")[0].slice(0, 5);
-                        const endTime = slotInfo.end.toTimeString().split(" ")[0].slice(0, 5);
+                        const startDate = formatDateToInput(slotInfo.start);
+                        const startBr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo", hour12: false }).format(slotInfo.start);
+                        const endBr = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo", hour12: false }).format(slotInfo.end);
+                        const startTime = startBr;
+                        const endTime = endBr;
                         const validarEabrir = async () => {
                           if (!medicoSelecionado) return;
                           try {

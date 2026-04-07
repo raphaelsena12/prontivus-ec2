@@ -135,13 +135,13 @@ export function HistoricoConsultasContent() {
                       {/* Date column */}
                       <div className="flex flex-col items-center justify-center min-w-[72px] bg-gradient-to-b from-violet-500 to-purple-600 px-3 py-4 text-white">
                         <span className="text-lg font-bold leading-none">
-                          {data.getDate().toString().padStart(2, "0")}
+                          {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", timeZone: "America/Sao_Paulo" }).format(data)}
                         </span>
                         <span className="text-[10px] font-medium uppercase opacity-90 mt-0.5">
-                          {data.toLocaleString("pt-BR", { month: "short" })}
+                          {new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "America/Sao_Paulo" }).format(data)}
                         </span>
                         <span className="text-[10px] opacity-75 mt-0.5">
-                          {data.getFullYear()}
+                          {new Intl.DateTimeFormat("pt-BR", { year: "numeric", timeZone: "America/Sao_Paulo" }).format(data)}
                         </span>
                       </div>
 

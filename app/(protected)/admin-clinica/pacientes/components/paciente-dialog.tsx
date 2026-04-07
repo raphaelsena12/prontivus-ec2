@@ -1,5 +1,6 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
+import { formatDateToInput } from "@/lib/utils";
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -137,7 +138,7 @@ export function PacienteDialog({
         cpf: paciente.cpf ? maskCPF(paciente.cpf) : "",
         rg: paciente.rg ? maskRG(paciente.rg) : "",
         dataNascimento: paciente.dataNascimento
-          ? new Date(paciente.dataNascimento).toISOString().split("T")[0]
+          ? formatDateToInput(paciente.dataNascimento)
           : "",
         sexo: paciente.sexo as "M" | "F" | "OUTRO",
         email: paciente.email || "",

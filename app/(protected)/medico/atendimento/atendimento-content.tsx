@@ -63,7 +63,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
-import { formatDate, formatTime, formatCPF } from '@/lib/utils';
+import { formatDate, formatTime, formatCPF, calcularIdade } from '@/lib/utils';
 import { useTranscription } from '@/hooks/use-transcription';
 import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
@@ -124,6 +124,7 @@ interface Prontuario {
   exameFisico: string | null;
   diagnostico: string | null;
   conduta: string | null;
+  orientacoesConduta: string | null;
   evolucao: string | null;
 }
 
@@ -1666,6 +1667,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           exameFisico: prontuario?.exameFisico || "",
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
+          orientacoesConduta: prontuario?.orientacoesConduta || "",
           evolucao: prontuario?.evolucao || "",
         }),
       });
@@ -1700,6 +1702,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           exameFisico: prontuario?.exameFisico || "",
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
+          orientacoesConduta: prontuario?.orientacoesConduta || "",
           evolucao: prontuario?.evolucao || "",
           cids: [
             ...(analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || []),
@@ -1892,16 +1895,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     }
   };
 
-  const calcularIdade = (dataNascimento: string) => {
-    const hoje = new Date();
-    const nascimento = new Date(dataNascimento);
-    let idade = hoje.getFullYear() - nascimento.getFullYear();
-    const mes = hoje.getMonth() - nascimento.getMonth();
-    if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
-      idade--;
-    }
-    return idade;
-  };
 
   const formatTranscriptionTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -1955,7 +1948,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
     // Abrir modal de configuração antes de gerar (exceto guia-tiss que tem modal próprio)
     if (modelId !== "guia-consulta-tiss" && !extraDados?._fromDocConfigModal) {
       setDocConfigModelId(modelId);
-      setDocConfigOpts(prev => ({ ...prev, horaInicio: new Date().toTimeString().slice(0, 5) }));
+      setDocConfigOpts(prev => ({ ...prev, horaInicio: new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo", hour12: false }).format(new Date()) }));
       setDocConfigModalOpen(true);
       return;
     }

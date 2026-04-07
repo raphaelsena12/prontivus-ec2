@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface Movimentacao {
   id: string;
@@ -70,13 +70,6 @@ interface FluxoCaixaTableProps {
   onDelete?: (movimentacao: Movimentacao) => void;
 }
 
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(dateString));
-};
 
 export function FluxoCaixaTable({
   data: initialData,

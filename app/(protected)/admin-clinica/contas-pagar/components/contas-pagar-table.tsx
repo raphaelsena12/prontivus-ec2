@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface ContaPagar {
   id: string;
@@ -64,14 +64,6 @@ interface ContasPagarTableProps {
   onDelete?: (conta: ContaPagar) => void;
 }
 
-const formatDate = (date: Date | null) => {
-  if (!date) return "-";
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 const getStatusBadge = (status: string) => {
   switch (status) {

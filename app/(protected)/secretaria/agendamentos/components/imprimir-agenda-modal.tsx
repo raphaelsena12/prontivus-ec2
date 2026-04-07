@@ -1,5 +1,6 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,7 @@ const FORMATOS: { value: FormatoAgenda; label: string; desc: string; icon: React
 
 export function ImprimirAgendaModal({ open, onOpenChange, medicoNome, agendamentos }: ImprimirAgendaModalProps) {
   const [formato, setFormato] = useState<FormatoAgenda>("diario");
-  const [data, setData] = useState(() => new Date().toISOString().split("T")[0]);
+  const [data, setData] = useState(() => brazilToday());
   const [gerando, setGerando] = useState(false);
 
   const handleGerar = () => {

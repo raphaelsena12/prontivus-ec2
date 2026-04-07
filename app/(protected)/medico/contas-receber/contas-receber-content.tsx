@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateToInput } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import {
   Card,
@@ -226,7 +227,7 @@ export function ContasReceberContent() {
         descricao: conta.descricao,
         pacienteId: conta.pacienteId || undefined,
         valor: conta.valor,
-        dataVencimento: new Date(conta.dataVencimento).toISOString().split("T")[0],
+        dataVencimento: formatDateToInput(conta.dataVencimento),
         formaPagamentoId: conta.formaPagamentoId || undefined,
         observacoes: conta.observacoes || "",
       });

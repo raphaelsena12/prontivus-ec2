@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateToInput } from "@/lib/utils";
 import { useMemo } from "react";
 import { Calendar, dateFnsLocalizer } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
@@ -159,7 +160,7 @@ export function AgendamentosCalendar({
       let dataFim: Date;
 
       if (bloqueio.dataInicio instanceof Date) {
-        const dataStr = bloqueio.dataInicio.toISOString().split("T")[0];
+        const dataStr = formatDateToInput(bloqueio.dataInicio);
         dataInicio = new Date(`${dataStr}T${bloqueio.horaInicio}:00`);
       } else {
         const dataStr = bloqueio.dataInicio.split("T")[0];
@@ -167,7 +168,7 @@ export function AgendamentosCalendar({
       }
 
       if (bloqueio.dataFim instanceof Date) {
-        const dataStr = bloqueio.dataFim.toISOString().split("T")[0];
+        const dataStr = formatDateToInput(bloqueio.dataFim);
         dataFim = new Date(`${dataStr}T${bloqueio.horaFim}:00`);
       } else {
         const dataStr = bloqueio.dataFim.split("T")[0];

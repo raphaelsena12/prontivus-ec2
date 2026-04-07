@@ -515,6 +515,7 @@ export function PagamentosPlanosContent({ data }: PagamentosPlanosContentProps) 
                       {new Intl.DateTimeFormat("pt-BR", {
                         month: "long",
                         year: "numeric",
+                        timeZone: "America/Sao_Paulo",
                       }).format(new Date(pagamento.mesReferencia))}
                     </TableCell>
                     <TableCell className="font-medium">

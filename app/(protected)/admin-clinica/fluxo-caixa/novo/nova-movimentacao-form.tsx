@@ -1,5 +1,6 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
+import { brazilToday } from "@/lib/timezone-utils";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -39,7 +40,7 @@ export function NovaMovimentacaoForm({ clinicaId, formasPagamento }: NovaMovimen
   
   useEffect(() => {
     // Define a data apenas no cliente para evitar problemas de hidratação
-    setDefaultDate(new Date().toISOString().split("T")[0]);
+    setDefaultDate(brazilToday());
   }, []);
 
   const form = useForm<MovimentacaoFormData>({

@@ -15,6 +15,7 @@ interface ProntuariosSectionProps {
     exameFisico: string | null;
     diagnostico: string | null;
     conduta: string | null;
+    orientacoesConduta: string | null;
     evolucao: string | null;
     createdAt: string;
     medico: {
@@ -135,6 +136,15 @@ export function ProntuariosSection({ prontuarios, expanded, onToggle }: Prontuar
                         <p className="text-xs font-semibold text-slate-500 mb-1">Conduta</p>
                         <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
                           {prontuario.conduta}
+                        </p>
+                      </div>
+                    )}
+
+                    {prontuario.orientacoesConduta && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-1">Orientações e Conduta</p>
+                        <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
+                          {prontuario.orientacoesConduta}
                         </p>
                       </div>
                     )}

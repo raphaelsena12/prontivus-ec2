@@ -814,8 +814,9 @@ model Prontuario {
   anamnese    String?
   exameFisico String?
   diagnostico String?
-  conduta     String?
-  evolucao    String?
+  conduta            String?
+  orientacoesConduta String?  @map("orientacoes_conduta")
+  evolucao           String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

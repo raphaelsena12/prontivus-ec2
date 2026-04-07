@@ -1,5 +1,6 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
+import { formatDateToInput } from "@/lib/utils";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -45,8 +46,8 @@ export function EditarContaReceberForm({ conta, clinicaId, formasPagamento, paci
       descricao: conta.descricao || "",
       pacienteId: conta.pacienteId || undefined,
       valor: conta.valor ? Number(conta.valor) : 0,
-      dataVencimento: conta.dataVencimento ? new Date(conta.dataVencimento).toISOString().split("T")[0] : "",
-      dataRecebimento: conta.dataRecebimento ? new Date(conta.dataRecebimento).toISOString().split("T")[0] : "",
+      dataVencimento: conta.dataVencimento ? formatDateToInput(conta.dataVencimento) : "",
+      dataRecebimento: conta.dataRecebimento ? formatDateToInput(conta.dataRecebimento) : "",
       status: conta.status || "PENDENTE",
       formaPagamentoId: conta.formaPagamentoId || undefined,
       observacoes: conta.observacoes || "",

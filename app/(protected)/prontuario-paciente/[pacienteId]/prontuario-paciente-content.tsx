@@ -18,7 +18,7 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate, formatCPF } from '@/lib/utils';
+import { formatDate, formatCPF, calcularIdade } from '@/lib/utils';
 
 /* ── Interfaces ─────────────────────────────────────────────────────────── */
 
@@ -66,6 +66,7 @@ interface ProntuarioCompleto {
       exameFisico: string | null;
       diagnostico: string | null;
       conduta: string | null;
+      orientacoesConduta: string | null;
       evolucao: string | null;
       createdAt: string;
     }>;
@@ -128,6 +129,7 @@ interface ProntuarioCompleto {
 
 interface ProntuarioPacienteContentProps {
   pacienteId: string;
+  userType?: "MEDICO" | "SECRETARIA" | "ADMIN_CLINICA";
 }
 
 /* ── Lookup de status ───────────────────────────────────────────────────── */
@@ -148,7 +150,7 @@ const EXAME_STATUS: Record<string, { label: string; badge: string }> = {
 
 /* ── Componente principal ───────────────────────────────────────────────── */
 
-export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteContentProps) {
+export function ProntuarioPacienteContent({ pacienteId, userType = "MEDICO" }: ProntuarioPacienteContentProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ProntuarioCompleto | null>(null);
@@ -212,15 +214,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
   }
 
   const { paciente } = data;
-
-  const calcularIdade = (dataNascimento: string) => {
-    const hoje = new Date();
-    const nasc = new Date(dataNascimento);
-    let idade = hoje.getFullYear() - nasc.getFullYear();
-    const m = hoje.getMonth() - nasc.getMonth();
-    if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
-    return idade;
-  };
+  const isSecretaria = userType === "SECRETARIA";
 
   const idade = calcularIdade(paciente.dataNascimento);
 
@@ -259,7 +253,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
 
       <PageHeader
         icon={BookOpen}
-        title="Prontuário"
+        title={isSecretaria ? "Histórico de Atendimentos" : "Prontuário"}
         subtitle={paciente.numeroProntuario
           ? `N: ${String(paciente.numeroProntuario).padStart(6, '0')}`
           : `N: —`}
@@ -365,6 +359,7 @@ export function ProntuarioPacienteContent({ pacienteId }: ProntuarioPacienteCont
                         examesAnexados={data.documentos.filter(d => d.consulta.id === consulta.id && (d.tipoDocumento === 'exame-imagem' || d.tipoDocumento === 'exame-pdf'))}
                         loadingFicha={loadingFicha}
                         onAbrirFicha={handleAbrirFichaAtendimento}
+                        isSecretaria={isSecretaria}
                       />
                     ))}
                   </div>
@@ -392,6 +387,7 @@ function ConsultaRow({
   examesAnexados,
   loadingFicha,
   onAbrirFicha,
+  isSecretaria = false,
 }: {
   consulta: ProntuarioCompleto['consultas'][0];
   exames: ProntuarioCompleto['solicitacoesExames'];
@@ -403,6 +399,7 @@ function ConsultaRow({
   examesAnexados: ProntuarioCompleto['documentos'];
   loadingFicha: string | null;
   onAbrirFicha: (id: string) => void;
+  isSecretaria?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -425,10 +422,10 @@ function ConsultaRow({
         {/* Data */}
         <div className="shrink-0 text-center w-10">
           <p className="text-base font-bold text-slate-800 leading-none">
-            {new Date(consulta.dataHora).getDate().toString().padStart(2, '0')}
+            {new Intl.DateTimeFormat('pt-BR', { day: '2-digit', timeZone: 'America/Sao_Paulo' }).format(new Date(consulta.dataHora))}
           </p>
           <p className="text-[10px] text-slate-400 mt-0.5 capitalize">
-            {new Date(consulta.dataHora).toLocaleDateString('pt-BR', { month: 'short' })}
+            {new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(consulta.dataHora))}
           </p>
         </div>
 
@@ -444,7 +441,7 @@ function ConsultaRow({
               {st.label}
             </span>
           </div>
-          {prontuario?.diagnostico && (
+          {!isSecretaria && prontuario?.diagnostico && (
             <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
               {prontuario.diagnostico}
             </p>
@@ -477,8 +474,8 @@ function ConsultaRow({
             {consulta.observacoes && <Detail label="Observações da Consulta" value={consulta.observacoes} full />}
           </div>
 
-          {/* Prontuário / Registro clínico */}
-          {prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.evolucao) && (
+          {/* Prontuário / Registro clínico — oculto para secretária */}
+          {!isSecretaria && prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.orientacoesConduta || prontuario.evolucao) && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Registro Clínico</p>
               <div className="space-y-3">
@@ -486,12 +483,14 @@ function ConsultaRow({
                 {prontuario.exameFisico && <Detail label="Exame Físico" value={prontuario.exameFisico} full />}
                 {prontuario.diagnostico && <Detail label="Diagnóstico" value={prontuario.diagnostico} full />}
                 {prontuario.conduta && <Detail label="Conduta" value={prontuario.conduta} full />}
+                {prontuario.orientacoesConduta && <Detail label="Orientações e Conduta" value={prontuario.orientacoesConduta} full />}
                 {prontuario.evolucao && <Detail label="Evolução" value={prontuario.evolucao} full />}
               </div>
             </div>
           )}
 
-          {cidsLegacy.length > 0 && (
+          {/* CID / CIAP — oculto para secretária */}
+          {!isSecretaria && cidsLegacy.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">CID / CIAP</p>
               <div className="flex flex-wrap gap-2">
@@ -519,8 +518,8 @@ function ConsultaRow({
                           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${exSt.badge}`}>{exSt.label}</span>
                         </div>
                         {e.exame.tipo && <p className="text-[10px] text-slate-400 mt-0.5">{e.exame.tipo}</p>}
-                        {e.resultado && <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Resultado:</span> {e.resultado}</p>}
-                        {e.observacoes && <p className="text-xs text-slate-500 mt-1">{e.observacoes}</p>}
+                        {!isSecretaria && e.resultado && <p className="text-xs text-slate-600 mt-1"><span className="font-medium">Resultado:</span> {e.resultado}</p>}
+                        {!isSecretaria && e.observacoes && <p className="text-xs text-slate-500 mt-1">{e.observacoes}</p>}
                       </div>
                     </div>
                   );
@@ -545,8 +544,8 @@ function ConsultaRow({
             </div>
           )}
 
-          {/* Prescrições desta consulta */}
-          {prescricoes.length > 0 && (
+          {/* Prescrições — oculto para secretária */}
+          {!isSecretaria && prescricoes.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Prescrições</p>
               <div className="space-y-2">
@@ -565,7 +564,7 @@ function ConsultaRow({
             </div>
           )}
 
-          {prescricoesLegacy.length > 0 && (
+          {!isSecretaria && prescricoesLegacy.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Prescrições (Legado)</p>
               <div className="space-y-2">
@@ -616,14 +615,14 @@ function ConsultaRow({
           </div>
 
           {/* Fallback */}
-          {!prontuario && exames.length === 0 && prescricoes.length === 0 && examesLegacy.length === 0 &&
-            prescricoesLegacy.length === 0 && cidsLegacy.length === 0 && examesAnexados.length === 0 &&
+          {!prontuario && exames.length === 0 && (isSecretaria || (prescricoes.length === 0 &&
+            prescricoesLegacy.length === 0 && cidsLegacy.length === 0)) && examesAnexados.length === 0 &&
             !consulta.codigoTuss && consulta.valorCobrado == null && !consulta.observacoes && (
             <p className="text-xs text-slate-400">Sem informações adicionais.</p>
           )}
 
-          {/* Ficha de Atendimento — rodapé direito */}
-          {fichaDocumento && (
+          {/* Ficha de Atendimento — rodapé direito (oculto para secretária) */}
+          {!isSecretaria && fichaDocumento && (
             <div className="flex items-end justify-end gap-3 pt-3 border-t border-slate-100">
               <div className="text-right">
                 <p className="text-[10px] text-slate-400 leading-none">Ficha de Atendimento</p>

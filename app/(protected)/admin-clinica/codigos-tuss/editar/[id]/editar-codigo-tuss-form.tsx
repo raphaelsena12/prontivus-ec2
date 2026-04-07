@@ -1,5 +1,6 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
+import { formatDateToInput } from "@/lib/utils";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -81,10 +82,10 @@ export function EditarCodigoTussForm({ codigoTuss }: EditarCodigoTussFormProps) 
       tipoProcedimento: codigoTuss.tipoProcedimento,
       categoriaExame: codigoTuss.categoriaExame || null,
       dataVigenciaInicio: codigoTuss.dataVigenciaInicio
-        ? new Date(codigoTuss.dataVigenciaInicio).toISOString().split("T")[0]
+        ? formatDateToInput(codigoTuss.dataVigenciaInicio)
         : "",
       dataVigenciaFim: codigoTuss.dataVigenciaFim
-        ? new Date(codigoTuss.dataVigenciaFim).toISOString().split("T")[0]
+        ? formatDateToInput(codigoTuss.dataVigenciaFim)
         : "",
       ativo: codigoTuss.ativo,
       observacoes: codigoTuss.observacoes || "",

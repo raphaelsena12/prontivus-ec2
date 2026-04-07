@@ -1,5 +1,6 @@
 "use client";
 
+import { brazilToday } from "@/lib/timezone-utils";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,7 @@ interface Faturamento {
   status: "ABERTO" | "FECHADO" | "CONCILIADO";
 }
 
-const CURRENT_YEAR = new Date().getFullYear();
+const CURRENT_YEAR = parseInt(brazilToday().split("-")[0]);
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
 const MONTHS = [
   { value: "01", label: "Janeiro" },
@@ -93,7 +94,7 @@ export function FaturamentoConvenioContent() {
   const [fecharDialogOpen, setFecharDialogOpen] = useState(false);
   const [fecharForm, setFecharForm] = useState({
     operadoraId: "",
-    mes: String(new Date().getMonth() + 1).padStart(2, "0"),
+    mes: brazilToday().split("-")[1],
     ano: String(CURRENT_YEAR),
   });
 
@@ -208,9 +209,8 @@ export function FaturamentoConvenioContent() {
   const formatMesReferencia = (mesRef: string) => {
     try {
       const date = new Date(mesRef);
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const year = date.getFullYear();
-      return `${month}/${year}`;
+      const parts = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).format(date).split("-");
+      return `${parts[1]}/${parts[0]}`;
     } catch {
       return mesRef;
     }
@@ -247,7 +247,7 @@ export function FaturamentoConvenioContent() {
       setFecharDialogOpen(false);
       setFecharForm({
         operadoraId: "",
-        mes: String(new Date().getMonth() + 1).padStart(2, "0"),
+        mes: brazilToday().split("-")[1],
         ano: String(CURRENT_YEAR),
       });
       fetchFaturamentos();
@@ -558,7 +558,7 @@ export function FaturamentoConvenioContent() {
             setFecharDialogOpen(false);
             setFecharForm({
               operadoraId: "",
-              mes: String(new Date().getMonth() + 1).padStart(2, "0"),
+              mes: brazilToday().split("-")[1],
               ano: String(CURRENT_YEAR),
             });
           }

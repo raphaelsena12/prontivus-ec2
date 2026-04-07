@@ -1,5 +1,6 @@
 "use client";
 import { getApiErrorMessage } from "@/lib/zod-validation-error";
+import { formatDateToInput } from "@/lib/utils";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -42,7 +43,7 @@ export function EditarMovimentacaoForm({ movimentacao, clinicaId, formasPagament
       tipo: movimentacao.tipo || undefined,
       descricao: movimentacao.descricao || "",
       valor: movimentacao.valor ? Number(movimentacao.valor) : 0,
-      data: movimentacao.data ? new Date(movimentacao.data).toISOString().split("T")[0] : "",
+      data: movimentacao.data ? formatDateToInput(movimentacao.data) : "",
       formaPagamentoId: movimentacao.formaPagamentoId || undefined,
       observacoes: movimentacao.observacoes || "",
     },

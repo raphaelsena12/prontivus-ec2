@@ -176,6 +176,7 @@ REGRAS DA ANAMNESE:
 - Use títulos em MAIÚSCULAS seguidos de dois pontos (:)
 - Se alguma seção não for mencionada na transcrição, exiba o título seguido de "N/A"
 - A seção "EXAMES REALIZADOS" deve conter APENAS exames que o paciente mencionou que JÁ realizou. NÃO inclua sugestões futuras nesta seção.
+- NÃO inclua o nome do paciente em nenhuma parte da anamnese. Quando o nome do paciente for mencionado na transcrição (ex: cumprimentos, apresentações, chamadas pelo nome), ignore-o completamente. A anamnese deve conter apenas informações clínicas, sem identificação nominal do paciente.
 
 IMPORTANTE — EXAMES E PRESCRIÇÕES (baseados em protocolos por CID):
 
@@ -526,6 +527,9 @@ A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULA
 6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
 
 Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
+
+IMPORTANTE: NÃO inclua o nome do paciente em nenhuma parte da anamnese. Quando o nome do paciente for mencionado na transcrição (ex: cumprimentos, apresentações, chamadas pelo nome), ignore-o completamente. A anamnese deve conter apenas informações clínicas, sem identificação nominal do paciente.
+
 Retorne APENAS um JSON com o campo "anamnese".`;
 
   const completion = await withRetry(() => openai.chat.completions.create({
@@ -570,7 +574,9 @@ A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULA
 5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
 6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta
 
-Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".`;
+Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
+
+IMPORTANTE: NÃO inclua o nome do paciente em nenhuma parte da anamnese. Quando o nome do paciente for mencionado na transcrição (ex: cumprimentos, apresentações, chamadas pelo nome), ignore-o completamente. A anamnese deve conter apenas informações clínicas, sem identificação nominal do paciente.`;
 
   return openai.chat.completions.create({
     model: process.env.OPENAI_MODEL || "gpt-4o",

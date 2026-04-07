@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDate, formatCPF } from "@/lib/utils";
+import { brazilToday } from "@/lib/timezone-utils";
 import { NovoAgendamentoModal } from "@/app/(protected)/secretaria/agendamentos/components/novo-agendamento-modal";
 import { PageHeader } from "@/components/page-header";
 import { PacienteToggleStatusDialog } from "./components/paciente-toggle-status-dialog";
@@ -268,8 +269,7 @@ export function PacientesContent() {
                             className="h-7 gap-1.5 text-xs px-2 shadow-sm"
                             onClick={() => {
                               // Formatar data de hoje no formato YYYY-MM-DD
-                              const hoje = new Date();
-                              const dataFormatada = hoje.toISOString().split('T')[0];
+                              const dataFormatada = brazilToday();
                               setPacienteParaAgendar(paciente.id);
                               setNovoAgendamentoModalOpen(true);
                             }}
@@ -341,7 +341,7 @@ export function PacientesContent() {
         }}
         initialData={pacienteParaAgendar ? { 
           pacienteId: pacienteParaAgendar,
-          data: new Date().toISOString().split('T')[0] // Data de hoje no formato YYYY-MM-DD
+          data: brazilToday() // Data de hoje no formato YYYY-MM-DD
         } : undefined}
       />
 

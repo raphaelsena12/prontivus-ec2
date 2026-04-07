@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/utils";
 import * as React from "react";
 import {
   flexRender,
@@ -55,13 +56,6 @@ interface CategoriasTableProps {
   onDelete?: (categoria: Categoria) => void;
 }
 
-const formatDate = (date: Date) => {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(new Date(date));
-};
 
 export function CategoriasTable({ data: initialData, onEdit, onDelete }: CategoriasTableProps) {
   const [data] = React.useState(() => initialData);
