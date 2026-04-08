@@ -1,10 +1,10 @@
 export const Colors = {
-  // Primary palette - Vivid Violet (inspired by Nubank, Revolut)
-  primary: '#7C3AED',
-  primaryDark: '#6D28D9',
-  primaryLight: '#F5F3FF',
-  primaryMuted: '#C4B5FD',
-  primarySoft: '#EDE9FE',
+  // Primary palette - Azul Prontivus (identidade visual da marca)
+  primary: '#2563EB',
+  primaryDark: '#1D4ED8',
+  primaryLight: '#EFF6FF',
+  primaryMuted: '#93C5FD',
+  primarySoft: '#DBEAFE',
 
   // Accent - Teal for telemedicine / health
   accent: '#0D9488',
@@ -50,7 +50,7 @@ export const Colors = {
   shadowDark: 'rgba(15, 23, 42, 0.12)',
 
   // Card overlay gradient simulation
-  overlay: 'rgba(124, 58, 237, 0.08)',
+  overlay: 'rgba(37, 99, 235, 0.08)',
 };
 
 export const Spacing = {

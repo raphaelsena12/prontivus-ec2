@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Animated,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -46,6 +47,7 @@ export default function LoginScreen() {
           nome: session.name,
           email: session.email,
           clinicaId: session.clinicaId,
+          avatar: session.avatar,
         });
       }
 
@@ -78,14 +80,12 @@ export default function LoginScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <View style={styles.logoOuter}>
-                <View style={styles.logoInner}>
-                  <Ionicons name="heart-half" size={32} color={Colors.white} />
-                </View>
-              </View>
+              <Image
+                source={require('../../assets/logo-prontivus.webp')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.brandName}>Prontivus</Text>
-            <Text style={styles.brandTagline}>Sua saude conectada</Text>
           </View>
 
           {/* Welcome text */}
@@ -244,39 +244,11 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 16,
-  },
-  logoOuter: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  logoInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  brandName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  brandTagline: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    fontWeight: '500',
+  logoImage: {
+    width: 200,
+    height: 100,
   },
   welcomeSection: {
     marginBottom: 28,

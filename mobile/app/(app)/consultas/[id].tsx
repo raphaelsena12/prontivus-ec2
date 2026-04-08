@@ -16,7 +16,7 @@ const statusLabel: Record<string, string> = {
   CONFIRMADA: 'Confirmada',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
-  NAO_COMPARECEU: 'Nao compareceu',
+  NAO_COMPARECEU: 'Não compareceu',
 };
 
 export default function ConsultaDetailScreen() {
@@ -102,7 +102,7 @@ export default function ConsultaDetailScreen() {
                 <Ionicons name="chatbubble-outline" size={18} color="#F59E0B" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.detailLabel}>Observacoes</Text>
+                <Text style={styles.detailLabel}>Observações</Text>
                 <Text style={styles.detailValue}>{consulta.observacoes}</Text>
               </View>
             </View>

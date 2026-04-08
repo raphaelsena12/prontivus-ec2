@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
   Alert, Animated, Platform,
@@ -14,6 +14,7 @@ import { telemeditcinaService } from '../../../services/telemedicina.service';
 const STRIPE_KEY = (Constants.expoConfig?.extra as any)?.stripePublishableKey ?? '';
 
 function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: string): string {
+  const valorFormatado = valor.toFixed(2).replace('.', ',');
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -39,11 +40,40 @@ function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: strin
       align-items: center;
       gap: 6px;
     }
-    #payment-element { margin-bottom: 20px; }
+    .field-group {
+      margin-bottom: 16px;
+    }
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0F172A;
+      margin-bottom: 8px;
+    }
+    .stripe-field {
+      border: 1.5px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 14px;
+      background: #fff;
+      transition: border-color 0.2s;
+    }
+    .stripe-field.StripeElement--focus {
+      border-color: #2563EB;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+    .stripe-field.StripeElement--invalid {
+      border-color: #EF4444;
+    }
+    .row {
+      display: flex;
+      gap: 12px;
+    }
+    .row .field-group {
+      flex: 1;
+    }
     #submit-btn {
       width: 100%;
       height: 54px;
-      background: #7C3AED;
+      background: #2563EB;
       color: white;
       font-size: 16px;
       font-weight: 700;
@@ -54,8 +84,9 @@ function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: strin
       align-items: center;
       justify-content: center;
       gap: 8px;
-      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
       transition: opacity 0.2s;
+      margin-top: 4px;
     }
     #submit-btn:disabled { opacity: 0.5; }
     #submit-btn:active { opacity: 0.8; }
@@ -93,74 +124,87 @@ function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: strin
 </head>
 <body>
   <div class="section-label">Dados do cartao</div>
-  <div id="payment-element"></div>
+
+  <div class="field-group">
+    <div class="field-label">Numero do cartao</div>
+    <div id="card-number" class="stripe-field"></div>
+  </div>
+
+  <div class="row">
+    <div class="field-group">
+      <div class="field-label">Validade</div>
+      <div id="card-expiry" class="stripe-field"></div>
+    </div>
+    <div class="field-group">
+      <div class="field-label">CVC</div>
+      <div id="card-cvc" class="stripe-field"></div>
+    </div>
+  </div>
+
   <div class="error" id="error-msg"></div>
 
   <button id="submit-btn" onclick="handlePagar()">
-    Pagar R$ ${valor.toFixed(2).replace('.', ',')}
+    Pagar R$ ${valorFormatado}
   </button>
   <div class="secure-note">Pagamento seguro via Stripe</div>
 
   <script>
-    const stripe = Stripe('${STRIPE_KEY}');
-    const elements = stripe.elements({
-      clientSecret: '${clientSecret}',
-      locale: 'pt-BR',
-      appearance: {
-        theme: 'stripe',
-        variables: {
-          colorPrimary: '#7C3AED',
-          borderRadius: '10px',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-          fontSizeBase: '15px',
-        },
-        rules: {
-          '.Input': {
-            border: '1.5px solid #E2E8F0',
-            boxShadow: 'none',
-            padding: '12px 14px',
-          },
-          '.Input:focus': {
-            border: '1.5px solid #7C3AED',
-            boxShadow: '0 0 0 3px rgba(124,58,237,0.1)',
-          },
-          '.Label': {
-            fontWeight: '600',
-            fontSize: '13px',
-            color: '#0F172A',
-          },
-        },
+    var stripe = Stripe('${STRIPE_KEY}');
+    var elements = stripe.elements({ locale: 'pt-BR' });
+
+    var style = {
+      base: {
+        fontSize: '15px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        color: '#0F172A',
+        '::placeholder': { color: '#94A3B8' },
       },
+      invalid: { color: '#EF4444' },
+    };
+
+    var cardNumber = elements.create('cardNumber', { style: style, showIcon: true });
+    var cardExpiry = elements.create('cardExpiry', { style: style });
+    var cardCvc = elements.create('cardCvc', { style: style });
+
+    cardNumber.mount('#card-number');
+    cardExpiry.mount('#card-expiry');
+    cardCvc.mount('#card-cvc');
+
+    cardNumber.on('change', function(e) {
+      var errEl = document.getElementById('error-msg');
+      errEl.textContent = e.error ? e.error.message : '';
     });
-    const paymentElement = elements.create('payment', { layout: 'tabs' });
-    paymentElement.mount('#payment-element');
 
     async function handlePagar() {
-      const btn = document.getElementById('submit-btn');
-      const errEl = document.getElementById('error-msg');
+      var btn = document.getElementById('submit-btn');
+      var errEl = document.getElementById('error-msg');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Processando...';
       errEl.textContent = '';
 
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {},
-        redirect: 'if_required',
-      });
+      try {
+        var result = await stripe.confirmCardPayment('${clientSecret}', {
+          payment_method: { card: cardNumber },
+        });
 
-      if (error) {
-        errEl.textContent = error.message || 'Erro ao processar pagamento';
-        btn.disabled = false;
-        btn.innerHTML = 'Pagar R$ ${valor.toFixed(2).replace('.', ',')}';
-        return;
-      }
+        if (result.error) {
+          errEl.textContent = result.error.message || 'Erro ao processar pagamento';
+          btn.disabled = false;
+          btn.innerHTML = 'Pagar R$ ${valorFormatado}';
+          return;
+        }
 
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ success: true }));
-      } else {
-        errEl.textContent = 'Pagamento nao confirmado. Tente novamente.';
+        if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ success: true }));
+        } else {
+          errEl.textContent = 'Pagamento nao confirmado. Tente novamente.';
+          btn.disabled = false;
+          btn.innerHTML = 'Pagar R$ ${valorFormatado}';
+        }
+      } catch (err) {
+        errEl.textContent = 'Erro inesperado. Tente novamente.';
         btn.disabled = false;
-        btn.innerHTML = 'Pagar R$ ${valor.toFixed(2).replace('.', ',')}';
+        btn.innerHTML = 'Pagar R$ ${valorFormatado}';
       }
     }
   </script>
@@ -186,7 +230,10 @@ export default function PagamentoTelemedicinaScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const valor = parseFloat(params.valor ?? '0');
-  const html = buildPaymentHtml(params.clientSecret, valor, params.medicoNome);
+  const source = useMemo(() => ({
+    html: buildPaymentHtml(params.clientSecret, valor, params.medicoNome),
+    baseUrl: 'https://js.stripe.com',
+  }), [params.clientSecret, valor, params.medicoNome]);
 
   function showOverlay() {
     Animated.timing(fadeAnim, {
@@ -273,7 +320,7 @@ export default function PagamentoTelemedicinaScreen() {
 
       <WebView
         ref={webViewRef}
-        source={{ html, baseUrl: 'https://js.stripe.com' }}
+        source={source}
         style={[styles.webview, processando && { opacity: 0 }]}
         onLoadEnd={() => setLoading(false)}
         onMessage={handleMessage}
@@ -282,6 +329,10 @@ export default function PagamentoTelemedicinaScreen() {
         originWhitelist={['*']}
         scrollEnabled={true}
         bounces={false}
+        thirdPartyCookiesEnabled={true}
+        mixedContentMode="always"
+        allowFileAccessFromFileURLs={true}
+        allowUniversalAccessFromFileURLs={true}
       />
 
       {/* Processing overlay */}

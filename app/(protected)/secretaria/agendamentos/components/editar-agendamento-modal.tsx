@@ -47,7 +47,6 @@ const agendamentoSchema = z.object({
   procedimentoId: z.string().uuid().optional().nullable(),
   formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
-  planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().min(0).optional().nullable(),
   observacoes: z.string().optional(),
@@ -77,11 +76,6 @@ interface TipoConsulta {
   id: string;
   nome: string;
   codigo: string;
-}
-
-interface PlanoSaude {
-  id: string;
-  nome: string;
 }
 
 interface Procedimento {
@@ -121,7 +115,6 @@ interface Agendamento {
   procedimentoId: string | null;
   formaPagamentoId: string | null;
   operadoraId: string | null;
-  planoSaudeId: string | null;
   numeroCarteirinha: string | null;
   valorCobrado: number | string | null;
   documentos?: DocumentoExistente[];
@@ -395,7 +388,6 @@ export function EditarAgendamentoModal({
   const [tiposConsulta, setTiposConsulta] = useState<TipoConsulta[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamento[]>([]);
-  const [planosSaude, setPlanosSaude] = useState<PlanoSaude[]>([]);
   const [agendamento, setAgendamento] = useState<Agendamento | null>(null);
   const [pacienteSelecionado, setPacienteSelecionado] = useState<Paciente | null>(null);
   const [pacienteSearchValue, setPacienteSearchValue] = useState("");
@@ -435,7 +427,6 @@ export function EditarAgendamentoModal({
       procedimentoId: null,
       formaPagamentoId: null,
       operadoraId: null,
-      planoSaudeId: null,
       numeroCarteirinha: "",
       valorCobrado: null,
       observacoes: "",
@@ -495,7 +486,6 @@ export function EditarAgendamentoModal({
       fetchData();
     } else {
       form.reset();
-      setPlanosSaude([]);
       setConsultasRetorno(null);
       setLimiteRetornos(null);
       setPacienteSelecionado(null);
@@ -565,7 +555,6 @@ export function EditarAgendamentoModal({
             procedimentoId: consulta.procedimentoId || null,
             formaPagamentoId: consulta.formaPagamentoId || null,
             operadoraId: consulta.operadoraId,
-            planoSaudeId: consulta.planoSaudeId,
             numeroCarteirinha: consulta.numeroCarteirinha || "",
             valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
             observacoes: consulta.observacoes || "",
@@ -573,15 +562,6 @@ export function EditarAgendamentoModal({
           });
 
           setDocumentosExistentes(consulta.documentos || []);
-
-          // Carregar planos de saúde se houver operadora
-          if (consulta.operadoraId) {
-            const planosRes = await fetch(`/api/admin-clinica/planos-saude?operadoraId=${consulta.operadoraId}`);
-            if (planosRes.ok) {
-              const planosData = await planosRes.json();
-              setPlanosSaude(planosData.planosSaude || []);
-            }
-          }
         } catch (error) {
           toast.error("Erro ao carregar agendamento");
           console.error(error);
@@ -595,30 +575,6 @@ export function EditarAgendamentoModal({
     }
   }, [open, agendamentoId, form, onOpenChange]);
 
-  // Carregar planos de saúde quando operadora mudar
-  useEffect(() => {
-    const fetchPlanos = async () => {
-      if (!operadoraId || operadoraId === "null") {
-        setPlanosSaude([]);
-        form.setValue("planoSaudeId", null);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/admin-clinica/planos-saude?operadoraId=${operadoraId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPlanosSaude(data.planosSaude || []);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar planos de saúde:", error);
-      }
-    };
-
-    if (open) {
-      fetchPlanos();
-    }
-  }, [operadoraId, form, open]);
 
   // Verificar consultas de retorno
   useEffect(() => {
@@ -720,8 +676,9 @@ export function EditarAgendamentoModal({
 
       try {
         setLoadingHorarios(true);
+        const excludeParam = agendamentoId ? `&excludeConsultaId=${agendamentoId}` : "";
         const response = await fetch(
-          `/api/secretaria/horarios-disponiveis?medicoId=${medicoId}&data=${data}&intervaloMin=10`
+          `/api/secretaria/horarios-disponiveis?medicoId=${medicoId}&data=${data}&intervaloMin=10${excludeParam}`
         );
         if (!response.ok) throw new Error();
         const responseData = await response.json();
@@ -812,7 +769,6 @@ export function EditarAgendamentoModal({
         if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
         if (data.formaPagamentoId) formData.append("formaPagamentoId", data.formaPagamentoId);
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
-        if (data.planoSaudeId) formData.append("planoSaudeId", data.planoSaudeId);
         if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
         if (data.valorCobrado != null) formData.append("valorCobrado", String(data.valorCobrado));
         if (data.observacoes) formData.append("observacoes", data.observacoes);
@@ -836,7 +792,6 @@ export function EditarAgendamentoModal({
             procedimentoId: data.procedimentoId || null,
             formaPagamentoId: data.formaPagamentoId || null,
             operadoraId: data.operadoraId || null,
-            planoSaudeId: data.planoSaudeId || null,
             valorCobrado: data.valorCobrado || null,
           }),
         });
@@ -1195,7 +1150,6 @@ export function EditarAgendamentoModal({
                               operadoraId={field.value ?? null}
                               onSelectOperadoraId={(id) => {
                                 field.onChange(id);
-                                if (!id) form.setValue("planoSaudeId", null);
                               }}
                               error={form.formState.errors.operadoraId?.message}
                             />
@@ -1228,30 +1182,6 @@ export function EditarAgendamentoModal({
                   {/* Plano de Saúde (aparece apenas quando há convênio) */}
                   {operadoraId && operadoraId !== "null" && (
                     <div className="flex flex-wrap items-start gap-2.5">
-                      <FormField
-                        control={form.control}
-                        name="planoSaudeId"
-                        render={({ field }) => (
-                          <FormItem className="min-w-[200px]">
-                            <FormLabel className="text-xs font-medium">Plano de Saúde</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Selecione o plano" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent position="popper" className="max-h-60">
-                                {planosSaude.map((plano) => (
-                                  <SelectItem key={plano.id} value={plano.id} className="text-xs">
-                                    {plano.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name="codigoTussId"

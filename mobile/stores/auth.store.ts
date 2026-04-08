@@ -8,6 +8,7 @@ interface AuthUser {
   nome: string;
   email: string;
   clinicaId?: string;
+  avatar?: string | null;
 }
 
 interface AuthState {

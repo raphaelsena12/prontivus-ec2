@@ -12,6 +12,7 @@ interface SessionUser {
   email: string;
   tipo: string;
   clinicaId?: string;
+  avatar?: string | null;
 }
 
 /**

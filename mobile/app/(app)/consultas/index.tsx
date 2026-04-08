@@ -18,7 +18,7 @@ const statusLabel: Record<string, string> = {
   CONFIRMADA: 'Confirmada',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
-  NAO_COMPARECEU: 'Nao compareceu',
+  NAO_COMPARECEU: 'Não compareceu',
 };
 
 export default function ConsultasScreen() {
@@ -42,7 +42,7 @@ export default function ConsultasScreen() {
           <EmptyState
             icon="medical-outline"
             title="Nenhuma consulta"
-            description="Suas consultas aparecerao aqui"
+            description="Suas consultas aparecerão aqui"
           />
         }
         renderItem={({ item }) => <ConsultaCard consulta={item} />}

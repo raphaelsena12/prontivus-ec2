@@ -126,6 +126,7 @@ model Tenant {
   medicosEscalasAgenda        MedicoEscalaAgenda[]         @relation("TenantToMedicoEscalaAgenda")
   medicosEscalasAgendaExcecoes MedicoEscalaAgendaExcecao[] @relation("TenantToMedicoEscalaAgendaExcecao")
   cidsCatalogo                Cid[]
+  examesPacientes             ExamePaciente[]
   // Observação: super-admin gerencia registros globais com clinicaId = NULL; tenants consomem só os globais
 
   @@index([cnpj])
@@ -280,6 +281,7 @@ model Paciente {
   pagamentosConsultas PagamentoConsulta[]
   listasEspera        ListaEspera[]
   guiasTiss           GuiaTiss[]
+  examesPaciente      ExamePaciente[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -1818,4 +1820,28 @@ model ConsultaPrescricao {
   @@index([clinicaId])
   @@index([consultaId])
   @@map("consulta_prescricoes")
+}
+
+model ExamePaciente {
+  id            String   @id @default(uuid())
+  clinicaId     String
+  pacienteId    String
+  nome          String // Nome do exame (ex: "Hemograma", "Raio-X Torax")
+  tipoArquivo   String // "imagem", "pdf", "documento"
+  nomeArquivo   String // Nome original do arquivo
+  mimeType      String // "image/jpeg", "application/pdf", etc
+  tamanho       Int // Tamanho em bytes
+  s3Key         String // Chave do arquivo no S3
+  observacoes   String?
+  dataExame     DateTime? // Data de realização do exame
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([clinicaId])
+  @@index([pacienteId])
+  @@index([createdAt])
+  @@map("exames_pacientes")
 }

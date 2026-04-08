@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../stores/auth.store';
 import { Colors } from '../../constants/colors';
@@ -40,9 +40,6 @@ export default function AppLayout() {
           fontWeight: '600',
           marginTop: 2,
         },
-        tabBarIconStyle: {
-          marginBottom: -2,
-        },
       }}
     >
       <Tabs.Screen
@@ -50,31 +47,14 @@ export default function AppLayout() {
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? {
-              backgroundColor: Colors.primaryLight,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            } : undefined}>
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
-            </View>
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="agendamentos"
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? {
-              backgroundColor: Colors.primaryLight,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            } : undefined}>
-              <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={22} color={color} />
-            </View>
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -82,14 +62,16 @@ export default function AppLayout() {
         options={{
           title: 'Consultas',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? {
-              backgroundColor: Colors.primaryLight,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            } : undefined}>
-              <Ionicons name={focused ? 'medical' : 'medical-outline'} size={22} color={color} />
-            </View>
+            <Ionicons name={focused ? 'medical' : 'medical-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="exames"
+        options={{
+          title: 'Exames',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'flask' : 'flask-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -98,14 +80,7 @@ export default function AppLayout() {
         options={{
           title: 'Receitas',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? {
-              backgroundColor: Colors.primaryLight,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            } : undefined}>
-              <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={22} color={color} />
-            </View>
+            <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -114,14 +89,7 @@ export default function AppLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? {
-              backgroundColor: Colors.primaryLight,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-            } : undefined}>
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
-            </View>
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
           ),
         }}
       />

@@ -446,15 +446,14 @@ export const authOptions: NextAuthOptions = {
             data: { ultimoAcesso: new Date() },
           });
 
-          // Armazenar apenas dados essenciais para reduzir tamanho da sessão
-          // clinicaNome e avatar serão buscados quando necessário
           return {
             id: usuario.id,
             email: usuario.email,
             nome: usuario.nome,
             tipo: initialTipo,
             clinicaId: initialClinicaId ?? null,
-            tenantIds: tenants.map(t => t.id), // Apenas IDs
+            avatar: usuario.avatar ?? null,
+            tenantIds: tenants.map(t => t.id),
             requiresTenantSelection,
           };
         } catch (error) {
@@ -479,7 +478,7 @@ export const authOptions: NextAuthOptions = {
         token.nome = user.nome;
         token.tipo = user.tipo;
         token.clinicaId = user.clinicaId;
-        // Não armazenar clinicaNome e avatar - serão buscados quando necessário
+        token.avatar = (user as any).avatar || null;
         token.tenantIds = (user as any).tenantIds || [];
         token.requiresTenantSelection = user.requiresTenantSelection;
       }
@@ -559,7 +558,7 @@ export const authOptions: NextAuthOptions = {
         // Não buscar nome da clínica aqui - será buscado quando necessário via API
         // Isso reduz o tamanho da sessão e evita queries desnecessárias
         session.user.clinicaNome = null;
-        session.user.avatar = null;
+        session.user.avatar = (token.avatar as string) || null;
         // Não incluir lista completa de tenants na sessão para reduzir tamanho
         // Os tenants serão buscados quando necessário via getUserTenants()
         session.user.tenantIds = (token.tenantIds as string[]) || [];

@@ -63,7 +63,7 @@ export default function PrescricaoDetailScreen() {
             </View>
 
             <View style={styles.medDetails}>
-              <MedInfo icon="flask-outline" label="Dosagem" value={med.dosagem} color="#7C3AED" bgColor="#F5F3FF" />
+              <MedInfo icon="flask-outline" label="Dosagem" value={med.dosagem} color="#2563EB" bgColor="#EFF6FF" />
               <MedInfo icon="time-outline" label="Posologia" value={med.posologia} color="#3B82F6" bgColor="#EFF6FF" />
               {med.duracao && (
                 <MedInfo icon="calendar-outline" label="Duracao" value={med.duracao} color="#10B981" bgColor="#ECFDF5" />
@@ -78,7 +78,7 @@ export default function PrescricaoDetailScreen() {
               <View style={[styles.sectionIcon, { backgroundColor: '#FFFBEB' }]}>
                 <Ionicons name="chatbubble" size={16} color="#F59E0B" />
               </View>
-              <Text style={styles.sectionTitle}>Observacoes</Text>
+              <Text style={styles.sectionTitle}>Observações</Text>
             </View>
             <Card>
               <Text style={styles.observacoes}>{prescricao.observacoes}</Text>

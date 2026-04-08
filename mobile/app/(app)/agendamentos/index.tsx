@@ -46,7 +46,7 @@ export default function AgendamentosScreen() {
         </View>
         <TouchableOpacity
           style={styles.newButton}
-          onPress={() => router.push('/(app)/agendamentos/novo')}
+          onPress={() => router.push('/(app)/agendamentos/telemedicina')}
           activeOpacity={0.7}
         >
           <Ionicons name="add" size={20} color={Colors.white} />

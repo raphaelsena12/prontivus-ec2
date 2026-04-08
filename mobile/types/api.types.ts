@@ -84,6 +84,21 @@ export interface MedicoOnline {
   fotoUrl: string | null;
 }
 
+export interface ExamePaciente {
+  id: string;
+  nome: string;
+  tipoArquivo: string; // "imagem", "pdf", "documento"
+  nomeArquivo: string;
+  mimeType: string;
+  tamanho: number;
+  s3Key: string;
+  observacoes?: string;
+  dataExame?: string;
+  url?: string;
+  createdAt: string;
+  origem?: 'paciente' | 'secretaria';
+}
+
 export interface ApiError {
   message: string;
   status?: number;

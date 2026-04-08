@@ -251,6 +251,42 @@ export async function uploadMedicoDocumentoToS3(
   }
 }
 
+/**
+ * Upload de exame enviado pelo paciente (independente de consulta/médico).
+ * Estrutura: clinicas/{clinicaId}/pacientes/{pacienteId}/Exames/{tipoArquivo}-{timestamp}-{fileName}
+ */
+export async function uploadExamePacienteToS3(
+  fileBuffer: Buffer,
+  fileName: string,
+  options: {
+    clinicaId: string;
+    pacienteId: string;
+    tipoArquivo: string; // "imagem", "pdf", "documento"
+  },
+  contentType: string
+): Promise<string> {
+  const timestamp = Date.now();
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+  const key = `clinicas/${options.clinicaId}/pacientes/${options.pacienteId}/Exames/exame-${options.tipoArquivo}-${timestamp}-${sanitizedFileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: contentType,
+    Metadata: {
+      clinicaId: options.clinicaId,
+      pacienteId: options.pacienteId,
+      tipoArquivo: options.tipoArquivo,
+      uploadedAt: new Date().toISOString(),
+    },
+  });
+
+  const s3Client = getS3Client();
+  await s3Client.send(command);
+  return key;
+}
+
 export async function getSignedUrlFromS3(key: string, expiresIn: number = 3600): Promise<string> {
   try {
     const s3Client = getS3Client();

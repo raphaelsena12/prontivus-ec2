@@ -38,7 +38,6 @@ const agendamentoSchema = z.object({
   procedimentoId: z.string().uuid().optional().nullable(),
   formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
-  planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().min(0).optional().nullable(),
   observacoes: z.string().optional(),
@@ -68,11 +67,6 @@ interface TipoConsulta {
   id: string;
   nome: string;
   codigo: string;
-}
-
-interface PlanoSaude {
-  id: string;
-  nome: string;
 }
 
 interface Procedimento {
@@ -552,7 +546,6 @@ export function NovoAgendamentoModal({
   const [tiposConsulta, setTiposConsulta] = useState<TipoConsulta[]>([]);
   const [procedimentos, setProcedimentos] = useState<Procedimento[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamento[]>([]);
-  const [planosSaude, setPlanosSaude] = useState<PlanoSaude[]>([]);
   const [pacienteSelecionado, setPacienteSelecionado] = useState<Paciente | null>(null);
   const [pacienteSearchValue, setPacienteSearchValue] = useState("");
   const [consultasRetorno, setConsultasRetorno] = useState<{
@@ -589,7 +582,6 @@ export function NovoAgendamentoModal({
       procedimentoId: null,
       formaPagamentoId: null,
       operadoraId: null,
-      planoSaudeId: null,
       numeroCarteirinha: "",
       valorCobrado: null,
       observacoes: "",
@@ -690,7 +682,6 @@ export function NovoAgendamentoModal({
     } else {
       // Resetar formulário quando fechar
       form.reset();
-      setPlanosSaude([]);
       setConsultasRetorno(null);
       setLimiteRetornos(null);
       setSugestaoDataRetorno(null);
@@ -699,29 +690,6 @@ export function NovoAgendamentoModal({
       setAnexos([]);
     }
   }, [open, form, initialData]);
-
-  // Carregar planos quando operadora mudar
-  useEffect(() => {
-    const fetchPlanos = async () => {
-      if (!operadoraId || operadoraId === "null") {
-        setPlanosSaude([]);
-        form.setValue("planoSaudeId", null);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/admin-clinica/planos-saude?operadoraId=${operadoraId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPlanosSaude(data.planosSaude || []);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar planos de saúde:", error);
-      }
-    };
-
-    fetchPlanos();
-  }, [operadoraId, form]);
 
   // Verificar consultas de retorno
   useEffect(() => {
@@ -903,7 +871,6 @@ export function NovoAgendamentoModal({
         if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
         if (data.formaPagamentoId) formData.append("formaPagamentoId", data.formaPagamentoId);
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
-        if (data.planoSaudeId) formData.append("planoSaudeId", data.planoSaudeId);
         if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
         if (data.valorCobrado != null) formData.append("valorCobrado", String(data.valorCobrado));
         if (data.observacoes) formData.append("observacoes", data.observacoes);
@@ -926,7 +893,6 @@ export function NovoAgendamentoModal({
             codigoTussId: data.codigoTussId || null,
             procedimentoId: data.procedimentoId || null,
             operadoraId: data.operadoraId || null,
-            planoSaudeId: data.planoSaudeId || null,
             valorCobrado: data.valorCobrado || null,
           }),
         });
@@ -1274,7 +1240,6 @@ export function NovoAgendamentoModal({
                               operadoraId={field.value ?? null}
                               onSelectOperadoraId={(id) => {
                                 field.onChange(id);
-                                if (!id) form.setValue("planoSaudeId", null);
                               }}
                               error={form.formState.errors.operadoraId?.message}
                             />
@@ -1307,30 +1272,6 @@ export function NovoAgendamentoModal({
                   {/* Plano de Saúde (aparece apenas quando há convênio) */}
                   {operadoraId && operadoraId !== "null" && (
                     <div className="flex flex-wrap items-start gap-2.5">
-                      <FormField
-                        control={form.control}
-                        name="planoSaudeId"
-                        render={({ field }) => (
-                          <FormItem className="min-w-[200px]">
-                            <FormLabel className="text-xs font-medium">Plano de Saúde</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                              <FormControl>
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue placeholder="Selecione o plano" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent position="popper" className="max-h-60">
-                                {planosSaude.map((plano) => (
-                                  <SelectItem key={plano.id} value={plano.id} className="text-xs">
-                                    {plano.nome}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage className="text-xs" />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name="codigoTussId"

@@ -19,7 +19,7 @@ import { ptBR } from 'date-fns/locale';
 
 // ── Avatar ──────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ['#7C3AED', '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899'];
+const AVATAR_COLORS = ['#2563EB', '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899'];
 
 function getAvatarColor(id: string) {
   const hash = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -322,14 +322,6 @@ export default function TelemedicinaScreen() {
         )}
       </View>
 
-      {/* Info banner */}
-      <View style={styles.infoBanner}>
-        <Ionicons name="information-circle" size={16} color={Colors.accent} />
-        <Text style={styles.infoBannerText}>
-          Pague pelo app e realize sua consulta por video sem sair
-        </Text>
-      </View>
-
       {/* Tabs */}
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -438,7 +430,7 @@ export default function TelemedicinaScreen() {
               ListEmptyComponent={
                 <EmptyState
                   icon="videocam-outline"
-                  title={medicos.length === 0 ? 'Nenhum medico online' : 'Nenhum medico encontrado'}
+                  title={medicos.length === 0 ? 'Nenhum médico online' : 'Nenhum médico encontrado'}
                   description={medicos.length === 0
                     ? 'Tente novamente mais tarde ou agende uma consulta'
                     : 'Ajuste os filtros ou a busca'}
@@ -460,8 +452,8 @@ export default function TelemedicinaScreen() {
             ListEmptyComponent={
               <EmptyState
                 icon="videocam-outline"
-                title="Nenhuma sessao disponivel"
-                description="Suas consultas de telemedicina aparecerao aqui"
+                title="Nenhuma sessão disponível"
+                description="Suas consultas de telemedicina aparecerão aqui"
               />
             }
             renderItem={({ item }) => (
@@ -620,21 +612,6 @@ const styles = StyleSheet.create({
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#10B981' },
   onlinePillText: { fontSize: 11, fontWeight: '600', color: '#065F46' },
 
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    backgroundColor: Colors.accentLight,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#99F6E4',
-  },
-  infoBannerText: { flex: 1, fontSize: 12, color: '#115E59', fontWeight: '500' },
-
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 16,
@@ -670,8 +647,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: Colors.text },
 
-  filterScroll: { marginTop: 8 },
-  filterContent: { paddingHorizontal: 16, gap: 6, paddingVertical: 4 },
+  filterScroll: { marginTop: 8, flexGrow: 0 },
+  filterContent: { paddingHorizontal: 16, gap: 6, paddingVertical: 12 },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 7,

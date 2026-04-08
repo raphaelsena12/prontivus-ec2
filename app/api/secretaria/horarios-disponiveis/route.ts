@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     const medicoId = searchParams.get("medicoId");
     const dataParam = searchParams.get("data");
     const intervaloMin = Number(searchParams.get("intervaloMin") || "10");
+    const excludeConsultaId = searchParams.get("excludeConsultaId");
 
     if (!medicoId || !dataParam) {
       return NextResponse.json({ error: "medicoId e data são obrigatórios" }, { status: 400 });
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
           medicoId,
           dataHora: { gte: dataInicio, lte: dataFimDia },
           status: { notIn: ["CANCELADA", "CANCELADO"] },
+          ...(excludeConsultaId ? { id: { not: excludeConsultaId } } : {}),
         },
         select: { dataHora: true, dataHoraFim: true },
       }),

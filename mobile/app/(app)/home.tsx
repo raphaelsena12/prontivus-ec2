@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useConsultas } from '../../hooks/useConsultas';
 import { usePrescricoes } from '../../hooks/usePrescricoes';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { Colors, BorderRadius, Spacing } from '../../constants/colors';
+import { Colors, BorderRadius } from '../../constants/colors';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -18,7 +18,7 @@ const statusLabel: Record<string, string> = {
   CONFIRMADA: 'Confirmada',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
-  NAO_COMPARECEU: 'Nao compareceu',
+  NAO_COMPARECEU: 'Não compareceu',
 };
 
 export default function HomeScreen() {
@@ -42,18 +42,22 @@ export default function HomeScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>Ola,</Text>
+            <Text style={styles.greeting}>Olá,</Text>
             <Text style={styles.name}>{firstName}</Text>
           </View>
           <TouchableOpacity
             style={styles.avatarButton}
             onPress={() => router.push('/(app)/perfil')}
           >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {firstName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {firstName.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -64,7 +68,7 @@ export default function HomeScreen() {
               <View style={styles.nextCardIcon}>
                 <Ionicons name="calendar" size={18} color={Colors.primary} />
               </View>
-              <Text style={styles.nextCardLabel}>Proxima consulta</Text>
+              <Text style={styles.nextCardLabel}>Próxima consulta</Text>
             </View>
             <Text style={styles.nextDate}>
               {format(new Date(proximoAgendamento.dataHora), "dd 'de' MMMM", {
@@ -107,31 +111,40 @@ export default function HomeScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.noAppointmentTitle}>Nenhuma consulta agendada</Text>
-                <Text style={styles.noAppointmentSub}>Agende sua proxima consulta</Text>
+                <Text style={styles.noAppointmentSub}>Suas consultas aparecerão aqui</Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.noAppointmentBtn}
-              onPress={() => router.push('/(app)/agendamentos/novo')}
-            >
-              <Ionicons name="add" size={16} color={Colors.primary} />
-              <Text style={styles.noAppointmentBtnText}>Agendar</Text>
-            </TouchableOpacity>
           </Card>
         )}
 
         {/* Quick actions */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Acesso rapido</Text>
+          <Text style={styles.sectionTitle}>Acesso rápido</Text>
         </View>
         <View style={styles.actions}>
           <ActionCard
-            icon="calendar-outline"
-            label="Agendar consulta"
-            subtitle="Marque um horario"
-            color="#7C3AED"
+            icon="medical-outline"
+            label="Consultas"
+            subtitle="Histórico completo"
+            color="#3B82F6"
+            bgColor="#EFF6FF"
+            onPress={() => router.push('/(app)/consultas')}
+          />
+          <ActionCard
+            icon="flask-outline"
+            label="Exames"
+            subtitle="Seus resultados"
+            color="#8B5CF6"
             bgColor="#F5F3FF"
-            onPress={() => router.push('/(app)/agendamentos/novo')}
+            onPress={() => router.push('/(app)/exames')}
+          />
+          <ActionCard
+            icon="document-text-outline"
+            label="Receitas"
+            subtitle="Suas prescrições"
+            color="#F59E0B"
+            bgColor="#FFFBEB"
+            onPress={() => router.push('/(app)/prescricoes')}
           />
           <ActionCard
             icon="videocam-outline"
@@ -140,22 +153,6 @@ export default function HomeScreen() {
             color="#0D9488"
             bgColor="#CCFBF1"
             onPress={() => router.push('/(app)/agendamentos/telemedicina')}
-          />
-          <ActionCard
-            icon="medical-outline"
-            label="Consultas"
-            subtitle="Historico completo"
-            color="#3B82F6"
-            bgColor="#EFF6FF"
-            onPress={() => router.push('/(app)/consultas')}
-          />
-          <ActionCard
-            icon="document-text-outline"
-            label="Receitas"
-            subtitle="Suas prescricoes"
-            color="#F59E0B"
-            bgColor="#FFFBEB"
-            onPress={() => router.push('/(app)/prescricoes')}
           />
         </View>
 
@@ -168,8 +165,8 @@ export default function HomeScreen() {
             icon="calendar"
             label="Agendamentos"
             value={totalAgendamentos}
-            color="#7C3AED"
-            bgColor="#F5F3FF"
+            color="#2563EB"
+            bgColor="#EFF6FF"
           />
           <StatCard
             icon="medical"
@@ -369,23 +366,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  noAppointmentBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed' as const,
-  },
-  noAppointmentBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-
   // Section
   sectionHeader: {
     flexDirection: 'row',

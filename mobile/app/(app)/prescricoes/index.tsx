@@ -21,7 +21,7 @@ export default function PrescricoesScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Receitas</Text>
-        <Text style={styles.subtitle}>{prescricoes?.length ?? 0} prescricoes</Text>
+        <Text style={styles.subtitle}>{prescricoes?.length ?? 0} prescrições</Text>
       </View>
 
       <FlatList
@@ -32,8 +32,8 @@ export default function PrescricoesScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="document-text-outline"
-            title="Nenhuma prescricao"
-            description="Suas prescricoes medicas aparecerao aqui"
+            title="Nenhuma prescrição"
+            description="Suas prescrições médicas aparecerão aqui"
           />
         }
         renderItem={({ item }) => <PrescricaoCard prescricao={item} />}

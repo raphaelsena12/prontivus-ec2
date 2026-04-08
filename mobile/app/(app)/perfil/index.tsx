@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,9 +44,13 @@ export default function PerfilScreen() {
         {/* Avatar section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarOuter}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.name}>{user?.nome ?? 'Paciente'}</Text>
           <Text style={styles.email}>{user?.email}</Text>
@@ -62,15 +66,15 @@ export default function PerfilScreen() {
             icon="calendar-outline"
             label="Meus agendamentos"
             subtitle="Consultas futuras"
-            color="#7C3AED"
-            bgColor="#F5F3FF"
+            color="#2563EB"
+            bgColor="#EFF6FF"
             onPress={() => router.push('/(app)/agendamentos')}
           />
           <View style={styles.divider} />
           <MenuItem
             icon="medical-outline"
             label="Minhas consultas"
-            subtitle="Historico completo"
+            subtitle="Histórico completo"
             color="#3B82F6"
             bgColor="#EFF6FF"
             onPress={() => router.push('/(app)/consultas')}
@@ -78,8 +82,8 @@ export default function PerfilScreen() {
           <View style={styles.divider} />
           <MenuItem
             icon="document-text-outline"
-            label="Minhas prescricoes"
-            subtitle="Receitas medicas"
+            label="Minhas prescrições"
+            subtitle="Receitas médicas"
             color="#F59E0B"
             bgColor="#FFFBEB"
             onPress={() => router.push('/(app)/prescricoes')}
@@ -95,11 +99,6 @@ export default function PerfilScreen() {
           />
         </Card>
 
-        {/* Version info */}
-        <View style={styles.versionSection}>
-          <Text style={styles.versionText}>Prontivus v1.0.0</Text>
-        </View>
-
         {/* Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.7}>
           <View style={styles.logoutIcon}>
@@ -107,6 +106,11 @@ export default function PerfilScreen() {
           </View>
           <Text style={styles.logoutText}>Sair da conta</Text>
         </TouchableOpacity>
+
+        {/* Version info */}
+        <View style={styles.versionSection}>
+          <Text style={styles.versionText}>Prontivus v1.0.0</Text>
+        </View>
 
         <View style={{ height: 20 }} />
       </ScrollView>
