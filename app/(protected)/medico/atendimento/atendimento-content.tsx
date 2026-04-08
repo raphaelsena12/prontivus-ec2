@@ -2623,6 +2623,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   consultationMode={consultationMode}
                   historicoClinico={historicoClinico}
                   onRepetirItens={handleRepetirItens}
+                  onAttachExame={() => setUploadDialogOpen(true)}
                 />
             </div>
           </div>

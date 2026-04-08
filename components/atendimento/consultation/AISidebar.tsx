@@ -26,6 +26,7 @@ import {
   Check,
   Brain,
   ClipboardList,
+  Paperclip,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -118,6 +119,8 @@ interface AISidebarProps {
   handleGenerateDocument: (modelId: string, extraDados?: Record<string, any>) => Promise<void>;
   onSignDocument?: (id: string) => void | Promise<void>;
   onDeleteDocument?: (id: string) => void;
+  // Anexar exame
+  onAttachExame?: () => void;
   // Action
   onGenerateSuggestions: (context: AIContext) => void;
   consultationMode: "manual" | "ai";
@@ -176,6 +179,7 @@ export function AISidebar({
   handleGenerateDocument,
   onSignDocument,
   onDeleteDocument,
+  onAttachExame,
   onGenerateSuggestions,
   historicoClinico = [],
   onRepetirItens,
@@ -187,6 +191,21 @@ export function AISidebar({
     examesIds: [],
     medicamentos: true,
   });
+
+  // Auto-selecionar novos exames da consulta atual para análise da IA
+  const prevExamesRef = useRef<string[]>([]);
+  useEffect(() => {
+    const currentIds = examesAnexados.filter(e => e.isFromCurrentConsulta).map(e => e.id);
+    const prevIds = prevExamesRef.current;
+    const newIds = currentIds.filter(id => !prevIds.includes(id));
+    if (newIds.length > 0) {
+      setAiContext(prev => ({
+        ...prev,
+        examesIds: [...new Set([...prev.examesIds, ...newIds])],
+      }));
+    }
+    prevExamesRef.current = currentIds;
+  }, [examesAnexados]);
 
   const toggleExameContexto = (id: string) => {
     setAiContext((prev) => {
@@ -588,12 +607,27 @@ export function AISidebar({
             })}
 
             {/* Exames individuais */}
-            {examesAnexados.length > 0 && (
+            {(examesAnexados.length > 0 || onAttachExame) && (
               <div className="pt-0.5">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
-                  Exames anexados
-                </p>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                    Exames anexados
+                  </p>
+                  {onAttachExame && (
+                    <button
+                      type="button"
+                      onClick={onAttachExame}
+                      className="p-0.5 rounded hover:bg-slate-100 transition-colors text-slate-400 hover:text-blue-600"
+                      title="Anexar exame"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-1.5">
+                  {examesAnexados.length === 0 && (
+                    <p className="text-[10px] text-slate-400 italic">Nenhum exame anexado</p>
+                  )}
                   {examesAnexados.map((exame) => {
                     const checked = aiContext.examesIds.includes(exame.id);
                     return (
