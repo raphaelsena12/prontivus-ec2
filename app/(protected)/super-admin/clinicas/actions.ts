@@ -19,7 +19,6 @@ interface CreateClinicaData {
   cidade?: string;
   estado?: string;
   pais?: string;
-  logoUrl?: string;
 }
 
 interface UpdateClinicaData {
@@ -36,7 +35,6 @@ interface UpdateClinicaData {
   cidade?: string;
   estado?: string;
   pais?: string;
-  logoUrl?: string;
 }
 
 export async function createClinica(data: CreateClinicaData) {
@@ -71,7 +69,6 @@ export async function createClinica(data: CreateClinicaData) {
         cidade: data.cidade,
         estado: data.estado,
         pais: data.pais || "Brasil",
-        logoUrl: data.logoUrl,
       },
     });
 
@@ -158,7 +155,6 @@ export async function updateClinica(data: UpdateClinicaData) {
         cidade: data.cidade,
         estado: data.estado,
         pais: data.pais || "Brasil",
-        logoUrl: data.logoUrl,
       },
     });
 

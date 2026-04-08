@@ -29,12 +29,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+
 import { TipoPlano, StatusClinica } from "@/lib/generated/prisma";
 import { createClinica, updateClinica } from "./actions";
 import { ESTADOS_BRASILEIROS } from "@/lib/estados-brasileiros";
-import { Upload, Loader2, X } from "lucide-react";
-import Image from "next/image";
+import { Loader2 } from "lucide-react";
 
 interface Plano {
   id: string;
@@ -190,7 +189,6 @@ const clinicaSchema = z.object({
   cidade: z.string().optional(),
   estado: z.string().optional(),
   pais: z.string().optional(),
-  logoUrl: z.string().optional(),
 });
 
 type ClinicaFormValues = z.infer<typeof clinicaSchema>;
@@ -203,8 +201,6 @@ export function ClinicaDialog({
   planos,
 }: ClinicaDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const isEditing = !!clinica;
 
   const form = useForm<ClinicaFormValues>({
@@ -223,7 +219,6 @@ export function ClinicaDialog({
       cidade: "",
       estado: "",
       pais: "Brasil",
-      logoUrl: "",
     },
   });
 
@@ -244,9 +239,7 @@ export function ClinicaDialog({
         cidade: clinica.cidade || "",
         estado: clinica.estado || "",
         pais: clinica.pais || "Brasil",
-        logoUrl: clinica.logoUrl || "",
       });
-      setLogoPreview(clinica.logoUrl || null);
     } else if (!clinica && open) {
       form.reset({
         nome: "",
@@ -262,70 +255,12 @@ export function ClinicaDialog({
         cidade: "",
         estado: "",
         pais: "Brasil",
-        logoUrl: "",
       });
-      setLogoPreview(null);
     }
   }, [clinica, open, form]);
 
   const selectedPlanoId = form.watch("planoId");
   const selectedPlano = planos.find((p) => p.id === selectedPlanoId);
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tipo
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Tipo de arquivo não permitido. Use JPEG, PNG ou WEBP");
-      return;
-    }
-
-    // Validar tamanho (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Tamanho máximo: 5MB");
-      return;
-    }
-
-    setUploadingLogo(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (clinica?.id) {
-        formData.append("clinicaId", clinica.id);
-      } else {
-        // Para nova clínica, usar um ID temporário baseado no CNPJ
-        const cnpj = form.getValues("cnpj").replace(/\D/g, "");
-        if (!cnpj) {
-          toast.error("Preencha o CNPJ antes de fazer upload da logo");
-          setUploadingLogo(false);
-          return;
-        }
-        formData.append("clinicaId", `temp-${cnpj}`);
-      }
-
-      const response = await fetch("/api/super-admin/clinicas/upload-logo", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Erro ao fazer upload");
-      }
-
-      form.setValue("logoUrl", data.url);
-      setLogoPreview(data.url);
-      toast.success("Logo enviada com sucesso!");
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao fazer upload da logo");
-    } finally {
-      setUploadingLogo(false);
-    }
-  };
 
   const onSubmit = async (data: ClinicaFormValues) => {
     setIsLoading(true);
@@ -346,7 +281,6 @@ export function ClinicaDialog({
           cidade: data.cidade,
           estado: data.estado,
           pais: data.pais,
-          logoUrl: data.logoUrl,
         });
 
         if (result.error) {
@@ -370,7 +304,6 @@ export function ClinicaDialog({
           cidade: data.cidade,
           estado: data.estado,
           pais: data.pais,
-          logoUrl: data.logoUrl,
         });
 
         if (result.error) {
@@ -541,63 +474,6 @@ export function ClinicaDialog({
                 </div>
               </div>
             )}
-
-            {/* Upload de Logo */}
-            <div className="space-y-2">
-              <Label>Logo da Clínica</Label>
-              {logoPreview ? (
-                <div className="relative">
-                  <div className="relative h-24 w-full rounded-md border bg-background overflow-hidden" style={{ minWidth: '100%', width: '100%' }}>
-                    <img
-                      src={logoPreview}
-                      alt="Logo da clínica"
-                      className="h-full w-full object-contain p-3"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                    onClick={() => {
-                      setLogoPreview(null);
-                      form.setValue("logoUrl", "");
-                    }}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ) : (
-                <label
-                  htmlFor="logo-upload"
-                  className="flex h-20 w-full cursor-pointer items-center justify-center rounded-md border-2 border-dashed border-input bg-muted/50 transition-colors hover:bg-muted"
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <Upload className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      Escolher arquivo
-                    </span>
-                  </div>
-                  <input
-                    id="logo-upload"
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    onChange={handleLogoUpload}
-                    disabled={uploadingLogo}
-                    className="hidden"
-                  />
-                </label>
-              )}
-              <p className="text-xs text-muted-foreground">
-                JPG, PNG ou WEBP. Máximo 5MB.
-              </p>
-              {uploadingLogo && (
-                <p className="text-xs text-primary flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Enviando...
-                </p>
-              )}
-            </div>
 
             {/* Endereço */}
             <div className="space-y-4 border-t pt-4">
