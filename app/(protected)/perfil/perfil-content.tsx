@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
+import { ReportHeaderPreview } from "@/components/report-header-preview";
+import { getAvatarUrl } from "@/lib/avatar-utils";
 import { formatCPF } from "@/lib/utils";
 import { Loader2, Camera, Lock, Upload, ZoomIn, UserCircle, Eye as EyeIcon, Trash2, FileText, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -182,6 +184,7 @@ export function PerfilContent() {
     startOffsetY: number;
   } | null>(null);
   const AVATAR_PREVIEW_SIZE = 288;
+  const [resolvedAvatarUrl, setResolvedAvatarUrl] = useState<string | null>(null);
   const [medicoEspecialidadesLoading, setMedicoEspecialidadesLoading] = useState(false);
   const [especialidadesCatalogo, setEspecialidadesCatalogo] = useState<Especialidade[]>([]);
   const [categoriasCatalogo, setCategoriasCatalogo] = useState<Categoria[]>([]);
@@ -287,6 +290,15 @@ export function PerfilContent() {
       }
     };
   }, [cameraStream, avatarPreviewUrl]);
+
+  // Resolver URL do avatar para o preview do cabeçalho (admin-clínica)
+  useEffect(() => {
+    if (usuario?.tipo !== "ADMIN_CLINICA" || !usuario.avatar) {
+      setResolvedAvatarUrl(null);
+      return;
+    }
+    getAvatarUrl(usuario.avatar).then((url) => setResolvedAvatarUrl(url ?? null));
+  }, [usuario?.avatar, usuario?.tipo]);
 
   const loadCertificado = async () => {
     setCertLoading(true);
@@ -1160,6 +1172,20 @@ export function PerfilContent() {
                   </div>
                 </CardContent>
           </Card>
+
+          {usuario?.tipo === "ADMIN_CLINICA" && (
+            <Card className="mt-4">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-xl">Preview nos Relatórios</CardTitle>
+                <CardDescription className="text-xs">
+                  Veja como sua foto de perfil aparecerá como logo nos documentos e relatórios gerados
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                <ReportHeaderPreview avatarUrl={resolvedAvatarUrl} />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {usuario?.tipo === "MEDICO" && (
