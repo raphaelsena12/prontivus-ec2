@@ -1,8 +1,8 @@
 "use client";
 
 import { formatDateToInput } from "@/lib/utils";
-import { useMemo } from "react";
-import { Calendar, dateFnsLocalizer } from "react-big-calendar";
+import { useCallback, useMemo, useState } from "react";
+import { Calendar, dateFnsLocalizer, type View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -99,9 +99,8 @@ const getStatusColor = (status: string): { bg: string; border: string } => {
 const STATUS_LEGENDA = [
   { status: "AGENDADA", label: "Agendada" },
   { status: "CONFIRMADA", label: "Confirmada" },
-  { status: "AGUARDANDO_APROVACAO", label: "Aguardando aprovação" },
-  { status: "REALIZADA", label: "Realizada" },
   { status: "CANCELADA", label: "Cancelada" },
+  { status: "REALIZADA", label: "Realizada" },
 ];
 
 export function AgendamentosCalendar({
@@ -112,6 +111,16 @@ export function AgendamentosCalendar({
   onSlotSelect,
 }: AgendamentosCalendarProps) {
   const router = useRouter();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentView, setCurrentView] = useState<View>("week");
+
+  const handleNavigate = useCallback((newDate: Date) => {
+    setCurrentDate(newDate);
+  }, []);
+
+  const handleViewChange = useCallback((newView: View) => {
+    setCurrentView(newView);
+  }, []);
 
   const escalaPorDia = useMemo(() => {
     const map = new Map<number, Array<{ inicio: number; fim: number }>>();
@@ -281,14 +290,6 @@ export function AgendamentosCalendar({
             </div>
           );
         })}
-        {/* Bloqueio */}
-        <div className="flex items-center gap-1.5">
-          <div
-            className="w-3 h-3 rounded border"
-            style={{ backgroundColor: "#000000", borderColor: "#1a1a1a" }}
-          />
-          <span className="text-[13px] text-foreground font-medium">Bloqueio</span>
-        </div>
       </div>
 
       {/* Calendário com estilos customizados */}
@@ -408,7 +409,10 @@ export function AgendamentosCalendar({
             }
             return {};
           }}
-          defaultView="week"
+          date={currentDate}
+          onNavigate={handleNavigate}
+          view={currentView}
+          onView={handleViewChange}
           views={["month", "week", "day", "agenda"]}
           messages={messages}
           culture="pt-BR"

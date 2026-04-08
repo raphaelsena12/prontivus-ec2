@@ -413,6 +413,9 @@ export function EditarAgendamentoModal({
   const [loadingCancel, setLoadingCancel] = useState(false);
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<string[]>([]);
   const [loadingHorarios, setLoadingHorarios] = useState(false);
+  const horarioOriginalRef = useRef<{ hora: string; horaFim: string } | null>(null);
+  const medicoDataCarregadoRef = useRef<string | null>(null);
+  const [agendamentoCarregado, setAgendamentoCarregado] = useState(false);
 
   const form = useForm<AgendamentoFormData>({
     resolver: zodResolver(agendamentoSchema),
@@ -442,49 +445,40 @@ export function EditarAgendamentoModal({
   const hora = form.watch("hora");
   const horaFim = form.watch("horaFim");
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    if (open) {
-      const fetchData = async () => {
-        try {
-          setLoadingData(true);
-          const [medicosRes, tiposConsultaRes, procedimentosRes, formasPagamentoRes] = await Promise.all([
-            // Somente médicos ativos devem aparecer para seleção no agendamento
-            fetch("/api/admin-clinica/medicos?ativo=true"),
-            fetch("/api/admin-clinica/tipos-consulta"),
-            fetch("/api/secretaria/procedimentos?limit=1000"),
-            fetch("/api/admin-clinica/formas-pagamento?limit=100"),
-          ]);
+  // Carregar horários disponíveis para um médico/data
+  const carregarHorarios = useCallback(async (medicoIdParam: string, dataParam: string) => {
+    try {
+      setLoadingHorarios(true);
+      const excludeParam = agendamentoId ? `&excludeConsultaId=${agendamentoId}` : "";
+      const response = await fetch(
+        `/api/secretaria/horarios-disponiveis?medicoId=${medicoIdParam}&data=${dataParam}&intervaloMin=10${excludeParam}`
+      );
+      if (!response.ok) throw new Error();
+      const responseData = await response.json();
+      let horarios: string[] = responseData.horarios || [];
 
-          if (medicosRes.ok) {
-            const data = await medicosRes.json();
-            setMedicos(data.medicos || []);
-          }
-
-          if (tiposConsultaRes.ok) {
-            const data = await tiposConsultaRes.json();
-            setTiposConsulta(data.tiposConsulta || []);
-          }
-
-          if (procedimentosRes.ok) {
-            const data = await procedimentosRes.json();
-            setProcedimentos(data.procedimentos || []);
-          }
-
-          if (formasPagamentoRes.ok) {
-            const data = await formasPagamentoRes.json();
-            setFormasPagamento(data.formasPagamento || []);
-          }
-        } catch (error) {
-          toast.error("Erro ao carregar dados");
-          console.error(error);
-        } finally {
-          setLoadingData(false);
+      // Garantir que os horários originais do agendamento estejam sempre disponíveis
+      if (horarioOriginalRef.current) {
+        if (horarioOriginalRef.current.hora && !horarios.includes(horarioOriginalRef.current.hora)) {
+          horarios = [...horarios, horarioOriginalRef.current.hora].sort();
         }
-      };
+        if (horarioOriginalRef.current.horaFim && !horarios.includes(horarioOriginalRef.current.horaFim)) {
+          horarios = [...horarios, horarioOriginalRef.current.horaFim].sort();
+        }
+      }
 
-      fetchData();
-    } else {
+      setHorariosDisponiveis(horarios);
+    } catch (error) {
+      console.error("Erro ao carregar horários disponíveis:", error);
+      setHorariosDisponiveis([]);
+    } finally {
+      setLoadingHorarios(false);
+    }
+  }, [agendamentoId]);
+
+  // Carregar TUDO de uma vez quando o modal abrir (dados + agendamento + horários)
+  useEffect(() => {
+    if (!open) {
       form.reset();
       setConsultasRetorno(null);
       setLimiteRetornos(null);
@@ -493,87 +487,129 @@ export function EditarAgendamentoModal({
       setAnexos([]);
       setDocumentosExistentes([]);
       setAgendamento(null);
+      setHorariosDisponiveis([]);
+      horarioOriginalRef.current = null;
+      medicoDataCarregadoRef.current = null;
+      setAgendamentoCarregado(false);
+      return;
     }
-  }, [open, form]);
 
-  // Carregar agendamento quando o modal abrir
-  useEffect(() => {
-    if (open && agendamentoId) {
-      const fetchAgendamento = async () => {
-        try {
-          setLoadingData(true);
-          const response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`);
+    if (!agendamentoId) return;
 
-          if (!response.ok) {
-            throw new Error("Erro ao carregar agendamento");
-          }
+    let cancelado = false;
 
-          const data = await response.json();
-          const consulta = data.consulta;
+    const carregarTudo = async () => {
+      try {
+        setLoadingData(true);
 
-          setAgendamento(consulta);
+        // 1. Carregar dados de referência + agendamento em paralelo
+        const [medicosRes, tiposConsultaRes, procedimentosRes, formasPagamentoRes, agendamentoRes] = await Promise.all([
+          fetch("/api/admin-clinica/medicos?ativo=true"),
+          fetch("/api/admin-clinica/tipos-consulta"),
+          fetch("/api/secretaria/procedimentos?limit=1000"),
+          fetch("/api/admin-clinica/formas-pagamento?limit=100"),
+          fetch(`/api/secretaria/agendamentos/${agendamentoId}`),
+        ]);
 
-          // Formatar data e hora
-          const dataHora = new Date(consulta.dataHora);
-          const year = dataHora.getFullYear();
-          const month = String(dataHora.getMonth() + 1).padStart(2, "0");
-          const day = String(dataHora.getDate()).padStart(2, "0");
-          const hours = String(dataHora.getHours()).padStart(2, "0");
-          const minutes = String(dataHora.getMinutes()).padStart(2, "0");
-          const dataFormatada = `${year}-${month}-${day}`;
-          const horaFormatada = `${hours}:${minutes}`;
+        if (cancelado) return;
 
-          let horaFimFormatada = "";
-          if (consulta.dataHoraFim) {
-            const dataHoraFim = new Date(consulta.dataHoraFim);
-            horaFimFormatada = `${String(dataHoraFim.getHours()).padStart(2, "0")}:${String(dataHoraFim.getMinutes()).padStart(2, "0")}`;
-          }
+        if (medicosRes.ok) {
+          const data = await medicosRes.json();
+          setMedicos(data.medicos || []);
+        }
+        if (tiposConsultaRes.ok) {
+          const data = await tiposConsultaRes.json();
+          setTiposConsulta(data.tiposConsulta || []);
+        }
+        if (procedimentosRes.ok) {
+          const data = await procedimentosRes.json();
+          setProcedimentos(data.procedimentos || []);
+        }
+        if (formasPagamentoRes.ok) {
+          const data = await formasPagamentoRes.json();
+          setFormasPagamento(data.formasPagamento || []);
+        }
 
-          // Usar dados do paciente que vêm na resposta da API
-          if (consulta.paciente) {
-            const paciente: Paciente = {
-              id: consulta.paciente.id,
-              nome: consulta.paciente.nome,
-              cpf: consulta.paciente.cpf,
-              email: consulta.paciente.email || undefined,
-              telefone: consulta.paciente.telefone || undefined,
-              celular: consulta.paciente.celular || undefined,
-            };
-            setPacienteSelecionado(paciente);
-            setPacienteSearchValue(maskCPF(paciente.cpf));
-          }
+        if (!agendamentoRes.ok) {
+          throw new Error("Erro ao carregar agendamento");
+        }
 
-          // Preencher formulário
-          form.reset({
-            pacienteId: consulta.pacienteId,
-            medicoId: consulta.medicoId,
-            data: dataFormatada,
-            hora: horaFormatada,
-            horaFim: horaFimFormatada,
-            codigoTussId: consulta.codigoTussId,
-            tipoConsultaId: consulta.tipoConsultaId || "",
-            procedimentoId: consulta.procedimentoId || null,
-            formaPagamentoId: consulta.formaPagamentoId || null,
-            operadoraId: consulta.operadoraId,
-            numeroCarteirinha: consulta.numeroCarteirinha || "",
-            valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
-            observacoes: consulta.observacoes || "",
-            anexos: [],
+        const agendamentoData = await agendamentoRes.json();
+        const consulta = agendamentoData.consulta;
+
+        if (cancelado) return;
+
+        setAgendamento(consulta);
+
+        // 2. Formatar data e hora
+        const dataHora = new Date(consulta.dataHora);
+        const dataFormatada = `${dataHora.getFullYear()}-${String(dataHora.getMonth() + 1).padStart(2, "0")}-${String(dataHora.getDate()).padStart(2, "0")}`;
+        const horaFormatada = `${String(dataHora.getHours()).padStart(2, "0")}:${String(dataHora.getMinutes()).padStart(2, "0")}`;
+
+        let horaFimFormatada = "";
+        if (consulta.dataHoraFim) {
+          const dataHoraFim = new Date(consulta.dataHoraFim);
+          horaFimFormatada = `${String(dataHoraFim.getHours()).padStart(2, "0")}:${String(dataHoraFim.getMinutes()).padStart(2, "0")}`;
+        }
+
+        // 3. Paciente
+        if (consulta.paciente) {
+          setPacienteSelecionado({
+            id: consulta.paciente.id,
+            nome: consulta.paciente.nome,
+            cpf: consulta.paciente.cpf,
+            email: consulta.paciente.email || undefined,
+            telefone: consulta.paciente.telefone || undefined,
+            celular: consulta.paciente.celular || undefined,
           });
+          setPacienteSearchValue(maskCPF(consulta.paciente.cpf));
+        }
 
-          setDocumentosExistentes(consulta.documentos || []);
-        } catch (error) {
+        // 4. Guardar horários originais ANTES do form.reset
+        horarioOriginalRef.current = { hora: horaFormatada, horaFim: horaFimFormatada };
+
+        // 5. Carregar horários disponíveis ANTES de preencher o form
+        await carregarHorarios(consulta.medicoId, dataFormatada);
+
+        if (cancelado) return;
+
+        // 6. Preencher formulário por último (horários já carregados, sem race condition)
+        form.reset({
+          pacienteId: consulta.pacienteId,
+          medicoId: consulta.medicoId,
+          data: dataFormatada,
+          hora: horaFormatada,
+          horaFim: horaFimFormatada,
+          codigoTussId: consulta.codigoTussId,
+          tipoConsultaId: consulta.tipoConsultaId || "",
+          procedimentoId: consulta.procedimentoId || null,
+          formaPagamentoId: consulta.formaPagamentoId || null,
+          operadoraId: consulta.operadoraId,
+          numeroCarteirinha: consulta.numeroCarteirinha || "",
+          valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
+          observacoes: consulta.observacoes || "",
+          anexos: [],
+        });
+
+        setDocumentosExistentes(consulta.documentos || []);
+        setAgendamentoCarregado(true);
+      } catch (error) {
+        if (!cancelado) {
           toast.error("Erro ao carregar agendamento");
           console.error(error);
           onOpenChange(false);
-        } finally {
+        }
+      } finally {
+        if (!cancelado) {
           setLoadingData(false);
         }
-      };
+      }
+    };
 
-      fetchAgendamento();
-    }
-  }, [open, agendamentoId, form, onOpenChange]);
+    carregarTudo();
+
+    return () => { cancelado = true; };
+  }, [open, agendamentoId, form, onOpenChange, carregarHorarios]);
 
 
   // Verificar consultas de retorno
@@ -667,40 +703,23 @@ export function EditarAgendamentoModal({
     verificarSugestaoDataRetorno();
   }, [pacienteId, medicoId, tipoConsultaId, tiposConsulta, open]);
 
+  // Recarregar horários quando o usuário mudar médico ou data (não na carga inicial)
   useEffect(() => {
-    const carregarHorarios = async () => {
-      if (!medicoId || !data) {
-        setHorariosDisponiveis([]);
-        return;
-      }
-
-      try {
-        setLoadingHorarios(true);
-        const excludeParam = agendamentoId ? `&excludeConsultaId=${agendamentoId}` : "";
-        const response = await fetch(
-          `/api/secretaria/horarios-disponiveis?medicoId=${medicoId}&data=${data}&intervaloMin=10${excludeParam}`
-        );
-        if (!response.ok) throw new Error();
-        const responseData = await response.json();
-        const horarios = responseData.horarios || [];
-        setHorariosDisponiveis(horarios);
-
-        if (hora && !horarios.includes(hora)) {
-          form.setValue("hora", "");
-          form.setValue("horaFim", "");
-        }
-      } catch (error) {
-        console.error("Erro ao carregar horários disponíveis:", error);
-        setHorariosDisponiveis([]);
-      } finally {
-        setLoadingHorarios(false);
-      }
-    };
-
-    carregarHorarios();
-  }, [medicoId, data, form, hora]);
+    if (!agendamentoCarregado || !medicoId || !data) return;
+    const chave = `${medicoId}_${data}`;
+    // Pular a primeira execução (carga inicial já carregou os horários)
+    if (medicoDataCarregadoRef.current === null) {
+      medicoDataCarregadoRef.current = chave;
+      return;
+    }
+    // Só recarregar se o médico ou data realmente mudaram
+    if (medicoDataCarregadoRef.current === chave) return;
+    medicoDataCarregadoRef.current = chave;
+    carregarHorarios(medicoId, data);
+  }, [medicoId, data, agendamentoCarregado, carregarHorarios]);
 
   useEffect(() => {
+    if (!agendamentoCarregado) return;
     if (!hora) {
       form.setValue("horaFim", "");
       return;
@@ -708,7 +727,7 @@ export function EditarAgendamentoModal({
     if (horaFim && horaFim <= hora) {
       form.setValue("horaFim", "");
     }
-  }, [hora, horaFim, form]);
+  }, [hora, horaFim, form, agendamentoCarregado]);
 
   const handleAplicarDataSugerida = () => {
     if (sugestaoDataRetorno?.dataSugerida) {
@@ -1008,11 +1027,18 @@ export function EditarAgendamentoModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent position="popper" className="max-h-60">
-                              {horariosDisponiveis.map((horario) => (
-                                <SelectItem key={horario} value={horario} className="text-xs">
-                                  {horario}
-                                </SelectItem>
-                              ))}
+                              {(() => {
+                                const opcoes = [...horariosDisponiveis];
+                                if (field.value && !opcoes.includes(field.value)) {
+                                  opcoes.push(field.value);
+                                  opcoes.sort();
+                                }
+                                return opcoes.map((horario) => (
+                                  <SelectItem key={horario} value={horario} className="text-xs">
+                                    {horario}
+                                  </SelectItem>
+                                ));
+                              })()}
                             </SelectContent>
                           </Select>
                           <FormMessage className="text-xs" />
@@ -1037,13 +1063,18 @@ export function EditarAgendamentoModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent position="popper" className="max-h-60">
-                              {horariosDisponiveis
-                                .filter((horario) => horario > (hora || ""))
-                                .map((horario) => (
+                              {(() => {
+                                const opcoes = horariosDisponiveis.filter((horario) => horario > (hora || ""));
+                                if (field.value && !opcoes.includes(field.value) && field.value > (hora || "")) {
+                                  opcoes.push(field.value);
+                                  opcoes.sort();
+                                }
+                                return opcoes.map((horario) => (
                                   <SelectItem key={horario} value={horario} className="text-xs">
                                     {horario}
                                   </SelectItem>
-                                ))}
+                                ));
+                              })()}
                             </SelectContent>
                           </Select>
                           <FormMessage className="text-xs" />
@@ -1179,7 +1210,7 @@ export function EditarAgendamentoModal({
                     />
                   </div>
 
-                  {/* Plano de Saúde (aparece apenas quando há convênio) */}
+                  {/* Código TUSS (aparece apenas quando há convênio) */}
                   {operadoraId && operadoraId !== "null" && (
                     <div className="flex flex-wrap items-start gap-2.5">
                       <FormField

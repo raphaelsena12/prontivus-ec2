@@ -1269,7 +1269,7 @@ export function NovoAgendamentoModal({
                     />
                   </div>
 
-                  {/* Plano de Saúde (aparece apenas quando há convênio) */}
+                  {/* Código TUSS (aparece apenas quando há convênio) */}
                   {operadoraId && operadoraId !== "null" && (
                     <div className="flex flex-wrap items-start gap-2.5">
                       <FormField
