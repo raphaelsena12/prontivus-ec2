@@ -113,7 +113,9 @@ export function FilaAtendimentoContent() {
     }
   }, [fetchConsultas, mounted]);
 
-  const handleIniciarAtendimento = async (consultaId: string, modalidade?: string) => {
+  const handleIniciarAtendimento = async (consulta: Consulta) => {
+    const consultaId = consulta.id;
+    const modalidade = consulta.modalidade;
     try {
       const response = await fetch("/api/medico/fila-atendimento", {
         method: "POST",
@@ -126,6 +128,20 @@ export function FilaAtendimentoContent() {
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Erro ao iniciar atendimento");
+      }
+
+      // Atualizar o painel de chamadas (TV): CHAMANDO → EM_ATENDIMENTO
+      const clinicaId = session?.user?.clinicaId;
+      if (clinicaId) {
+        void fetch("/api/painel/chamar-paciente", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pacienteNome: consulta.paciente.nome,
+            status: "EM_ATENDIMENTO",
+            clinicaId,
+          }),
+        }).catch(() => {});
       }
 
       await fetchConsultas(true);
@@ -428,7 +444,7 @@ export function FilaAtendimentoContent() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleIniciarAtendimento(consulta.id, consulta.modalidade)}
+                              onClick={() => handleIniciarAtendimento(consulta)}
                               className="text-xs h-7"
                             >
                               {consulta.status === "EM_ATENDIMENTO" ? "Abrir" : "Iniciar"}

@@ -68,16 +68,19 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { id, status, clinicaId } = body;
+  const { id, pacienteNome, status, clinicaId } = body;
 
-  if (!id || !status || !clinicaId) {
-    return NextResponse.json({ error: "Dados incompletos: id, status e clinicaId são obrigatórios" }, { status: 400 });
+  if ((!id && !pacienteNome) || !status || !clinicaId) {
+    return NextResponse.json({ error: "Dados incompletos: (id ou pacienteNome), status e clinicaId são obrigatórios" }, { status: 400 });
   }
 
   const painelChamadas = (global as any).__painelChamadas as Map<string, any[]> | undefined;
   if (painelChamadas) {
     const atual = painelChamadas.get(clinicaId) || [];
-    const idx = atual.findIndex((c) => c.id === id);
+    // Buscar por id ou por nome do paciente
+    const idx = id
+      ? atual.findIndex((c) => c.id === id)
+      : atual.findIndex((c) => c.pacienteNome.toLowerCase() === String(pacienteNome).toLowerCase());
     if (idx !== -1) {
       atual[idx] = { ...atual[idx], status };
       painelChamadas.set(clinicaId, atual);
