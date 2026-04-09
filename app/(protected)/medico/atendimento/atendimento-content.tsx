@@ -220,6 +220,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     dosagem: string;
     posologia: string;
     duracao: string;
+    manual?: boolean;
   } | null>(null);
   type DocumentoGeradoLocal = {
     id: string;
@@ -3398,10 +3399,22 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           {/* ── Passo 2: formulário de posologia ── */}
           {pendingMedicamento && (
             <div className="flex flex-col gap-5 flex-1 overflow-y-auto py-2 px-1">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100">
-                <Pill className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                <span className="text-sm font-semibold text-slate-800 truncate">{pendingMedicamento.nome}</span>
-              </div>
+              {pendingMedicamento.manual ? (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Nome do Medicamento</label>
+                  <Input
+                    placeholder="Digite o nome do medicamento ou manipulado"
+                    value={pendingMedicamento.nome}
+                    onChange={(e) => setPendingMedicamento((p) => p ? { ...p, nome: e.target.value } : p)}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100">
+                  <Pill className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-slate-800 truncate">{pendingMedicamento.nome}</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -3444,6 +3457,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 <Button
                   className="flex-1 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white"
                   onClick={handleConfirmPendingMedicamento}
+                  disabled={pendingMedicamento.manual && !pendingMedicamento.nome.trim()}
                 >
                   Confirmar Prescrição
                 </Button>
@@ -3453,7 +3467,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
 
           {/* ── Passo 1: seleção de medicamento ── */}
           {!pendingMedicamento && (
-          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-3">
             <Tabs value={activeMedicamentoTab} onValueChange={(value) => {
               const newTab = value as "medicamentos" | "manipulados";
               setActiveMedicamentoTab(newTab);
@@ -3464,16 +3478,16 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
               } else {
                 fetchManipulados();
               }
-            }}>
-              <TabsList className="grid w-full grid-cols-2">
+            }} className="flex flex-col flex-1 min-h-0">
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                 <TabsTrigger value="medicamentos">Medicamentos</TabsTrigger>
                 <TabsTrigger value="manipulados">Manipulados</TabsTrigger>
               </TabsList>
-              
-              <div className="relative flex-shrink-0 mt-4">
+
+              <div className="relative flex-shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder={activeMedicamentoTab === "medicamentos" 
+                  placeholder={activeMedicamentoTab === "medicamentos"
                     ? "Buscar medicamento por nome, princípio ativo ou laboratório..."
                     : "Buscar manipulado por descrição..."}
                   value={medicamentoSearch}
@@ -3482,8 +3496,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 />
               </div>
 
-              <TabsContent value="medicamentos" className="mt-0">
-                <div className="h-[400px] overflow-y-auto border rounded-lg">
+              <TabsContent value="medicamentos" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
                   {loadingMedicamentos ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -3533,11 +3547,11 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       ))}
                     </div>
                   )}
-                </div>
+                </ScrollArea>
               </TabsContent>
 
-              <TabsContent value="manipulados" className="mt-0">
-                <div className="h-[400px] overflow-y-auto border rounded-lg">
+              <TabsContent value="manipulados" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
+                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
                   {loadingManipulados ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -3571,11 +3585,29 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       ))}
                     </div>
                   )}
-                </div>
+                </ScrollArea>
               </TabsContent>
             </Tabs>
           </div>
-          )} {/* fim passo 1 */}
+          )}
+          {!pendingMedicamento && (
+          <div className="flex items-center justify-between pt-3 border-t border-slate-200 flex-shrink-0">
+            <button
+              onClick={() => {
+                setPendingMedicamento({
+                  nome: "",
+                  dosagem: "",
+                  posologia: "",
+                  duracao: "",
+                  manual: true,
+                });
+              }}
+              className="text-xs text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1.5 hover:underline"
+            >
+              <Plus className="w-3.5 h-3.5" /> Adicionar manualmente
+            </button>
+          </div>
+          )}
         </DialogContent>
       </Dialog>
 
