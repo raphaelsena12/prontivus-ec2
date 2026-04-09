@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { auditLogFromRequest, getChangedFields } from "@/lib/audit-log";
 
 // Schema de validação para atualização de status
 const updatePacienteStatusSchema = z.object({
@@ -75,6 +76,13 @@ export async function GET(
       );
     }
 
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Paciente",
+      resourceId: id,
+      details: { pacienteNome: paciente.nome },
+    });
+
     return NextResponse.json({ paciente });
   } catch (error) {
     console.error("Erro ao buscar paciente:", error);
@@ -126,6 +134,17 @@ export async function PATCH(
     const paciente = await prisma.paciente.update({
       where: { id },
       data: { ativo: validation.data.ativo },
+    });
+
+    const camposAlterados = getChangedFields(pacienteExistente as any, validation.data as any);
+    auditLogFromRequest(request, {
+      action: "UPDATE",
+      resource: "Paciente",
+      resourceId: id,
+      details: {
+        pacienteNome: pacienteExistente.nome,
+        camposAlterados,
+      },
     });
 
     return NextResponse.json({ paciente });

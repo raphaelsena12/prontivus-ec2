@@ -74,7 +74,14 @@ interface AgendamentosCalendarProps {
     horaInicio: string;
     horaFim: string;
   }>;
+  excecoesEscala?: Array<{
+    data: string;
+    horaInicio: string | null;
+    horaFim: string | null;
+    ativo: boolean;
+  }>;
   onEventClick?: (agendamento: Agendamento) => void;
+  onBloqueioClick?: (bloqueio: BloqueioAgenda) => void;
   onSlotSelect?: (slotInfo: { start: Date; end: Date }) => void;
 }
 
@@ -107,7 +114,9 @@ export function AgendamentosCalendar({
   agendamentos,
   bloqueios = [],
   escalas = [],
+  excecoesEscala = [],
   onEventClick,
+  onBloqueioClick,
   onSlotSelect,
 }: AgendamentosCalendarProps) {
   const router = useRouter();
@@ -135,11 +144,35 @@ export function AgendamentosCalendar({
     return map;
   }, [escalas]);
 
+  const excecoesPorData = useMemo(() => {
+    const map = new Map<string, Array<{ inicio: number; fim: number }>>();
+    for (const exc of excecoesEscala) {
+      if (!exc.ativo || !exc.horaInicio || !exc.horaFim) continue;
+      const dataKey = new Date(exc.data).toISOString().split("T")[0];
+      const [hIni, mIni] = exc.horaInicio.split(":").map(Number);
+      const [hFim, mFim] = exc.horaFim.split(":").map(Number);
+      const item = { inicio: hIni * 60 + mIni, fim: hFim * 60 + mFim };
+      const lista = map.get(dataKey) || [];
+      lista.push(item);
+      map.set(dataKey, lista);
+    }
+    return map;
+  }, [excecoesEscala]);
+
   const isSlotDisponivel = (date: Date) => {
+    const minutos = date.getHours() * 60 + date.getMinutes();
+
+    // Verificar exceções (horários extras) para a data específica
+    const dataKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const faixasExcecao = excecoesPorData.get(dataKey) || [];
+    if (faixasExcecao.some((faixa) => minutos >= faixa.inicio && minutos < faixa.fim)) {
+      return true;
+    }
+
+    // Verificar escala regular
     const diaSemana = date.getDay();
     const faixas = escalaPorDia.get(diaSemana) || [];
     if (faixas.length === 0) return false;
-    const minutos = date.getHours() * 60 + date.getMinutes();
     return faixas.some((faixa) => minutos >= faixa.inicio && minutos < faixa.fim);
   };
 
@@ -163,7 +196,7 @@ export function AgendamentosCalendar({
       };
     });
 
-    const bloqueiosEvents = bloqueios.map((bloqueio) => {
+    const bloqueiosEvents = bloqueios.flatMap((bloqueio) => {
       // Combinar data e hora para criar DateTime
       let dataInicio: Date;
       let dataFim: Date;
@@ -184,16 +217,63 @@ export function AgendamentosCalendar({
         dataFim = new Date(`${dataStr}T${bloqueio.horaFim}:00`);
       }
 
-      const title = `🚫 Bloqueio - Dr(a). ${bloqueio.medico.usuario.nome}${bloqueio.observacoes ? ` - ${bloqueio.observacoes}` : ""}`;
+      const title = bloqueio.observacoes ? `Bloqueio - ${bloqueio.observacoes}` : "Bloqueio";
 
-      return {
-        id: `bloqueio-${bloqueio.id}`,
-        title,
-        start: dataInicio,
-        end: dataFim,
-        resource: bloqueio,
-        tipo: "bloqueio" as const,
-      };
+      // Se o bloqueio for no mesmo dia, retornar evento unico
+      const inicioDateStr = formatDateToInput(dataInicio);
+      const fimDateStr = formatDateToInput(dataFim);
+
+      if (inicioDateStr === fimDateStr) {
+        return [{
+          id: `bloqueio-${bloqueio.id}`,
+          title,
+          start: dataInicio,
+          end: dataFim,
+          resource: bloqueio,
+          tipo: "bloqueio" as const,
+        }];
+      }
+
+      // Bloqueio multi-dia: dividir em eventos por dia
+      // Iterar por datas usando strings YYYY-MM-DD para evitar problemas de timezone
+      const dayEvents: Array<{
+        id: string;
+        title: string;
+        start: Date;
+        end: Date;
+        resource: BloqueioAgenda;
+        tipo: "bloqueio";
+      }> = [];
+
+      const [iy, im, id] = inicioDateStr.split("-").map(Number);
+      const [fy, fm, fd] = fimDateStr.split("-").map(Number);
+      const startDate = new Date(iy, im - 1, id);
+      const endDate = new Date(fy, fm - 1, fd);
+
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const yy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const currentDateStr = `${yy}-${mm}-${dd}`;
+
+        const dayStart = currentDateStr === inicioDateStr
+          ? dataInicio
+          : new Date(`${currentDateStr}T06:00:00`);
+        const dayEnd = currentDateStr === fimDateStr
+          ? dataFim
+          : new Date(`${currentDateStr}T23:00:00`);
+
+        dayEvents.push({
+          id: `bloqueio-${bloqueio.id}-${currentDateStr}`,
+          title,
+          start: dayStart,
+          end: dayEnd,
+          resource: bloqueio,
+          tipo: "bloqueio" as const,
+        });
+      }
+
+      return dayEvents;
     });
 
     return [...agendamentosEvents, ...bloqueiosEvents];
@@ -203,17 +283,19 @@ export function AgendamentosCalendar({
     // Se for um bloqueio, usar estilo diferente
     if (event.tipo === "bloqueio") {
       return {
+        className: "evento-bloqueio",
         style: {
           backgroundColor: "#000000",
           borderColor: "#1a1a1a",
           borderWidth: "1px",
           borderRadius: "3px",
           color: "white",
-          padding: "1px 3px",
+          padding: "4px 6px",
           opacity: 0.8,
           fontWeight: "500",
           fontSize: "14px",
           lineHeight: "1.2",
+          cursor: "pointer",
         },
       };
     }
@@ -238,8 +320,10 @@ export function AgendamentosCalendar({
   };
 
   const handleEventClick = (event: any) => {
-    // Se for um bloqueio, não fazer nada (ou mostrar informações)
     if (event.tipo === "bloqueio") {
+      if (onBloqueioClick) {
+        onBloqueioClick(event.resource);
+      }
       return;
     }
 
@@ -388,6 +472,25 @@ export function AgendamentosCalendar({
           .calendar-compact .rbc-time-slot.slot-bloqueado {
             background-color: rgba(17, 24, 39, 0.08) !important;
             cursor: not-allowed !important;
+          }
+          .evento-bloqueio .rbc-event-label {
+            display: none !important;
+          }
+          .evento-bloqueio .rbc-event-content {
+            position: sticky !important;
+            top: 2px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+          .evento-bloqueio {
+            background-image: repeating-linear-gradient(
+              45deg,
+              transparent,
+              transparent 5px,
+              rgba(255,255,255,0.06) 5px,
+              rgba(255,255,255,0.06) 10px
+            ) !important;
           }
         `}} />
         <Calendar

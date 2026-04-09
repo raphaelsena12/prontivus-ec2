@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 // Schema de validação
 const resetarSenhaSchema = z.object({
   token: z.string().min(1, "Token é obrigatório"),
-  senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  senha: z.string().min(12, "Senha deve ter no mínimo 12 caracteres"),
 });
 
 // POST /api/auth/resetar-senha - Redefinir senha usando token

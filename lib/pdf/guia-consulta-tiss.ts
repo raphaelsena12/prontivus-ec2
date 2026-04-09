@@ -307,21 +307,7 @@ export function generateGuiaConsultaTISSPDF(
   doc.setLineWidth(0.25);
   doc.rect(M, y, CW, HDR_H, "S");
 
-  // ── Logo à esquerda (com padding interno) ──
-  const LOGO_PADDING = 0.8; // padding interno para não encostar na borda
-  if (logoBase64) {
-    const maxLogoWidth = LOGO_W - 2 * LOGO_PADDING;
-    const maxLogoHeight = HDR_H - 2 * LOGO_PADDING;
-    const imgDims = calculateImageDimensions(doc, logoBase64, maxLogoWidth, maxLogoHeight);
-    
-    // Com padding interno
-    const logoX = M + LOGO_PADDING;
-    const logoY = y + LOGO_PADDING;
-    
-    doc.addImage(logoBase64, "PNG", logoX, logoY, imgDims.width, imgDims.height);
-  } else {
-    drawIamspe(doc, M + LOGO_PADDING, y + LOGO_PADDING, LOGO_W - 2 * LOGO_PADDING, HDR_H - 2 * LOGO_PADDING);
-  }
+  // ── Espaço à esquerda (sem logo) ──
 
   // ── Título no centro ──
   {

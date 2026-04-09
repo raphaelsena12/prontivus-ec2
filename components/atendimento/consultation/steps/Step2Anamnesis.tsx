@@ -835,20 +835,6 @@ export function Step2Anamnesis({
                   {anamneseText ? "Gravar Novamente" : "Iniciar Gravação"}
                 </Button>
               )}
-              {/* Campo manual exclusivo do médico - também no modo IA */}
-              {anamneseText && (
-                <div className="w-full mt-6 px-2 text-left">
-                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    ORIENTAÇÕES E CONDUTA
-                  </label>
-                  <Textarea
-                    value={orientacoesConduta}
-                    onChange={(e) => handleOrientacoesCondutaChange(e.target.value)}
-                    placeholder="Orientações ao paciente, plano terapêutico, encaminhamentos, retorno..."
-                    className="mt-1.5 text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
-                  />
-                </div>
-              )}
             </div>
           )}
         </div>

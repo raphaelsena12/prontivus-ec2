@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban, AlertCircle, Printer, Settings } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, Trash2, List, CalendarDays, Ban, AlertCircle, Printer, Settings, CalendarPlus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +45,7 @@ import { NovoAgendamentoModal } from "./components/novo-agendamento-modal";
 import { PageHeader } from "@/components/page-header";
 import { EscalaMedicoModal } from "./components/escala-medico-modal";
 import { ImprimirAgendaModal } from "./components/imprimir-agenda-modal";
+import { HorarioExtraModal } from "./components/horario-extra-modal";
 
 interface Agendamento {
   id: string;
@@ -127,10 +128,13 @@ export function AgendamentosContent() {
   const [agendamentoToEdit, setAgendamentoToEdit] = useState<string | null>(null);
   const [view, setView] = useState<"calendar" | "table">("calendar");
   const [bloqueioModalOpen, setBloqueioModalOpen] = useState(false);
+  const [bloqueioToEdit, setBloqueioToEdit] = useState<string | null>(null);
   const [novoAgendamentoModalOpen, setNovoAgendamentoModalOpen] = useState(false);
   const [escalaModalOpen, setEscalaModalOpen] = useState(false);
   const [imprimirModalOpen, setImprimirModalOpen] = useState(false);
+  const [horarioExtraModalOpen, setHorarioExtraModalOpen] = useState(false);
   const [escalasMedico, setEscalasMedico] = useState<EscalaHorario[]>([]);
+  const [excecoesEscala, setExcecoesEscala] = useState<Array<{ data: string; horaInicio: string | null; horaFim: string | null; ativo: boolean }>>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 20;
 
@@ -251,6 +255,7 @@ export function AgendamentosContent() {
     const fetchEscala = async () => {
       if (!medicoSelecionado) {
         setEscalasMedico([]);
+        setExcecoesEscala([]);
         return;
       }
 
@@ -259,14 +264,16 @@ export function AgendamentosContent() {
         if (!response.ok) throw new Error("Erro ao carregar escala");
         const data = await response.json();
         setEscalasMedico(data.escalas || []);
+        setExcecoesEscala(data.excecoes || []);
       } catch (error) {
         console.error("Erro ao carregar escala do médico:", error);
         setEscalasMedico([]);
+        setExcecoesEscala([]);
       }
     };
 
     fetchEscala();
-  }, [medicoSelecionado, escalaModalOpen]);
+  }, [medicoSelecionado, escalaModalOpen, horarioExtraModalOpen]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -510,6 +517,10 @@ export function AgendamentosContent() {
                     <Ban className="mr-2 h-3.5 w-3.5" />
                     Bloqueio
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setHorarioExtraModalOpen(true)}>
+                    <CalendarPlus className="mr-2 h-3.5 w-3.5" />
+                    Horário Extra
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button 
@@ -548,9 +559,14 @@ export function AgendamentosContent() {
                       agendamentos={agendamentos}
                       bloqueios={bloqueios}
                       escalas={escalasMedico}
+                      excecoesEscala={excecoesEscala}
                       onEventClick={(agendamento) => {
                         setAgendamentoToEdit(agendamento.id);
                         setEditModalOpen(true);
+                      }}
+                      onBloqueioClick={(bloqueio) => {
+                        setBloqueioToEdit(bloqueio.id);
+                        setBloqueioModalOpen(true);
                       }}
                       onSlotSelect={(slotInfo) => {
                         const startDate = formatDateToInput(slotInfo.start);
@@ -817,9 +833,16 @@ export function AgendamentosContent() {
 
       <BloqueioAgendaModal
         open={bloqueioModalOpen}
-        onOpenChange={setBloqueioModalOpen}
+        onOpenChange={(open) => {
+          setBloqueioModalOpen(open);
+          if (!open) {
+            setBloqueioToEdit(null);
+          }
+        }}
+        bloqueioId={bloqueioToEdit}
         onSuccess={() => {
           fetchAgendamentos();
+          setBloqueioToEdit(null);
         }}
       />
 
@@ -842,6 +865,14 @@ export function AgendamentosContent() {
         onOpenChange={setEscalaModalOpen}
         medicoId={medicoSelecionado || undefined}
         medicoNome={medicos.find((m) => m.id === medicoSelecionado)?.usuario.nome}
+      />
+
+      <HorarioExtraModal
+        open={horarioExtraModalOpen}
+        onOpenChange={setHorarioExtraModalOpen}
+        onSuccess={() => {
+          fetchAgendamentos();
+        }}
       />
 
       <ImprimirAgendaModal

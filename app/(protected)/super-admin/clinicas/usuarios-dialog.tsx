@@ -110,7 +110,7 @@ const usuarioSchema = z.object({
     ),
   tipo: z.nativeEnum(TipoUsuario),
   senha: z
-    .union([z.string().min(6, "Senha deve ter no mínimo 6 caracteres"), z.literal(""), z.undefined()])
+    .union([z.string().min(12, "Senha deve ter no mínimo 12 caracteres"), z.literal(""), z.undefined()])
     .optional(),
 });
 
@@ -285,7 +285,7 @@ export function UsuariosDialog({
           setIsSubmitting(false);
           return;
         }
-        if (!data.senha || data.senha.trim().length < 6) {
+        if (!data.senha || data.senha.trim().length < 12) {
           form.setError("senha", { message: "Senha deve ter no mínimo 6 caracteres" });
           setIsSubmitting(false);
           return;

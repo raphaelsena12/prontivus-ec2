@@ -12,7 +12,7 @@ const createUsuarioSchema = z.object({
   cpf: z.string().min(11, "CPF deve ter 11 dígitos"),
   telefone: z.string().optional(),
   tipo: z.nativeEnum(TipoUsuario),
-  senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  senha: z.string().min(12, "Senha deve ter no mínimo 12 caracteres"),
 });
 
 

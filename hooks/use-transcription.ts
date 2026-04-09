@@ -31,6 +31,13 @@ export function useTranscription() {
   const isPausedRef = useRef(false);
   const hasPartialRef = useRef(false);
   const transcriptionRef = useRef<TranscriptionEntry[]>([]);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intentionalStopRef = useRef(false);
+
+  const MAX_RECONNECT_ATTEMPTS = 5;
+  const PING_INTERVAL_MS = 25_000; // ping a cada 25s para manter conexão viva
 
   useEffect(() => {
     transcriptionRef.current = transcription;
@@ -43,8 +50,22 @@ export function useTranscription() {
       second: "2-digit",
     });
 
+  // ─── Limpeza de ping/reconnect timers ─────────────────────────────────────
+  const clearTimers = useCallback(() => {
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
   // ─── Limpeza interna ──────────────────────────────────────────────────────
   const teardown = useCallback(() => {
+    clearTimers();
+
     if (processorRef.current) {
       try { processorRef.current.disconnect(); } catch (_) {}
       processorRef.current = null;
@@ -79,7 +100,7 @@ export function useTranscription() {
       hasPartialRef.current = false;
       return prev;
     });
-  }, []);
+  }, [clearTimers]);
 
   useEffect(() => () => { teardown(); }, [teardown]);
 
@@ -161,12 +182,9 @@ export function useTranscription() {
 
       case "error": {
         console.error("OpenAI Realtime error:", msg.error);
-        if (isTranscribingRef.current) {
-          isTranscribingRef.current = false;
-          setIsTranscribing(false);
-          setStoppedUnexpectedly(true);
-          toast.error("Erro na transcrição: " + (msg.error?.message || "Erro desconhecido"));
-        }
+        // Não parar imediatamente — o onclose vai disparar a reconexão automática.
+        // Apenas logar erros que não fecham a conexão.
+        toast.warning("Erro na transcrição: " + (msg.error?.message || "Erro desconhecido"));
         break;
       }
 
@@ -176,22 +194,154 @@ export function useTranscription() {
     }
   }, []);
 
+  // ─── Ping periódico para manter o WebSocket vivo ──────────────────────────
+  const startPing = useCallback(() => {
+    clearTimers();
+    pingIntervalRef.current = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        // Enviar um buffer de áudio vazio como keepalive
+        wsRef.current.send(
+          JSON.stringify({ type: "input_audio_buffer.append", audio: "" })
+        );
+      }
+    }, PING_INTERVAL_MS);
+  }, [clearTimers]);
+
+  // ─── Conectar WebSocket (usado tanto no start quanto no reconnect) ────────
+  const connectWebSocket = useCallback(
+    async (stream: MediaStream, isReconnect = false): Promise<void> => {
+      // 1. Token efêmero — API key nunca sai do servidor
+      const tokenRes = await fetch("/api/medico/transcribe-realtime", { method: "POST" });
+      if (!tokenRes.ok) {
+        const err = await tokenRes.json().catch(() => ({}));
+        throw new Error(err.error || "Erro ao criar sessão de transcrição");
+      }
+      const { token } = await tokenRes.json();
+      if (!token) throw new Error("Token de sessão inválido");
+
+      // 2. Limpar WebSocket anterior (se reconexão)
+      if (wsRef.current) {
+        try { wsRef.current.close(); } catch (_) {}
+        wsRef.current = null;
+      }
+
+      // Limpar pipeline de áudio anterior (se reconexão)
+      if (isReconnect) {
+        if (processorRef.current) {
+          try { processorRef.current.disconnect(); } catch (_) {}
+          processorRef.current = null;
+        }
+        if (sourceRef.current) {
+          try { sourceRef.current.disconnect(); } catch (_) {}
+          sourceRef.current = null;
+        }
+        if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+          try { audioContextRef.current.close(); } catch (_) {}
+          audioContextRef.current = null;
+        }
+      }
+
+      // 3. WebSocket → OpenAI Realtime (auth via subprotocol)
+      const ws = new WebSocket(REALTIME_URL, [
+        "realtime",
+        `openai-insecure-api-key.${token}`,
+        "openai-beta.realtime-v1",
+      ]);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        // Configurar sessão: VAD + transcrição PT
+        ws.send(
+          JSON.stringify({
+            type: "session.update",
+            session: {
+              modalities: ["text"],
+              instructions: "",
+              input_audio_format: "pcm16",
+              input_audio_transcription: {
+                model: "whisper-1",
+                language: "pt",
+              },
+              turn_detection: {
+                type: "server_vad",
+                threshold: 0.5,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 600,
+                create_response: false,
+              },
+            },
+          })
+        );
+
+        startAudioPipeline(stream, ws);
+        startPing();
+
+        reconnectAttemptsRef.current = 0;
+        isTranscribingRef.current = true;
+        setIsTranscribing(true);
+        setStoppedUnexpectedly(false);
+
+        if (isReconnect) {
+          toast.success("Transcrição reconectada automaticamente");
+        } else {
+          toast.success("Transcrição iniciada");
+        }
+      };
+
+      ws.onmessage = handleWsMessage;
+
+      ws.onerror = () => {
+        console.error("WebSocket: erro de conexão com OpenAI Realtime");
+      };
+
+      ws.onclose = () => {
+        clearTimers();
+
+        if (intentionalStopRef.current) {
+          // Parada intencional pelo usuário — não reconectar
+          return;
+        }
+
+        if (isTranscribingRef.current) {
+          isTranscribingRef.current = false;
+          setIsTranscribing(false);
+
+          // Tentar reconexão automática
+          if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS && streamRef.current) {
+            reconnectAttemptsRef.current += 1;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 8000);
+            console.log(`Reconectando transcrição (tentativa ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}) em ${delay}ms...`);
+            toast.info(`Reconectando transcrição... (tentativa ${reconnectAttemptsRef.current})`);
+
+            reconnectTimerRef.current = setTimeout(() => {
+              if (!intentionalStopRef.current && streamRef.current) {
+                connectWebSocket(streamRef.current, true).catch((err) => {
+                  console.error("Falha ao reconectar:", err);
+                  setStoppedUnexpectedly(true);
+                  toast.error("Não foi possível reconectar a transcrição");
+                });
+              }
+            }, delay);
+          } else {
+            setStoppedUnexpectedly(true);
+            toast.error("Conexão de transcrição encerrada. Clique em Retomar.");
+          }
+        }
+      };
+    },
+    [startAudioPipeline, handleWsMessage, startPing, clearTimers]
+  );
+
   // ─── Iniciar ──────────────────────────────────────────────────────────────
   const startTranscription = useCallback(
     async (_remoteAudioEl?: HTMLAudioElement | null) => {
       if (isTranscribingRef.current) return;
 
-      try {
-        // 1. Token efêmero — API key nunca sai do servidor
-        const tokenRes = await fetch("/api/medico/transcribe-realtime", { method: "POST" });
-        if (!tokenRes.ok) {
-          const err = await tokenRes.json().catch(() => ({}));
-          throw new Error(err.error || "Erro ao criar sessão de transcrição");
-        }
-        const { token } = await tokenRes.json();
-        if (!token) throw new Error("Token de sessão inválido");
+      intentionalStopRef.current = false;
+      reconnectAttemptsRef.current = 0;
 
-        // 2. Microfone
+      try {
+        // Microfone
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
@@ -201,63 +351,7 @@ export function useTranscription() {
         });
         streamRef.current = stream;
 
-        // 3. WebSocket → OpenAI Realtime (auth via subprotocol)
-        const ws = new WebSocket(REALTIME_URL, [
-          "realtime",
-          `openai-insecure-api-key.${token}`,
-          "openai-beta.realtime-v1",
-        ]);
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          // Configurar sessão: VAD + transcrição PT
-          ws.send(
-            JSON.stringify({
-              type: "session.update",
-              session: {
-                modalities: ["text"],
-                instructions: "",
-                input_audio_format: "pcm16",
-                input_audio_transcription: {
-                  model: "whisper-1",
-                  language: "pt",
-                },
-                turn_detection: {
-                  type: "server_vad",
-                  threshold: 0.5,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 600,
-                  create_response: false,
-                },
-              },
-            })
-          );
-
-          startAudioPipeline(stream, ws);
-
-          isTranscribingRef.current = true;
-          setIsTranscribing(true);
-          setStoppedUnexpectedly(false);
-          toast.success("Transcrição iniciada");
-        };
-
-        ws.onmessage = handleWsMessage;
-
-        ws.onerror = () => {
-          console.error("WebSocket: erro de conexão com OpenAI Realtime");
-        };
-
-        ws.onclose = (e) => {
-          if (isTranscribingRef.current) {
-            // Fechou sem ser o usuário quem pediu
-            isTranscribingRef.current = false;
-            setIsTranscribing(false);
-            if (!isPausedRef.current) {
-              setStoppedUnexpectedly(true);
-              toast.error("Conexão de transcrição encerrada inesperadamente");
-            }
-          }
-        };
+        await connectWebSocket(stream);
       } catch (error: any) {
         console.error("Erro ao iniciar transcrição:", error);
         isTranscribingRef.current = false;
@@ -265,7 +359,7 @@ export function useTranscription() {
         toast.error(error.message || "Erro ao acessar o microfone.");
       }
     },
-    [startAudioPipeline, handleWsMessage]
+    [connectWebSocket]
   );
 
   // ─── Pausar ───────────────────────────────────────────────────────────────
@@ -287,6 +381,8 @@ export function useTranscription() {
 
   // ─── Parar ────────────────────────────────────────────────────────────────
   const stopTranscription = useCallback(() => {
+    intentionalStopRef.current = true;
+    reconnectAttemptsRef.current = 0;
     isTranscribingRef.current = false;
     isPausedRef.current = false;
     setIsTranscribing(false);

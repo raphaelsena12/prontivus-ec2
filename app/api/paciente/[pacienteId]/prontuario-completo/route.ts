@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -367,6 +368,16 @@ export async function GET(
         },
       }),
     ]);
+
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Prontuario",
+      resourceId: pacienteId,
+      details: {
+        pacienteNome: paciente.nome,
+        operacao: "Visualizou prontuário completo",
+      },
+    });
 
     return NextResponse.json(
       {

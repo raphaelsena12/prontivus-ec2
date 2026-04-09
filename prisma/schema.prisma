@@ -1845,3 +1845,29 @@ model ExamePaciente {
   @@index([createdAt])
   @@map("exames_pacientes")
 }
+
+// ============================================
+// LGPD — AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  clinicaId  String?
+  userId     String
+  userTipo   TipoUsuario
+  action     String   // VIEW, CREATE, UPDATE, DELETE, EXPORT, LOGIN, ACCESS_DENIED
+  resource   String   // Prontuario, Paciente, Consulta, Prescricao, Exame, Documento, Usuario
+  resourceId String?
+  ipAddress  String?
+  userAgent  String?
+  details    Json?    // Metadados adicionais (campos alterados, motivo, etc.)
+  createdAt  DateTime @default(now())
+
+  @@index([clinicaId])
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@index([resourceId])
+  @@map("audit_logs")
+}

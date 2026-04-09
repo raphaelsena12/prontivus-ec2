@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -112,6 +113,12 @@ export async function GET(request: NextRequest) {
       }),
       prisma.prontuario.count({ where }),
     ]);
+
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Prontuario",
+      details: { search, page, total },
+    });
 
     return NextResponse.json({
       prontuarios,

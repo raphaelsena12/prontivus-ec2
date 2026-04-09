@@ -31,7 +31,7 @@ const resetarSenhaSchema = z.object({
   senha: z
     .string()
     .min(1, "Senha é obrigatória")
-    .min(6, "Senha deve ter no mínimo 6 caracteres"),
+    .min(12, "Senha deve ter no mínimo 12 caracteres"),
   confirmarSenha: z
     .string()
     .min(1, "Confirmação de senha é obrigatória"),

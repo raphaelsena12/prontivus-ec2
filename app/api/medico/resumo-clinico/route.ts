@@ -3,6 +3,8 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import OpenAI from 'openai';
 import { checkTokens, consumeTokens } from "@/lib/token-usage";
+import { sanitizeTextForAI, anonymizedDemographics } from "@/lib/crypto/sanitize-pii";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -250,19 +252,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Construir contexto para a IA
-    const idade = paciente.dataNascimento
-      ? Math.floor((new Date().getTime() - new Date(paciente.dataNascimento).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-      : null;
+    // LGPD: construir contexto anonimizado para a IA (sem nome, CPF, ou outros identificadores)
+    const demographics = anonymizedDemographics(paciente);
 
     let contextoClinico = `RESUMO CLÍNICO DO PACIENTE
 
-DADOS PESSOAIS:
-- Nome: ${paciente.nome}
-- Idade: ${idade ? `${idade} anos` : 'Não informado'}
-- Sexo: ${paciente.sexo || 'Não informado'}
-- CPF: ${paciente.cpf || 'Não informado'}
-${paciente.observacoes ? `- Observações: ${paciente.observacoes}` : ''}
+DADOS DEMOGRÁFICOS:
+- ${demographics}
+${paciente.observacoes ? `- Observações: ${sanitizeTextForAI(paciente.observacoes, { patientName: paciente.nome })}` : ''}
 ${alergias.length > 0 ? `- Alergias: ${alergias.join(', ')}` : '- Alergias: Nenhuma alergia registrada'}
 
 `;
@@ -377,12 +374,15 @@ IMPORTANTE:
 - Use quebras de linha para separar seções
 - Se não houver informações suficientes em alguma área, indique claramente`;
 
+    // LGPD: sanitizar todo o contexto clínico antes de enviar à OpenAI
+    const contextoSanitizado = sanitizeTextForAI(contextoClinico, { patientName: paciente.nome });
+
     // Chamar OpenAI
     const completion = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Analise o seguinte histórico clínico completo e gere um resumo clínico estruturado:\n\n${contextoClinico}` }
+        { role: "user", content: `Analise o seguinte histórico clínico completo e gere um resumo clínico estruturado:\n\n${contextoSanitizado}` }
       ],
       temperature: 0.3,
       max_tokens: 3000,
@@ -396,6 +396,13 @@ IMPORTANTE:
     if (auth.clinicaId) {
       await consumeTokens(auth.clinicaId, "resumo-clinico", completion.usage?.total_tokens);
     }
+
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Paciente",
+      resourceId: pacienteId,
+      details: { operation: "resumo-clinico" },
+    });
 
     return NextResponse.json({
       success: true,

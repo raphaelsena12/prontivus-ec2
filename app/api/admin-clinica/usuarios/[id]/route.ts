@@ -5,6 +5,7 @@ import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
+import { auditLogFromRequest, getChangedFields } from "@/lib/audit-log";
 
 // Schema de validação para atualização de usuário
 const updateUsuarioSchema = z.object({
@@ -27,7 +28,7 @@ const updateUsuarioSchema = z.object({
     }),
   tipo: z.nativeEnum(TipoUsuario).optional(),
   senha: z.string()
-    .min(6, "Senha deve ter no mínimo 6 caracteres")
+    .min(12, "Senha deve ter no mínimo 12 caracteres")
     .max(255, "Senha deve ter no máximo 255 caracteres")
     .optional(),
   ativo: z.boolean().optional(),
@@ -187,6 +188,19 @@ export async function PUT(
       }
     }
 
+    const camposAlterados = getChangedFields(usuarioExistente as any, updateData);
+    auditLogFromRequest(request, {
+      action: "UPDATE",
+      resource: "Usuario",
+      resourceId: id,
+      details: {
+        usuarioNome: usuarioExistente.nome,
+        usuarioEmail: usuarioExistente.email,
+        camposAlterados,
+        senhaAlterada: !!data.senha,
+      },
+    });
+
     return NextResponse.json({ usuario });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);
@@ -245,6 +259,17 @@ export async function DELETE(
     await prisma.usuario.update({
       where: { id },
       data: { ativo: false },
+    });
+
+    auditLogFromRequest(request, {
+      action: "DELETE",
+      resource: "Usuario",
+      resourceId: id,
+      details: {
+        usuarioNome: usuarioExistente.nome,
+        usuarioEmail: usuarioExistente.email,
+        operacao: "Inativação de usuário",
+      },
     });
 
     return NextResponse.json({

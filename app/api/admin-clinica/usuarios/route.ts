@@ -3,6 +3,7 @@ import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { auditLogFromRequest } from "@/lib/audit-log";
 import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
 
@@ -31,7 +32,7 @@ const createUsuarioSchema = z.object({
     }),
   tipo: z.nativeEnum(TipoUsuario),
   senha: z.string()
-    .min(6, "Senha deve ter no mínimo 6 caracteres")
+    .min(12, "Senha deve ter no mínimo 12 caracteres")
     .max(255, "Senha deve ter no máximo 255 caracteres"),
   isEnfermeiro: z.boolean().optional(),
 });
@@ -169,6 +170,17 @@ export async function POST(request: NextRequest) {
         ultimoAcesso: true,
         createdAt: true,
         updatedAt: true,
+      },
+    });
+
+    auditLogFromRequest(request, {
+      action: "CREATE",
+      resource: "Usuario",
+      resourceId: usuario.id,
+      details: {
+        usuarioNome: usuario.nome,
+        usuarioEmail: usuario.email,
+        tipo: usuario.tipo,
       },
     });
 

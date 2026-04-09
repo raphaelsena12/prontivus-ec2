@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId, getUserMedicoId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { auditLogFromRequest } from "@/lib/audit-log";
 import {
   generateAtestadoAfastamentoPDF,
   generateAtestadoAfastamentoSemCidPDF,
@@ -27,6 +28,8 @@ import { generateJustificativaPedidosExamesPDF } from "@/lib/pdf/justificativa-e
 import { generateControleDiabetesPDF, generateControleDiabetesAnaliticoPDF } from "@/lib/pdf/controle-diabetes";
 import { generateControlePressaoPDF, generateControlePressaoAnaliticoPDF } from "@/lib/pdf/controle-pressao";
 import { generateFichaAtendimentoPDF } from "@/lib/pdf/ficha-atendimento";
+import { generateLaudoMedicoPDF } from "@/lib/pdf/laudo-medico";
+import { generatePedidoExamesPDF } from "@/lib/pdf/pedido-exames";
 import { generateGuiaConsultaTISSPDF, type GuiaSADTInput } from "@/lib/pdf/guia-consulta-tiss";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
@@ -723,12 +726,41 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "laudo-medico": {
+        if (!dados?.textoLaudo || dados.textoLaudo.trim().length === 0) {
+          return NextResponse.json({ error: "O texto do laudo é obrigatório" }, { status: 400 });
+        }
+        pdfBuffer = generateLaudoMedicoPDF({
+          ...baseData,
+          textoLaudo: dados.textoLaudo.slice(0, 1000),
+        });
+        break;
+      }
+
+      case "pedido-exames": {
+        if (!dados?.textoLaudo || dados.textoLaudo.trim().length === 0) {
+          return NextResponse.json({ error: "O texto do pedido é obrigatório" }, { status: 400 });
+        }
+        pdfBuffer = generatePedidoExamesPDF({
+          ...baseData,
+          textoPedido: dados.textoLaudo.slice(0, 1000),
+        });
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: `Tipo de documento '${tipoDocumento}' ainda não implementado` },
           { status: 400 }
         );
     }
+
+    auditLogFromRequest(request, {
+      action: "EXPORT",
+      resource: "Documento",
+      resourceId: consultaId,
+      details: { tipoDocumento, pacienteId: consulta.pacienteId },
+    });
 
     // Retornar PDF como download
     return new NextResponse(pdfBuffer, {

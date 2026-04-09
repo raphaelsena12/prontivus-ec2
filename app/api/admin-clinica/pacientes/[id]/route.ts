@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
+import { auditLogFromRequest, getChangedFields } from "@/lib/audit-log";
 
 // Schema de validação para atualização
 const updatePacienteSchema = z.object({
@@ -100,6 +101,13 @@ export async function GET(
       );
     }
 
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Paciente",
+      resourceId: id,
+      details: { pacienteNome: paciente.nome },
+    });
+
     return NextResponse.json({ paciente });
   } catch (error) {
     console.error("Erro ao buscar paciente:", error);
@@ -182,6 +190,17 @@ export async function PATCH(
       data: updateData,
     });
 
+    const camposAlterados = getChangedFields(pacienteExistente as any, updateData);
+    auditLogFromRequest(request, {
+      action: "UPDATE",
+      resource: "Paciente",
+      resourceId: id,
+      details: {
+        pacienteNome: pacienteExistente.nome,
+        camposAlterados,
+      },
+    });
+
     return NextResponse.json({ paciente });
   } catch (error) {
     console.error("Erro ao atualizar paciente:", error);
@@ -234,9 +253,19 @@ export async function DELETE(
       data: { ativo: false },
     });
 
-    return NextResponse.json({ 
+    auditLogFromRequest(request, {
+      action: "DELETE",
+      resource: "Paciente",
+      resourceId: id,
+      details: {
+        pacienteNome: paciente.nome,
+        operacao: "Inativação de paciente",
+      },
+    });
+
+    return NextResponse.json({
       message: "Paciente desativado com sucesso",
-      paciente: pacienteAtualizado 
+      paciente: pacienteAtualizado
     });
   } catch (error) {
     console.error("Erro ao deletar paciente:", error);

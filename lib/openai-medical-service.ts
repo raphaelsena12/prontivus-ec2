@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { prisma } from '@/lib/prisma';
 import { getSignedUrlFromS3 } from '@/lib/s3-service';
+import { sanitizeTextForAI } from '@/lib/crypto/sanitize-pii';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -76,6 +77,9 @@ export async function processTranscriptionWithOpenAI(
   }
 
   try {
+    // LGPD: remover PII (CPF, telefone, email, etc.) antes de enviar para a OpenAI
+    const sanitizedTranscription = sanitizeTextForAI(transcriptionText);
+
 const systemPrompt = `Você é um assistente médico especializado em análise de consultas médicas, com conhecimento atualizado das diretrizes clínicas brasileiras e internacionais (PCDT/CONITEC, CFM, SBC, SBD, SBPT, UpToDate, Dynamed).
 
 Sua função é analisar transcrições de consultas médicas e gerar:
@@ -311,10 +315,10 @@ Formato JSON esperado:
                 text: `Analise a seguinte transcrição de consulta médica${examesContext ? ` e os exames anexados` : ""} e gere a anamnese estruturada, códigos CID-10, exames sugeridos e prescrições médicas.
 
 Transcrição da consulta:
-${transcriptionText}
+${sanitizedTranscription}
 ${examesContext}
 
-IMPORTANTE: 
+IMPORTANTE:
 - Analise as imagens dos exames anexados e incorpore os achados relevantes na anamnese, nos códigos CID sugeridos e nas prescrições médicas.
 - Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou. NÃO inclua sugestões de exames futuros.
 - Se o paciente mencionou exames anexados ou que já fez, liste-os na seção "EXAMES REALIZADOS".
@@ -411,7 +415,7 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     const userPrompt = `Analise a seguinte transcrição de consulta médica${examesContext ? ` e os exames anexados` : ""} e gere a anamnese estruturada, códigos CID-10, exames sugeridos e prescrições médicas.
 
 Transcrição da consulta:
-${transcriptionText}
+${sanitizedTranscription}
 ${examesContext}
 
 IMPORTANTE:
@@ -515,6 +519,9 @@ export async function generateAnamneseOnly(transcriptionText: string): Promise<{
     throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
   }
 
+  // LGPD: remover PII antes de enviar para a OpenAI
+  const sanitizedTranscription = sanitizeTextForAI(transcriptionText);
+
   const systemPrompt = `Você é um assistente médico especializado em registros clínicos.
 Sua função é estruturar a transcrição de uma consulta em uma anamnese médica completa e profissional em português brasileiro.
 
@@ -536,7 +543,7 @@ Retorne APENAS um JSON com o campo "anamnese".`;
     model: process.env.OPENAI_MODEL || "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica:\n\n${transcriptionText}\n\nRetorne APENAS o JSON: {"anamnese": "..."}` },
+      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica:\n\n${sanitizedTranscription}\n\nRetorne APENAS o JSON: {"anamnese": "..."}` },
     ],
     response_format: { type: "json_object" },
     temperature: 0,
@@ -563,6 +570,9 @@ export async function generateAnamneseStream(transcriptionText: string) {
     throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
   }
 
+  // LGPD: remover PII antes de enviar para a OpenAI
+  const sanitizedTranscription = sanitizeTextForAI(transcriptionText);
+
   const systemPrompt = `Você é um assistente médico especializado em registros clínicos.
 Sua função é estruturar a transcrição de uma consulta em uma anamnese médica objetiva e profissional em português brasileiro.
 
@@ -582,7 +592,7 @@ IMPORTANTE: NÃO inclua o nome do paciente em nenhuma parte da anamnese. Quando 
     model: process.env.OPENAI_MODEL || "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica estruturada. Retorne APENAS o texto da anamnese, sem JSON, sem marcadores extras:\n\n${transcriptionText}` },
+      { role: "user", content: `Estruture a seguinte transcrição em anamnese médica estruturada. Retorne APENAS o texto da anamnese, sem JSON, sem marcadores extras:\n\n${sanitizedTranscription}` },
     ],
     temperature: 0,
     max_tokens: 2000,
@@ -615,7 +625,8 @@ export async function generateMedicalSuggestions(context: SuggestionsContext): P
     throw new Error("Credenciais OpenAI não configuradas. Configure OPENAI_API_KEY no .env");
   }
 
-  let contextText = `ANAMNESE DA CONSULTA:\n${context.anamnese}`;
+  // LGPD: sanitizar a anamnese antes de montar o contexto para a OpenAI
+  let contextText = `ANAMNESE DA CONSULTA:\n${sanitizeTextForAI(context.anamnese)}`;
 
   if (context.alergias && context.alergias.length > 0) {
     contextText += `\n\nALERGIAS DO PACIENTE:\n${context.alergias.join(", ")}`;

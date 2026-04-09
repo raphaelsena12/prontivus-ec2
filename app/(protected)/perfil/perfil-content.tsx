@@ -128,8 +128,8 @@ const updatePerfilSchema = z.object({
 
 const changePasswordSchema = z.object({
   senhaAtual: z.string().min(1, "Senha atual é obrigatória"),
-  novaSenha: z.string().min(6, "Nova senha deve ter no mínimo 6 caracteres"),
-  confirmarSenha: z.string().min(6, "Confirmação de senha é obrigatória"),
+  novaSenha: z.string().min(12, "Nova senha deve ter no mínimo 12 caracteres"),
+  confirmarSenha: z.string().min(12, "Confirmação de senha é obrigatória"),
 }).refine((data) => data.novaSenha === data.confirmarSenha, {
   message: "As senhas não coincidem",
   path: ["confirmarSenha"],

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getSession } from '@/lib/auth-helpers';
 import { checkTokens, consumeTokens } from '@/lib/token-usage';
+import { sanitizeTextForAI } from '@/lib/crypto/sanitize-pii';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -61,10 +62,11 @@ export async function POST(req: NextRequest) {
       .map((v: any) => `${v.label}: ${v.value} ${v.unit}`)
       .join(' | ');
 
-    const prompt = `Você é um assistente clínico especializado em síntese de prontuário médico.
+    // LGPD: sanitizar o prompt completo para remover PII residual antes de enviar à OpenAI
+    const prompt = sanitizeTextForAI(`Você é um assistente clínico especializado em síntese de prontuário médico.
 Analise os dados abaixo e gere um RESUMO MÉDICO objetivo e estruturado, útil para o médico antes de iniciar o atendimento.
 
-PACIENTE: ${paciente?.nome ?? 'Não informado'}, ${paciente?.idade ?? '?'} anos
+PACIENTE: ${paciente?.idade ?? '?'} anos, sexo: ${paciente?.sexo ?? 'não informado'}
 ALERGIAS: ${alergias?.length ? alergias.join(', ') : 'Nenhuma registrada'}
 SINAIS VITAIS: ${vitaisTexto || 'Não disponíveis'}
 
@@ -91,7 +93,7 @@ INSTRUÇÕES:
   "tendenciasClinicas": ["tendência observada no histórico 1"],
   "orientacoesSugeridas": ["sugestão 1 baseada no histórico", "sugestão 2"],
   "nivelComplexidade": "baixo" | "moderado" | "alto"
-}`;
+}`, { patientName: paciente?.nome });
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',

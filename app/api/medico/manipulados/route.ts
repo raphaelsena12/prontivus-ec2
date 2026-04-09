@@ -8,6 +8,10 @@ const manipuladoSchema = z.object({
   informacoes: z.string().optional(),
 });
 
+function removeAccents(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
@@ -21,15 +25,43 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
+    if (search) {
+      const normalized = removeAccents(search);
+      const pattern = `%${normalized}%`;
+      const accentFrom = "áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ";
+      const accentTo   = "aaaaaeeeeiiiioooooouuuucAAAAAEEEEIIIIOOOOOUUUUC";
+
+      const manipulados: any[] = await prisma.$queryRawUnsafe(`
+        SELECT * FROM "manipulados"
+        WHERE "clinicaId" = $1 AND "medicoId" = $2
+          AND (
+            translate(LOWER("descricao"), '${accentFrom}', '${accentTo}') ILIKE $3
+            OR translate(LOWER(COALESCE("informacoes", '')), '${accentFrom}', '${accentTo}') ILIKE $3
+          )
+        ORDER BY "createdAt" DESC
+        LIMIT $4 OFFSET $5
+      `, auth.clinicaId!, auth.medicoId!, pattern, limit, skip);
+
+      const countResult: any[] = await prisma.$queryRawUnsafe(`
+        SELECT COUNT(*)::int as total FROM "manipulados"
+        WHERE "clinicaId" = $1 AND "medicoId" = $2
+          AND (
+            translate(LOWER("descricao"), '${accentFrom}', '${accentTo}') ILIKE $3
+            OR translate(LOWER(COALESCE("informacoes", '')), '${accentFrom}', '${accentTo}') ILIKE $3
+          )
+      `, auth.clinicaId!, auth.medicoId!, pattern);
+
+      const total = countResult[0]?.total || 0;
+
+      return NextResponse.json({
+        manipulados,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      });
+    }
+
     const where = {
       clinicaId: auth.clinicaId!,
       medicoId: auth.medicoId!,
-      ...(search && {
-        OR: [
-          { descricao: { contains: search, mode: "insensitive" as const } },
-          { informacoes: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
     };
 
     const [manipulados, total] = await Promise.all([

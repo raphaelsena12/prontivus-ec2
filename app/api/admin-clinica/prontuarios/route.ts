@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { getTenantFilter } from "@/lib/prisma-helpers";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -17,8 +18,8 @@ async function checkAuthorization() {
     };
   }
 
+  // LGPD: Super Admin NÃO deve acessar dados clínicos de pacientes
   const allowedTypes = [
-    TipoUsuario.SUPER_ADMIN,
     TipoUsuario.ADMIN_CLINICA,
     TipoUsuario.MEDICO,
   ];
@@ -27,7 +28,7 @@ async function checkAuthorization() {
     return {
       authorized: false,
       response: NextResponse.json(
-        { error: "Acesso negado" },
+        { error: "Acesso negado. Dados clínicos não disponíveis para este perfil." },
         { status: 403 }
       ),
     };
@@ -35,8 +36,7 @@ async function checkAuthorization() {
 
   const clinicaId = await getUserClinicaId();
 
-  // Super Admin não precisa de clinicaId
-  if (session.user.tipo !== TipoUsuario.SUPER_ADMIN && !clinicaId) {
+  if (!clinicaId) {
     return {
       authorized: false,
       response: NextResponse.json(
@@ -122,6 +122,12 @@ export async function GET(request: NextRequest) {
       }),
       prisma.prontuario.count({ where }),
     ]);
+
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Prontuario",
+      details: { search, pacienteId, medicoId, page, total },
+    });
 
     return NextResponse.json({
       prontuarios,

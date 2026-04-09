@@ -6,6 +6,7 @@ import { uploadPDFToS3 } from "@/lib/s3-service";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { brazilTodayFormatted } from "@/lib/timezone-utils";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -303,6 +304,17 @@ export async function GET(request: NextRequest) {
     consulta.paciente.usuario.avatar = avatarEncontrado;
     
     
+
+    auditLogFromRequest(request, {
+      action: "VIEW",
+      resource: "Consulta",
+      resourceId: consultaId,
+      details: {
+        pacienteNome: consulta.paciente?.nome,
+        pacienteId: consulta.pacienteId,
+        operacao: "Abriu atendimento",
+      },
+    });
 
     return NextResponse.json(
       {
@@ -627,6 +639,17 @@ export async function POST(request: NextRequest) {
         console.error("Erro ao gerar e fazer upload do PDF do prontuário:", error);
       }
     } // fim if (finalizar)
+
+    auditLogFromRequest(request, {
+      action: finalizar ? "UPDATE" : (prontuarioExistente ? "UPDATE" : "CREATE"),
+      resource: "Prontuario",
+      resourceId: prontuario.id,
+      details: {
+        pacienteId: consulta.pacienteId,
+        consultaId,
+        operacao: finalizar ? "Finalizou atendimento" : (prontuarioExistente ? "Atualizou prontuário" : "Criou prontuário"),
+      },
+    });
 
     return NextResponse.json(
       {

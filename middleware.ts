@@ -38,8 +38,48 @@ export default withAuth(
       return NextResponse.redirect(url);
     }
 
+    // LGPD: Super Admin NÃO deve acessar dados clínicos de pacientes
+    if (token?.tipo === TipoUsuario.SUPER_ADMIN) {
+      const clinicalApiPaths = [
+        "/api/medico/",
+        "/api/paciente/",
+        "/api/admin-clinica/prontuarios",
+        "/api/admin-clinica/pacientes",
+      ];
+      const isClinicalRoute = clinicalApiPaths.some((p) => pathname.startsWith(p));
+      if (isClinicalRoute) {
+        // LGPD AuditLog: registrar tentativa de acesso negado via API interna
+        // (middleware roda no Edge Runtime e não pode importar Prisma diretamente)
+        const auditUrl = new URL("/api/audit-log", req.nextUrl.origin);
+        fetch(auditUrl.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: token.id || "unknown",
+            userTipo: TipoUsuario.SUPER_ADMIN,
+            action: "ACCESS_DENIED",
+            resource: "ClinicalRoute",
+            details: { pathname, reason: "SUPER_ADMIN blocked from clinical data" },
+          }),
+        }).catch(() => {}); // fire-and-forget
+
+        return NextResponse.json(
+          { error: "Acesso negado. Super Admin não pode acessar dados clínicos." },
+          { status: 403 }
+        );
+      }
+    }
+
     // Criar headers customizados
     const requestHeaders = new Headers(req.headers);
+
+    // LGPD: Repassar IP real do cliente para audit log
+    const clientIp =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      (req as any).ip ||
+      "unknown";
+    requestHeaders.set("x-client-ip", clientIp);
 
     if (token) {
       // Adicionar headers com dados do usuário
@@ -84,6 +124,7 @@ export default withAuth(
         const publicRoutes = [
           "/login",
           "/api/auth",
+          "/api/audit-log",                              // Endpoint interno do middleware (Edge → Node)
           "/api/public",
           "/api/stripe",
           "/api/cron",

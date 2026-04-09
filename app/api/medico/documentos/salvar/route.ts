@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId, getUserMedicoId } from "@/lib/auth-helper
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { uploadPDFToS3 } from "@/lib/s3-service";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 export async function POST(request: NextRequest) {
   try {
@@ -138,6 +139,13 @@ export async function POST(request: NextRequest) {
     });
 
     console.log("Documento salvo no banco com sucesso! ID:", documento.id);
+
+    auditLogFromRequest(request, {
+      action: "CREATE",
+      resource: "Documento",
+      resourceId: documento.id,
+      details: { tipoDocumento: documento.tipoDocumento, consultaId },
+    });
 
     return NextResponse.json({
       success: true,

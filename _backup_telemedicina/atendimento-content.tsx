@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,9 +59,7 @@ import {
   Ruler,
   TrendingUp,
   FileText as FileTextIcon,
-  X,
-  Wifi,
-  Phone as PhoneIcon,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -84,6 +82,7 @@ import { PatientHistory } from '@/components/atendimento/patient/PatientHistory'
 import { TranscriptionBar } from '@/components/atendimento/consultation/TranscriptionBar';
 import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
 import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
+import { TelemedicineView } from '@/components/atendimento/consultation/TelemedicineView';
 import { AvatarWithS3 } from '@/components/avatar-with-s3';
 
 interface Consulta {
@@ -131,45 +130,25 @@ interface Prontuario {
   evolucao: string | null;
 }
 
-interface ChatMessage {
-  id: number;
-  sender: string;
-  text: string;
-  time: string;
-}
-
 interface AtendimentoContentProps {
   consultaId: string;
-  // Props de telemedicina (opcionais — injetadas pela page de sessão)
-  telemedicinaProps?: {
-    localVideoRef: React.RefObject<HTMLVideoElement | null>;
-    remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
-    isMicOn: boolean;
-    onToggleMic: (v: boolean) => void;
-    isCameraOn: boolean;
-    onToggleCamera: (v: boolean) => void;
-    isScreenSharing: boolean;
-    onToggleScreenSharing: (v: boolean) => void;
-    connectionQuality: "excellent" | "good" | "unstable";
-    patientPresent: boolean;
-    patientLink?: string;
-    chatMessages: ChatMessage[];
-    onSendMessage: (text: string) => void;
-    onEncerrar: () => void;
-    remoteAudioRef?: React.RefObject<HTMLAudioElement | null>;
-  };
 }
 
-export function AtendimentoContent({ consultaId, telemedicinaProps }: AtendimentoContentProps) {
+export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const router = useRouter();
   const { open: sidebarOpen, isMobile } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savingStep, setSavingStep] = useState("");
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [prontuario, setProntuario] = useState<Prontuario | null>(null);
   const [activeTab, setActiveTab] = useState<string>('informacoes');
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [chatMessage, setChatMessage] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [connectionQuality, setConnectionQuality] = useState('excellent');
   const [sessionStartTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [historicoConsultas, setHistoricoConsultas] = useState<any[]>([]);
@@ -221,7 +200,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     dosagem: string;
     posologia: string;
     duracao: string;
-    manual?: boolean;
   } | null>(null);
   type DocumentoGeradoLocal = {
     id: string;
@@ -301,7 +279,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
   const [loadingFichaPreview, setLoadingFichaPreview] = useState(false);
   const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
-  const [cidAlertVisible, setCidAlertVisible] = useState(false);
   const [retornoModalOpen, setRetornoModalOpen] = useState(false);
   const [retornoAgendado, setRetornoAgendado] = useState(false);
   const [retornoDias, setRetornoDias] = useState<number>(30);
@@ -312,7 +289,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     diasAfastamento: 1, observacoes: "",
     mesesValidade: "", horaInicio: "", horaFim: "",
     nomeAcompanhante: "", uf: "", dataValidade: "",
-    convenio: "", justificativa: "", textoLivre: "",
+    convenio: "", justificativa: "",
   });
 
   // Hook de transcrição
@@ -534,12 +511,23 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   // Determinar se é telemedicina baseado no tipo de consulta
   const isTelemedicina = consulta?.tipoConsulta?.nome?.toLowerCase().includes('telemedicina') || false;
 
-  // Tabs — unificadas para ambos os modos
-  const tabs = [
+  // Tabs para consulta normal
+  const tabsNormal = [
     { id: 'informacoes', label: 'Informações', icon: User },
     { id: 'contexto-consulta', label: 'Contexto da consulta', icon: FileText },
   ];
 
+  // Tabs para telemedicina
+  const tabsTelemedicina = [
+    { id: 'informacoes', label: 'Informações', icon: User },
+    { id: 'telemedicina', label: 'Telemedicina', icon: Video },
+  ];
+
+  const tabs = isTelemedicina ? tabsTelemedicina : tabsNormal;
+
+  const chatMessages = [
+    { id: 1, sender: 'patient', text: 'Olá, doutor! Consegue me ouvir bem?', time: formatTime(new Date()) },
+  ];
 
   useEffect(() => {
     fetchConsulta();
@@ -1430,8 +1418,12 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       }
 
       // Definir aba inicial baseado no tipo de consulta
-      // Ambos os modos usam o mesmo layout — aba inicial é contexto-consulta
-      setActiveTab('contexto-consulta');
+      const isTelemedicina = data.consulta?.tipoConsulta?.nome?.toLowerCase().includes('telemedicina') || false;
+      if (isTelemedicina) {
+        setActiveTab('telemedicina');
+      } else {
+        setActiveTab('contexto-consulta');
+      }
     } catch (error: any) {
       const errorMessage = error.message || "Erro ao carregar dados do atendimento";
       toast.error(errorMessage);
@@ -1827,8 +1819,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const handleFinalizarAtendimento = async () => {
     try {
       setSaving(true);
-      setSavingStep("Salvando prontuário...");
-
+      
       // Primeiro, salvar o prontuário
       const response = await fetch("/api/medico/atendimento", {
         method: "POST",
@@ -1869,16 +1860,18 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       }
 
       // Gerar e salvar Ficha de Atendimento automaticamente
-      setSavingStep("Gerando ficha de atendimento...");
       try {
+        console.log("📋 Gerando Ficha de Atendimento...");
+        
+        // Preparar dados para a ficha de atendimento
         const selectedCidsList = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)).map(c => ({ code: c.code, description: c.description })) || [];
         const selectedExamesList = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || [];
         const allExames = [...selectedExamesList, ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }))];
-
+        
         const selectedProtocolosList = analysisResults?.protocolos?.filter((_, i) => selectedProtocolosAI.has(i)).map(p => ({ nome: p.nome, descricao: p.descricao })) || [];
         const protocolosManuaisList = protocolosManuais.map(p => ({ nome: p.nome, descricao: p.descricao }));
         const allProtocolos = [...selectedProtocolosList, ...protocolosManuaisList];
-
+        
         const fichaRequestData = {
           tipoDocumento: "ficha-atendimento",
           consultaId,
@@ -1892,53 +1885,116 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           },
         };
 
+        // Gerar o PDF da ficha de atendimento
         const fichaResponse = await fetch("/api/medico/documentos/gerar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(fichaRequestData),
         });
 
-        if (fichaResponse.ok) {
+        if (!fichaResponse.ok) {
+          const error = await fichaResponse.json();
+          console.error("Erro ao gerar Ficha de Atendimento:", error);
+          toast.warning("Ficha de Atendimento não pôde ser gerada automaticamente");
+        } else {
+          // Obter o blob do PDF
           const fichaPdfBlob = await fichaResponse.blob();
+
+          // Salvar a ficha de atendimento
           const fichaFormData = new FormData();
           fichaFormData.append("consultaId", consultaId);
           fichaFormData.append("tipoDocumento", "ficha-atendimento");
           fichaFormData.append("nomeDocumento", "Ficha de Atendimento");
           fichaFormData.append("pdfFile", fichaPdfBlob, "ficha-atendimento.pdf");
 
-          await fetch("/api/medico/documentos/salvar", {
+          const fichaSaveResponse = await fetch("/api/medico/documentos/salvar", {
             method: "POST",
             body: fichaFormData,
           });
+
+          if (!fichaSaveResponse.ok) {
+            const error = await fichaSaveResponse.json();
+            console.error("Erro ao salvar Ficha de Atendimento:", error);
+            toast.warning("Ficha de Atendimento gerada mas não pôde ser salva");
+          } else {
+            console.log("✅ Ficha de Atendimento gerada e salva com sucesso!");
+          }
         }
       } catch (fichaError: any) {
         console.error("Erro ao gerar/salvar Ficha de Atendimento:", fichaError);
+        toast.warning("Ficha de Atendimento não pôde ser gerada automaticamente");
       }
 
       // Salvar documentos gerados
       if (documentosGerados.length > 0) {
-        for (let i = 0; i < documentosGerados.length; i++) {
-          const doc = documentosGerados[i];
-          setSavingStep(`Salvando documento ${i + 1} de ${documentosGerados.length}...`);
+        for (const doc of documentosGerados) {
           try {
-            if (!doc.pdfBlob) continue;
+            if (!doc.pdfBlob) {
+              console.warn(`PDF blob não disponível para ${doc.nomeDocumento}`);
+              toast.warning(`PDF não disponível para ${doc.nomeDocumento}`);
+              continue;
+            }
 
+            console.log(`📤 Enviando documento: ${doc.nomeDocumento}`);
+            console.log("Tipo:", doc.tipoDocumento);
+            console.log("Tamanho do blob:", doc.pdfBlob.size, "bytes");
+            console.log("Tipo MIME:", doc.pdfBlob.type);
+
+            // Criar FormData para enviar o arquivo
             const formData = new FormData();
             formData.append("consultaId", consultaId);
             formData.append("tipoDocumento", doc.tipoDocumento);
             formData.append("nomeDocumento", doc.nomeDocumento);
             formData.append("pdfFile", doc.pdfBlob, `${doc.tipoDocumento}.pdf`);
 
+            console.log("FormData criado, enviando requisição...");
+
             const docResponse = await fetch("/api/medico/documentos/salvar", {
               method: "POST",
-              body: formData,
+              body: formData, // Não definir Content-Type, o browser define automaticamente com boundary
             });
 
+            console.log("Resposta recebida. Status:", docResponse.status, docResponse.statusText);
+
             if (!docResponse.ok) {
-              console.error(`Erro ao salvar documento: ${doc.nomeDocumento}`);
+              const errorText = await docResponse.text();
+              let errorData: any;
+              try {
+                errorData = JSON.parse(errorText);
+              } catch {
+                errorData = { error: errorText || `Erro ${docResponse.status}: ${docResponse.statusText}` };
+              }
+              
+              // Log detalhado do erro
+              console.error(`=== ERRO AO SALVAR DOCUMENTO: ${doc.nomeDocumento} ===`);
+              console.error("Status:", docResponse.status);
+              console.error("Status Text:", docResponse.statusText);
+              console.error("Error Data:", errorData);
+              console.error("Error Text:", errorText);
+              
+              // Mensagem de erro mais clara
+              const errorMessage = errorData.error || errorData.details || errorData.message || "Erro desconhecido ao salvar documento";
+              const errorType = errorData.type || "UnknownError";
+              
+              console.error(`Tipo de erro: ${errorType}`);
+              console.error(`Mensagem: ${errorMessage}`);
+              
+              toast.error(`Erro ao salvar ${doc.nomeDocumento}: ${errorMessage}`, {
+                description: errorType !== "UnknownError" ? `Tipo: ${errorType}` : undefined,
+                duration: 5000,
+              });
+            } else {
+              const successData = await docResponse.json();
+              console.log(`✅ Documento ${doc.nomeDocumento} salvo com sucesso!`);
+              console.log("S3 Key:", successData.documento?.s3Key);
+              toast.success(`${doc.nomeDocumento} salvo com sucesso!`);
             }
           } catch (error: any) {
-            console.error(`Erro ao salvar documento: ${doc.nomeDocumento}`, error);
+            console.error(`=== ERRO EXCEPCIONAL AO SALVAR DOCUMENTO: ${doc.nomeDocumento} ===`);
+            console.error("Erro completo:", error);
+            console.error("Mensagem:", error?.message);
+            console.error("Stack:", error?.stack);
+            toast.error(`Erro ao salvar ${doc.nomeDocumento}: ${error?.message || "Erro inesperado"}`);
           }
         }
       }
@@ -1946,17 +2002,34 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       // Limpar rascunho local após finalização bem-sucedida
       try { localStorage.removeItem(draftKey); } catch {}
 
-      setSavingStep("Atendimento finalizado!");
+      toast.success("Atendimento finalizado com sucesso!", {
+        description: `Prontuário do paciente ${consulta?.paciente?.nome || 'o paciente'} foi atualizado.`,
+        duration: 5000,
+      });
+      
+      // Mostrar toast adicional com link para prontuário completo
+      setTimeout(() => {
+        if (consulta?.paciente?.nome && consulta?.paciente?.id) {
+          toast.info(
+            `Deseja visualizar o prontuário completo de ${consulta.paciente.nome}? Acesse pelo menu de prontuários.`,
+            {
+              duration: 6000,
+            }
+          );
+        }
+      }, 800);
+      
+      // Limpa rascunho ao finalizar com sucesso
+      try { localStorage.removeItem(draftKey); } catch { /* ignorar */ }
 
       // Redirecionar para a fila de atendimento após um breve delay
       setTimeout(() => {
         router.push("/medico/fila-atendimento");
-      }, 1500);
+      }, 2000);
     } catch (error: any) {
       toast.error(error.message || "Erro ao finalizar atendimento");
       console.error(error);
       setSaving(false);
-      setSavingStep("");
     }
   };
 
@@ -1971,6 +2044,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const documentModels = useMemo(() => [
     { id: "receita-medica", nome: "Receita Médica" },
     { id: "receita-controle-especial", nome: "Receita de Controle Especial" },
+    { id: "receita-tipo-ba", nome: "Receita Tipo B" },
     { id: "atestado-afastamento", nome: "Atestado de Afastamento" },
     { id: "atestado-afastamento-cid", nome: "Atestado de Afastamento c/ CID" },
     { id: "atestado-afastamento-sem-cid", nome: "Atestado de Afastamento s/ CID" },
@@ -1992,6 +2066,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     { id: "controle-diabetes", nome: "Controle de Diabetes" },
     { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico" },
     { id: "controle-pressao-arterial", nome: "Controle de Pressão Arterial" },
+    { id: "termo-consentimento", nome: "Termo de Consentimento" },
   ], []);
 
   // Filtrar sugestões baseado no input
@@ -2324,104 +2399,18 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   <span className="whitespace-nowrap">Resumo Clínico</span>
                 </Button>
 
-                {isTelemedicina && telemedicinaProps && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* Controles A/V compactos */}
-                    <button
-                      onClick={() => telemedicinaProps.onToggleMic(!telemedicinaProps.isMicOn)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        telemedicinaProps.isMicOn
-                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          : "bg-red-100 text-red-600 hover:bg-red-200"
-                      }`}
-                      title={telemedicinaProps.isMicOn ? "Mutar microfone" : "Ativar microfone"}
-                    >
-                      {telemedicinaProps.isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      onClick={() => telemedicinaProps.onToggleCamera(!telemedicinaProps.isCameraOn)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        telemedicinaProps.isCameraOn
-                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          : "bg-red-100 text-red-600 hover:bg-red-200"
-                      }`}
-                      title={telemedicinaProps.isCameraOn ? "Desligar câmera" : "Ligar câmera"}
-                    >
-                      {telemedicinaProps.isCameraOn ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
-                    </button>
-                    <button
-                      onClick={() => telemedicinaProps.onToggleScreenSharing(!telemedicinaProps.isScreenSharing)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        telemedicinaProps.isScreenSharing
-                          ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                      title="Compartilhar tela"
-                    >
-                      <Monitor className="w-3.5 h-3.5" />
-                    </button>
-                    {/* Qualidade conexão */}
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold ${
-                      telemedicinaProps.connectionQuality === "excellent" ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
-                      telemedicinaProps.connectionQuality === "good" ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
-                      "bg-red-50 border-red-200 text-red-600"
-                    }`}>
-                      <Wifi className="w-3 h-3" />
-                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
-                        telemedicinaProps.connectionQuality === "excellent" ? "bg-emerald-500" :
-                        telemedicinaProps.connectionQuality === "good" ? "bg-yellow-500" : "bg-red-500"
-                      }`} />
-                    </div>
-                  </div>
+                {isTelemedicina && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {}}
+                    className="h-9 px-4 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 flex-shrink-0"
+                  >
+                    <Video className="w-3.5 h-3.5" />
+                    <span className="whitespace-nowrap">Videochamada</span>
+                  </Button>
                 )}
               </div>
-
-              {/* Telemedicina PiP — vídeo compacto do paciente */}
-              {isTelemedicina && telemedicinaProps && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="relative w-[180px] h-[120px] rounded-xl overflow-hidden bg-slate-900 border-2 border-slate-200 shadow-lg flex-shrink-0">
-                    {/* Placeholder quando paciente não conectou */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        telemedicinaProps.patientPresent
-                          ? "bg-emerald-500/20"
-                          : "bg-slate-700 animate-pulse"
-                      }`}>
-                        <User className="w-5 h-5 text-slate-400" />
-                      </div>
-                      <span className="text-[9px] text-slate-500 mt-1">
-                        {telemedicinaProps.patientPresent ? "" : "Aguardando..."}
-                      </span>
-                    </div>
-                    {/* Vídeo remoto */}
-                    <video
-                      ref={telemedicinaProps.remoteVideoRef}
-                      autoPlay
-                      playsInline
-                      className="absolute inset-0 w-full h-full object-cover z-10"
-                    />
-                    {/* PiP local (miniatura) */}
-                    <div className="absolute bottom-1.5 right-1.5 w-[52px] h-[36px] rounded-lg overflow-hidden bg-slate-800 border border-white/20 shadow-md z-20">
-                      <video
-                        ref={telemedicinaProps.localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {/* Badge de presença */}
-                    <div className={`absolute top-1.5 left-1.5 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
-                      telemedicinaProps.patientPresent
-                        ? "bg-emerald-500/90 text-white"
-                        : "bg-slate-700/80 text-slate-300"
-                    }`}>
-                      <span className={`w-1 h-1 rounded-full ${telemedicinaProps.patientPresent ? "bg-white animate-pulse" : "bg-slate-400"}`} />
-                      {telemedicinaProps.patientPresent ? "Online" : "Offline"}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Vitais — chips compactos */}
               <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
@@ -2470,7 +2459,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         />
 
         {/* Zona 3 — Stepper de Progresso */}
-        {(() => {
+        {!isTelemedicina && (() => {
           const hasTranscription = isTranscribing || transcricaoFinalizada || transcription.length > 0;
           const hasAnamnese = !!(analysisResults?.anamnese || prontuario?.anamnese);
           const hasAnamnDiv = anamneseConfirmed || hasAnamnese;
@@ -2529,7 +2518,40 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           );
         })()}
 
-        {/* Zona 4 — Consulta Atual (layout unificado presencial + telemedicina) */}
+        {/* Zona 4 — Consulta Atual */}
+        {isTelemedicina ? (
+          <TelemedicineView
+            patient={patient}
+            vitals={vitals}
+            sessionDuration={sessionDuration}
+            connectionQuality={connectionQuality}
+            isMicOn={isMicOn}
+            setIsMicOn={setIsMicOn}
+            isCameraOn={isCameraOn}
+            setIsCameraOn={setIsCameraOn}
+            isScreenSharing={isScreenSharing}
+            setIsScreenSharing={setIsScreenSharing}
+            isFullscreen={isFullscreen}
+            setIsFullscreen={setIsFullscreen}
+            isChatOpen={isChatOpen}
+            setIsChatOpen={setIsChatOpen}
+            chatMessage={chatMessage}
+            setChatMessage={setChatMessage}
+            chatMessages={chatMessages}
+            onSendMessage={() => {}}
+            isTranscribing={isTranscribing}
+            isPaused={isPaused}
+            transcription={transcription}
+            startTranscription={startTranscription}
+            pauseTranscription={pauseTranscription}
+            resumeTranscription={resumeTranscription}
+            stopTranscription={stopTranscription}
+            handleProcessTranscription={handleProcessTranscription}
+            onOpenResumoClinico={() => setResumoClinicoDialogOpen(true)}
+            onEncerrar={handleFinalizarAtendimento}
+          />
+        ) : (
+          <>
           <div className="grid grid-cols-10 gap-4 items-stretch w-full min-w-0">
             {/* Coluna Anamnese */}
             <div className="col-span-7 h-full flex flex-col min-w-0 overflow-x-hidden">
@@ -2601,13 +2623,12 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   historicoClinico={historicoClinico}
                   onRepetirItens={handleRepetirItens}
                   onAttachExame={() => setUploadDialogOpen(true)}
-                  isTelemedicina={isTelemedicina}
-                  chatMessages={telemedicinaProps?.chatMessages}
-                  onSendMessage={telemedicinaProps?.onSendMessage}
-                  cidAlertVisible={cidAlertVisible}
                 />
             </div>
           </div>
+
+          </>
+        )}
       </div>
 
       {/* ── Barra de ações fixada no bottom ── */}
@@ -2626,34 +2647,15 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           </button>
 
 
-          {isTelemedicina && telemedicinaProps ? (
-            <button
-              onClick={telemedicinaProps.onEncerrar}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all bg-red-600 hover:bg-red-700 shadow-sm"
-            >
-              <PhoneIcon className="w-3.5 h-3.5 rotate-[135deg]" />
-              Encerrar Consulta
-            </button>
-          ) : (
-            <button
-              onClick={() => {
-                const cidsIA = analysisResults?.cidCodes?.filter((_, i) => selectedCids.has(i)) || [];
-                const allCids = [...cidsIA, ...cidsManuais];
-                if (allCids.length === 0) {
-                  setCidAlertVisible(true);
-                  setTimeout(() => setCidAlertVisible(false), 3000);
-                  return;
-                }
-                setFinalizarModalOpen(true);
-              }}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
-              style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
-            >
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-              {saving ? "Salvando..." : "Finalizar Atendimento"}
-            </button>
-          )}
+          <button
+            onClick={() => setFinalizarModalOpen(true)}
+            disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            {saving ? "Salvando..." : "Finalizar Atendimento"}
+          </button>
         </div>
       </div>
 
@@ -2692,8 +2694,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         const hasAcomp = ["declaracao-comparecimento-acompanhante","declaracao-comparecimento-horario-cid"].includes(id);
         const hasUfValidade = id === "receita-controle-especial";
         const hasConvenio = id === "justificativa-exames-plano";
-        const hasTextoLivre = id === "laudo-medico" || id === "pedido-exames";
-        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre;
+        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio;
 
         return (
           <Dialog open={docConfigModalOpen} onOpenChange={setDocConfigModalOpen}>
@@ -2708,6 +2709,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 {/* ── Campos específicos do documento ── */}
                 {hasSpecific && (
                   <>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Opções do documento</p>
                     {hasDias && (
                       <div className="flex items-center justify-between gap-4">
                         <div>
@@ -2818,19 +2820,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   </div>
                   <Switch checked={opts.assinar} onCheckedChange={v => set({ assinar: v })} />
                 </div>
-
-                {hasTextoLivre && (
-                  <>
-                    <div className="border-t border-slate-100" />
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">{id === "pedido-exames" ? "Texto do Pedido" : "Texto do Laudo"}</p>
-                      <textarea rows={5} placeholder={id === "pedido-exames" ? "Digite os exames solicitados..." : "Digite o conteúdo do laudo médico..."}
-                        value={opts.textoLivre} onChange={e => { if (e.target.value.length <= 1000) set({ textoLivre: e.target.value }); }}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
-                      <p className="text-[10px] text-slate-400 mt-1 text-right">{opts.textoLivre.length}/1000</p>
-                    </div>
-                  </>
-                )}
               </div>
 
               <div className="px-5 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
@@ -2839,7 +2828,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   Cancelar
                 </button>
                 <button
-                  disabled={hasTextoLivre && opts.textoLivre.trim().length === 0}
                   onClick={() => {
                     setDocConfigModalOpen(false);
                     handleGenerateDocument(docConfigModelId, {
@@ -2857,10 +2845,9 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       dataValidade: opts.dataValidade || undefined,
                       convenio: opts.convenio || undefined,
                       justificativa: opts.justificativa || undefined,
-                      textoLaudo: opts.textoLivre || undefined,
                     });
                   }}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all"
                   style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -2956,12 +2943,12 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       setFinalizarModalOpen(false);
                       setRetornoModalOpen(true);
                     }}
-                    disabled={saving || allCids.length === 0}
-                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
                     style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                    {allCids.length === 0 ? "Selecione ao menos 1 CID" : erros.length > 0 || alertas.length > 0 ? "Finalizar mesmo assim" : "Confirmar e Finalizar"}
+                    {erros.length > 0 || alertas.length > 0 ? "Finalizar mesmo assim" : "Confirmar e Finalizar"}
                   </button>
                 </div>
               </>
@@ -3343,22 +3330,10 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           {/* ── Passo 2: formulário de posologia ── */}
           {pendingMedicamento && (
             <div className="flex flex-col gap-5 flex-1 overflow-y-auto py-2 px-1">
-              {pendingMedicamento.manual ? (
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Nome do Medicamento</label>
-                  <Input
-                    placeholder="Digite o nome do medicamento ou manipulado"
-                    value={pendingMedicamento.nome}
-                    onChange={(e) => setPendingMedicamento((p) => p ? { ...p, nome: e.target.value } : p)}
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100">
-                  <Pill className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-slate-800 truncate">{pendingMedicamento.nome}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100">
+                <Pill className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <span className="text-sm font-semibold text-slate-800 truncate">{pendingMedicamento.nome}</span>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -3401,7 +3376,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 <Button
                   className="flex-1 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white"
                   onClick={handleConfirmPendingMedicamento}
-                  disabled={pendingMedicamento.manual && !pendingMedicamento.nome.trim()}
                 >
                   Confirmar Prescrição
                 </Button>
@@ -3411,7 +3385,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
 
           {/* ── Passo 1: seleção de medicamento ── */}
           {!pendingMedicamento && (
-          <div className="flex flex-col flex-1 min-h-0 overflow-hidden gap-3">
+          <div className="flex flex-col gap-4 flex-1 min-h-0 overflow-hidden">
             <Tabs value={activeMedicamentoTab} onValueChange={(value) => {
               const newTab = value as "medicamentos" | "manipulados";
               setActiveMedicamentoTab(newTab);
@@ -3422,16 +3396,16 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
               } else {
                 fetchManipulados();
               }
-            }} className="flex flex-col flex-1 min-h-0">
-              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+            }}>
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="medicamentos">Medicamentos</TabsTrigger>
                 <TabsTrigger value="manipulados">Manipulados</TabsTrigger>
               </TabsList>
-
-              <div className="relative flex-shrink-0">
+              
+              <div className="relative flex-shrink-0 mt-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <Input
-                  placeholder={activeMedicamentoTab === "medicamentos"
+                  placeholder={activeMedicamentoTab === "medicamentos" 
                     ? "Buscar medicamento por nome, princípio ativo ou laboratório..."
                     : "Buscar manipulado por descrição..."}
                   value={medicamentoSearch}
@@ -3440,8 +3414,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 />
               </div>
 
-              <TabsContent value="medicamentos" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
-                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
+              <TabsContent value="medicamentos" className="mt-0">
+                <div className="h-[400px] overflow-y-auto border rounded-lg">
                   {loadingMedicamentos ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -3491,11 +3465,11 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       ))}
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </TabsContent>
 
-              <TabsContent value="manipulados" className="mt-0 flex-1 min-h-0 flex flex-col data-[state=inactive]:hidden">
-                <ScrollArea className="flex-1 border rounded-lg min-h-0 h-full">
+              <TabsContent value="manipulados" className="mt-0">
+                <div className="h-[400px] overflow-y-auto border rounded-lg">
                   {loadingManipulados ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
@@ -3529,29 +3503,11 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       ))}
                     </div>
                   )}
-                </ScrollArea>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
-          )}
-          {!pendingMedicamento && (
-          <div className="flex items-center justify-between pt-3 border-t border-slate-200 flex-shrink-0">
-            <button
-              onClick={() => {
-                setPendingMedicamento({
-                  nome: "",
-                  dosagem: "",
-                  posologia: "",
-                  duracao: "",
-                  manual: true,
-                });
-              }}
-              className="text-xs text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1.5 hover:underline"
-            >
-              <Plus className="w-3.5 h-3.5" /> Adicionar manualmente
-            </button>
-          </div>
-          )}
+          )} {/* fim passo 1 */}
         </DialogContent>
       </Dialog>
 
@@ -4001,17 +3957,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* ====== OVERLAY: FINALIZANDO ATENDIMENTO ====== */}
-      {saving && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 bg-white rounded-2xl px-10 py-8 shadow-2xl">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            <p className="text-sm font-semibold text-slate-800">Finalizando atendimento</p>
-            <p className="text-xs text-slate-500 animate-pulse">{savingStep}</p>
-          </div>
-        </div>
-      )}
 
     </div>
   );

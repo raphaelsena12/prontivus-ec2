@@ -12,7 +12,7 @@ const updateUsuarioSchema = z.object({
   cpf: z.string().optional(),
   telefone: z.string().nullable().optional(),
   tipo: z.nativeEnum(TipoUsuario).optional(),
-  senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").optional(),
+  senha: z.string().min(12, "Senha deve ter no mínimo 12 caracteres").optional(),
   ativo: z.boolean().optional(),
 });
 

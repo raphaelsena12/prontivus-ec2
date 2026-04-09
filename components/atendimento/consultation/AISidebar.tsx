@@ -149,6 +149,8 @@ interface AISidebarProps {
   chatMessages?: Array<{ id: number; sender: string; text: string; time: string }>;
   onSendMessage?: (text: string) => void;
   isTelemedicina?: boolean;
+  // Alerta visual de CID obrigatório
+  cidAlertVisible?: boolean;
 }
 
 
@@ -192,6 +194,7 @@ export function AISidebar({
   chatMessages,
   onSendMessage,
   isTelemedicina = false,
+  cidAlertVisible = false,
 }: AISidebarProps) {
   // ── Chat telemedicina ──────────────────────────────────────────────────────
   const [chatInput, setChatInput] = useState("");
@@ -798,10 +801,18 @@ export function AISidebar({
         </div>
 
         {/* ── CID-10 ── */}
-        <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+        <div className="border-t border-slate-100 relative">
+          {cidAlertVisible && (
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-50 animate-bounce">
+              <div className="bg-red-500 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
+                Selecione ao menos 1 CID-10
+                <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-red-500" />
+              </div>
+            </div>
+          )}
+          <div className={`px-3 py-2 flex items-center gap-2 border-b border-slate-100 transition-colors ${cidAlertVisible ? "bg-red-50" : "bg-slate-50"}`}>
             <Stethoscope className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">CID-10</span>
+            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">CID-10 Diagnóstico</span>
             <div className="flex items-center gap-1">
               {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
 import { gerarNumeroProntuario } from "@/lib/paciente-helpers";
+import { auditLogFromRequest } from "@/lib/audit-log";
 
 // Schema de validação
 const pacienteSchema = z.object({
@@ -172,6 +173,8 @@ export async function GET(request: NextRequest) {
       updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : null,
       numeroProntuario: p.numeroProntuario ? Number(p.numeroProntuario) : null,
     }));
+
+    auditLogFromRequest(request, { action: "VIEW", resource: "Paciente", details: { page, total } });
 
     return NextResponse.json({
       pacientes,
@@ -356,6 +359,16 @@ export async function POST(request: NextRequest) {
         },
       });
     }
+
+    auditLogFromRequest(request, {
+      action: "CREATE",
+      resource: "Paciente",
+      resourceId: paciente.id,
+      details: {
+        pacienteNome: paciente.nome,
+        numeroProntuario: paciente.numeroProntuario,
+      },
+    });
 
     return NextResponse.json({ paciente }, { status: 201 });
   } catch (error) {

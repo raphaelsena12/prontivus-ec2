@@ -40,6 +40,11 @@ async function checkAuthorization() {
   return { authorized: true, clinicaId };
 }
 
+// Remove acentos de uma string (usado para busca accent-insensitive)
+function removeAccents(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 // GET /api/medico/medicamentos
 export async function GET(request: NextRequest) {
   try {
@@ -51,22 +56,38 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
 
-    const where = {
-      clinicaId: null, // catálogo global
-      ativo: true, // Apenas medicamentos ativos
-      ...(search && {
-        OR: [
-          { nome: { contains: search, mode: "insensitive" as const } },
-          { principioAtivo: { contains: search, mode: "insensitive" as const } },
-          { laboratorio: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
-    };
+    if (search) {
+      // Busca accent-insensitive usando translate() nativo do PostgreSQL
+      const normalized = removeAccents(search);
+      const pattern = `%${normalized}%`;
+      const accentFrom = "áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ";
+      const accentTo   = "aaaaaeeeeiiiioooooouuuucAAAAAEEEEIIIIOOOOOUUUUC";
+
+      const medicamentos = await prisma.$queryRawUnsafe(`
+        SELECT * FROM "medicamentos"
+        WHERE ("clinicaId" IS NULL OR "clinicaId" = $2) AND "ativo" = true
+          AND (
+            translate(LOWER("nome"), '${accentFrom}', '${accentTo}') ILIKE $1
+            OR translate(LOWER(COALESCE("principioAtivo", '')), '${accentFrom}', '${accentTo}') ILIKE $1
+            OR translate(LOWER(COALESCE("laboratorio", '')), '${accentFrom}', '${accentTo}') ILIKE $1
+          )
+        ORDER BY "nome" ASC
+        LIMIT 50
+      `, pattern, auth.clinicaId);
+
+      return NextResponse.json({ medicamentos });
+    }
 
     const medicamentos = await prisma.medicamento.findMany({
-      where,
+      where: {
+        OR: [
+          { clinicaId: null },
+          { clinicaId: auth.clinicaId },
+        ],
+        ativo: true,
+      },
       orderBy: { nome: "asc" },
-      take: 50, // Limitar a 50 resultados
+      take: 50,
     });
 
     return NextResponse.json({ medicamentos });

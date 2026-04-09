@@ -81,7 +81,7 @@ const createUsuarioSchema = z.object({
   tipo: z.nativeEnum(TipoUsuario),
   senha: z
     .union([
-      z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(255, "Senha deve ter no máximo 255 caracteres"),
+      z.string().min(12, "Senha deve ter no mínimo 12 caracteres").max(255, "Senha deve ter no máximo 255 caracteres"),
       z.literal(""),
       z.undefined(),
     ])
@@ -106,7 +106,7 @@ const updateUsuarioSchema = z.object({
   tipo: z.nativeEnum(TipoUsuario),
   senha: z
     .union([
-      z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(255, "Senha deve ter no máximo 255 caracteres"),
+      z.string().min(12, "Senha deve ter no mínimo 12 caracteres").max(255, "Senha deve ter no máximo 255 caracteres"),
       z.literal(""),
       z.undefined()
     ])
@@ -198,8 +198,8 @@ export function UsuarioDialog({
             }
             // Validar senha apenas se foi fornecida
             if (field === "senha" && data.senha && data.senha.trim() !== "") {
-              if (data.senha.trim().length < 6) {
-                form.setError("senha", { message: "Senha deve ter no mínimo 6 caracteres" });
+              if (data.senha.trim().length < 12) {
+                form.setError("senha", { message: "Senha deve ter no mínimo 12 caracteres" });
               }
             }
           });

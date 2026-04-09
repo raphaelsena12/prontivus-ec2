@@ -34,8 +34,7 @@ const loginSchema = z.object({
     .email("Formato de email inválido"),
   password: z
     .string()
-    .min(1, "Senha é obrigatória")
-    .min(6, "Senha deve ter no mínimo 6 caracteres"),
+    .min(1, "Senha é obrigatória"),
 });
 
 const recuperarSenhaSchema = z.object({

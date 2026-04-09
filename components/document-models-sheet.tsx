@@ -20,7 +20,6 @@ import {
   FileCheck,
   Stethoscope,
   FlaskConical,
-  Scale,
   ScrollText,
   Activity,
   Loader2,
@@ -65,7 +64,6 @@ const documentModels: DocumentModel[] = [
   { id: "prontuario-medico", nome: "Prontuário Médico", descricao: "Prontuário completo com anamnese, exame físico, diagnóstico e conduta", categoria: "prontuario", icon: FileText },
   { id: "receita-medica", nome: "Receita Médica", descricao: "Receita médica simples com prescrições do atendimento", categoria: "receitas", icon: Pill },
   { id: "receita-controle-especial", nome: "Receita de Controle Especial", descricao: "Receita para medicamentos controlados (portaria 344/98)", categoria: "receitas", icon: ShieldCheck },
-  { id: "receita-tipo-ba", nome: "Receita Tipo B", descricao: "Receita especial para substâncias tipo B e A", categoria: "receitas", icon: ShieldCheck },
   { id: "atestado-afastamento", nome: "Atestado de Afastamento", descricao: "Atestado médico para afastamento do trabalho ou atividades", categoria: "atestados", icon: FileCheck, needsForm: true },
   { id: "atestado-afastamento-cid", nome: "Atestado de Afastamento c/ CID", descricao: "Atestado de afastamento incluindo código CID-10 do diagnóstico", categoria: "atestados", icon: FileCheck, needsForm: true },
   { id: "atestado-afastamento-sem-cid", nome: "Atestado de Afastamento s/ CID", descricao: "Atestado de afastamento sem exposição do código CID-10", categoria: "atestados", icon: FileCheck, needsForm: true },
@@ -77,9 +75,9 @@ const documentModels: DocumentModel[] = [
   { id: "declaracao-comparecimento-acompanhante", nome: "Declaração de Comparecimento (Acompanhante)", descricao: "Declaração para acompanhantes que necessitam comprovar presença", categoria: "atestados", icon: UserCheck },
   { id: "declaracao-comparecimento-horario-cid", nome: "Declaração de Comparecimento de Horário c/ CID", descricao: "Declaração com horário de atendimento e código CID-10", categoria: "atestados", icon: UserCheck },
   { id: "declaracao-comparecimento", nome: "Declaração de Comparecimento", descricao: "Declaração simples de comparecimento à consulta médica", categoria: "atestados", icon: UserCheck },
-  { id: "pedido-exames", nome: "Pedido de Exames", descricao: "Solicitação de exames laboratoriais e de imagem", categoria: "exames", icon: FlaskConical },
+  { id: "pedido-exames", nome: "Pedido de Exames", descricao: "Solicitação de exames laboratoriais e de imagem", categoria: "exames", icon: FlaskConical, needsForm: true },
   { id: "justificativa-exames-plano", nome: "Justificativa de Exames para Planos de Saúde", descricao: "Justificativa médica para autorização de exames pelo plano de saúde", categoria: "exames", icon: ClipboardList },
-  { id: "laudo-medico", nome: "Laudo Médico", descricao: "Laudo médico detalhado com diagnóstico e parecer técnico", categoria: "laudos", icon: ScrollText },
+  { id: "laudo-medico", nome: "Laudo Médico", descricao: "Laudo médico detalhado com diagnóstico e parecer técnico", categoria: "laudos", icon: ScrollText, needsForm: true },
   { id: "risco-cirurgico-cardiaco", nome: "Risco Cirúrgico Cardíaco", descricao: "Avaliação de risco cirúrgico cardíaco pré-operatório", categoria: "laudos", icon: Heart },
   { id: "guia-encaminhamento", nome: "Guia de Encaminhamento", descricao: "Guia para encaminhamento a outro especialista ou serviço", categoria: "laudos", icon: Stethoscope },
   { id: "guia-consulta-tiss", nome: "Guia Consulta - SADT", descricao: "Guia de consulta padrão TISS para planos de saúde (ANS) — A4 paisagem", categoria: "laudos", icon: ClipboardList },
@@ -87,7 +85,6 @@ const documentModels: DocumentModel[] = [
   { id: "controle-diabetes", nome: "Controle de Diabetes", descricao: "Ficha de controle e acompanhamento de diabetes", categoria: "outros", icon: Activity },
   { id: "controle-pressao-arterial-analitico", nome: "Controle de Pressão Arterial Analítico", descricao: "Ficha analítica de acompanhamento de pressão arterial com métricas", categoria: "outros", icon: Heart },
   { id: "controle-pressao-arterial", nome: "Controle de Pressão Arterial", descricao: "Ficha de controle e acompanhamento de pressão arterial", categoria: "outros", icon: Heart },
-  { id: "termo-consentimento", nome: "Termo de Consentimento", descricao: "Termo de consentimento livre e esclarecido para procedimentos", categoria: "outros", icon: Scale },
 ];
 
 export function DocumentModelsSheet({
@@ -111,6 +108,7 @@ export function DocumentModelsSheet({
   const [mesesValidade, setMesesValidade] = useState("6");
   const [observacoes, setObservacoes] = useState("");
   const [cidade, setCidade] = useState("");
+  const [textoLaudo, setTextoLaudo] = useState("");
 
   const filteredModels = documentModels.filter((model) => {
     const matchesCategory = activeCategory === "todos" || model.categoria === activeCategory;
@@ -163,6 +161,7 @@ export function DocumentModelsSheet({
           cidDescricao: cidData?.description,
           observacoes,
           cidade,
+          textoLaudo,
         },
       };
 
@@ -211,6 +210,7 @@ export function DocumentModelsSheet({
     setMesesValidade("6");
     setObservacoes("");
     setCidade("");
+    setTextoLaudo("");
   };
 
   const resetAndClose = () => {
@@ -219,6 +219,9 @@ export function DocumentModelsSheet({
     onClose();
   };
 
+  const isLaudo = formModel?.id === "laudo-medico";
+  const isPedidoExames = formModel?.id === "pedido-exames";
+  const isTextoLivre = isLaudo || isPedidoExames;
   const isIndeterminado = formModel?.id === "atestado-afastamento-indeterminado";
   const isAptidao = formModel?.id === "atestado-aptidao-fisica-mental" ||
     formModel?.id === "atestado-aptidao-piscinas" ||
@@ -336,89 +339,112 @@ export function DocumentModelsSheet({
 
             <div className="space-y-4 py-2">
 
-              {/* Dias de afastamento */}
-              {!isAptidao && !isIndeterminado && (
+              {/* Texto livre (Laudo Médico / Pedido de Exames) */}
+              {isTextoLivre ? (
                 <div>
                   <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    Dias de Afastamento
+                    <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                    {isPedidoExames ? "Texto do Pedido" : "Texto do Laudo"}
                   </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={diasAfastamento}
-                    onChange={(e) => setDiasAfastamento(e.target.value)}
-                    className="h-10 bg-slate-50 border-slate-200"
-                    placeholder="1"
+                  <Textarea
+                    value={textoLaudo}
+                    onChange={(e) => {
+                      if (e.target.value.length <= 1000) setTextoLaudo(e.target.value);
+                    }}
+                    className="min-h-[160px] bg-slate-50 border-slate-200 resize-none text-sm"
+                    placeholder={isPedidoExames ? "Digite os exames solicitados..." : "Digite o conteúdo do laudo médico..."}
                     autoFocus
+                    maxLength={1000}
                   />
+                  <p className="text-[10px] text-slate-400 mt-1 text-right">{textoLaudo.length}/1000</p>
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* Dias de afastamento */}
+                  {!isAptidao && !isIndeterminado && (
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        Dias de Afastamento
+                      </label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={diasAfastamento}
+                        onChange={(e) => setDiasAfastamento(e.target.value)}
+                        className="h-10 bg-slate-50 border-slate-200"
+                        placeholder="1"
+                        autoFocus
+                      />
+                    </div>
+                  )}
 
-              {/* Meses de validade */}
-              {isAptidao && (
-                <div>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                    Validade (meses)
-                  </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={mesesValidade}
-                    onChange={(e) => setMesesValidade(e.target.value)}
-                    className="h-10 bg-slate-50 border-slate-200"
-                    placeholder="6"
-                    autoFocus
-                  />
-                </div>
-              )}
+                  {/* Meses de validade */}
+                  {isAptidao && (
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        Validade (meses)
+                      </label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="24"
+                        value={mesesValidade}
+                        onChange={(e) => setMesesValidade(e.target.value)}
+                        className="h-10 bg-slate-50 border-slate-200"
+                        placeholder="6"
+                        autoFocus
+                      />
+                    </div>
+                  )}
 
-              {/* CID automático do diagnóstico da IA */}
-              {cidAutomatico && (
-                <div>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
-                    <Hash className="w-3.5 h-3.5 text-slate-400" />
-                    CID-10 <span className="text-slate-400 font-normal">(diagnóstico da IA)</span>
-                  </label>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-200 bg-slate-50">
-                    <Badge className="bg-slate-800 text-white font-mono text-xs flex-shrink-0">
-                      {cidAutomatico.code}
-                    </Badge>
-                    <span className="text-sm text-slate-600">{cidAutomatico.description}</span>
+                  {/* CID automático do diagnóstico da IA */}
+                  {cidAutomatico && (
+                    <div>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
+                        <Hash className="w-3.5 h-3.5 text-slate-400" />
+                        CID-10 <span className="text-slate-400 font-normal">(diagnóstico da IA)</span>
+                      </label>
+                      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                        <Badge className="bg-slate-800 text-white font-mono text-xs flex-shrink-0">
+                          {cidAutomatico.code}
+                        </Badge>
+                        <span className="text-sm text-slate-600">{cidAutomatico.description}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cidade */}
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      Cidade <span className="text-slate-400 font-normal">(opcional)</span>
+                    </label>
+                    <Input
+                      value={cidade}
+                      onChange={(e) => setCidade(e.target.value)}
+                      className="h-10 bg-slate-50 border-slate-200"
+                      placeholder="Ex: São Paulo - SP"
+                    />
                   </div>
-                </div>
+
+                  {/* Observações */}
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                      Observações <span className="text-slate-400 font-normal">(opcional)</span>
+                    </label>
+                    <Textarea
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                      className="min-h-[80px] bg-slate-50 border-slate-200 resize-none text-sm"
+                      placeholder="Informações adicionais que devem constar no documento..."
+                    />
+                  </div>
+                </>
               )}
-
-              {/* Cidade */}
-              <div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  Cidade <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <Input
-                  value={cidade}
-                  onChange={(e) => setCidade(e.target.value)}
-                  className="h-10 bg-slate-50 border-slate-200"
-                  placeholder="Ex: São Paulo - SP"
-                />
-              </div>
-
-              {/* Observações */}
-              <div>
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 mb-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-                  Observações <span className="text-slate-400 font-normal">(opcional)</span>
-                </label>
-                <Textarea
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  className="min-h-[80px] bg-slate-50 border-slate-200 resize-none text-sm"
-                  placeholder="Informações adicionais que devem constar no documento..."
-                />
-              </div>
             </div>
 
             <DialogFooter className="gap-2">
@@ -427,7 +453,7 @@ export function DocumentModelsSheet({
               </Button>
               <Button
                 onClick={() => handleGeneratePDF(formModel.id)}
-                disabled={generating}
+                disabled={generating || (isTextoLivre && textoLaudo.trim().length === 0)}
                 className="flex-1 h-10 text-sm bg-slate-800 hover:bg-slate-900 text-white"
               >
                 {generating ? (

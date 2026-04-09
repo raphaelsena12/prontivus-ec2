@@ -10,7 +10,13 @@
       "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
       "Bash(curl -s -H \"Authorization: Bearer cc7c2e75bd5f603a72a6a4a17f6b7ba461addea576f58b06502489e5e92d0c16\" https://prontivus.com/api/cron/lembretes-whatsapp)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
-      "Bash(ls -la \"c:\\\\Users\\\\raphael.souza\\\\Desktop\\\\Prontivus\\\\prontivus-ec2\\\\app\\\\\\(protected\\)\")"
+      "Bash(ls -la \"c:\\\\Users\\\\raphael.souza\\\\Desktop\\\\Prontivus\\\\prontivus-ec2\\\\app\\\\\\(protected\\)\")",
+      "Bash(npm run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda"
     ]
   }
 }

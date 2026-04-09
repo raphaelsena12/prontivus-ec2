@@ -152,7 +152,9 @@ export function PacientesContent() {
       // Buscar dados completos do paciente
       const response = await fetch(`/api/secretaria/pacientes/${pacienteId}`);
       if (!response.ok) {
-        throw new Error("Erro ao carregar paciente");
+        const errorBody = await response.json().catch(() => ({}));
+        console.error("Status:", response.status, "Body:", errorBody);
+        throw new Error(errorBody.error || "Erro ao carregar paciente");
       }
       const data = await response.json();
       setEditingPaciente(data.paciente);

@@ -105,7 +105,7 @@ const createUsuarioSchema = z.object({
       { message: "Telefone inválido. Use o formato (XX) XXXXX-XXXX" }
     ),
   tipo: z.nativeEnum(TipoUsuario),
-  senha: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  senha: z.string().min(12, "Senha deve ter no mínimo 12 caracteres"),
 });
 
 const updateUsuarioSchema = z.object({
@@ -121,7 +121,7 @@ const updateUsuarioSchema = z.object({
     ),
   tipo: z.nativeEnum(TipoUsuario),
   senha: z
-    .union([z.string().min(6, "Senha deve ter no mínimo 6 caracteres"), z.literal(""), z.undefined()])
+    .union([z.string().min(12, "Senha deve ter no mínimo 12 caracteres"), z.literal(""), z.undefined()])
     .optional(),
 });
 
@@ -270,7 +270,7 @@ export function UsuariosContent({ clinica }: UsuariosContentProps) {
             }
             // Validar senha apenas se foi fornecida
             if (field === "senha" && data.senha && data.senha.trim() !== "") {
-              if (data.senha.trim().length < 6) {
+              if (data.senha.trim().length < 12) {
                 form.setError("senha", { message: "Senha deve ter no mínimo 6 caracteres" });
               }
             }

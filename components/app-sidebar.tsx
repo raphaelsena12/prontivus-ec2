@@ -32,6 +32,7 @@ import {
   IconArrowBack,
   IconCashBanknote,
   IconFileInvoice,
+  IconShieldLock,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -369,6 +370,11 @@ const getSimpleMenuItems = (tipo: TipoUsuario) => {
       title: "Operadoras",
       url: "/super-admin/operadoras",
       icon: IconFileText,
+    });
+    items.push({
+      title: "Logs de Auditoria (LGPD)",
+      url: "/super-admin/audit-logs",
+      icon: IconShieldLock,
     });
   }
 
