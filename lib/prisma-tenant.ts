@@ -1,6 +1,7 @@
 import { PrismaClient } from "@/lib/generated/prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { applyFieldEncryption } from "@/lib/crypto/prisma-encryption";
 
 // Cache de clients por clinicaId para evitar criar múltiplos clients
 const clientCache = new Map<string, PrismaClient>();
@@ -118,12 +119,14 @@ export function getPrismaClient(clinicaId?: string): PrismaClient {
     return clientCache.get(clinicaId)!;
   }
 
-  // Criar novo client com adapter
+  // Criar novo client com adapter + criptografia de campos
   const adapter = new PrismaPg(pool);
-  const client = new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+  const client = applyFieldEncryption(
+    new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    })
+  );
 
   // Criar proxy para interceptar chamadas e adicionar filtro de clinicaId
   const proxiedClient = new Proxy(client, {
@@ -176,13 +179,15 @@ export function getPrismaAdminClient(): PrismaClient {
   }
 
   const adapter = new PrismaPg(pool);
-  adminClient = new PrismaClient({
-    adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-  });
+  adminClient = applyFieldEncryption(
+    new PrismaClient({
+      adapter,
+      log:
+        process.env.NODE_ENV === "development"
+          ? ["query", "error", "warn"]
+          : ["error"],
+    })
+  );
 
   return adminClient;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -59,7 +59,9 @@ import {
   Ruler,
   TrendingUp,
   FileText as FileTextIcon,
-  X
+  X,
+  Wifi,
+  Phone as PhoneIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -82,7 +84,6 @@ import { PatientHistory } from '@/components/atendimento/patient/PatientHistory'
 import { TranscriptionBar } from '@/components/atendimento/consultation/TranscriptionBar';
 import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
 import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
-import { TelemedicineView } from '@/components/atendimento/consultation/TelemedicineView';
 import { AvatarWithS3 } from '@/components/avatar-with-s3';
 
 interface Consulta {
@@ -130,11 +131,36 @@ interface Prontuario {
   evolucao: string | null;
 }
 
-interface AtendimentoContentProps {
-  consultaId: string;
+interface ChatMessage {
+  id: number;
+  sender: string;
+  text: string;
+  time: string;
 }
 
-export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
+interface AtendimentoContentProps {
+  consultaId: string;
+  // Props de telemedicina (opcionais — injetadas pela page de sessão)
+  telemedicinaProps?: {
+    localVideoRef: React.RefObject<HTMLVideoElement | null>;
+    remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
+    isMicOn: boolean;
+    onToggleMic: (v: boolean) => void;
+    isCameraOn: boolean;
+    onToggleCamera: (v: boolean) => void;
+    isScreenSharing: boolean;
+    onToggleScreenSharing: (v: boolean) => void;
+    connectionQuality: "excellent" | "good" | "unstable";
+    patientPresent: boolean;
+    patientLink?: string;
+    chatMessages: ChatMessage[];
+    onSendMessage: (text: string) => void;
+    onEncerrar: () => void;
+    remoteAudioRef?: React.RefObject<HTMLAudioElement | null>;
+  };
+}
+
+export function AtendimentoContent({ consultaId, telemedicinaProps }: AtendimentoContentProps) {
   const router = useRouter();
   const { open: sidebarOpen, isMobile } = useSidebar();
   const [loading, setLoading] = useState(true);
@@ -142,13 +168,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [prontuario, setProntuario] = useState<Prontuario | null>(null);
   const [activeTab, setActiveTab] = useState<string>('informacoes');
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isCameraOn, setIsCameraOn] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const [chatMessage, setChatMessage] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [connectionQuality, setConnectionQuality] = useState('excellent');
   const [sessionStartTime] = useState(new Date());
   const [sessionDuration, setSessionDuration] = useState('00:00:00');
   const [historicoConsultas, setHistoricoConsultas] = useState<any[]>([]);
@@ -511,23 +531,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
   // Determinar se é telemedicina baseado no tipo de consulta
   const isTelemedicina = consulta?.tipoConsulta?.nome?.toLowerCase().includes('telemedicina') || false;
 
-  // Tabs para consulta normal
-  const tabsNormal = [
+  // Tabs — unificadas para ambos os modos
+  const tabs = [
     { id: 'informacoes', label: 'Informações', icon: User },
     { id: 'contexto-consulta', label: 'Contexto da consulta', icon: FileText },
   ];
 
-  // Tabs para telemedicina
-  const tabsTelemedicina = [
-    { id: 'informacoes', label: 'Informações', icon: User },
-    { id: 'telemedicina', label: 'Telemedicina', icon: Video },
-  ];
-
-  const tabs = isTelemedicina ? tabsTelemedicina : tabsNormal;
-
-  const chatMessages = [
-    { id: 1, sender: 'patient', text: 'Olá, doutor! Consegue me ouvir bem?', time: formatTime(new Date()) },
-  ];
 
   useEffect(() => {
     fetchConsulta();
@@ -1418,12 +1427,8 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
       }
 
       // Definir aba inicial baseado no tipo de consulta
-      const isTelemedicina = data.consulta?.tipoConsulta?.nome?.toLowerCase().includes('telemedicina') || false;
-      if (isTelemedicina) {
-        setActiveTab('telemedicina');
-      } else {
-        setActiveTab('contexto-consulta');
-      }
+      // Ambos os modos usam o mesmo layout — aba inicial é contexto-consulta
+      setActiveTab('contexto-consulta');
     } catch (error: any) {
       const errorMessage = error.message || "Erro ao carregar dados do atendimento";
       toast.error(errorMessage);
@@ -2042,7 +2047,6 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
 
   // Lista completa de documentos disponíveis
   const documentModels = useMemo(() => [
-    { id: "prontuario-medico", nome: "Prontuário Médico" },
     { id: "receita-medica", nome: "Receita Médica" },
     { id: "receita-controle-especial", nome: "Receita de Controle Especial" },
     { id: "receita-tipo-ba", nome: "Receita Tipo B" },
@@ -2400,18 +2404,104 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   <span className="whitespace-nowrap">Resumo Clínico</span>
                 </Button>
 
-                {isTelemedicina && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {}}
-                    className="h-9 px-4 text-xs gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 flex-shrink-0"
-                  >
-                    <Video className="w-3.5 h-3.5" />
-                    <span className="whitespace-nowrap">Videochamada</span>
-                  </Button>
+                {isTelemedicina && telemedicinaProps && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Controles A/V compactos */}
+                    <button
+                      onClick={() => telemedicinaProps.onToggleMic(!telemedicinaProps.isMicOn)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        telemedicinaProps.isMicOn
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-red-100 text-red-600 hover:bg-red-200"
+                      }`}
+                      title={telemedicinaProps.isMicOn ? "Mutar microfone" : "Ativar microfone"}
+                    >
+                      {telemedicinaProps.isMicOn ? <Mic className="w-3.5 h-3.5" /> : <MicOff className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => telemedicinaProps.onToggleCamera(!telemedicinaProps.isCameraOn)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        telemedicinaProps.isCameraOn
+                          ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          : "bg-red-100 text-red-600 hover:bg-red-200"
+                      }`}
+                      title={telemedicinaProps.isCameraOn ? "Desligar câmera" : "Ligar câmera"}
+                    >
+                      {telemedicinaProps.isCameraOn ? <Video className="w-3.5 h-3.5" /> : <VideoOff className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => telemedicinaProps.onToggleScreenSharing(!telemedicinaProps.isScreenSharing)}
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                        telemedicinaProps.isScreenSharing
+                          ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                      title="Compartilhar tela"
+                    >
+                      <Monitor className="w-3.5 h-3.5" />
+                    </button>
+                    {/* Qualidade conexão */}
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold ${
+                      telemedicinaProps.connectionQuality === "excellent" ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
+                      telemedicinaProps.connectionQuality === "good" ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
+                      "bg-red-50 border-red-200 text-red-600"
+                    }`}>
+                      <Wifi className="w-3 h-3" />
+                      <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                        telemedicinaProps.connectionQuality === "excellent" ? "bg-emerald-500" :
+                        telemedicinaProps.connectionQuality === "good" ? "bg-yellow-500" : "bg-red-500"
+                      }`} />
+                    </div>
+                  </div>
                 )}
               </div>
+
+              {/* Telemedicina PiP — vídeo compacto do paciente */}
+              {isTelemedicina && telemedicinaProps && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="relative w-[180px] h-[120px] rounded-xl overflow-hidden bg-slate-900 border-2 border-slate-200 shadow-lg flex-shrink-0">
+                    {/* Placeholder quando paciente não conectou */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        telemedicinaProps.patientPresent
+                          ? "bg-emerald-500/20"
+                          : "bg-slate-700 animate-pulse"
+                      }`}>
+                        <User className="w-5 h-5 text-slate-400" />
+                      </div>
+                      <span className="text-[9px] text-slate-500 mt-1">
+                        {telemedicinaProps.patientPresent ? "" : "Aguardando..."}
+                      </span>
+                    </div>
+                    {/* Vídeo remoto */}
+                    <video
+                      ref={telemedicinaProps.remoteVideoRef}
+                      autoPlay
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover z-10"
+                    />
+                    {/* PiP local (miniatura) */}
+                    <div className="absolute bottom-1.5 right-1.5 w-[52px] h-[36px] rounded-lg overflow-hidden bg-slate-800 border border-white/20 shadow-md z-20">
+                      <video
+                        ref={telemedicinaProps.localVideoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {/* Badge de presença */}
+                    <div className={`absolute top-1.5 left-1.5 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
+                      telemedicinaProps.patientPresent
+                        ? "bg-emerald-500/90 text-white"
+                        : "bg-slate-700/80 text-slate-300"
+                    }`}>
+                      <span className={`w-1 h-1 rounded-full ${telemedicinaProps.patientPresent ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+                      {telemedicinaProps.patientPresent ? "Online" : "Offline"}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Vitais — chips compactos */}
               <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
@@ -2460,7 +2550,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
         />
 
         {/* Zona 3 — Stepper de Progresso */}
-        {!isTelemedicina && (() => {
+        {(() => {
           const hasTranscription = isTranscribing || transcricaoFinalizada || transcription.length > 0;
           const hasAnamnese = !!(analysisResults?.anamnese || prontuario?.anamnese);
           const hasAnamnDiv = anamneseConfirmed || hasAnamnese;
@@ -2519,40 +2609,7 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           );
         })()}
 
-        {/* Zona 4 — Consulta Atual */}
-        {isTelemedicina ? (
-          <TelemedicineView
-            patient={patient}
-            vitals={vitals}
-            sessionDuration={sessionDuration}
-            connectionQuality={connectionQuality}
-            isMicOn={isMicOn}
-            setIsMicOn={setIsMicOn}
-            isCameraOn={isCameraOn}
-            setIsCameraOn={setIsCameraOn}
-            isScreenSharing={isScreenSharing}
-            setIsScreenSharing={setIsScreenSharing}
-            isFullscreen={isFullscreen}
-            setIsFullscreen={setIsFullscreen}
-            isChatOpen={isChatOpen}
-            setIsChatOpen={setIsChatOpen}
-            chatMessage={chatMessage}
-            setChatMessage={setChatMessage}
-            chatMessages={chatMessages}
-            onSendMessage={() => {}}
-            isTranscribing={isTranscribing}
-            isPaused={isPaused}
-            transcription={transcription}
-            startTranscription={startTranscription}
-            pauseTranscription={pauseTranscription}
-            resumeTranscription={resumeTranscription}
-            stopTranscription={stopTranscription}
-            handleProcessTranscription={handleProcessTranscription}
-            onOpenResumoClinico={() => setResumoClinicoDialogOpen(true)}
-            onEncerrar={handleFinalizarAtendimento}
-          />
-        ) : (
-          <>
+        {/* Zona 4 — Consulta Atual (layout unificado presencial + telemedicina) */}
           <div className="grid grid-cols-10 gap-4 items-stretch w-full min-w-0">
             {/* Coluna Anamnese */}
             <div className="col-span-7 h-full flex flex-col min-w-0 overflow-x-hidden">
@@ -2624,12 +2681,12 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
                   historicoClinico={historicoClinico}
                   onRepetirItens={handleRepetirItens}
                   onAttachExame={() => setUploadDialogOpen(true)}
+                  isTelemedicina={isTelemedicina}
+                  chatMessages={telemedicinaProps?.chatMessages}
+                  onSendMessage={telemedicinaProps?.onSendMessage}
                 />
             </div>
           </div>
-
-          </>
-        )}
       </div>
 
       {/* ── Barra de ações fixada no bottom ── */}
@@ -2648,15 +2705,25 @@ export function AtendimentoContent({ consultaId }: AtendimentoContentProps) {
           </button>
 
 
-          <button
-            onClick={() => setFinalizarModalOpen(true)}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
-            style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            {saving ? "Salvando..." : "Finalizar Atendimento"}
-          </button>
+          {isTelemedicina && telemedicinaProps ? (
+            <button
+              onClick={telemedicinaProps.onEncerrar}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all bg-red-600 hover:bg-red-700 shadow-sm"
+            >
+              <PhoneIcon className="w-3.5 h-3.5 rotate-[135deg]" />
+              Encerrar Consulta
+            </button>
+          ) : (
+            <button
+              onClick={() => setFinalizarModalOpen(true)}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-60"
+              style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              {saving ? "Salvando..." : "Finalizar Atendimento"}
+            </button>
+          )}
         </div>
       </div>
 
