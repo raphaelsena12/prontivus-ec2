@@ -47,7 +47,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { formatDate, formatCPF } from "@/lib/utils";
+import { formatDate, maskCPF } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { Loader2 } from "lucide-react";
 
@@ -177,7 +177,7 @@ export function HistoricoAtendimentosContent() {
           </span>
         ),
         cell: ({ row }) => (
-          <div className="text-xs">{formatCPF(row.original.cpf)}</div>
+          <div className="text-xs">{maskCPF(row.original.cpf)}</div>
         ),
       },
       {

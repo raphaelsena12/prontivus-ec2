@@ -51,7 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { formatCPF } from "@/lib/utils";
+import { maskCPF } from "@/lib/utils";
 import { Edit, Power } from "lucide-react";
 
 interface Usuario {
@@ -180,7 +180,7 @@ export function UsuariosTable({
       {
         accessorKey: "cpf",
         header: "CPF",
-        cell: ({ row }) => formatCPF(row.original.cpf),
+        cell: ({ row }) => maskCPF(row.original.cpf),
       },
       {
         accessorKey: "tipo",

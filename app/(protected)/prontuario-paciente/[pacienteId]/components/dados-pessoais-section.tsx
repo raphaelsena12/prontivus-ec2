@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, User, Calendar, Phone, Mail, MapPin, FileText } from 'lucide-react';
-import { formatDate, formatCPF, calcularIdade } from '@/lib/utils';
+import { formatDate, maskCPF, calcularIdade } from '@/lib/utils';
 
 interface DadosPessoaisSectionProps {
   paciente: {
@@ -25,8 +25,6 @@ interface DadosPessoaisSectionProps {
     bairro: string | null;
     cidade: string | null;
     estado: string | null;
-    nomeMae: string | null;
-    nomePai: string | null;
     profissao: string | null;
     estadoCivil: string | null;
     observacoes: string | null;
@@ -73,7 +71,7 @@ export function DadosPessoaisSection({ paciente, expanded, onToggle }: DadosPess
                     <FileText className="w-4 h-4 text-slate-400 mt-1" />
                     <div className="flex-1">
                       <p className="text-xs text-slate-500 mb-0.5">CPF</p>
-                      <p className="text-sm font-medium text-slate-800">{formatCPF(paciente.cpf)}</p>
+                      <p className="text-sm font-medium text-slate-800">{maskCPF(paciente.cpf)}</p>
                     </div>
                   </div>
                   
@@ -183,33 +181,6 @@ export function DadosPessoaisSection({ paciente, expanded, onToggle }: DadosPess
                         {paciente.cep && ` - CEP: ${paciente.cep}`}
                       </p>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {(paciente.nomeMae || paciente.nomePai) && (
-                <div>
-                  <h4 className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">Filiação</h4>
-                  <div className="space-y-3">
-                    {paciente.nomeMae && (
-                      <div className="flex items-start gap-3">
-                        <User className="w-4 h-4 text-slate-400 mt-1" />
-                        <div className="flex-1">
-                          <p className="text-xs text-slate-500 mb-0.5">Nome da Mãe</p>
-                          <p className="text-sm font-medium text-slate-800">{paciente.nomeMae}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {paciente.nomePai && (
-                      <div className="flex items-start gap-3">
-                        <User className="w-4 h-4 text-slate-400 mt-1" />
-                        <div className="flex-1">
-                          <p className="text-xs text-slate-500 mb-0.5">Nome do Pai</p>
-                          <p className="text-sm font-medium text-slate-800">{paciente.nomePai}</p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

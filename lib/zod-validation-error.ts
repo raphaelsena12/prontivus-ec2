@@ -26,8 +26,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   bairro: "Bairro",
   cidade: "Cidade",
   estado: "Estado",
-  nomeMae: "Nome da mãe",
-  nomePai: "Nome do pai",
   profissao: "Profissão",
   estadoCivil: "Estado civil",
   observacoes: "Observações",

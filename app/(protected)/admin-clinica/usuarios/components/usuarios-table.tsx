@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Trash2, Plus, Upload } from "lucide-react";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { formatCPF, formatDate } from "@/lib/utils";
+import { maskCPF, formatDate } from "@/lib/utils";
 import { IconCircleCheckFilled, IconLoader } from "@tabler/icons-react";
 
 interface Usuario {
@@ -139,7 +139,7 @@ export function UsuariosTable({
         accessorKey: "cpf",
         header: "CPF",
         cell: ({ row }) => (
-          <div>{formatCPF(row.original.cpf)}</div>
+          <div>{maskCPF(row.original.cpf)}</div>
         ),
       },
       {

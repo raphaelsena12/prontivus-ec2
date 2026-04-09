@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AvatarWithS3 } from "@/components/avatar-with-s3";
 import { toast } from "sonner";
-import { formatDate, formatCPF } from "@/lib/utils";
+import { formatDate, maskCPF } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Phone, Clock, User, Stethoscope, Loader2, List } from "lucide-react";
 import { AdicionarListaEsperaModal } from "./components/adicionar-lista-espera-modal";
@@ -323,7 +323,7 @@ export function ListaEsperaContent() {
                               <div>
                                 <p className="text-sm font-medium">{lista.paciente.nome}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {formatCPF(lista.paciente.cpf)}
+                                  {maskCPF(lista.paciente.cpf)}
                                   {lista.paciente.numeroProntuario && (
                                     <> • Pront: {lista.paciente.numeroProntuario}</>
                                   )}

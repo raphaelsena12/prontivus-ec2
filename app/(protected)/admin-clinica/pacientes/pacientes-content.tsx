@@ -46,8 +46,6 @@ interface Paciente {
   bairro: string | null;
   cidade: string | null;
   estado: string | null;
-  nomeMae: string | null;
-  nomePai: string | null;
   profissao: string | null;
   estadoCivil: string | null;
   observacoes: string | null;

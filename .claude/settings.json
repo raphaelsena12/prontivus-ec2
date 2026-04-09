@@ -16,7 +16,8 @@
       "Bash(git commit -m ':*)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda"
+      "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda",
+      "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\admin-clinica\\dsar"
     ]
   }
 }

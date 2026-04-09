@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { formatTime, formatCPF } from "@/lib/utils";
+import { formatTime, maskCPF } from "@/lib/utils";
 import { playPollyAnnouncement } from "@/lib/play-polly-announcement";
 import { PageHeader } from "@/components/page-header";
 
@@ -346,7 +346,7 @@ export function FilaAtendimentoContent() {
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">
                         <span className="text-xs text-foreground font-mono">
-                          {formatCPF(consulta.paciente.cpf)}
+                          {maskCPF(consulta.paciente.cpf)}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">

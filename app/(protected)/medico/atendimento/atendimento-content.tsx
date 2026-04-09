@@ -65,7 +65,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
-import { formatDate, formatTime, formatCPF, calcularIdade } from '@/lib/utils';
+import { formatDate, formatTime, maskCPF, calcularIdade } from '@/lib/utils';
 import { useTranscription } from '@/hooks/use-transcription';
 import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';

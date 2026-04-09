@@ -29,8 +29,6 @@ const pacienteSchema = z.object({
   bairro: z.string().nullable().optional(),
   cidade: z.string().nullable().optional(),
   estado: z.string().nullable().optional(),
-  nomeMae: z.string().nullable().optional(),
-  nomePai: z.string().nullable().optional(),
   profissao: z.string().nullable().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).nullable().optional(),
   observacoes: z.string().nullable().optional(),
@@ -131,7 +129,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         id, "clinicaId", "usuarioId", "numeroProntuario", nome, cpf, rg, 
         "dataNascimento", sexo, email, telefone, celular, cep, endereco, 
-        numero, complemento, bairro, cidade, estado, "nomeMae", "nomePai", 
+        numero, complemento, bairro, cidade, estado,
         profissao, "estadoCivil", observacoes, ativo, "createdAt", "updatedAt"
       FROM pacientes
       WHERE ${whereConditions}
@@ -142,7 +140,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         id, "clinicaId", "usuarioId", NULL as "numeroProntuario", nome, cpf, rg, 
         "dataNascimento", sexo, email, telefone, celular, cep, endereco, 
-        numero, complemento, bairro, cidade, estado, "nomeMae", "nomePai", 
+        numero, complemento, bairro, cidade, estado,
         profissao, "estadoCivil", observacoes, ativo, "createdAt", "updatedAt"
       FROM pacientes
       WHERE ${whereConditions}
@@ -311,7 +309,7 @@ export async function POST(request: NextRequest) {
         INSERT INTO pacientes (
           id, "clinicaId", "usuarioId", nome, cpf, rg, "dataNascimento", sexo, 
           email, telefone, celular, cep, endereco, numero, complemento, 
-          bairro, cidade, estado, "nomeMae", "nomePai", profissao, "estadoCivil", 
+          bairro, cidade, estado, profissao, "estadoCivil",
           observacoes, ativo, "createdAt", "updatedAt"
         ) VALUES (
           gen_random_uuid(), 
@@ -332,8 +330,6 @@ export async function POST(request: NextRequest) {
           ${escapeSQL(data.bairro || null)},
           ${escapeSQL(data.cidade || null)},
           ${escapeSQL(data.estado || null)},
-          ${escapeSQL(data.nomeMae || null)},
-          ${escapeSQL(data.nomePai || null)},
           ${escapeSQL(data.profissao || null)},
           ${escapeSQL(data.estadoCivil || null)},
           ${escapeSQL(data.observacoes || null)},

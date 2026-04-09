@@ -154,8 +154,6 @@ export async function POST(request: NextRequest) {
             bairro: row.bairro ? row.bairro.toString().trim() : null,
             cidade: row.cidade ? row.cidade.toString().trim() : null,
             estado: row.estado || row.uf ? (row.estado || row.uf).toString().trim().substring(0, 2).toUpperCase() : null,
-            nomeMae: row.nome_mae || row.mae ? (row.nome_mae || row.mae).toString().trim() : null,
-            nomePai: row.nome_pai || row.pai ? (row.nome_pai || row.pai).toString().trim() : null,
             profissao: row.profissao ? row.profissao.toString().trim() : null,
             estadoCivil: row.estado_civil || row.estado_civil_abrev ? (row.estado_civil || row.estado_civil_abrev).toString().trim().toUpperCase() : null,
             observacoes: row.observacoes || row.obs ? (row.observacoes || row.obs).toString().trim() : null,

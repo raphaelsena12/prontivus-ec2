@@ -222,6 +222,16 @@ const getMenuCategories = (tipo: TipoUsuario): NavCategory[] => {
           url: "/admin-clinica/configuracoes",
           icon: IconSettings,
         },
+        {
+          title: "Consentimentos LGPD",
+          url: "/admin-clinica/consentimentos-lgpd",
+          icon: IconShieldLock,
+        },
+        {
+          title: "Solicitações DSAR",
+          url: "/admin-clinica/dsar",
+          icon: IconFileAlert,
+        },
       ],
     });
   }

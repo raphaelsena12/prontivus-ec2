@@ -15,6 +15,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import Link from "next/link";
+import { ConsentimentoModal } from "@/components/lgpd/consentimento-modal";
 
 interface PacienteContentProps {
   nome: string;
@@ -81,6 +82,7 @@ export function PacienteContent({ nome }: PacienteContentProps) {
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-0">
+      <ConsentimentoModal />
       <div className="px-6 lg:px-8 pt-6">
         <PageHeader
           icon={LayoutDashboard}

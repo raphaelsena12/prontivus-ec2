@@ -70,6 +70,17 @@ export function formatCPF(cpf: string | null | undefined): string {
 }
 
 /**
+ * Mascara o CPF para exibição parcial (LGPD).
+ * Ex: 39246119800 → 392.461.***-**
+ */
+export function maskCPF(cpf: string | null | undefined): string {
+  if (!cpf) return "-";
+  const cleaned = cpf.replace(/\D/g, "");
+  if (cleaned.length !== 11) return cpf;
+  return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.***-**`;
+}
+
+/**
  * Normaliza uma string removendo acentos, espaços e caracteres especiais
  * para uso em emails ou URLs
  */

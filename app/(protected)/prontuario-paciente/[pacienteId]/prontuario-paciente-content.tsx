@@ -18,7 +18,7 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate, formatCPF, calcularIdade } from '@/lib/utils';
+import { formatDate, maskCPF, calcularIdade } from '@/lib/utils';
 
 /* ── Interfaces ─────────────────────────────────────────────────────────── */
 
@@ -41,8 +41,6 @@ interface ProntuarioCompleto {
     bairro: string | null;
     cidade: string | null;
     estado: string | null;
-    nomeMae: string | null;
-    nomePai: string | null;
     profissao: string | null;
     estadoCivil: string | null;
     observacoes: string | null;
@@ -298,7 +296,7 @@ export function ProntuarioPacienteContent({ pacienteId, userType = "MEDICO" }: P
 
               {/* Grid de campos — 6 colunas */}
               <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-6 gap-x-5 gap-y-1.5">
-                <Field label="CPF"          value={formatCPF(paciente.cpf)} />
+                <Field label="CPF"          value={maskCPF(paciente.cpf)} />
                 <Field label="RG"           value={paciente.rg || '—'} />
                 <Field label="Nascimento"   value={`${formatDate(new Date(paciente.dataNascimento))} · ${idade}a`} />
                 <Field label="Estado Civil" value={paciente.estadoCivil || '—'} />
@@ -306,8 +304,6 @@ export function ProntuarioPacienteContent({ pacienteId, userType = "MEDICO" }: P
                 <Field label="Celular"      value={paciente.celular || '—'} />
                 <Field label="Telefone"     value={paciente.telefone || '—'} />
                 <Field label="E-mail"       value={paciente.email || '—'} span={2} />
-                <Field label="Mãe"          value={paciente.nomeMae || '—'} />
-                <Field label="Pai"          value={paciente.nomePai || '—'} />
                 {data.planosSaude.length > 0
                   ? data.planosSaude.map((pl: any, i: number) => (
                       <Field

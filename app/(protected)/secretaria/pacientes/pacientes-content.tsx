@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { formatDate, formatCPF } from "@/lib/utils";
+import { formatDate, maskCPF } from "@/lib/utils";
 import { brazilToday } from "@/lib/timezone-utils";
 import { NovoAgendamentoModal } from "@/app/(protected)/secretaria/agendamentos/components/novo-agendamento-modal";
 import { PageHeader } from "@/components/page-header";
@@ -55,8 +55,6 @@ interface Paciente {
   bairro: string | null;
   cidade: string | null;
   estado: string | null;
-  nomeMae: string | null;
-  nomePai: string | null;
   profissao: string | null;
   estadoCivil: string | null;
   observacoes: string | null;
@@ -250,7 +248,7 @@ export function PacientesContent() {
                           <span className="font-medium">{paciente.nome}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs py-3">{formatCPF(paciente.cpf)}</TableCell>
+                      <TableCell className="text-xs py-3">{maskCPF(paciente.cpf)}</TableCell>
                       <TableCell className="text-xs py-3 text-muted-foreground">
                         {paciente.email || "-"}
                       </TableCell>

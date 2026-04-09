@@ -127,6 +127,8 @@ model Tenant {
   medicosEscalasAgendaExcecoes MedicoEscalaAgendaExcecao[] @relation("TenantToMedicoEscalaAgendaExcecao")
   cidsCatalogo                Cid[]
   examesPacientes             ExamePaciente[]
+  consentimentosLGPD          ConsentimentoLGPD[]
+  solicitacoesDSAR            SolicitacaoDSAR[]
   // Observação: super-admin gerencia registros globais com clinicaId = NULL; tenants consomem só os globais
 
   @@index([cnpj])
@@ -282,6 +284,8 @@ model Paciente {
   listasEspera        ListaEspera[]
   guiasTiss           GuiaTiss[]
   examesPaciente      ExamePaciente[]
+  consentimentos      ConsentimentoLGPD[]
+  solicitacoesDSAR    SolicitacaoDSAR[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -1870,4 +1874,56 @@ model AuditLog {
   @@index([createdAt])
   @@index([resourceId])
   @@map("audit_logs")
+}
+
+// ============================================
+// LGPD — TERMO DE CONSENTIMENTO
+// ============================================
+
+model ConsentimentoLGPD {
+  id            String    @id @default(uuid())
+  pacienteId    String
+  clinicaId     String
+  versaoTermo   String    @default("1.0")   // Versão do termo aceito
+  textoTermo    String    @db.Text           // Conteúdo integral do termo
+  canalAceite   String                       // PORTAL_ONLINE | PRESENCIAL
+  ipAddress     String?                      // IP se aceite online
+  aceitoEm      DateTime  @default(now())    // Quando aceitou
+  revogadoEm    DateTime?                    // Quando revogou (null = ativo)
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId])
+  @@index([clinicaId])
+  @@index([pacienteId, clinicaId, versaoTermo])
+  @@map("consentimentos_lgpd")
+}
+
+// ============================================
+// LGPD — DSAR (Direitos do Titular - Art. 18)
+// ============================================
+
+model SolicitacaoDSAR {
+  id            String    @id @default(uuid())
+  pacienteId    String
+  clinicaId     String
+  tipo          String                       // EXPORTACAO | EXCLUSAO | CORRECAO
+  status        String    @default("PENDENTE") // PENDENTE | EM_ANALISE | CONCLUIDA | RECUSADA
+  motivo        String?   @db.Text           // Motivo do paciente (opcional)
+  respostaAdmin String?   @db.Text           // Resposta/justificativa do admin
+  adminId       String?                      // Quem analisou
+  arquivoUrl    String?                      // URL do arquivo gerado (exportação)
+  criadoEm      DateTime  @default(now())
+  analisadoEm   DateTime?                    // Quando o admin respondeu
+  concluidoEm   DateTime?                    // Quando foi finalizada
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  clinica  Tenant   @relation(fields: [clinicaId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId])
+  @@index([clinicaId])
+  @@index([status])
+  @@index([tipo])
+  @@map("solicitacoes_dsar")
 }

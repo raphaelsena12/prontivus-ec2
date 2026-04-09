@@ -23,8 +23,6 @@ const updatePacienteSchema = z.object({
   bairro: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
-  nomeMae: z.string().optional(),
-  nomePai: z.string().optional(),
   profissao: z.string().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).optional(),
   observacoes: z.string().optional(),

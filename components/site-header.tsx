@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { IconBell, IconLogout, IconUserCircle, IconMessage, IconPhoneCall } from "@tabler/icons-react";
+import { IconBell, IconLogout, IconUserCircle, IconMessage, IconPhoneCall, IconShieldLock } from "@tabler/icons-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -800,6 +800,15 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                       <IconUserCircle className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
                       Perfil
                     </DropdownMenuItem>
+                    {session?.user?.tipo === TipoUsuario.PACIENTE && (
+                      <DropdownMenuItem
+                        onClick={() => router.push("/paciente/meus-dados")}
+                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                      >
+                        <IconShieldLock className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
+                        Meus Dados
+                      </DropdownMenuItem>
+                    )}
                     {session?.user?.tipo === TipoUsuario.SECRETARIA &&
                       session?.user?.clinicaId && (
                         <DropdownMenuItem

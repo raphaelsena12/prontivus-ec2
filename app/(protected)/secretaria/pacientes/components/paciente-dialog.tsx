@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +31,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { maskCPF, maskRG, maskTelefone, maskCelular, maskCEP, removeMask } from "@/lib/masks";
+import { maskCPF as maskCPFInput, maskRG, maskTelefone, maskCelular, maskCEP, removeMask } from "@/lib/masks";
+import { maskCPF as maskCPFDisplay } from "@/lib/utils";
 
 interface Paciente {
   id: string;
@@ -52,8 +54,6 @@ interface Paciente {
   bairro: string | null;
   cidade: string | null;
   estado: string | null;
-  nomeMae: string | null;
-  nomePai: string | null;
   profissao: string | null;
   estadoCivil: string | null;
   observacoes: string | null;
@@ -83,8 +83,6 @@ const pacienteSchema = z.object({
   bairro: z.string().optional(),
   cidade: z.string().optional(),
   estado: z.string().optional(),
-  nomeMae: z.string().optional(),
-  nomePai: z.string().optional(),
   profissao: z.string().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).optional(),
   observacoes: z.string().optional(),
@@ -99,6 +97,8 @@ export function PacienteDialog({
   onSuccess,
 }: PacienteDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [consentimentoLGPD, setConsentimentoLGPD] = useState(false);
+  const [cpfRevealed, setCpfRevealed] = useState(false);
   const isEditing = !!paciente;
 
   const form = useForm<PacienteFormValues>({
@@ -119,8 +119,6 @@ export function PacienteDialog({
       bairro: "",
       cidade: "",
       estado: "",
-      nomeMae: "",
-      nomePai: "",
       profissao: "",
       estadoCivil: undefined,
       observacoes: "",
@@ -131,7 +129,7 @@ export function PacienteDialog({
     if (paciente) {
       form.reset({
         nome: paciente.nome || "",
-        cpf: paciente.cpf ? maskCPF(paciente.cpf) : "",
+        cpf: paciente.cpf ? maskCPFInput(paciente.cpf) : "",
         rg: paciente.rg ? maskRG(paciente.rg) : "",
         dataNascimento: paciente.dataNascimento
           ? formatDateToInput(paciente.dataNascimento)
@@ -147,8 +145,6 @@ export function PacienteDialog({
         bairro: paciente.bairro || "",
         cidade: paciente.cidade || "",
         estado: paciente.estado || "",
-        nomeMae: paciente.nomeMae || "",
-        nomePai: paciente.nomePai || "",
         profissao: paciente.profissao || "",
         estadoCivil: paciente.estadoCivil as "SOLTEIRO" | "CASADO" | "DIVORCIADO" | "VIUVO" | undefined,
         observacoes: paciente.observacoes || "",
@@ -170,13 +166,13 @@ export function PacienteDialog({
         bairro: "",
         cidade: "",
         estado: "",
-        nomeMae: "",
-        nomePai: "",
         profissao: "",
         estadoCivil: undefined,
         observacoes: "",
       });
+      setConsentimentoLGPD(false);
     }
+    setCpfRevealed(false);
   }, [paciente, form]);
 
   const onSubmit = async (data: PacienteFormValues) => {
@@ -201,8 +197,6 @@ export function PacienteDialog({
       if (data.bairro && data.bairro.trim()) payload.bairro = data.bairro;
       if (data.cidade && data.cidade.trim()) payload.cidade = data.cidade;
       if (data.estado && data.estado.trim()) payload.estado = data.estado;
-      if (data.nomeMae && data.nomeMae.trim()) payload.nomeMae = data.nomeMae;
-      if (data.nomePai && data.nomePai.trim()) payload.nomePai = data.nomePai;
       if (data.profissao && data.profissao.trim()) payload.profissao = data.profissao;
       if (data.estadoCivil) payload.estadoCivil = data.estadoCivil;
       if (data.observacoes && data.observacoes.trim()) payload.observacoes = data.observacoes;
@@ -216,6 +210,22 @@ export function PacienteDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
+      if (response.ok && !isEditing && consentimentoLGPD) {
+        // Registrar consentimento presencial para o paciente recém-criado
+        try {
+          const result = await response.clone().json();
+          if (result.paciente?.id) {
+            await fetch("/api/secretaria/pacientes/consentimento", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pacienteId: result.paciente.id }),
+            });
+          }
+        } catch {
+          // Não bloquear o cadastro se falhar o registro do consentimento
+        }
+      }
 
       if (!response.ok) {
         let error;
@@ -297,27 +307,53 @@ export function PacienteDialog({
                 <FormField
                   control={form.control}
                   name="cpf"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        CPF <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="000.000.000-00"
-                          maxLength={14}
-                          disabled={loading}
-                          value={field.value ? maskCPF(field.value) : ""}
-                          onChange={(e) => {
-                            const masked = maskCPF(e.target.value);
-                            field.onChange(masked);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const showMasked = isEditing && !cpfRevealed;
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          CPF <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="000.000.000-00"
+                              maxLength={14}
+                              disabled={loading || showMasked}
+                              value={
+                                showMasked
+                                  ? maskCPFDisplay(removeMask(field.value))
+                                  : field.value
+                                  ? maskCPFInput(field.value)
+                                  : ""
+                              }
+                              onChange={(e) => {
+                                const masked = maskCPFInput(e.target.value);
+                                field.onChange(masked);
+                              }}
+                              className={isEditing ? "pr-10" : ""}
+                            />
+                          </FormControl>
+                          {isEditing && (
+                            <button
+                              type="button"
+                              onClick={() => setCpfRevealed(!cpfRevealed)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                              tabIndex={-1}
+                            >
+                              {cpfRevealed ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <FormField
@@ -619,34 +655,6 @@ export function PacienteDialog({
                 <div className="grid gap-4 md:grid-cols-2">
                   <FormField
                     control={form.control}
-                    name="nomeMae"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome da Mãe</FormLabel>
-                        <FormControl>
-                          <Input {...field} disabled={loading} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="nomePai"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome do Pai</FormLabel>
-                        <FormControl>
-                          <Input {...field} disabled={loading} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="observacoes"
                     render={({ field }) => (
                       <FormItem className="md:col-span-2">
@@ -666,6 +674,38 @@ export function PacienteDialog({
                   />
                 </div>
               </div>
+
+              {/* Consentimento LGPD — apenas no cadastro novo */}
+              {!isEditing && (
+                <div className="rounded-lg border p-4 bg-blue-50/50">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground mb-1">
+                        Consentimento LGPD
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Marque abaixo se o paciente assinou o Termo de Consentimento
+                        para Tratamento de Dados Pessoais e de Saúde (Lei nº 13.709/2018).
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="consentimento-lgpd"
+                          checked={consentimentoLGPD}
+                          onCheckedChange={(checked) => setConsentimentoLGPD(checked === true)}
+                          disabled={loading}
+                        />
+                        <label
+                          htmlFor="consentimento-lgpd"
+                          className="text-sm cursor-pointer select-none"
+                        >
+                          Paciente assinou o termo de consentimento LGPD
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t">
                 <Button

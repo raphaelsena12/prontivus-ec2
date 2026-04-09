@@ -16,7 +16,7 @@ const ENC_PREFIX = "enc_v1:";
 // ---------- Configuração dos campos por modelo ----------
 
 export const ENCRYPTED_FIELDS: Record<string, string[]> = {
-  Paciente: ["rg", "nomeMae", "nomePai", "endereco", "complemento", "bairro"],
+  Paciente: ["rg", "endereco", "complemento", "bairro"],
   Prontuario: [
     "anamnese",
     "exameFisico",
