@@ -11,6 +11,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -49,6 +50,7 @@ export default function ExamesScreen() {
   const uploadMutation = useUploadExame();
   const deleteMutation = useDeleteExame();
 
+  const [selectedExame, setSelectedExame] = useState<ExamePaciente | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{
     uri: string;
@@ -195,10 +197,21 @@ export default function ExamesScreen() {
         renderItem={({ item }) => (
           <ExameCard
             exame={item}
-            onPress={() => router.push(`/(app)/exames/${item.id}`)}
+            onPress={() => setSelectedExame(item)}
             onDelete={item.origem !== 'secretaria' ? () => handleDelete(item) : undefined}
           />
         )}
+      />
+
+      {/* Detail Modal */}
+      <ExameDetailModal
+        exame={selectedExame}
+        visible={!!selectedExame}
+        onClose={() => setSelectedExame(null)}
+        onDelete={selectedExame && selectedExame.origem !== 'secretaria' ? () => {
+          setSelectedExame(null);
+          handleDelete(selectedExame);
+        } : undefined}
       />
 
       {/* FAB */}
@@ -278,6 +291,144 @@ export default function ExamesScreen() {
   );
 }
 
+// ── Modal de Detalhes ─────────────────────────────────────────────────────────
+
+function ExameDetailModal({
+  exame,
+  visible,
+  onClose,
+  onDelete,
+}: {
+  exame: ExamePaciente | null;
+  visible: boolean;
+  onClose: () => void;
+  onDelete?: () => void;
+}) {
+  if (!exame) return null;
+
+  const icon = getIconForType(exame.tipoArquivo);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={detail.backdrop}>
+        <View style={detail.sheet}>
+          <View style={detail.handle} />
+
+          {/* Header */}
+          <View style={detail.header}>
+            <View style={[detail.headerIcon, { backgroundColor: icon.bg }]}>
+              <Ionicons name={icon.name} size={20} color={icon.color} />
+            </View>
+            <Text style={detail.title}>Detalhes do Exame</Text>
+            <TouchableOpacity onPress={onClose} style={detail.closeBtn}>
+              <Ionicons name="close" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={detail.scroll} showsVerticalScrollIndicator={false}>
+            {/* Nome */}
+            <View style={detail.nameCard}>
+              <View style={[detail.nameIcon, { backgroundColor: icon.bg }]}>
+                <Ionicons name={icon.name} size={28} color={icon.color} />
+              </View>
+              <Text style={detail.nameText}>{exame.nome}</Text>
+              <Text style={detail.nameFile}>{exame.nomeArquivo}</Text>
+            </View>
+
+            {/* Info grid */}
+            <View style={detail.infoRow}>
+              <View style={detail.infoBox}>
+                <View style={[detail.infoIconWrap, { backgroundColor: Colors.primaryLight }]}>
+                  <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
+                </View>
+                <Text style={detail.infoLabel}>Enviado em</Text>
+                <Text style={detail.infoValue}>
+                  {format(new Date(exame.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                </Text>
+                <Text style={detail.infoSub}>
+                  {format(new Date(exame.createdAt), "HH:mm", { locale: ptBR })}
+                </Text>
+              </View>
+              <View style={detail.infoBox}>
+                <View style={[detail.infoIconWrap, { backgroundColor: '#F5F3FF' }]}>
+                  <Ionicons name="document-outline" size={16} color="#8B5CF6" />
+                </View>
+                <Text style={detail.infoLabel}>Tipo</Text>
+                <Text style={detail.infoValue} numberOfLines={1}>
+                  {exame.tipoArquivo === 'imagem' ? 'Imagem' : exame.tipoArquivo === 'pdf' ? 'PDF' : 'Documento'}
+                </Text>
+                {exame.tamanho > 0 && (
+                  <Text style={detail.infoSub}>{formatFileSize(exame.tamanho)}</Text>
+                )}
+              </View>
+            </View>
+
+            {/* Data do exame */}
+            {exame.dataExame && (
+              <View style={detail.detailItem}>
+                <View style={[detail.detailIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name="today-outline" size={16} color="#3B82F6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={detail.detailLabel}>Data do Exame</Text>
+                  <Text style={detail.detailValue}>
+                    {format(new Date(exame.dataExame), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Origem */}
+            <View style={detail.detailItem}>
+              <View style={[detail.detailIcon, { backgroundColor: exame.origem === 'secretaria' ? Colors.successLight : Colors.primaryLight }]}>
+                <Ionicons
+                  name={exame.origem === 'secretaria' ? 'business-outline' : 'person-outline'}
+                  size={16}
+                  color={exame.origem === 'secretaria' ? Colors.success : Colors.primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={detail.detailLabel}>Origem</Text>
+                <Text style={detail.detailValue}>
+                  {exame.origem === 'secretaria' ? 'Enviado pela clínica' : 'Enviado por você'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Observações */}
+            {exame.observacoes && (
+              <View style={detail.detailItem}>
+                <View style={[detail.detailIcon, { backgroundColor: '#FFFBEB' }]}>
+                  <Ionicons name="chatbubble-outline" size={16} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={detail.detailLabel}>Observações</Text>
+                  <Text style={detail.detailValue}>{exame.observacoes}</Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={detail.footer}>
+            {onDelete && (
+              <TouchableOpacity onPress={onDelete} style={detail.deleteBtn}>
+                <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                <Text style={detail.deleteBtnText}>Remover exame</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onClose} style={detail.footerBtn}>
+              <Text style={detail.footerBtnText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+
 function ExameCard({
   exame,
   onPress,
@@ -305,7 +456,7 @@ function ExameCard({
             </Text>
             {exame.origem === 'secretaria' && (
               <View style={styles.origemBadge}>
-                <Text style={styles.origemText}>Clinica</Text>
+                <Text style={styles.origemText}>Clínica</Text>
               </View>
             )}
           </View>
@@ -331,6 +482,80 @@ function ExameCard({
     </Card>
   );
 }
+
+const detail = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '85%',
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    backgroundColor: Colors.border, alignSelf: 'center', marginTop: 12,
+  },
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 24, paddingTop: 16, gap: 10,
+  },
+  headerIcon: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { flex: 1, fontSize: 18, fontWeight: '800', color: Colors.text },
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center',
+  },
+  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
+  nameCard: {
+    alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: Colors.border, borderRadius: BorderRadius.lg,
+    padding: 20, marginBottom: 14,
+  },
+  nameIcon: {
+    width: 56, height: 56, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nameText: { fontSize: 17, fontWeight: '800', color: Colors.text, textAlign: 'center' },
+  nameFile: { fontSize: 12, color: Colors.textMuted },
+  infoRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  infoBox: {
+    flex: 1, borderWidth: 1, borderColor: Colors.border,
+    borderRadius: BorderRadius.md, padding: 12, gap: 4,
+  },
+  infoIconWrap: {
+    width: 28, height: 28, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+  },
+  infoLabel: { fontSize: 10, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  infoValue: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  infoSub: { fontSize: 12, color: Colors.textSecondary },
+  detailItem: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start',
+    paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.borderLight,
+  },
+  detailIcon: {
+    width: 36, height: 36, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  detailLabel: { fontSize: 11, color: Colors.textMuted, fontWeight: '600', textTransform: 'uppercase' },
+  detailValue: { fontSize: 15, color: Colors.text, marginTop: 2, lineHeight: 22 },
+  footer: {
+    padding: 24, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: Colors.borderLight,
+    gap: 8,
+  },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10,
+    backgroundColor: Colors.errorLight, borderRadius: BorderRadius.md,
+  },
+  deleteBtnText: { color: Colors.error, fontSize: 14, fontWeight: '600' },
+  footerBtn: { alignItems: 'center', paddingVertical: 10 },
+  footerBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '600' },
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },

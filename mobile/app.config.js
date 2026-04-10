@@ -34,7 +34,7 @@ export default {
       apiBaseUrl: process.env.API_BASE_URL ?? 'http://localhost:3000',
       stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY ?? '',
       eas: {
-        projectId: process.env.EAS_PROJECT_ID ?? '',
+        projectId: process.env.EAS_PROJECT_ID ?? '1b3b4556-3a8b-4497-87c1-ac74309b6c17',
       },
     },
   },

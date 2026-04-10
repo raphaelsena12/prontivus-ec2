@@ -20,6 +20,7 @@ export async function GET(
         consulta: {
           select: {
             dataHora: true,
+            pacienteId: true,
             clinica: { select: { nome: true } },
             medico: {
               select: {
@@ -66,10 +67,17 @@ export async function GET(
     const medicoNome = sessao.consulta.medico?.usuario?.nome || "Médico";
     const especialidade = sessao.consulta.medico?.especialidade || null;
 
+    // Verificar se consentimento já foi dado
+    const consentimento = await prisma.telemedicineConsent.findFirst({
+      where: { sessionId: sessao.id, consentGiven: true },
+      select: { id: true },
+    });
+
     return NextResponse.json({
       sessionId: sessao.id,
       status: sessao.status,
       identityVerified: !!sessao.identityVerifiedAt,
+      consentGiven: !!consentimento,
       doctorName: medicoNome,
       specialty: especialidade || null,
       scheduledAt: sessao.consulta.dataHora,

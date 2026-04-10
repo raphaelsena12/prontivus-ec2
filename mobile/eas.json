@@ -18,14 +18,14 @@
       },
       "env": {
         "APP_VARIANT": "development",
-        "API_BASE_URL": "https://SEU_DOMINIO.com.br"
+        "API_BASE_URL": "https://prontivus.com"
       }
     },
     "production": {
       "distribution": "store",
       "env": {
         "APP_VARIANT": "production",
-        "API_BASE_URL": "https://SEU_DOMINIO.com.br"
+        "API_BASE_URL": "https://prontivus.com"
       }
     }
   },

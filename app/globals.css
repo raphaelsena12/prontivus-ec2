@@ -416,3 +416,14 @@
 .rbc-agenda-view table tbody tr:hover {
   background-color: hsl(var(--muted) / 0.5);
 }
+
+/* ── Modo Foco (Atendimento) ─────────────────────────────────────────────── */
+.atendimento-focus-mode [data-slot="sidebar"] {
+  display: none !important;
+}
+.atendimento-focus-mode header.sticky {
+  display: none !important;
+}
+.atendimento-focus-mode [data-slot="sidebar-inset"] {
+  margin: 0 !important;
+}

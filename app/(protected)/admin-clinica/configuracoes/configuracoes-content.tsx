@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { IconBrandWhatsapp, IconSettings, IconTrash, IconCheck, IconX, IconPlugConnected } from "@tabler/icons-react";
+import { IconBrandWhatsapp, IconSettings, IconTrash, IconCheck, IconX, IconPlugConnected, IconBuilding } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,13 @@ interface WhatsAppConfig {
   whatsappConfigurado: boolean;
 }
 
+interface ClinicaConfig {
+  id: string;
+  nome: string;
+  cnpj: string;
+  codigoCnes: string | null;
+}
+
 export function ConfiguracoesContent() {
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +33,11 @@ export function ConfiguracoesContent() {
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [contatoNumero, setContatoNumero] = useState("");
+
+  // Dados da clínica (CNES)
+  const [clinicaConfig, setClinicaConfig] = useState<ClinicaConfig | null>(null);
+  const [codigoCnes, setCodigoCnes] = useState("");
+  const [savingClinica, setSavingClinica] = useState(false);
 
   const fetchConfig = useCallback(async () => {
     try {
@@ -42,9 +54,22 @@ export function ConfiguracoesContent() {
     }
   }, []);
 
+  const fetchClinicaConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin-clinica/configuracoes/clinica");
+      if (!res.ok) throw new Error();
+      const data: ClinicaConfig = await res.json();
+      setClinicaConfig(data);
+      setCodigoCnes(data.codigoCnes ?? "");
+    } catch {
+      // silencioso — não bloqueia a tela
+    }
+  }, []);
+
   useEffect(() => {
     fetchConfig();
-  }, [fetchConfig]);
+    fetchClinicaConfig();
+  }, [fetchConfig, fetchClinicaConfig]);
 
   async function handleSave() {
     if (!phoneNumberId.trim() || (!accessToken.trim() && !config?.whatsappConfigurado)) {
@@ -113,6 +138,76 @@ export function ConfiguracoesContent() {
         title="Configurações"
         subtitle="Gerencie as integrações da sua clínica"
       />
+
+      {/* Card: Dados da Clínica (CNES) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100">
+              <IconBuilding className="w-6 h-6 text-blue-600" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Dados da Clínica (TISS)</CardTitle>
+              <CardDescription>
+                Informações obrigatórias para geração de guias TISS e envio às operadoras
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label>CNPJ</Label>
+              <Input value={clinicaConfig?.cnpj ?? ""} disabled className="bg-muted" />
+              <p className="text-xs text-muted-foreground">Gerenciado pelo Super Admin</p>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="codigoCnes">
+                Código CNES <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="codigoCnes"
+                placeholder="Ex: 1234567"
+                maxLength={7}
+                value={codigoCnes}
+                onChange={(e) => setCodigoCnes(e.target.value.replace(/\D/g, ""))}
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cadastro Nacional de Estabelecimentos de Saúde — 7 dígitos numéricos, obrigatório para emissão de guias TISS
+              </p>
+            </div>
+          </div>
+          <div>
+            <Button
+              onClick={async () => {
+                if (!/^\d{7}$/.test(codigoCnes)) {
+                  toast.error("Código CNES deve ter exatamente 7 dígitos numéricos");
+                  return;
+                }
+                setSavingClinica(true);
+                try {
+                  const res = await fetch("/api/admin-clinica/configuracoes/clinica", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ codigoCnes }),
+                  });
+                  if (!res.ok) throw new Error();
+                  toast.success("CNES salvo com sucesso");
+                  await fetchClinicaConfig();
+                } catch {
+                  toast.error("Erro ao salvar CNES");
+                } finally {
+                  setSavingClinica(false);
+                }
+              }}
+              disabled={savingClinica || loading}
+            >
+              {savingClinica ? "Salvando..." : "Salvar CNES"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

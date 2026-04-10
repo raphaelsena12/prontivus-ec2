@@ -13,7 +13,15 @@
       "Bash(ls -la \"c:\\\\Users\\\\raphael.souza\\\\Desktop\\\\Prontivus\\\\prontivus-ec2\\\\app\\\\\\(protected\\)\")",
       "Bash(npm run:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.gov.br)",
+      "Bash(curl -L -o /tmp/tiss_schemas.zip \"https://www.gov.br/ans/pt-br/arquivos/assuntos/espaco-da-operadora-de-plano-de-saude/compromissos-e-interacoes-com-a-ans/padroes-e-schemas/arquivos_schemas_ans_tiss.zip\")",
+      "Bash(cd /tmp)",
+      "Bash(unzip -o tiss_schemas.zip -d tiss_schemas)",
+      "Read(//tmp/tiss_schemas/**)",
+      "Bash(npx next:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda",

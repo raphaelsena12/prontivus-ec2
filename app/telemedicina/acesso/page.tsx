@@ -33,6 +33,7 @@ interface SessionInfo {
   sessionId: string;
   status: string;
   identityVerified: boolean;
+  consentGiven: boolean;
   doctorName: string;
   specialty: string | null;
   scheduledAt: string;
@@ -72,6 +73,7 @@ async function initChime(credentials: ChimeCredentials) {
 function TelemedicineAccessContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") || "";
+  const skipConsent = searchParams.get("skipConsent") === "1";
 
   const [step, setStep] = useState<Step>("loading");
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
@@ -119,9 +121,16 @@ function TelemedicineAccessContent() {
       }
 
       setSessionInfo(data);
-      // Se identidade já verificada, pula para consent
-      if (data.identityVerified) {
+      if ((data.identityVerified && data.consentGiven) || (data.identityVerified && skipConsent)) {
+        // Identidade verificada e consentimento já dado (ex: via app mobile) — conectar direto
+        setStep("connecting");
+        await connectToRoom();
+      } else if (data.identityVerified) {
         setStep("consent");
+      } else if (skipConsent) {
+        // App mobile: identidade já verificada pelo backend (auto), pular info + consent
+        setStep("connecting");
+        await connectToRoom();
       } else {
         setStep("info");
       }
@@ -193,7 +202,12 @@ function TelemedicineAccessContent() {
       const data = await res.json();
 
       if (res.ok && data.verified) {
-        setStep("consent");
+        if (sessionInfo?.consentGiven || skipConsent) {
+          setStep("connecting");
+          await connectToRoom();
+        } else {
+          setStep("consent");
+        }
       } else {
         // Se backend retornou 429, é rate limiting — mostra erro crítico
         if (res.status === 429) {

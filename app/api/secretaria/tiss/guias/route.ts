@@ -8,10 +8,15 @@ const guiaSchema = z.object({
   pacienteId: z.string().uuid(),
   operadoraId: z.string().uuid(),
   planoSaudeId: z.string().uuid().optional().nullable(),
+  medicoId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().min(1),
   dataAtendimento: z.string().transform((s) => new Date(s)),
   consultaId: z.string().uuid().optional().nullable(),
   observacoes: z.string().optional().nullable(),
+  indicacaoAcidente: z.string().optional().default("9"),
+  tipoConsulta: z.string().optional().default("1"),
+  regimeAtendimento: z.string().optional().default("01"),
+  caraterAtendimento: z.string().optional().default("1"),
 });
 
 export async function GET(req: NextRequest) {
@@ -90,6 +95,16 @@ export async function POST(req: NextRequest) {
   // Generate guide number: tipo + timestamp
   const numeroGuia = `${data.tipoGuia.substring(0, 3)}-${Date.now()}`;
 
+  // Se não forneceu medicoId, tenta pegar da consulta
+  let medicoId = data.medicoId ?? null;
+  if (!medicoId && data.consultaId) {
+    const consulta = await prisma.consulta.findFirst({
+      where: { id: data.consultaId, clinicaId },
+      select: { medicoId: true },
+    });
+    medicoId = consulta?.medicoId ?? null;
+  }
+
   const guia = await prisma.guiaTiss.create({
     data: {
       clinicaId,
@@ -97,10 +112,15 @@ export async function POST(req: NextRequest) {
       pacienteId: data.pacienteId,
       operadoraId: data.operadoraId,
       planoSaudeId: data.planoSaudeId ?? null,
+      medicoId,
       numeroCarteirinha: data.numeroCarteirinha,
       dataAtendimento: data.dataAtendimento,
       consultaId: data.consultaId ?? null,
       observacoes: data.observacoes ?? null,
+      indicacaoAcidente: data.indicacaoAcidente,
+      tipoConsulta: data.tipoConsulta,
+      regimeAtendimento: data.regimeAtendimento,
+      caraterAtendimento: data.caraterAtendimento,
       numeroGuia,
       status: "RASCUNHO",
     },

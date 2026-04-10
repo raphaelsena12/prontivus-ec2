@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Linking } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -183,6 +183,24 @@ export default function HomeScreen() {
             bgColor="#ECFDF5"
           />
         </View>
+
+        {/* Emergency disclaimer */}
+        <TouchableOpacity
+          style={styles.emergencyBanner}
+          onPress={() => Linking.openURL('tel:192')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.emergencyIconWrap}>
+            <Ionicons name="warning" size={16} color={Colors.error} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emergencyTitle}>Emergência médica?</Text>
+            <Text style={styles.emergencyText}>
+              Ligue para o <Text style={styles.emergencyBold}>SAMU (192)</Text> ou dirija-se ao pronto-socorro mais próximo.
+            </Text>
+          </View>
+          <Ionicons name="call-outline" size={18} color={Colors.error} />
+        </TouchableOpacity>
 
         {/* Bottom spacing */}
         <View style={{ height: 16 }} />
@@ -449,5 +467,40 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     fontWeight: '500',
+  },
+
+  // Emergency banner
+  emergencyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.errorLight,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: BorderRadius.lg,
+    padding: 14,
+    marginTop: 4,
+  },
+  emergencyIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emergencyTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.errorDark,
+  },
+  emergencyText: {
+    fontSize: 12,
+    color: Colors.errorDark,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  emergencyBold: {
+    fontWeight: '800',
   },
 });

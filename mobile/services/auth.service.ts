@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { BASE_URL } from './api';
 
 interface LoginCredentials {
@@ -15,68 +14,98 @@ interface SessionUser {
   avatar?: string | null;
 }
 
-/**
- * Busca o CSRF token necessário para o NextAuth
- */
-async function getCsrfToken(): Promise<string> {
-  const response = await axios.get(`${BASE_URL}/api/auth/csrf`);
-  return response.data.csrfToken;
-}
-
-/**
- * Realiza login via NextAuth credentials e retorna o token de sessão
- */
 const COOKIE_NAME = BASE_URL.startsWith('https')
   ? '__Secure-next-auth.session-token'
   : 'next-auth.session-token';
 
-async function login(credentials: LoginCredentials): Promise<string> {
+/**
+ * Busca o CSRF token necessário para o NextAuth
+ */
+async function getCsrfToken(): Promise<string> {
+  const res = await fetch(`${BASE_URL}/api/auth/csrf`, { credentials: 'include' });
+  const data = await res.json();
+  return data.csrfToken;
+}
+
+/**
+ * Realiza login via NextAuth credentials.
+ * Usa fetch nativo para que o React Native gerencie os cookies automaticamente.
+ */
+async function login(credentials: LoginCredentials): Promise<SessionUser> {
   const csrfToken = await getCsrfToken();
 
-  const response = await axios.post(
-    `${BASE_URL}/api/auth/callback/credentials`,
-    new URLSearchParams({
+  // POST credentials — o RN armazena o cookie de sessão automaticamente
+  const res = await fetch(`${BASE_URL}/api/auth/callback/credentials`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       email: credentials.email,
       password: credentials.password,
       csrfToken,
       callbackUrl: '/',
       json: 'true',
-    }),
-    {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      maxRedirects: 0,
-      validateStatus: (status) => status < 400,
-    }
-  );
+    }).toString(),
+    credentials: 'include',
+    redirect: 'follow',
+  });
 
-  // Extrai o cookie de sessão da resposta
-  const setCookieHeader =
-    response.headers['set-cookie'] ?? [];
-
-  const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
-  const sessionCookie = cookies.find((c: string) =>
-    c.startsWith('__Secure-next-auth.session-token=') ||
-    c.startsWith('next-auth.session-token=')
-  );
-
-  if (!sessionCookie) {
+  if (!res.ok) {
     throw new Error('Credenciais inválidas');
   }
 
-  // Extrai apenas o valor do cookie (sem os atributos)
-  const tokenValue = sessionCookie.split(';')[0].replace(/^(__Secure-)?next-auth\.session-token=/, '');
-  return tokenValue;
+  // Verificar se o login funcionou buscando a sessão (cookie nativo)
+  const session = await getSession();
+  if (!session) {
+    throw new Error('Credenciais inválidas');
+  }
+
+  return session;
 }
 
 /**
- * Busca os dados da sessão atual
+ * Resolve avatar S3 key para URL assinada
  */
-async function getSession(token: string): Promise<SessionUser | null> {
+async function resolveAvatarUrl(avatar: string | null | undefined): Promise<string | null> {
+  if (!avatar) return null;
+
+  // Se já é uma URL completa (https ou base64), usar direto
+  if (avatar.startsWith('http') || avatar.startsWith('data:')) {
+    return avatar;
+  }
+
+  // Se é uma key do S3 (ex: usuarios/xxx), buscar URL assinada
+  if (avatar.startsWith('usuarios/')) {
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/usuarios/avatar-url?key=${encodeURIComponent(avatar)}`,
+        { credentials: 'include' },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return data.url ?? null;
+      }
+    } catch {
+      // ignora erro
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Busca os dados da sessão atual usando cookies nativos
+ */
+async function getSession(): Promise<SessionUser | null> {
   try {
-    const response = await axios.get(`${BASE_URL}/api/auth/session`, {
-      headers: { Cookie: `${COOKIE_NAME}=${token}` },
+    const res = await fetch(`${BASE_URL}/api/auth/session`, {
+      credentials: 'include',
     });
-    return response.data?.user ?? null;
+    const data = await res.json();
+    const user = data?.user ?? null;
+    if (user) {
+      user.avatar = await resolveAvatarUrl(user.avatar);
+    }
+    return user;
   } catch {
     return null;
   }
@@ -85,21 +114,15 @@ async function getSession(token: string): Promise<SessionUser | null> {
 /**
  * Realiza logout via NextAuth
  */
-async function logout(token: string): Promise<void> {
+async function logout(): Promise<void> {
   try {
     const csrfToken = await getCsrfToken();
-    await axios.post(
-      `${BASE_URL}/api/auth/signout`,
-      new URLSearchParams({ csrfToken, callbackUrl: '/', json: 'true' }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Cookie: `${COOKIE_NAME}=${token}`,
-        },
-        maxRedirects: 0,
-        validateStatus: () => true,
-      }
-    );
+    await fetch(`${BASE_URL}/api/auth/signout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ csrfToken, callbackUrl: '/', json: 'true' }).toString(),
+      credentials: 'include',
+    });
   } catch {
     // ignora erro no logout
   }

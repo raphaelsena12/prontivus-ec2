@@ -13,7 +13,9 @@ const medicoEspecialidadeItemSchema = z.object({
 
 const medicoSchema = z.object({
   usuarioId: z.string().uuid("ID de usuário inválido"),
-  crm: z.string().min(1, "CRM é obrigatório"),
+  crm: z.string().regex(/^\d{4,10}$/, "CRM deve conter apenas números (4 a 10 dígitos)"),
+  ufCrm: z.string().regex(/^[A-Z]{2}$/, "UF do CRM deve ter 2 letras maiúsculas (ex: SP)"),
+  codigoCbo: z.string().regex(/^\d{6}$/, "Código CBO-S deve ter exatamente 6 dígitos numéricos"),
   especialidades: z.array(medicoEspecialidadeItemSchema).min(1, "Adicione ao menos 1 especialidade"),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
 });
@@ -219,6 +221,8 @@ export async function POST(request: NextRequest) {
       data: {
         usuarioId: data.usuarioId,
         crm: data.crm,
+        ufCrm: data.ufCrm,
+        codigoCbo: data.codigoCbo,
         // legado: manter uma especialidade "principal" em texto
         especialidade: especialidadePrincipal?.nome || "Especialidade",
         // legado: manter rqe "principal" se possível

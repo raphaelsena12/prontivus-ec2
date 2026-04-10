@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   Alert,
-  Animated,
   Image,
 } from 'react-native';
 import { router } from 'expo-router';
@@ -18,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../stores/auth.store';
 import { Button } from '../../components/ui/Button';
-import { Colors, BorderRadius, Spacing } from '../../constants/colors';
+import { Colors, BorderRadius } from '../../constants/colors';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -27,7 +26,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const { setToken, setUser } = useAuthStore();
+  const { setLoggedIn } = useAuthStore();
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
@@ -37,19 +36,14 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const token = await authService.login({ email: email.trim(), password });
-      await setToken(token);
-
-      const session = await authService.getSession(token);
-      if (session) {
-        setUser({
-          id: session.id,
-          nome: session.name,
-          email: session.email,
-          clinicaId: session.clinicaId,
-          avatar: session.avatar,
-        });
-      }
+      const session = await authService.login({ email: email.trim(), password });
+      await setLoggedIn({
+        id: session.id,
+        nome: session.name,
+        email: session.email,
+        clinicaId: session.clinicaId,
+        avatar: session.avatar,
+      });
 
       router.replace('/(app)/home');
     } catch (error) {
@@ -185,7 +179,7 @@ export default function LoginScreen() {
               <View style={styles.dividerLine} />
             </View>
             <Text style={styles.footerText}>
-              Plataforma segura de gestao em saude
+              Plataforma segura de gestão em saúde
             </Text>
           </View>
         </ScrollView>
@@ -288,12 +282,6 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 2,
   },
   inputIcon: {
     marginRight: 12,

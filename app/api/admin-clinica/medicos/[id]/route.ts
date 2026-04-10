@@ -12,7 +12,9 @@ const medicoEspecialidadeItemSchema = z.object({
 });
 
 const updateMedicoSchema = z.object({
-  crm: z.string().min(1, "CRM é obrigatório").optional(),
+  crm: z.string().regex(/^\d{4,10}$/, "CRM deve conter apenas números (4 a 10 dígitos)").optional(),
+  ufCrm: z.string().regex(/^[A-Z]{2}$/, "UF do CRM deve ter 2 letras maiúsculas (ex: SP)").optional(),
+  codigoCbo: z.string().regex(/^\d{6}$/, "Código CBO-S deve ter exatamente 6 dígitos numéricos").optional(),
   especialidades: z.array(medicoEspecialidadeItemSchema).min(1).optional(),
   limiteMaximoRetornosPorDia: z.number().int().min(0).nullable().optional(),
   ativo: z.boolean().optional(),

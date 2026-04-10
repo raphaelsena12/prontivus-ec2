@@ -301,9 +301,9 @@ model Medico {
   clinicaId                  String
   usuarioId                  String
   crm                        String
-  ufCrm                      String?  // UF do CRM (ex: SP, RJ)
+  ufCrm                      String   @default("") // UF do CRM (ex: SP, RJ) — obrigatório para TISS
   especialidade              String
-  codigoCbo                  String?  // Código CBO-S da especialidade
+  codigoCbo                  String   @default("") // Código CBO-S da especialidade — obrigatório para TISS
   rqe                        Int?
   ativo                      Boolean  @default(true)
   createdAt                  DateTime @default(now())
@@ -328,6 +328,7 @@ model Medico {
   listasEspera                ListaEspera[]
   autorizacoesFechamentoCaixa AutorizacaoFechamentoCaixa[]
   telemedicina                MedicoTelemedicina?
+  guiasTiss                   GuiaTiss[]
 
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
@@ -1226,8 +1227,13 @@ model GuiaTiss {
   pacienteId         String
   operadoraId        String
   planoSaudeId       String?
+  medicoId           String?
   numeroCarteirinha  String
   dataAtendimento    DateTime
+  indicacaoAcidente  String    @default("9") // dm_indicadorAcidente: 0=Trabalho, 1=Trânsito, 2=Outros, 9=Não acidente
+  tipoConsulta       String    @default("1") // dm_tipoConsulta: 1=Primeira, 2=Seguimento, 3=Pré-natal, 4=Encaminhamento
+  regimeAtendimento  String    @default("01") // dm_regimeAtendimento: 01=Ambulatorial, 05=Telessaúde
+  caraterAtendimento String    @default("1") // dm_caraterAtendimento: 1=Eletiva, 2=Urgência
   xmlGuia            String?
   status             String    @default("RASCUNHO") // RASCUNHO, VALIDADA, LOTE, GERADA, ENVIADA
   dataGeracao        DateTime  @default(now())
@@ -1241,6 +1247,7 @@ model GuiaTiss {
   consulta      Consulta?              @relation(fields: [consultaId], references: [id])
   lote          LoteTiss?              @relation(fields: [loteId], references: [id])
   paciente      Paciente               @relation(fields: [pacienteId], references: [id])
+  medico        Medico?                @relation(fields: [medicoId], references: [id])
   operadora     Operadora              @relation(fields: [operadoraId], references: [id])
   planoSaude    PlanoSaude?            @relation(fields: [planoSaudeId], references: [id])
   procedimentos GuiaTissProcedimento[]
@@ -1250,6 +1257,7 @@ model GuiaTiss {
   @@index([consultaId])
   @@index([loteId])
   @@index([pacienteId])
+  @@index([medicoId])
   @@index([operadoraId])
   @@index([numeroGuia])
   @@index([status])

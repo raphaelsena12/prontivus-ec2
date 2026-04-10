@@ -15,6 +15,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Form,
   FormControl,
   FormField,
@@ -37,6 +47,8 @@ import { toast } from "sonner";
 interface Medico {
   id: string;
   crm: string;
+  ufCrm?: string | null;
+  codigoCbo?: string | null;
   especialidade: string; // legado (principal)
   rqe?: number | null; // legado (principal)
   limiteMaximoRetornosPorDia?: number | null;
@@ -104,9 +116,13 @@ interface MedicoDialogProps {
   onSuccess: () => void;
 }
 
+const UFS_BRASIL = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+
 const createMedicoSchema = z.object({
   usuarioId: z.string().uuid("Selecione um usuário médico"),
-  crm: z.string().min(1, "CRM é obrigatório"),
+  crm: z.string().regex(/^\d{4,10}$/, "CRM deve conter apenas números (4 a 10 dígitos)"),
+  ufCrm: z.string().length(2, "UF do CRM é obrigatória").refine((v) => UFS_BRASIL.includes(v.toUpperCase()), "UF inválida"),
+  codigoCbo: z.string().regex(/^\d{6}$/, "Código CBO-S deve ter exatamente 6 dígitos numéricos"),
   especialidades: z.array(
     z.object({
       especialidadeId: z.string().uuid("Selecione uma especialidade"),
@@ -118,7 +134,9 @@ const createMedicoSchema = z.object({
 });
 
 const updateMedicoSchema = z.object({
-  crm: z.string().min(1, "CRM é obrigatório"),
+  crm: z.string().regex(/^\d{4,10}$/, "CRM deve conter apenas números (4 a 10 dígitos)"),
+  ufCrm: z.string().length(2, "UF do CRM é obrigatória").refine((v) => UFS_BRASIL.includes(v.toUpperCase()), "UF inválida"),
+  codigoCbo: z.string().regex(/^\d{6}$/, "Código CBO-S deve ter exatamente 6 dígitos numéricos"),
   especialidades: z.array(
     z.object({
       especialidadeId: z.string().uuid("Selecione uma especialidade"),
@@ -151,6 +169,8 @@ export function MedicoDialog({
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [loadingUrl, setLoadingUrl] = useState<string | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
+  const [deleteDocDialogOpen, setDeleteDocDialogOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const isEditing = !!medico;
 
   const form = useForm<any>({
@@ -158,6 +178,8 @@ export function MedicoDialog({
     defaultValues: {
       usuarioId: "",
       crm: "",
+      ufCrm: "",
+      codigoCbo: "",
       especialidades: [{ especialidadeId: "", categoriaId: null, rqe: "" }],
       limiteMaximoRetornosPorDia: null,
       ativo: true,
@@ -264,6 +286,8 @@ export function MedicoDialog({
     if (medico) {
       form.reset({
         crm: medico.crm,
+        ufCrm: medico.ufCrm ?? "",
+        codigoCbo: medico.codigoCbo ?? "",
         especialidades:
           medico.medicoEspecialidades && medico.medicoEspecialidades.length > 0
             ? medico.medicoEspecialidades.map((me) => ({
@@ -279,6 +303,8 @@ export function MedicoDialog({
       form.reset({
         usuarioId: "",
         crm: "",
+        ufCrm: "",
+        codigoCbo: "",
         especialidades: [{ especialidadeId: "", categoriaId: null, rqe: "" }],
         limiteMaximoRetornosPorDia: null,
         ativo: true,
@@ -374,13 +400,15 @@ export function MedicoDialog({
     }
   };
 
+  const requestDeleteDocumento = (documentoId: string) => {
+    setDocToDelete(documentoId);
+    setDeleteDocDialogOpen(true);
+  };
+
   const handleDeleteDocumento = async (documentoId: string) => {
     if (!medico?.id) return;
 
-    if (!confirm("Tem certeza que deseja excluir este documento?")) {
-      return;
-    }
-
+    setDeleteDocDialogOpen(false);
     setDeletingDoc(documentoId);
     try {
       const response = await fetch(
@@ -413,6 +441,8 @@ export function MedicoDialog({
 
       const payload: any = {
         crm: data.crm,
+        ufCrm: data.ufCrm,
+        codigoCbo: data.codigoCbo,
         especialidades: (data.especialidades || []).map((it: any) => ({
           especialidadeId: it.especialidadeId,
           categoriaId: it.categoriaId || null,
@@ -544,12 +574,14 @@ export function MedicoDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    CRM <span className="text-destructive">*</span>
+                    CRM (apenas números) <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="000000"
+                      placeholder="Ex: 123456"
+                      maxLength={10}
                       {...field}
+                      onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
                       disabled={loading || isEditing}
                     />
                   </FormControl>
@@ -557,6 +589,52 @@ export function MedicoDialog({
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="ufCrm"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      UF do CRM <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: SP"
+                        maxLength={2}
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="codigoCbo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Código CBO-S (6 dígitos) <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: 225120"
+                        maxLength={6}
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                        disabled={loading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <FormField
               control={form.control}
@@ -782,7 +860,7 @@ export function MedicoDialog({
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteDocumento(doc.id)}
+                              onClick={() => requestDeleteDocumento(doc.id)}
                               disabled={loading || deletingDoc === doc.id}
                             >
                               {deletingDoc === doc.id ? (
@@ -909,6 +987,30 @@ export function MedicoDialog({
           </form>
         </Form>
       </DialogContent>
+
+      <AlertDialog open={deleteDocDialogOpen} onOpenChange={setDeleteDocDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir documento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este documento? Essa ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDocToDelete(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={() => {
+                if (docToDelete) handleDeleteDocumento(docToDelete);
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Edit, FileText, Filter, Loader2, Plus, Power, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -40,6 +40,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Operadora {
   id: string;
@@ -99,43 +109,33 @@ export function OperadorasSuperAdminContent() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [disableDialogOpen, setDisableDialogOpen] = useState(false);
+  const [operadoraToDisable, setOperadoraToDisable] = useState<Operadora | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return operadoras;
-    return operadoras.filter((o) => {
-      return (
-        o.codigoAns?.toLowerCase().includes(q) ||
-        o.razaoSocial?.toLowerCase().includes(q) ||
-        (o.nomeFantasia ?? "").toLowerCase().includes(q) ||
-        (o.cnpj ?? "").includes(q)
-      );
-    });
-  }, [operadoras, search]);
-
-  const allFilteredIds = useMemo(() => filtered.map((o) => o.id), [filtered]);
+  const allPageIds = operadoras.map((o) => o.id);
   const selectedCount = selectedIds.size;
   const isAllSelected =
-    filtered.length > 0 && allFilteredIds.every((id) => selectedIds.has(id));
+    operadoras.length > 0 && allPageIds.every((id) => selectedIds.has(id));
   const isIndeterminate =
-    selectedCount > 0 && filtered.length > 0 && !isAllSelected;
+    selectedCount > 0 && operadoras.length > 0 && !isAllSelected;
 
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-  const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(filtered.length / pagination.pageSize)),
-    [filtered.length, pagination.pageSize]
-  );
-  const paged = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize;
-    return filtered.slice(start, start + pagination.pageSize);
-  }, [filtered, pagination.pageIndex, pagination.pageSize]);
-
-  // Sempre que o filtro mudar, voltar para a primeira página (mesmo comportamento esperado)
+  // Debounce de 300ms no search
   useEffect(() => {
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
   }, [search]);
 
-  // Se a lista mudar (ex.: após import/edição), limpar seleção para evitar ações em itens "sumidos"
+  // Limpar seleção quando a página mudar
   useEffect(() => {
     setSelectedIds(new Set());
   }, [operadoras]);
@@ -143,18 +143,24 @@ export function OperadorasSuperAdminContent() {
   const fetchOperadoras = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ page: "1", limit: "2000" });
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       const res = await fetch(`${API_BASE}?${params.toString()}`);
       if (!res.ok) throw new Error("Erro ao carregar operadoras");
       const data = await res.json();
       setOperadoras(data.operadoras ?? []);
+      setTotalItems(data.pagination?.total || 0);
+      setTotalPages(data.pagination?.totalPages || 1);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao carregar operadoras");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, limit, debouncedSearch]);
 
   useEffect(() => {
     fetchOperadoras();
@@ -229,14 +235,22 @@ export function OperadorasSuperAdminContent() {
     }
   };
 
-  const handleDisable = async (o: Operadora) => {
+  const openDisableDialog = (o: Operadora) => {
+    setOperadoraToDisable(o);
+    setDisableDialogOpen(true);
+  };
+
+  const confirmDisable = async () => {
+    if (!operadoraToDisable) return;
     try {
-      const res = await fetch(`${API_BASE}/${o.id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/${operadoraToDisable.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "Erro ao desativar operadora");
       }
       toast.success("Operadora desativada");
+      setDisableDialogOpen(false);
+      setOperadoraToDisable(null);
       await fetchOperadoras();
     } catch (e: any) {
       toast.error(e?.message || "Erro ao desativar operadora");
@@ -256,9 +270,9 @@ export function OperadorasSuperAdminContent() {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (checked) {
-        for (const id of allFilteredIds) next.add(id);
+        for (const id of allPageIds) next.add(id);
       } else {
-        for (const id of allFilteredIds) next.delete(id);
+        for (const id of allPageIds) next.delete(id);
       }
       return next;
     });
@@ -352,7 +366,7 @@ export function OperadorasSuperAdminContent() {
                 <p className="text-sm text-muted-foreground">Carregando operadoras...</p>
               </div>
             </div>
-          ) : filtered.length === 0 ? (
+          ) : operadoras.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6">
               <p className="text-muted-foreground text-center">Nenhuma operadora encontrada</p>
             </div>
@@ -380,7 +394,7 @@ export function OperadorasSuperAdminContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paged.map((o) => (
+                    {operadoras.map((o) => (
                       <TableRow key={o.id}>
                         <TableCell className="text-xs py-3">
                           <div className="flex items-center justify-center">
@@ -434,7 +448,7 @@ export function OperadorasSuperAdminContent() {
                               <DropdownMenuContent align="end" className="w-40">
                                 <DropdownMenuItem
                                   variant="destructive"
-                                  onClick={() => handleDisable(o)}
+                                  onClick={() => openDisableDialog(o)}
                                 >
                                   <Power className="h-4 w-4" />
                                   Desativar
@@ -449,11 +463,11 @@ export function OperadorasSuperAdminContent() {
                 </Table>
               </div>
 
-              {/* Rodapé de tabela no mesmo padrão de Formas de Pagamento (DENTRO do Card) */}
-              {!loading && filtered.length > 0 && (
+              {/* Rodapé de paginação */}
+              {!loading && totalItems > 0 && (
                 <div className="flex items-center justify-between px-6 pb-6">
                   <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
-                    {filtered.length} operadora(s) encontrada(s).
+                    {totalItems} operadora(s) encontrada(s).
                   </div>
                   <div className="flex w-full items-center gap-8 lg:w-fit">
                     <div className="hidden items-center gap-2 lg:flex">
@@ -461,33 +475,31 @@ export function OperadorasSuperAdminContent() {
                         Linhas por página
                       </Label>
                       <Select
-                        value={`${pagination.pageSize}`}
+                        value={`${limit}`}
                         onValueChange={(value) => {
-                          const size = Number(value);
-                          setPagination({ pageIndex: 0, pageSize: size });
+                          setLimit(Number(value));
+                          setPage(1);
                         }}
                       >
                         <SelectTrigger size="sm" className="w-20 h-7 text-xs" id="rows-per-page">
-                          <SelectValue placeholder={pagination.pageSize} />
+                          <SelectValue />
                         </SelectTrigger>
                         <SelectContent side="top">
-                          {[10, 20, 30, 40, 50].map((pageSize) => (
-                            <SelectItem key={pageSize} value={`${pageSize}`}>
-                              {pageSize}
-                            </SelectItem>
+                          {[10, 20, 30, 40, 50].map((s) => (
+                            <SelectItem key={s} value={`${s}`}>{s}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="flex w-fit items-center justify-center text-xs font-medium">
-                      Página {pagination.pageIndex + 1} de {pageCount}
+                      Página {page} de {totalPages}
                     </div>
                     <div className="ml-auto flex items-center gap-2 lg:ml-0">
                       <Button
                         variant="outline"
                         className="hidden h-7 w-7 p-0 lg:flex text-xs"
-                        onClick={() => setPagination((p) => ({ ...p, pageIndex: 0 }))}
-                        disabled={pagination.pageIndex === 0}
+                        onClick={() => setPage(1)}
+                        disabled={page <= 1}
                       >
                         <span className="sr-only">Primeira página</span>
                         <IconChevronsLeft className="h-3 w-3" />
@@ -496,8 +508,8 @@ export function OperadorasSuperAdminContent() {
                         variant="outline"
                         className="h-7 w-7 text-xs"
                         size="icon"
-                        onClick={() => setPagination((p) => ({ ...p, pageIndex: Math.max(0, p.pageIndex - 1) }))}
-                        disabled={pagination.pageIndex === 0}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page <= 1}
                       >
                         <span className="sr-only">Página anterior</span>
                         <IconChevronLeft className="h-3 w-3" />
@@ -506,10 +518,8 @@ export function OperadorasSuperAdminContent() {
                         variant="outline"
                         className="h-7 w-7 text-xs"
                         size="icon"
-                        onClick={() =>
-                          setPagination((p) => ({ ...p, pageIndex: Math.min(pageCount - 1, p.pageIndex + 1) }))
-                        }
-                        disabled={pagination.pageIndex >= pageCount - 1}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
                       >
                         <span className="sr-only">Próxima página</span>
                         <IconChevronRight className="h-3 w-3" />
@@ -518,8 +528,8 @@ export function OperadorasSuperAdminContent() {
                         variant="outline"
                         className="hidden h-7 w-7 lg:flex text-xs"
                         size="icon"
-                        onClick={() => setPagination((p) => ({ ...p, pageIndex: pageCount - 1 }))}
-                        disabled={pagination.pageIndex >= pageCount - 1}
+                        onClick={() => setPage(totalPages)}
+                        disabled={page >= totalPages}
                       >
                         <span className="sr-only">Última página</span>
                         <IconChevronsRight className="h-3 w-3" />
@@ -543,7 +553,7 @@ export function OperadorasSuperAdminContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Código ANS</label>
-              <Input value={form.codigoAns} onChange={(e) => setForm((p) => ({ ...p, codigoAns: e.target.value }))} />
+              <Input value={form.codigoAns} maxLength={6} placeholder="6 dígitos numéricos" onChange={(e) => setForm((p) => ({ ...p, codigoAns: e.target.value.replace(/\D/g, "") }))} />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">CNPJ</label>
@@ -619,26 +629,52 @@ export function OperadorasSuperAdminContent() {
         onSuccess={fetchOperadoras}
       />
 
-      <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Excluir operadoras em massa</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
+        <AlertDialogContent className="sm:max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir operadoras em massa</AlertDialogTitle>
+            <AlertDialogDescription>
               Você está prestes a excluir <b>{selectedIds.size}</b> operadora(s) selecionada(s). Essa ação é
               irreversível. Se alguma operadora tiver vínculos (consultas/guias/planos), ela não poderá ser excluída.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleBulkDelete} disabled={selectedIds.size === 0}>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0}
+            >
               Excluir agora
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar operadora</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja desativar a operadora{" "}
+              <b>{operadoraToDisable?.razaoSocial}</b>? Essa ação pode afetar
+              planos de saúde, guias TISS e consultas vinculadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setOperadoraToDisable(null)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              onClick={confirmDisable}
+            >
+              Desativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { Prisma } from "@/lib/generated/prisma/client";
 import { z } from "zod";
 
 const operadoraSchema = z.object({
-  codigoAns: z.string().min(1, "Código ANS é obrigatório"),
+  codigoAns: z.string().regex(/^\d{6}$/, "Código ANS deve ter exatamente 6 dígitos numéricos"),
   razaoSocial: z.string().min(3, "Razão social é obrigatória"),
   nomeFantasia: z.string().optional().nullable(),
   cnpj: z.string().optional().nullable(),
@@ -49,6 +49,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const ativo = searchParams.get("ativo");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const skip = (page - 1) * limit;
 
     const where: any = {
       clinicaId: null, // catálogo global
@@ -64,28 +67,30 @@ export async function GET(request: NextRequest) {
     };
 
     let operadoras: any[] = [];
+    let total = 0;
     try {
       // Caminho padrão (Prisma Client atual)
-      operadoras = await prisma.operadora.findMany({
-        where,
-        orderBy: { razaoSocial: "asc" },
-      });
+      [operadoras, total] = await Promise.all([
+        prisma.operadora.findMany({
+          where,
+          orderBy: { razaoSocial: "asc" },
+          skip,
+          take: limit,
+        }),
+        prisma.operadora.count({ where }),
+      ]);
     } catch (e: any) {
       // Fallback defensivo para casos em que o dev server ainda esteja com Prisma Client antigo em cache
       // e rejeite `clinicaId: null` com "Argument clinicaId must not be null".
-      let query = Prisma.sql`
-        SELECT *
-        FROM "operadoras"
-        WHERE "clinicaId" IS NULL
-      `;
+      let baseWhere = Prisma.sql`"clinicaId" IS NULL`;
 
       if (ativo !== null) {
-        query = Prisma.sql`${query} AND "ativo" = ${ativo === "true"}`;
+        baseWhere = Prisma.sql`${baseWhere} AND "ativo" = ${ativo === "true"}`;
       }
 
       if (search) {
         const like = `%${search}%`;
-        query = Prisma.sql`${query} AND (
+        baseWhere = Prisma.sql`${baseWhere} AND (
           "codigoAns" ILIKE ${like}
           OR "razaoSocial" ILIKE ${like}
           OR "nomeFantasia" ILIKE ${like}
@@ -93,11 +98,20 @@ export async function GET(request: NextRequest) {
         )`;
       }
 
-      query = Prisma.sql`${query} ORDER BY "razaoSocial" ASC`;
-      operadoras = await prisma.$queryRaw<any[]>(query);
+      const countResult = await prisma.$queryRaw<any[]>(
+        Prisma.sql`SELECT COUNT(*)::int as count FROM "operadoras" WHERE ${baseWhere}`
+      );
+      total = countResult[0]?.count || 0;
+
+      operadoras = await prisma.$queryRaw<any[]>(
+        Prisma.sql`SELECT * FROM "operadoras" WHERE ${baseWhere} ORDER BY "razaoSocial" ASC LIMIT ${limit} OFFSET ${skip}`
+      );
     }
 
-    return NextResponse.json({ operadoras });
+    return NextResponse.json({
+      operadoras,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error) {
     console.error("Erro ao listar operadoras (super-admin):", error);
     return NextResponse.json({ error: "Erro ao listar operadoras" }, { status: 500 });

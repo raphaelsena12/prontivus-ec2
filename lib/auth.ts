@@ -115,6 +115,7 @@ export const authOptions: NextAuthOptions = {
               nome: usuario.nome,
               tipo: TipoUsuario.SUPER_ADMIN,
               clinicaId: null,
+              avatar: usuario.avatar ?? null,
               tenantIds: [],
               requiresTenantSelection: false,
             };
@@ -378,6 +379,7 @@ export const authOptions: NextAuthOptions = {
               nome: usuario.nome,
               tipo: usuario.tipo,
               clinicaId: usuario.clinicaId,
+              avatar: usuario.avatar ?? null,
               tenantIds: clinicaFallback ? [clinicaFallback.id] : [],
               requiresTenantSelection: false,
             };

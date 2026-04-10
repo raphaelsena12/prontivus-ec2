@@ -5,7 +5,7 @@ import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  codigoAns: z.string().min(1).optional(),
+  codigoAns: z.string().regex(/^\d{6}$/, "Código ANS deve ter exatamente 6 dígitos numéricos").optional(),
   razaoSocial: z.string().min(3).optional(),
   nomeFantasia: z.string().optional().nullable(),
   cnpj: z.string().optional().nullable(),

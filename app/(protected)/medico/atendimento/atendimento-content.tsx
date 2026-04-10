@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useReducer } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +85,19 @@ import { TranscriptionBar } from '@/components/atendimento/consultation/Transcri
 import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
 import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
 import { AvatarWithS3 } from '@/components/avatar-with-s3';
+import { AutoSaveIndicator } from './components/auto-save-indicator';
+import {
+  clinicalReducer,
+  initialClinicalState,
+  type ClinicalState,
+  type ClinicalAction,
+  type AnalysisResults,
+  type DocumentoGeradoLocal,
+  type Prescricao,
+  type CidManual,
+  type ExameManual,
+  type ProtocoloManual,
+} from './atendimento-reducer';
 
 interface Consulta {
   id: string;
@@ -162,7 +175,7 @@ interface AtendimentoContentProps {
 
 export function AtendimentoContent({ consultaId, telemedicinaProps }: AtendimentoContentProps) {
   const router = useRouter();
-  const { open: sidebarOpen, isMobile } = useSidebar();
+  const { open: sidebarOpen, setOpen: setSidebarOpen, isMobile } = useSidebar();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingStep, setSavingStep] = useState("");
@@ -187,27 +200,97 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState<'processing' | 'analyzing' | 'generating'>('processing');
   const [processingContext, setProcessingContext] = useState<'anamnese' | 'suggestions'>('anamnese');
-  const [analysisResults, setAnalysisResults] = useState<{
-    anamnese: string;
-    raciocinioClinico?: string;
-    cidCodes: Array<{ code: string; description: string; score: number }>;
-    protocolos: Array<{ nome: string; descricao: string; justificativa?: string }>;
-    exames: Array<{ nome: string; tipo: string; justificativa: string }>;
-    prescricoes: Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string; justificativa?: string }>;
-  } | null>(null);
-  const [editedAnamnese, setEditedAnamnese] = useState<string>('');
-  const [isAnamneseEdited, setIsAnamneseEdited] = useState(false);
+  // ── Reducer para dados clínicos (anamnese, CIDs, exames, prescrições, documentos, steps) ──
+  const [clinical, dispatch] = useReducer(clinicalReducer, initialClinicalState);
+  const {
+    editedAnamnese,
+    isAnamneseEdited,
+    anamneseConfirmed,
+    analysisResults,
+    selectedCids,
+    selectedExamesAI,
+    selectedPrescricoesAI,
+    selectedProtocolosAI,
+    cidsManuais,
+    protocolosManuais,
+    examesManuais,
+    prescricoes,
+    orientacoes,
+    documentosGerados,
+    currentStep,
+    completedSteps,
+    autoSaveStatus,
+    lastAutoSaveTime,
+  } = clinical;
+
+  // ── Dispatchers de conveniência (compatibilidade com código existente) ──
+  const setEditedAnamnese = (v: string) => dispatch({ type: "SET_EDITED_ANAMNESE", payload: v });
+  const setIsAnamneseEdited = (v: boolean) => dispatch({ type: "SET_ANAMNESE_EDITED", payload: v });
+  const setAnalysisResults = (v: AnalysisResults | null | ((prev: AnalysisResults | null) => AnalysisResults | null)) => {
+    if (typeof v === "function") dispatch({ type: "SET_ANALYSIS_RESULTS", payload: v(analysisResults) });
+    else dispatch({ type: "SET_ANALYSIS_RESULTS", payload: v });
+  };
+  const setSelectedCids = (v: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    if (typeof v === "function") dispatch({ type: "SET_SELECTED_CIDS", payload: v(selectedCids) });
+    else dispatch({ type: "SET_SELECTED_CIDS", payload: v });
+  };
+  const setSelectedExamesAI = (v: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    if (typeof v === "function") dispatch({ type: "SET_SELECTED_EXAMES_AI", payload: v(selectedExamesAI) });
+    else dispatch({ type: "SET_SELECTED_EXAMES_AI", payload: v });
+  };
+  const setSelectedPrescricoesAI = (v: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    if (typeof v === "function") dispatch({ type: "SET_SELECTED_PRESCRICOES_AI", payload: v(selectedPrescricoesAI) });
+    else dispatch({ type: "SET_SELECTED_PRESCRICOES_AI", payload: v });
+  };
+  const setSelectedProtocolosAI = (v: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    if (typeof v === "function") dispatch({ type: "SET_SELECTED_PROTOCOLOS_AI", payload: v(selectedProtocolosAI) });
+    else dispatch({ type: "SET_SELECTED_PROTOCOLOS_AI", payload: v });
+  };
+  const setCidsManuais = (v: CidManual[] | ((prev: CidManual[]) => CidManual[])) => {
+    if (typeof v === "function") dispatch({ type: "SET_CIDS_MANUAIS", payload: v(cidsManuais) });
+    else dispatch({ type: "SET_CIDS_MANUAIS", payload: v });
+  };
+  const setProtocolosManuais = (v: ProtocoloManual[] | ((prev: ProtocoloManual[]) => ProtocoloManual[])) => {
+    if (typeof v === "function") dispatch({ type: "SET_PROTOCOLOS_MANUAIS", payload: v(protocolosManuais) });
+    else dispatch({ type: "SET_PROTOCOLOS_MANUAIS", payload: v });
+  };
+  const setExamesManuais = (v: ExameManual[] | ((prev: ExameManual[]) => ExameManual[])) => {
+    if (typeof v === "function") dispatch({ type: "SET_EXAMES_MANUAIS", payload: v(examesManuais) });
+    else dispatch({ type: "SET_EXAMES_MANUAIS", payload: v });
+  };
+  const setPrescricoes = (v: Prescricao[] | ((prev: Prescricao[]) => Prescricao[])) => {
+    if (typeof v === "function") dispatch({ type: "SET_PRESCRICOES", payload: v(prescricoes) });
+    else dispatch({ type: "SET_PRESCRICOES", payload: v });
+  };
+  const setOrientacoes = (v: string) => dispatch({ type: "SET_ORIENTACOES", payload: v });
+  const setDocumentosGerados = (v: DocumentoGeradoLocal[] | ((prev: DocumentoGeradoLocal[]) => DocumentoGeradoLocal[])) => {
+    if (typeof v === "function") dispatch({ type: "SET_DOCUMENTOS", payload: v(documentosGerados) });
+    else dispatch({ type: "SET_DOCUMENTOS", payload: v });
+  };
+  const setCurrentStep = (v: 1 | 2 | 3 | 4 | 5) => dispatch({ type: "SET_STEP", payload: v });
+  const setCompletedSteps = (v: Set<number> | ((prev: Set<number>) => Set<number>)) => {
+    if (typeof v === "function") {
+      const next = v(completedSteps);
+      next.forEach(s => dispatch({ type: "COMPLETE_STEP", payload: s }));
+    } else {
+      v.forEach(s => dispatch({ type: "COMPLETE_STEP", payload: s }));
+    }
+  };
+  const setAnamneseConfirmed = (v: boolean) => { if (v) dispatch({ type: "CONFIRM_ANAMNESE" }); };
+  const setAutoSaveStatus = (v: 'idle' | 'saving' | 'saved' | 'error') => {
+    switch (v) {
+      case 'saving': dispatch({ type: "AUTO_SAVE_START" }); break;
+      case 'saved': dispatch({ type: "AUTO_SAVE_SUCCESS", payload: new Date() }); break;
+      case 'error': dispatch({ type: "AUTO_SAVE_ERROR" }); break;
+      case 'idle': dispatch({ type: "AUTO_SAVE_RESET" }); break;
+    }
+  };
   const [isEditingAnamnese, setIsEditingAnamnese] = useState(false);
   const [documentoSearch, setDocumentoSearch] = useState("");
   const [documentoSuggestions, setDocumentoSuggestions] = useState<Array<{ id: string; nome: string }>>([]);
   const [isMicrophoneSelectorOpen, setIsMicrophoneSelectorOpen] = useState(false);
   const [selectedMicrophoneId, setSelectedMicrophoneId] = useState<string | undefined>();
-  const [prescricoes, setPrescricoes] = useState<Array<{ medicamento: string; dosagem: string; posologia: string; duracao: string }>>([]);
-  const [orientacoes, setOrientacoes] = useState("");
-  const [selectedCids, setSelectedCids] = useState<Set<number>>(new Set());
-  const [selectedProtocolosAI, setSelectedProtocolosAI] = useState<Set<number>>(new Set());
-  const [selectedExamesAI, setSelectedExamesAI] = useState<Set<number>>(new Set());
-  const [selectedPrescricoesAI, setSelectedPrescricoesAI] = useState<Set<number>>(new Set());
+  // prescricoes, orientacoes, selectedCids, selectedExamesAI, selectedPrescricoesAI, selectedProtocolosAI → clinical reducer
   const [medicamentoDialogOpen, setMedicamentoDialogOpen] = useState(false);
   const [medicamentoSearch, setMedicamentoSearch] = useState("");
   const [medicamentos, setMedicamentos] = useState<Array<{ id: string; nome: string; principioAtivo: string | null; laboratorio: string | null; apresentacao: string | null; concentracao: string | null; unidade: string | null; controle: string | null }>>([]);
@@ -223,17 +306,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     duracao: string;
     manual?: boolean;
   } | null>(null);
-  type DocumentoGeradoLocal = {
-    id: string;
-    tipoDocumento: string;
-    nomeDocumento: string;
-    createdAt: string;
-    pdfBlob?: Blob;
-    assinado: boolean;
-    assinando?: boolean;
-    erroAssinatura?: string;
-  };
-  const [documentosGerados, setDocumentosGerados] = useState<DocumentoGeradoLocal[]>([]);
+  // DocumentoGeradoLocal type and documentosGerados → clinical reducer
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
   const [tissModalOpen, setTissModalOpen] = useState(false);
   const [tissGerandoGuia, setTissGerandoGuia] = useState(false);
@@ -259,9 +332,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [nomeExameInput, setNomeExameInput] = useState("");
   const [arquivoExame, setArquivoExame] = useState<File | null>(null);
-  const [cidsManuais, setCidsManuais] = useState<Array<{ code: string; description: string }>>([]);
-  const [protocolosManuais, setProtocolosManuais] = useState<Array<{ nome: string; descricao: string }>>([]);
-  const [examesManuais, setExamesManuais] = useState<Array<{ nome: string; tipo: string; codigoTussId?: string | null; codigoTuss?: string | null; exameId?: string | null; grupoId?: string | null }>>([]);
+  // cidsManuais, protocolosManuais, examesManuais → clinical reducer
   const [cidDialogOpen, setCidDialogOpen] = useState(false);
   const [cidSearchDialogOpen, setCidSearchDialogOpen] = useState(false);
   const [protocoloDialogOpen, setProtocoloDialogOpen] = useState(false);
@@ -294,11 +365,9 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [selectedGruposIds, setSelectedGruposIds] = useState<Set<string>>(new Set());
 
   // ─── UI states do redesign (não afetam lógica de negócio) ─────────────────
-  const [currentStep, setCurrentStep] = useState<1|2|3|4|5>(1);
+  // currentStep, completedSteps, anamneseConfirmed → clinical reducer
   const [consultationMode, setConsultationMode] = useState<'manual'|'ai'>('ai');
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
-  const [anamneseConfirmed, setAnamneseConfirmed] = useState(false);
   const [loadingFichaPreview, setLoadingFichaPreview] = useState(false);
   const [finalizarModalOpen, setFinalizarModalOpen] = useState(false);
   const [cidAlertVisible, setCidAlertVisible] = useState(false);
@@ -307,6 +376,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [retornoDias, setRetornoDias] = useState<number>(30);
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
+  const [certStatus, setCertStatus] = useState<{ configured: boolean; expired: boolean; checked: boolean }>({ configured: false, expired: false, checked: false });
   const [docConfigOpts, setDocConfigOpts] = useState({
     cpf: true, endereco: false, assinar: false,
     diasAfastamento: 1, observacoes: "",
@@ -314,6 +384,29 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     nomeAcompanhante: "", uf: "", dataValidade: "",
     convenio: "", justificativa: "", textoLivre: "",
   });
+
+  // autoSaveStatus, lastAutoSaveTime → clinical reducer
+  const autoSaveResetRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Modo foco ──────────────────────────────────────────────────────────────
+  const toggleFocusMode = useCallback(() => {
+    const next = !isFullscreen;
+    setIsFullscreen(next);
+    if (!isMobile) setSidebarOpen(!next);
+    if (next) {
+      document.body.classList.add('atendimento-focus-mode');
+    } else {
+      document.body.classList.remove('atendimento-focus-mode');
+    }
+  }, [isFullscreen, isMobile, setSidebarOpen]);
+
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('atendimento-focus-mode');
+      if (!isMobile) setSidebarOpen(true);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Hook de transcrição
   const {
@@ -327,6 +420,25 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     stopTranscription,
     processTranscription,
   } = useTranscription();
+
+  // ── Verificação de certificado digital ──────────────────────────────────────
+  const checkCertificado = useCallback(async (): Promise<{ configured: boolean; expired: boolean }> => {
+    try {
+      const res = await fetch("/api/medico/certificado");
+      if (!res.ok) return { configured: false, expired: false };
+      const data = await res.json();
+      const configured = !!data.configured;
+      const expired = configured && data.certificado?.validTo
+        ? new Date(data.certificado.validTo).getTime() < Date.now()
+        : false;
+      setCertStatus({ configured, expired, checked: true });
+      return { configured, expired };
+    } catch {
+      return { configured: false, expired: false };
+    }
+  }, []);
+
+  useEffect(() => { checkCertificado(); }, [checkCertificado]);
 
   // ── Autosave / recovery de rascunho ─────────────────────────────────────────
   const draftKey = `draft-consulta-${consultaId}`;
@@ -431,6 +543,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       lastAutoSaveRef.current = dataHash;
 
       try {
+        setAutoSaveStatus('saving');
         await fetch("/api/medico/atendimento", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -459,9 +572,13 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
             finalizar: false,
           }),
         });
-        console.log("💾 Autosave realizado com sucesso");
+        setAutoSaveStatus('saved');
+        if (autoSaveResetRef.current) clearTimeout(autoSaveResetRef.current);
+        autoSaveResetRef.current = setTimeout(() => setAutoSaveStatus('idle'), 5000);
       } catch {
-        // Falha silenciosa — o localStorage ainda serve de backup
+        setAutoSaveStatus('error');
+        if (autoSaveResetRef.current) clearTimeout(autoSaveResetRef.current);
+        autoSaveResetRef.current = setTimeout(() => setAutoSaveStatus('idle'), 8000);
       }
     }, 60000);
 
@@ -1160,6 +1277,17 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       return;
     }
 
+    // Verificar certificado antes de assinar
+    const cert = await checkCertificado();
+    if (!cert.configured) {
+      toast.error("Certificado digital não configurado. Acesse seu Perfil para carregar o certificado (.pfx/.p12) antes de assinar.");
+      return;
+    }
+    if (cert.expired) {
+      toast.error("Certificado digital expirado. Acesse seu Perfil para atualizar o certificado antes de assinar.");
+      return;
+    }
+
     setDocumentosGerados((prev) =>
       prev.map((d) =>
         d.id === id ? { ...d, assinando: true, erroAssinatura: undefined } : d
@@ -1736,34 +1864,34 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
 
       const pdfBlob = await response.blob();
 
-      // Assinar digitalmente de forma automática
+      // Assinar digitalmente de forma automática (com verificação prévia)
       let finalBlob = pdfBlob;
-      try {
-        const formData = new FormData();
-        formData.append("consultaId", consultaId);
-        formData.append("tipoDocumento", "ficha-atendimento");
-        formData.append("nomeDocumento", "Ficha de Atendimento");
-        formData.append("pdfFile", pdfBlob, "ficha-atendimento.pdf");
+      const certCheck = await checkCertificado();
+      if (!certCheck.configured) {
+        toast.warning("Certificado digital não configurado — abrindo sem assinatura. Acesse seu Perfil para carregar o certificado.");
+      } else if (certCheck.expired) {
+        toast.warning("Certificado digital expirado — abrindo sem assinatura. Acesse seu Perfil para atualizar o certificado.");
+      } else {
+        try {
+          const formData = new FormData();
+          formData.append("consultaId", consultaId);
+          formData.append("tipoDocumento", "ficha-atendimento");
+          formData.append("nomeDocumento", "Ficha de Atendimento");
+          formData.append("pdfFile", pdfBlob, "ficha-atendimento.pdf");
 
-        const signRes = await fetch("/api/medico/documentos/assinar", {
-          method: "POST",
-          body: formData,
-        });
+          const signRes = await fetch("/api/medico/documentos/assinar", {
+            method: "POST",
+            body: formData,
+          });
 
-        if (signRes.ok) {
-          finalBlob = await signRes.blob();
-        } else {
-          const err = await signRes.json().catch(() => ({}));
-          if (err.type === "MissingCertificate") {
-            toast.warning("Certificado digital não configurado — abrindo sem assinatura.");
-          } else if (err.type === "CertificateExpired") {
-            toast.warning("Certificado digital expirado — abrindo sem assinatura.");
+          if (signRes.ok) {
+            finalBlob = await signRes.blob();
           } else {
             toast.warning("Não foi possível assinar digitalmente — abrindo sem assinatura.");
           }
+        } catch {
+          toast.warning("Erro ao assinar digitalmente — abrindo sem assinatura.");
         }
-      } catch {
-        toast.warning("Erro ao assinar digitalmente — abrindo sem assinatura.");
       }
 
       const url = URL.createObjectURL(finalBlob);
@@ -2079,24 +2207,31 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       let pdfBlob = await response.blob();
       let assinado = false;
 
-      // Assinar digitalmente inline se solicitado
+      // Assinar digitalmente inline se solicitado (com verificação prévia)
       if (extraDados?.assinarAposGerar) {
-        try {
-          const formData = new FormData();
-          formData.append("consultaId", consultaId);
-          formData.append("tipoDocumento", modelId);
-          formData.append("nomeDocumento", nomeDocumento);
-          formData.append("pdfFile", pdfBlob, `${modelId}.pdf`);
-          const signRes = await fetch("/api/medico/documentos/assinar", { method: "POST", body: formData });
-          if (signRes.ok) {
-            pdfBlob = await signRes.blob();
-            assinado = true;
-            toast.success("Documento gerado e assinado digitalmente!");
-          } else {
+        const certCheck = await checkCertificado();
+        if (!certCheck.configured) {
+          toast.warning("Documento gerado, mas certificado digital não configurado. Acesse seu Perfil para carregar o certificado.");
+        } else if (certCheck.expired) {
+          toast.warning("Documento gerado, mas certificado digital expirado. Acesse seu Perfil para atualizar o certificado.");
+        } else {
+          try {
+            const formData = new FormData();
+            formData.append("consultaId", consultaId);
+            formData.append("tipoDocumento", modelId);
+            formData.append("nomeDocumento", nomeDocumento);
+            formData.append("pdfFile", pdfBlob, `${modelId}.pdf`);
+            const signRes = await fetch("/api/medico/documentos/assinar", { method: "POST", body: formData });
+            if (signRes.ok) {
+              pdfBlob = await signRes.blob();
+              assinado = true;
+              toast.success("Documento gerado e assinado digitalmente!");
+            } else {
+              toast.warning("Documento gerado, mas não foi possível assinar digitalmente.");
+            }
+          } catch {
             toast.warning("Documento gerado, mas não foi possível assinar digitalmente.");
           }
-        } catch {
-          toast.warning("Documento gerado, mas não foi possível assinar digitalmente.");
         }
       }
 
@@ -2311,6 +2446,22 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     <span className="text-sm font-bold text-slate-800 tabular-nums whitespace-nowrap tracking-tight">
                       {sessionDuration}
                     </span>
+                  </div>
+                  <div className="border-l border-slate-200 pl-2 ml-1">
+                    <AutoSaveIndicator status={autoSaveStatus} lastSaveTime={lastAutoSaveTime} />
+                  </div>
+                  <div className="border-l border-slate-200 pl-2 ml-1 flex items-center gap-1.5">
+                    {isFullscreen ? (
+                      <Minimize2 className="w-3 h-3 text-muted-foreground" />
+                    ) : (
+                      <Maximize2 className="w-3 h-3 text-muted-foreground" />
+                    )}
+                    <Switch
+                      checked={isFullscreen}
+                      onCheckedChange={toggleFocusMode}
+                      className="scale-75"
+                    />
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Foco</span>
                   </div>
                 </div>
 
@@ -2816,7 +2967,20 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     <p className="text-sm font-medium text-slate-700">Assinar digitalmente</p>
                     <p className="text-xs text-slate-400 mt-0.5">Aplica certificado digital ao PDF</p>
                   </div>
-                  <Switch checked={opts.assinar} onCheckedChange={v => set({ assinar: v })} />
+                  <Switch checked={opts.assinar} onCheckedChange={async (v) => {
+                    if (v) {
+                      const cert = await checkCertificado();
+                      if (!cert.configured) {
+                        toast.error("Certificado digital não configurado. Acesse seu Perfil para carregar o certificado (.pfx/.p12) antes de assinar.");
+                        return;
+                      }
+                      if (cert.expired) {
+                        toast.error("Certificado digital expirado. Acesse seu Perfil para atualizar o certificado.");
+                        return;
+                      }
+                    }
+                    set({ assinar: v });
+                  }} />
                 </div>
 
                 {hasTextoLivre && (
@@ -2914,20 +3078,93 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
 
                 <div className="px-5 py-4 space-y-3 max-h-[55vh] overflow-y-auto">
 
-                  {/* Resumo compacto */}
-                  <div className="grid grid-cols-4 gap-2">
-                    {[
-                      { icon: Stethoscope, label: "CIDs", count: allCids.length },
-                      { icon: FileText, label: "Exames", count: allExames.length },
-                      { icon: Pill, label: "Receitas", count: allRx.length },
-                      { icon: FileCheck, label: "Docs", count: documentosGerados.length },
-                    ].map(({ icon: Icon, label, count }) => (
-                      <div key={label} className="flex flex-col items-center gap-1 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                        <Icon className={`w-3.5 h-3.5 ${count > 0 ? "text-slate-500" : "text-slate-300"}`} />
-                        <p className={`text-base font-bold leading-none ${count > 0 ? "text-slate-800" : "text-slate-300"}`}>{count}</p>
-                        <p className="text-[10px] text-slate-400">{label}</p>
+                  {/* Status da anamnese */}
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                    (editedAnamnese || prontuario?.anamnese)
+                      ? "bg-emerald-50 border-emerald-200"
+                      : "bg-red-50 border-red-200"
+                  }`}>
+                    {(editedAnamnese || prontuario?.anamnese) ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                    )}
+                    <span className={`text-xs font-medium ${
+                      (editedAnamnese || prontuario?.anamnese) ? "text-emerald-700" : "text-red-600"
+                    }`}>
+                      {(editedAnamnese || prontuario?.anamnese) ? "Anamnese registrada" : "Anamnese não registrada"}
+                    </span>
+                  </div>
+
+                  {/* Resumo compacto com detalhes */}
+                  <div className="space-y-2">
+                    {/* CIDs */}
+                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                      <Stethoscope className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${allCids.length > 0 ? "text-slate-500" : "text-slate-300"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-slate-700">Diagnósticos (CID-10)</p>
+                          <span className={`text-xs font-bold ${allCids.length > 0 ? "text-slate-800" : "text-slate-300"}`}>{allCids.length}</span>
+                        </div>
+                        {allCids.length > 0 && (
+                          <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            {allCids.slice(0, 3).map(c => c.code).join(", ")}
+                            {allCids.length > 3 && ` + ${allCids.length - 3} mais`}
+                          </p>
+                        )}
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Exames */}
+                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                      <FileText className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${allExames.length > 0 ? "text-slate-500" : "text-slate-300"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-slate-700">Exames solicitados</p>
+                          <span className={`text-xs font-bold ${allExames.length > 0 ? "text-slate-800" : "text-slate-300"}`}>{allExames.length}</span>
+                        </div>
+                        {allExames.length > 0 && (
+                          <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            {allExames.slice(0, 3).map(e => e.nome).join(", ")}
+                            {allExames.length > 3 && ` + ${allExames.length - 3} mais`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Prescrições */}
+                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                      <Pill className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${allRx.length > 0 ? "text-slate-500" : "text-slate-300"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-slate-700">Prescrições</p>
+                          <span className={`text-xs font-bold ${allRx.length > 0 ? "text-slate-800" : "text-slate-300"}`}>{allRx.length}</span>
+                        </div>
+                        {allRx.length > 0 && (
+                          <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            {allRx.slice(0, 3).map(r => r.medicamento).join(", ")}
+                            {allRx.length > 3 && ` + ${allRx.length - 3} mais`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Documentos */}
+                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                      <FileCheck className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${documentosGerados.length > 0 ? "text-slate-500" : "text-slate-300"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-slate-700">Documentos gerados</p>
+                          <span className={`text-xs font-bold ${documentosGerados.length > 0 ? "text-slate-800" : "text-slate-300"}`}>{documentosGerados.length}</span>
+                        </div>
+                        {documentosGerados.length > 0 && (
+                          <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                            {documentosGerados.slice(0, 3).map(d => d.nomeDocumento).join(", ")}
+                            {documentosGerados.length > 3 && ` + ${documentosGerados.length - 3} mais`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Avisos */}

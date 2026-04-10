@@ -14,7 +14,7 @@ import { telemeditcinaService } from '../../../services/telemedicina.service';
 const STRIPE_KEY = (Constants.expoConfig?.extra as any)?.stripePublishableKey ?? '';
 
 function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: string): string {
-  const valorFormatado = valor.toFixed(2).replace('.', ',');
+  const valorFormatado = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -197,7 +197,7 @@ function buildPaymentHtml(clientSecret: string, valor: number, medicoNome: strin
         if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
           window.ReactNativeWebView.postMessage(JSON.stringify({ success: true }));
         } else {
-          errEl.textContent = 'Pagamento nao confirmado. Tente novamente.';
+          errEl.textContent = 'Pagamento não confirmado. Tente novamente.';
           btn.disabled = false;
           btn.innerHTML = 'Pagar R$ ${valorFormatado}';
         }
@@ -258,13 +258,20 @@ export default function PagamentoTelemedicinaScreen() {
           medicoTelemedicinaId: params.medicoTelemedicinaId,
         });
 
+        // Registrar consentimento (já aceito no modal do app) para que a página web pule o step
+        try {
+          await telemeditcinaService.registrarConsentimento(result.patientToken);
+        } catch {
+          // Não bloquear o fluxo se falhar — a página web pedirá novamente
+        }
+
         setEtapa('pronto');
 
         // Small delay to show success state
         setTimeout(() => {
           router.replace({
             pathname: '/(app)/agendamentos/consulta-web',
-            params: { url: result.patientLink, titulo: `Dr(a). ${params.medicoNome}` },
+            params: { url: `${result.patientLink}&skipConsent=1`, titulo: `Dr(a). ${params.medicoNome}` },
           });
         }, 1200);
       }
@@ -306,7 +313,7 @@ export default function PagamentoTelemedicinaScreen() {
           <Text style={styles.doctorSub}>Consulta por Telemedicina</Text>
         </View>
         <View style={styles.valorPill}>
-          <Text style={styles.valorText}>R$ {valor.toFixed(2).replace('.', ',')}</Text>
+          <Text style={styles.valorText}>R$ {valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
         </View>
       </View>
 
@@ -314,7 +321,7 @@ export default function PagamentoTelemedicinaScreen() {
       {loading && !processando && (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" color={Colors.primary} />
-          <Text style={styles.loadingText}>Carregando formulario de pagamento...</Text>
+          <Text style={styles.loadingText}>Carregando formulário de pagamento...</Text>
         </View>
       )}
 
@@ -345,12 +352,12 @@ export default function PagamentoTelemedicinaScreen() {
               </View>
               <Text style={styles.overlayTitle}>Preparando sua consulta...</Text>
               <Text style={styles.overlaySubtitle}>
-                Pagamento confirmado! Estamos configurando a sala de video.
+                Pagamento confirmado! Estamos configurando a sala de vídeo.
               </Text>
               <View style={styles.overlaySteps}>
                 <StepItem done label="Pagamento confirmado" />
-                <StepItem active label="Criando sala de video" />
-                <StepItem label="Notificando o medico" />
+                <StepItem active label="Criando sala de vídeo" />
+                <StepItem label="Notificando o médico" />
               </View>
             </View>
           )}

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import { authService } from '../services/auth.service';
 
-const SESSION_TOKEN_KEY = 'nextauth_session_token';
+const LOGGED_IN_KEY = 'session_active';
 
 interface AuthUser {
   id: string;
@@ -12,10 +13,10 @@ interface AuthUser {
 }
 
 interface AuthState {
-  token: string | null;
+  token: string | null; // mantém compatibilidade — agora é flag "1" ou null
   user: AuthUser | null;
   isLoading: boolean;
-  setToken: (token: string) => Promise<void>;
+  setLoggedIn: (user: AuthUser) => Promise<void>;
   setUser: (user: AuthUser) => void;
   loadToken: () => Promise<void>;
   clearAuth: () => Promise<void>;
@@ -26,9 +27,9 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoading: true,
 
-  setToken: async (token: string) => {
-    await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
-    set({ token });
+  setLoggedIn: async (user: AuthUser) => {
+    await SecureStore.setItemAsync(LOGGED_IN_KEY, '1');
+    set({ token: '1', user });
   },
 
   setUser: (user: AuthUser) => {
@@ -37,15 +38,35 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   loadToken: async () => {
     try {
-      const token = await SecureStore.getItemAsync(SESSION_TOKEN_KEY);
-      set({ token, isLoading: false });
+      const flag = await SecureStore.getItemAsync(LOGGED_IN_KEY);
+      if (flag) {
+        // Verificar se a sessão ainda é válida chamando o endpoint
+        const session = await authService.getSession();
+        if (session) {
+          set({
+            token: '1',
+            user: {
+              id: session.id,
+              nome: session.name,
+              email: session.email,
+              clinicaId: session.clinicaId,
+              avatar: session.avatar,
+            },
+            isLoading: false,
+          });
+          return;
+        }
+      }
+      // Sessão inválida ou sem flag
+      await SecureStore.deleteItemAsync(LOGGED_IN_KEY);
+      set({ token: null, user: null, isLoading: false });
     } catch {
-      set({ token: null, isLoading: false });
+      set({ token: null, user: null, isLoading: false });
     }
   },
 
   clearAuth: async () => {
-    await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(LOGGED_IN_KEY);
     set({ token: null, user: null });
   },
 }));

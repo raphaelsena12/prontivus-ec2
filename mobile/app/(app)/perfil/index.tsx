@@ -9,7 +9,7 @@ import { Card } from '../../../components/ui/Card';
 import { Colors, BorderRadius } from '../../../constants/colors';
 
 export default function PerfilScreen() {
-  const { user, token, clearAuth } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
 
   const initials = user?.nome
     ?.split(' ')
@@ -26,7 +26,7 @@ export default function PerfilScreen() {
         text: 'Sair',
         style: 'destructive',
         onPress: async () => {
-          if (token) await authService.logout(token);
+          await authService.logout();
           await clearAuth();
           router.replace('/(auth)/login');
         },

@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Loader2, Stethoscope, Upload, Filter, Plus, UserPlus, Search } from "lucide-react";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
@@ -59,13 +66,17 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"ativo" | "inativo">("ativo");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const fetchMedicos = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({ 
-        page: "1",
-        limit: "1000", // Buscar muitos registros para paginação no cliente
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
       });
       params.set("ativo", statusFilter === "ativo" ? "true" : "false");
       if (search.trim().length) params.set("search", search.trim());
@@ -73,13 +84,15 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
       if (!response.ok) throw new Error("Erro ao carregar médicos");
       const data = await response.json();
       setMedicos(data.medicos || []);
+      setTotalItems(data.pagination?.total || 0);
+      setTotalPages(data.pagination?.totalPages || 1);
     } catch (error) {
       toast.error("Erro ao carregar médicos");
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, search]);
+  }, [statusFilter, search, page, limit]);
 
   const fetchUsuarios = useCallback(async () => {
     try {
@@ -151,13 +164,13 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
                 type="search"
                 placeholder="Buscar por nome, CRM ou especialidade..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="pl-9 h-7 text-xs bg-background w-64"
               />
             </div>
             <Select
               value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as "ativo" | "inativo")}
+              onValueChange={(value) => { setStatusFilter(value as "ativo" | "inativo"); setPage(1); }}
             >
               <SelectTrigger className="h-7 text-xs w-28">
                 <SelectValue placeholder="Status" />
@@ -201,13 +214,85 @@ export function MedicosContent({ clinicaId }: MedicosContentProps) {
               <p className="text-muted-foreground text-center">Nenhum médico encontrado</p>
             </div>
           ) : (
-            <MedicosTable 
-              data={medicos} 
+            <MedicosTable
+              data={medicos}
               onEdit={handleEdit}
               onDelete={handleDeleteClick}
               onCreate={handleCreate}
               onUpload={() => setUploadDialogOpen(true)}
             />
+          )}
+
+          {!loading && totalItems > 0 && (
+            <div className="flex items-center justify-between px-6 pb-6">
+              <div className="text-muted-foreground hidden flex-1 text-xs lg:flex">
+                {totalItems} médico(s) encontrado(s).
+              </div>
+              <div className="flex w-full items-center gap-8 lg:w-fit">
+                <div className="hidden items-center gap-2 lg:flex">
+                  <Label htmlFor="rows-medicos" className="text-xs font-medium">
+                    Linhas por página
+                  </Label>
+                  <Select
+                    value={`${limit}`}
+                    onValueChange={(value) => {
+                      setLimit(Number(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-20" id="rows-medicos">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[10, 20, 30, 40, 50].map((s) => (
+                        <SelectItem key={s} value={`${s}`}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-center text-xs font-medium">
+                  Página {page} de {totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    className="hidden h-8 w-8 p-0 lg:flex"
+                    onClick={() => setPage(1)}
+                    disabled={page <= 1}
+                  >
+                    <span className="sr-only">Primeira página</span>
+                    <IconChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    <span className="sr-only">Página anterior</span>
+                    <IconChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-8 w-8 p-0"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    <span className="sr-only">Próxima página</span>
+                    <IconChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="hidden h-8 w-8 p-0 lg:flex"
+                    onClick={() => setPage(totalPages)}
+                    disabled={page >= totalPages}
+                  >
+                    <span className="sr-only">Última página</span>
+                    <IconChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -10,6 +10,7 @@ const updateClinicaSchema = z.object({
   email: z.string().email("Email inválido").optional(),
   telefone: z.string().min(1, "Telefone é obrigatório").optional(),
   planoId: z.string().uuid("Plano inválido").optional(),
+  codigoCnes: z.string().regex(/^\d{7}$/, "Código CNES deve ter exatamente 7 dígitos numéricos").optional(),
 });
 
 // Helper para verificar autorização

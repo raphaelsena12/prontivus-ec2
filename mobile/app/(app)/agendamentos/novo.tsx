@@ -39,10 +39,10 @@ export default function NovoAgendamentoScreen() {
   const criarAgendamento = useCreateAgendamento();
 
   const stepLabels: Record<Step, string> = {
-    medico: 'Escolha o medico',
+    medico: 'Escolha o médico',
     data: 'Escolha a data',
-    horario: 'Escolha o horario',
-    confirmacao: 'Confirmacao',
+    horario: 'Escolha o horário',
+    confirmacao: 'Confirmação',
   };
 
   const stepIndex = STEPS.indexOf(step);
@@ -58,7 +58,7 @@ export default function NovoAgendamentoScreen() {
         { text: 'OK', onPress: () => router.replace('/(app)/agendamentos') },
       ]);
     } catch {
-      Alert.alert('Erro', 'Nao foi possivel realizar o agendamento. Tente novamente.');
+      Alert.alert('Erro', 'Não foi possível realizar o agendamento. Tente novamente.');
     }
   }
 

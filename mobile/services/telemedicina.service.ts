@@ -27,9 +27,16 @@ async function iniciarImediato(data: {
   pagamentoId: string;
   medicoId: string;
   medicoTelemedicinaId: string;
-}): Promise<{ patientLink: string; sessionId: string }> {
+}): Promise<{ patientLink: string; patientToken: string; sessionId: string }> {
   const response = await api.post('/api/paciente/telemedicina/iniciar-imediato', data);
   return response.data;
+}
+
+async function registrarConsentimento(patientToken: string): Promise<void> {
+  await api.post(`/api/paciente/telemedicina/sessao/${patientToken}/consentimento`, {
+    consentGiven: true,
+    consentVersion: '1.0',
+  });
 }
 
 async function getCheckoutUrl(medicoId: string, dataHora: string): Promise<string> {
@@ -45,5 +52,6 @@ export const telemeditcinaService = {
   getMedicosOnline,
   criarPaymentIntent,
   iniciarImediato,
+  registrarConsentimento,
   getCheckoutUrl,
 };

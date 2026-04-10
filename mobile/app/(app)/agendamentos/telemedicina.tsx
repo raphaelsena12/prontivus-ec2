@@ -13,6 +13,7 @@ import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { ConsentimentoTelemedicina } from '../../../components/telemedicina/ConsentimentoTelemedicina';
 import { Colors, BorderRadius } from '../../../constants/colors';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -60,8 +61,9 @@ function ConsultaModal({
   medico, visible, onClose,
 }: { medico: MedicoOnline | null; visible: boolean; onClose: () => void }) {
   const [criandoPI, setCriandoPI] = useState(false);
+  const [showConsent, setShowConsent] = useState(false);
 
-  async function handleContinuar() {
+  async function handleProsseguirPagamento() {
     if (!medico) return;
     setCriandoPI(true);
     try {
@@ -86,16 +88,30 @@ function ConsultaModal({
         },
       });
     } catch (e: any) {
-      Alert.alert('Erro', e?.response?.data?.error ?? 'Nao foi possivel iniciar o pagamento.');
+      Alert.alert('Erro', e?.response?.data?.error ?? 'Não foi possível iniciar o pagamento.');
     } finally {
       setCriandoPI(false);
     }
   }
 
+  function handleContinuar() {
+    setShowConsent(true);
+  }
+
   if (!medico) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <>
+    <ConsentimentoTelemedicina
+      visible={showConsent}
+      medicoNome={medico.nome}
+      onAccept={() => {
+        setShowConsent(false);
+        handleProsseguirPagamento();
+      }}
+      onDecline={() => setShowConsent(false)}
+    />
+    <Modal visible={visible && !showConsent} transparent animationType="slide" onRequestClose={onClose}>
       <View style={modal.backdrop}>
         <View style={modal.sheet}>
           <View style={modal.handle} />
@@ -128,13 +144,13 @@ function ConsultaModal({
                   <Ionicons name="card-outline" size={16} color={Colors.primary} />
                 </View>
                 <Text style={modal.infoLabel}>Valor da consulta</Text>
-                <Text style={modal.infoValue}>R$ {medico.valorConsulta.toFixed(2).replace('.', ',')}</Text>
+                <Text style={modal.infoValue}>R$ {medico.valorConsulta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
               </View>
               <View style={modal.infoBox}>
                 <View style={[modal.infoIconWrap, { backgroundColor: Colors.accentLight }]}>
                   <Ionicons name="time-outline" size={16} color={Colors.accent} />
                 </View>
-                <Text style={modal.infoLabel}>Duracao estimada</Text>
+                <Text style={modal.infoLabel}>Duração estimada</Text>
                 <Text style={modal.infoValue}>{medico.tempoConsultaMin} min</Text>
               </View>
             </View>
@@ -150,7 +166,7 @@ function ConsultaModal({
                 <Ionicons name="videocam" size={14} color={Colors.accent} />
               </View>
               <Text style={modal.avisoText}>
-                Consulta por video dentro do app. Apos o pagamento, voce tera acesso imediato a sala.
+                Consulta por vídeo dentro do app. Após o pagamento, você terá acesso imediato à sala.
               </Text>
             </View>
 
@@ -178,6 +194,7 @@ function ConsultaModal({
         </View>
       </View>
     </Modal>
+    </>
   );
 }
 
@@ -232,7 +249,7 @@ function MedicoCard({ medico, onPress }: { medico: MedicoOnline; onPress: () => 
         <View style={styles.medicoCardFooter}>
           <View>
             <Text style={styles.footerLabel}>Consulta a partir de</Text>
-            <Text style={styles.footerValor}>R$ {medico.valorConsulta.toFixed(2).replace('.', ',')}</Text>
+            <Text style={styles.footerValor}>R$ {medico.valorConsulta.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
           </View>
           <TouchableOpacity
             style={[styles.iniciarBtn, !online && styles.iniciarBtnDisabled]}
@@ -334,7 +351,7 @@ export default function TelemedicinaScreen() {
             color={tab === 'medicos' ? Colors.primary : Colors.textSecondary}
           />
           <Text style={[styles.tabText, tab === 'medicos' && styles.tabTextActive]}>
-            Medicos Online
+            Médicos Online
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -347,7 +364,7 @@ export default function TelemedicinaScreen() {
             color={tab === 'sessoes' ? Colors.primary : Colors.textSecondary}
           />
           <Text style={[styles.tabText, tab === 'sessoes' && styles.tabTextActive]}>
-            Minhas Sessoes
+            Minhas Sessões
           </Text>
         </TouchableOpacity>
       </View>
@@ -360,7 +377,7 @@ export default function TelemedicinaScreen() {
             <Ionicons name="search" size={16} color={Colors.textMuted} style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Buscar medico, especialidade..."
+              placeholder="Buscar médico, especialidade..."
               placeholderTextColor={Colors.textMuted}
               value={search}
               onChangeText={setSearch}
@@ -401,7 +418,7 @@ export default function TelemedicinaScreen() {
                 onlineList.length > 0 ? (
                   <View style={styles.sectionHeader}>
                     <View style={[styles.sectionDot, { backgroundColor: '#10B981' }]} />
-                    <Text style={styles.sectionTitle}>Disponiveis Agora</Text>
+                    <Text style={styles.sectionTitle}>Disponíveis Agora</Text>
                     <View style={styles.sectionBadge}>
                       <Text style={styles.sectionBadgeText}>{onlineList.length}</Text>
                     </View>
