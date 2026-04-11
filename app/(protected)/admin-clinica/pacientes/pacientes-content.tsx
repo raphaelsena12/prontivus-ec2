@@ -224,7 +224,7 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
                   pacientes.map((paciente) => (
                     <TableRow key={paciente.id}>
                       <TableCell className="font-semibold text-xs py-3 text-primary">
-                        {paciente.numeroProntuario || "-"}
+                        {paciente.numeroProntuario ? String(paciente.numeroProntuario).padStart(6, "0") : "-"}
                       </TableCell>
                       <TableCell className="font-medium text-xs py-3">{paciente.nome}</TableCell>
                       <TableCell className="text-xs py-3">{paciente.cpf || "-"}</TableCell>

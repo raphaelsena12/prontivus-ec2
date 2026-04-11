@@ -107,6 +107,13 @@ export interface ExamePaciente {
   origem?: 'paciente' | 'secretaria';
 }
 
+export interface DocumentoConsulta {
+  id: string;
+  tipoDocumento: string;
+  nomeDocumento: string;
+  createdAt: string;
+}
+
 export interface ApiError {
   message: string;
   status?: number;

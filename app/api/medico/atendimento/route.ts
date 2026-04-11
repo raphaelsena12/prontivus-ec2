@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { uploadPDFToS3 } from "@/lib/s3-service";
+import { uploadPDFToS3, areAwsCredentialsConfigured } from "@/lib/s3-service";
 import sharp from "sharp";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { brazilTodayFormatted } from "@/lib/timezone-utils";
@@ -633,6 +633,119 @@ export async function POST(request: NextRequest) {
         );
 
         console.log("✅ Prontuário salvo no S3:", s3Key);
+      }
+
+      // Gerar ficha de atendimento automaticamente ao finalizar
+      if (consultaCompleta && prontuario) {
+        try {
+          const { generateFichaAtendimentoPDF } = await import("@/lib/pdf/ficha-atendimento");
+
+          // Buscar CIDs salvos
+          const cidsSalvos = await prisma.consultaCid.findMany({
+            where: { consultaId, clinicaId: auth.clinicaId! },
+          });
+          const cidCodes = cidsSalvos.map((c) => ({
+            code: c.code,
+            description: c.description,
+          }));
+
+          // Buscar exames solicitados
+          const solicitacoesExames = await prisma.solicitacaoExame.findMany({
+            where: { consultaId, clinicaId: auth.clinicaId! },
+            include: { exame: { select: { nome: true, tipo: true } } },
+          });
+          const exames = solicitacoesExames.map((se) => ({
+            nome: se.exame.nome,
+            tipo: se.exame.tipo || "Laboratorial",
+          }));
+
+          // Buscar prescrições
+          const consultaPrescricoes = await prisma.consultaPrescricao.findMany({
+            where: { consultaId, clinicaId: auth.clinicaId! },
+            orderBy: { createdAt: "asc" },
+          });
+          const prescricoesFicha = consultaPrescricoes.map((cp) => ({
+            medicamento: cp.medicamento,
+            dosagem: cp.dosagem || "",
+            posologia: cp.posologia,
+            duracao: cp.duracao || "",
+          }));
+
+          // Criar DocumentoGerado para número sequencial
+          const docFicha = await prisma.documentoGerado.create({
+            data: {
+              clinicaId: auth.clinicaId!,
+              consultaId,
+              medicoId: auth.medicoId!,
+              tipoDocumento: "ficha-atendimento",
+              nomeDocumento: "Ficha de Atendimento",
+            },
+            select: { id: true, numero: true },
+          });
+          const fichaNumero = String(docFicha.numero).padStart(6, "0");
+
+          const dataConsultaObj = new Date(consultaCompleta.dataHora);
+          const dataConsultaFmt = `${String(dataConsultaObj.getDate()).padStart(2, "0")}/${String(dataConsultaObj.getMonth() + 1).padStart(2, "0")}/${dataConsultaObj.getFullYear()}`;
+          const horaConsultaFmt = `${String(dataConsultaObj.getHours()).padStart(2, "0")}:${String(dataConsultaObj.getMinutes()).padStart(2, "0")}`;
+          const dataNascFicha = new Date(consultaCompleta.paciente.dataNascimento);
+          const dataNascFmt = `${String(dataNascFicha.getDate()).padStart(2, "0")}/${String(dataNascFicha.getMonth() + 1).padStart(2, "0")}/${dataNascFicha.getFullYear()}`;
+
+          const fichaPdfBuffer = generateFichaAtendimentoPDF({
+            clinicaNome: consultaCompleta.clinica.nome,
+            clinicaCnpj: consultaCompleta.clinica.cnpj || "",
+            clinicaTelefone: consultaCompleta.clinica.telefone || undefined,
+            clinicaEmail: consultaCompleta.clinica.email || undefined,
+            clinicaEndereco: consultaCompleta.clinica.endereco || undefined,
+            clinicaNumero: consultaCompleta.clinica.numero || undefined,
+            clinicaBairro: consultaCompleta.clinica.bairro || undefined,
+            clinicaCidade: consultaCompleta.clinica.cidade || undefined,
+            clinicaEstado: consultaCompleta.clinica.estado || undefined,
+            clinicaCep: consultaCompleta.clinica.cep || undefined,
+            clinicaSite: consultaCompleta.clinica.site || undefined,
+            logoBase64,
+            medicoNome: consultaCompleta.medico.usuario.nome,
+            medicoCrm: consultaCompleta.medico.crm,
+            medicoEspecialidade: consultaCompleta.medico.especialidade || "",
+            pacienteNome: consultaCompleta.paciente.nome,
+            pacienteCpf: consultaCompleta.paciente.cpf,
+            pacienteDataNascimento: dataNascFmt,
+            dataEmissao: brazilTodayFormatted(),
+            fichaNumero,
+            dataConsulta: dataConsultaFmt,
+            horaConsulta: horaConsultaFmt,
+            anamnese: prontuario.anamnese || "",
+            cidCodes,
+            exames,
+            prescricoes: prescricoesFicha,
+            orientacoes: prontuario.orientacoes || "",
+          });
+
+          if (areAwsCredentialsConfigured()) {
+            const fichaBuffer = Buffer.from(fichaPdfBuffer);
+            const fichaS3Key = await uploadPDFToS3(
+              fichaBuffer,
+              `ficha-atendimento-${consultaId}-${Date.now()}.pdf`,
+              {
+                clinicaId: auth.clinicaId!,
+                medicoId: auth.medicoId!,
+                consultaId,
+                pacienteId: consulta.pacienteId,
+                tipoDocumento: "ficha-atendimento",
+                categoria: "Fichas de Atendimento",
+              },
+              "application/pdf"
+            );
+
+            await prisma.documentoGerado.update({
+              where: { id: docFicha.id },
+              data: { s3Key: fichaS3Key },
+            });
+
+            console.log("✅ Ficha de atendimento salva no S3:", fichaS3Key);
+          }
+        } catch (fichaError) {
+          console.error("Erro ao gerar ficha de atendimento (não bloqueante):", fichaError);
+        }
       }
       } catch (error) {
         // Não falhar o processo se o upload do PDF falhar

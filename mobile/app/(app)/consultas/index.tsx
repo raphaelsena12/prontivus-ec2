@@ -1,15 +1,17 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView, RefreshControl } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useConsultas } from '../../../hooks/useConsultas';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Colors, BorderRadius } from '../../../constants/colors';
-import { Consulta } from '../../../types/api.types';
+import { Consulta, DocumentoConsulta } from '../../../types/api.types';
+import { consultasService } from '../../../services/consultas.service';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Constants from 'expo-constants';
@@ -29,23 +31,50 @@ const statusLabel: Record<string, string> = {
   NAO_COMPARECEU: 'Não compareceu',
 };
 
+const filterOptions = [
+  { key: 'AGENDADA', label: 'Agendadas' },
+  { key: 'REALIZADA', label: 'Realizadas' },
+  { key: 'CANCELADA', label: 'Canceladas' },
+  { key: 'TODOS', label: 'Todas' },
+];
+
 export default function ConsultasScreen() {
   const { data: consultas, isLoading, refetch, isRefetching } = useConsultas();
   const [selected, setSelected] = useState<Consulta | null>(null);
+  const [activeFilter, setActiveFilter] = useState('TODOS');
 
   const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
   if (isLoading) return <LoadingSpinner />;
 
+  const filtered = activeFilter === 'TODOS'
+    ? consultas
+    : consultas?.filter((c) => c.status === activeFilter);
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <Text style={styles.title}>Consultas</Text>
-        <Text style={styles.subtitle}>{consultas?.length ?? 0} registros</Text>
+        <Text style={styles.subtitle}>{filtered?.length ?? 0} registros</Text>
+      </View>
+
+      <View style={styles.filterRow}>
+        {filterOptions.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterChip, activeFilter === f.key && styles.filterChipActive]}
+            onPress={() => setActiveFilter(f.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.filterChipText, activeFilter === f.key && styles.filterChipTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <FlatList
-        data={consultas}
+        data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -56,7 +85,7 @@ export default function ConsultasScreen() {
           <EmptyState
             icon="medical-outline"
             title="Nenhuma consulta"
-            description="Suas consultas aparecerão aqui"
+            description={activeFilter === 'TODOS' ? 'Suas consultas aparecerão aqui' : `Nenhuma consulta ${statusLabel[activeFilter]?.toLowerCase() ?? ''}`}
           />
         }
         renderItem={({ item }) => (
@@ -79,6 +108,35 @@ function getTelemedicinaUrl(patientToken: string): string {
   return `${BASE_URL}/telemedicina/acesso?token=${patientToken}&skipConsent=1`;
 }
 
+const tipoDocumentoLabel: Record<string, string> = {
+  'receita-medica': 'Receita Médica',
+  'receita-controle-especial': 'Receita Controle Especial',
+  'atestado-afastamento': 'Atestado de Afastamento',
+  'atestado-afastamento-sem-cid': 'Atestado sem CID',
+  'atestado-afastamento-cid': 'Atestado com CID',
+  'atestado-afastamento-historico-cid': 'Atestado com Histórico CID',
+  'atestado-afastamento-indeterminado': 'Atestado Indeterminado',
+  'atestado-aptidao-fisica-mental': 'Aptidão Física/Mental',
+  'atestado-aptidao-piscinas': 'Aptidão para Piscinas',
+  'atestado-aptidao-fisica': 'Aptidão Física',
+  'ficha-atendimento': 'Ficha de Atendimento',
+  'declaracao-comparecimento': 'Declaração de Comparecimento',
+  'declaracao-comparecimento-acompanhante': 'Declaração Acompanhante',
+  'declaracao-comparecimento-horario-cid': 'Declaração com Horário/CID',
+  'guia-encaminhamento': 'Guia de Encaminhamento',
+  'laudo-medico': 'Laudo Médico',
+  'pedido-exames': 'Pedido de Exames',
+};
+
+const tipoDocumentoIcon: Record<string, string> = {
+  'receita-medica': 'medkit-outline',
+  'receita-controle-especial': 'medkit-outline',
+  'ficha-atendimento': 'document-text-outline',
+  'laudo-medico': 'document-text-outline',
+  'pedido-exames': 'flask-outline',
+  'guia-encaminhamento': 'arrow-forward-circle-outline',
+};
+
 function ConsultaDetailModal({
   consulta,
   visible,
@@ -88,6 +146,35 @@ function ConsultaDetailModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const [documentos, setDocumentos] = useState<DocumentoConsulta[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && consulta) {
+      setLoadingDocs(true);
+      consultasService.getDocumentosConsulta(consulta.id)
+        .then(setDocumentos)
+        .catch(() => setDocumentos([]))
+        .finally(() => setLoadingDocs(false));
+    } else {
+      setDocumentos([]);
+    }
+  }, [visible, consulta?.id]);
+
+  const handleOpenDocumento = async (doc: DocumentoConsulta) => {
+    if (!consulta) return;
+    try {
+      setDownloadingId(doc.id);
+      const url = await consultasService.getDocumentoUrl(consulta.id, doc.id);
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível abrir o documento.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   if (!consulta) return null;
 
   const isTelemedicina = consulta.modalidade === 'TELEMEDICINA';
@@ -245,6 +332,54 @@ function ConsultaDetailModal({
                   <Text style={modal.detailLabel}>Observações</Text>
                   <Text style={modal.detailValue}>{consulta.observacoes}</Text>
                 </View>
+              </View>
+            )}
+
+            {/* Documentos */}
+            {loadingDocs ? (
+              <View style={modal.docsLoading}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+              </View>
+            ) : documentos.length > 0 && (
+              <View style={modal.docsSection}>
+                <View style={modal.docsSectionHeader}>
+                  <View style={[modal.detailIcon, { backgroundColor: '#EEF2FF' }]}>
+                    <Ionicons name="documents-outline" size={16} color="#6366F1" />
+                  </View>
+                  <Text style={modal.docsSectionTitle}>Documentos</Text>
+                </View>
+                {documentos.map((doc) => {
+                  const iconName = tipoDocumentoIcon[doc.tipoDocumento] || 'document-outline';
+                  const isDownloading = downloadingId === doc.id;
+                  return (
+                    <TouchableOpacity
+                      key={doc.id}
+                      style={modal.docItem}
+                      onPress={() => handleOpenDocumento(doc)}
+                      disabled={isDownloading}
+                      activeOpacity={0.7}
+                    >
+                      <View style={modal.docIconWrap}>
+                        <Ionicons name={iconName as any} size={18} color="#6366F1" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={modal.docName}>
+                          {doc.nomeDocumento || tipoDocumentoLabel[doc.tipoDocumento] || doc.tipoDocumento}
+                        </Text>
+                        <Text style={modal.docDate}>
+                          {format(new Date(doc.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </Text>
+                      </View>
+                      {isDownloading ? (
+                        <ActivityIndicator size="small" color="#6366F1" />
+                      ) : (
+                        <View style={modal.docDownloadBtn}>
+                          <Ionicons name="open-outline" size={16} color="#6366F1" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
           </ScrollView>
@@ -407,6 +542,32 @@ const modal = StyleSheet.create({
     paddingVertical: 14,
   },
   footerTeleBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  docsLoading: { paddingVertical: 16, alignItems: 'center' },
+  docsSection: {
+    marginTop: 14, borderTopWidth: 1, borderTopColor: Colors.borderLight, paddingTop: 14,
+  },
+  docsSectionHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10,
+  },
+  docsSectionTitle: {
+    fontSize: 11, color: Colors.textMuted, fontWeight: '600',
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  docItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#F8F9FB', borderRadius: BorderRadius.md,
+    padding: 12, marginBottom: 8,
+  },
+  docIconWrap: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center',
+  },
+  docName: { fontSize: 14, fontWeight: '600', color: Colors.text },
+  docDate: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  docDownloadBtn: {
+    width: 32, height: 32, borderRadius: 8,
+    backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center',
+  },
 });
 
 const styles = StyleSheet.create({
@@ -414,6 +575,20 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingBottom: 8 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.text },
   subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  filterRow: {
+    flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 10, gap: 8,
+  },
+  filterChip: {
+    flex: 1, alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 20, backgroundColor: Colors.white,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.primary, borderColor: Colors.primary,
+  },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+  filterChipTextActive: { color: Colors.white },
   list: { padding: 20, paddingTop: 8, gap: 10 },
   card: { padding: 0 },
   cardBody: {

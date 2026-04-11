@@ -237,7 +237,7 @@ export function AgendamentosContent() {
                   minute: "2-digit",
                 });
                 const telefone = ag.paciente.telefone || ag.paciente.celular || "-";
-                const prontuario = ag.paciente.numeroProntuario ? ag.paciente.numeroProntuario.toString() : "-";
+                const prontuario = ag.paciente.numeroProntuario ? String(ag.paciente.numeroProntuario).padStart(6, "0") : "-";
                 const tipoConsulta = ag.tipoConsulta?.nome || "-";
                 const codigoTuss = ag.codigoTuss?.codigoTuss || "-";
                 const convenio = ag.operadora

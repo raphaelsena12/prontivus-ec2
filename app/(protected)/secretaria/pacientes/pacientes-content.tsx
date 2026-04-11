@@ -238,7 +238,7 @@ export function PacientesContent() {
                   pacientes.map((paciente) => (
                     <TableRow key={paciente.id} className="hover:bg-muted/50">
                       <TableCell className="text-xs py-3 font-semibold text-primary">
-                        {paciente.numeroProntuario || "-"}
+                        {paciente.numeroProntuario ? String(paciente.numeroProntuario).padStart(6, "0") : "-"}
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         <div 

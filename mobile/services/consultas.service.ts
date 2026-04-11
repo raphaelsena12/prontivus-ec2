@@ -1,5 +1,5 @@
 import api from './api';
-import { Consulta } from '../types/api.types';
+import { Consulta, DocumentoConsulta } from '../types/api.types';
 
 async function getConsultas(): Promise<Consulta[]> {
   const response = await api.get('/api/paciente/consultas');
@@ -13,4 +13,14 @@ async function getConsultaById(id: string): Promise<Consulta> {
   return response.data.consulta ?? response.data;
 }
 
-export const consultasService = { getConsultas, getConsultaById };
+async function getDocumentosConsulta(consultaId: string): Promise<DocumentoConsulta[]> {
+  const response = await api.get(`/api/paciente/consultas/${consultaId}/documentos`);
+  return response.data.documentos ?? [];
+}
+
+async function getDocumentoUrl(consultaId: string, documentoId: string): Promise<string> {
+  const response = await api.get(`/api/paciente/consultas/${consultaId}/documentos/${documentoId}/url`);
+  return response.data.url;
+}
+
+export const consultasService = { getConsultas, getConsultaById, getDocumentosConsulta, getDocumentoUrl };

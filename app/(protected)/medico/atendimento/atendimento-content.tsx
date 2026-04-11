@@ -2300,7 +2300,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const patient = {
     name: consulta.paciente.nome,
     age: calcularIdade(consulta.paciente.dataNascimento),
-    id: consulta.paciente.numeroProntuario ? consulta.paciente.numeroProntuario.toString() : "N/A",
+    id: consulta.paciente.numeroProntuario ? String(consulta.paciente.numeroProntuario).padStart(6, "0") : "N/A",
     phone: consulta.paciente.celular || consulta.paciente.telefone || "-",
     email: consulta.paciente.email || "-",
     bloodType: "Não informado", // Campo não disponível no schema atual
@@ -2321,7 +2321,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const inicial = consulta.paciente.nome.trim().charAt(0).toUpperCase();
   const idade = calcularIdade(consulta.paciente.dataNascimento);
   const prontuarioLabel = consulta.paciente.numeroProntuario
-    ? `Prontuário: ${String(consulta.paciente.numeroProntuario).padStart(5, "0")}`
+    ? `Prontuário: ${String(consulta.paciente.numeroProntuario).padStart(6, "0")}`
     : "Prontuário: N/A";
   const hasAllergies = patient.allergies.length > 0;
 

@@ -277,7 +277,7 @@ export function ProntuarioPacienteContent({ pacienteId, userType = "MEDICO" }: P
                   <h1 className="text-sm font-semibold text-slate-900 leading-tight">{paciente.nome}</h1>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {idade} anos · {paciente.sexo}
-                    {paciente.numeroProntuario && <span className="ml-2 font-mono">Nº {paciente.numeroProntuario}</span>}
+                    {paciente.numeroProntuario && <span className="ml-2 font-mono">Nº {String(paciente.numeroProntuario).padStart(6, "0")}</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-4 shrink-0">

@@ -325,7 +325,7 @@ export function ListaEsperaContent() {
                                 <p className="text-xs text-muted-foreground">
                                   {maskCPF(lista.paciente.cpf)}
                                   {lista.paciente.numeroProntuario && (
-                                    <> • Pront: {lista.paciente.numeroProntuario}</>
+                                    <> • Pront: {String(lista.paciente.numeroProntuario).padStart(6, "0")}</>
                                   )}
                                 </p>
                               </div>

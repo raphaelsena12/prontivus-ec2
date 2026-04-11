@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaAfast,
           horaConsulta: horaConsultaAfast,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaSemCid,
           horaConsulta: horaConsultaSemCid,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -285,7 +285,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaFmt,
           horaConsulta: horaConsultaFmt,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaHist,
           horaConsulta: horaConsultaHist,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaInd,
           horaConsulta: horaConsultaInd,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -340,7 +340,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaApt1,
           horaConsulta: horaConsultaApt1,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
         });
         break;
@@ -356,7 +356,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaApt2,
           horaConsulta: horaConsultaApt2,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
           mesesValidade: dados?.mesesValidade || undefined,
         });
@@ -384,7 +384,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaComp,
           horaConsulta: horaConsultaComp,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
           horaInicio: dados?.horaInicio || horaConsultaComp,
           horaFim: dados?.horaFim || undefined,
@@ -401,7 +401,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaAcomp,
           horaConsulta: horaConsultaAcomp,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
           horaInicio: dados?.horaInicio || horaConsultaAcomp,
           horaFim: dados?.horaFim || undefined,
@@ -421,7 +421,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaHorario,
           horaConsulta: horaConsultaHorario,
           fichaNumero: consulta.paciente.numeroProntuario
-            ? String(consulta.paciente.numeroProntuario).padStart(5, "0")
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
             : undefined,
           horaInicio: dados?.horaInicio || horaConsultaHorario,
           horaFim: dados?.horaFim || undefined,
