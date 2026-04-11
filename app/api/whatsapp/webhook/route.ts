@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log("🔍 [WEBHOOK DEBUG] Body completo:", JSON.stringify(body, null, 2));
     const entries: WhatsAppWebhookEntry[] = body.entry || [];
 
     for (const entry of entries) {
@@ -81,9 +82,14 @@ async function resolveClinicaByPhoneNumberId(phoneNumberId: string): Promise<str
 async function processIncomingMessage(message: any, value: any, clinicaId: string | null) {
   try {
     const from = message.from;
+    console.log("🔍 [WEBHOOK DEBUG] Mensagem raw:", JSON.stringify(message, null, 2));
+    console.log("🔍 [WEBHOOK DEBUG] message.type:", message.type);
+    console.log("🔍 [WEBHOOK DEBUG] message.button:", JSON.stringify(message.button));
+    console.log("🔍 [WEBHOOK DEBUG] message.interactive:", JSON.stringify(message.interactive));
+    console.log("🔍 [WEBHOOK DEBUG] message.text:", JSON.stringify(message.text));
     const messageText = message.text?.body || message.button?.text || message.button?.payload || message.interactive?.button_reply?.title || message.interactive?.button_reply?.id || "";
 
-    console.log(`📨 Mensagem recebida de ${from}: ${messageText}`);
+    console.log(`📨 Mensagem recebida de ${from}: "${messageText}"`);
 
     const telefoneFormatado = from.replace(/\D/g, "");
     const ultimosNoveDigitos = telefoneFormatado.slice(-9);
@@ -117,12 +123,16 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
       },
     });
 
+    console.log(`🔍 [WEBHOOK DEBUG] Paciente encontrado: ${paciente?.nome || "NÃO"}, ID: ${paciente?.id || "N/A"}`);
+    console.log(`🔍 [WEBHOOK DEBUG] Consultas encontradas: ${paciente?.consultas?.length || 0}`);
+
     if (!paciente) {
       console.log(`⚠️ Paciente não encontrado para o número ${from}`);
       return;
     }
 
     const consulta = paciente.consultas[0];
+    console.log(`🔍 [WEBHOOK DEBUG] Consulta: ${consulta?.id || "NENHUMA"}, status: ${consulta?.status || "N/A"}, dataHora: ${consulta?.dataHora || "N/A"}`);
 
     // Processar resposta de confirmação/cancelamento
     // Suporta: botões de template (quick reply), respostas interativas e texto livre
@@ -130,6 +140,7 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
     const respostaLower = resposta.toLowerCase();
     const isConfirmacao = respostaLower === "confirmar" || respostaLower === "1" || /^(sim|confirmo|confirmar)/i.test(resposta);
     const isCancelamento = respostaLower === "não poderei comparecer" || respostaLower === "nao poderei comparecer" || respostaLower === "2" || /^(não|nao|cancelar|cancelo|não poderei|nao poderei)/i.test(resposta);
+    console.log(`🔍 [WEBHOOK DEBUG] resposta="${resposta}", isConfirmacao=${isConfirmacao}, isCancelamento=${isCancelamento}`);
 
     if (consulta && isConfirmacao) {
       await prisma.consulta.update({
