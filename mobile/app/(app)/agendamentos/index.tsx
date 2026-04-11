@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,8 +26,10 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function AgendamentosScreen() {
-  const { data: agendamentos, isLoading } = useAgendamentos();
+  const { data: agendamentos, isLoading, refetch, isRefetching } = useAgendamentos();
   const cancelar = useCancelarAgendamento();
+
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -64,6 +66,9 @@ export default function AgendamentosScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} colors={[Colors.primary]} />
+        }
         ListEmptyComponent={
           <EmptyState
             icon="calendar-outline"

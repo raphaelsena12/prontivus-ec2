@@ -5,6 +5,7 @@ export function useConsultas() {
   return useQuery({
     queryKey: ['consultas'],
     queryFn: consultasService.getConsultas,
+    refetchInterval: 15000,
   });
 }
 

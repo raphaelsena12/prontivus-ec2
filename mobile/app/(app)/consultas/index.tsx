@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,8 +27,10 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function ConsultasScreen() {
-  const { data: consultas, isLoading } = useConsultas();
+  const { data: consultas, isLoading, refetch, isRefetching } = useConsultas();
   const [selected, setSelected] = useState<Consulta | null>(null);
+
+  const onRefresh = useCallback(() => { refetch(); }, [refetch]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -44,6 +46,9 @@ export default function ConsultasScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} colors={[Colors.primary]} />
+        }
         ListEmptyComponent={
           <EmptyState
             icon="medical-outline"

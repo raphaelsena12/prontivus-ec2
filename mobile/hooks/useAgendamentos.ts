@@ -5,6 +5,7 @@ export function useAgendamentos() {
   return useQuery({
     queryKey: ['agendamentos'],
     queryFn: agendamentosService.getAgendamentos,
+    refetchInterval: 15000, // Atualizar a cada 15s para detectar sessões de telemedicina
   });
 }
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
@@ -430,6 +431,27 @@ export async function POST(request: NextRequest) {
         where: { id: pagamentoId },
         data: { consultaId: consulta.id },
       });
+    }
+
+    // Criar sessão de telemedicina automaticamente
+    if (consulta.modalidade === "TELEMEDICINA") {
+      try {
+        const patientToken = randomBytes(32).toString("hex");
+        const patientTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+
+        await prisma.telemedicineSession.create({
+          data: {
+            consultaId: consulta.id,
+            status: "scheduled",
+            patientToken,
+            patientTokenExpiresAt,
+          },
+        });
+
+        console.log(`[Agendamento] Sessão de telemedicina criada automaticamente para consulta ${consulta.id}`);
+      } catch (teleError) {
+        console.error("[Agendamento] Erro ao criar sessão de telemedicina:", teleError);
+      }
     }
 
     // Processar anexos se houver
