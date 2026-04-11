@@ -94,19 +94,20 @@ async function processIncomingMessage(message: any, value: any, clinicaId: strin
     const telefoneFormatado = from.replace(/\D/g, "");
     const ultimosNoveDigitos = telefoneFormatado.slice(-9);
 
-    // Buscar paciente pelo celular ou telefone
-    const whereClause: any = {
-      OR: [
-        { celular: { contains: ultimosNoveDigitos } },
-        { telefone: { contains: ultimosNoveDigitos } },
-      ],
-    };
-    if (clinicaId) {
-      whereClause.clinicaId = clinicaId;
+    if (!clinicaId) {
+      console.log(`⚠️ Clínica não identificada para phoneNumberId — ignorando mensagem de ${from}`);
+      return;
     }
 
+    // Buscar paciente pelo celular ou telefone na clínica identificada
     const paciente = await prisma.paciente.findFirst({
-      where: whereClause,
+      where: {
+        clinicaId,
+        OR: [
+          { celular: { contains: ultimosNoveDigitos } },
+          { telefone: { contains: ultimosNoveDigitos } },
+        ],
+      },
       include: {
         clinica: true,
         consultas: {
