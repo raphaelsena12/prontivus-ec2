@@ -199,7 +199,61 @@ export default function PoliticaDePrivacidade() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900">10. Telemedicina</h2>
+            <h2 className="text-xl font-semibold text-gray-900">10. Comunicacao via WhatsApp</h2>
+            <p>
+              A Prontivus utiliza a plataforma WhatsApp Business, operada pela Meta Platforms, Inc.,
+              para comunicacao com pacientes. Ao fornecer seu numero de telefone celular e consentir
+              com o recebimento de mensagens, voce concorda com os seguintes termos:
+            </p>
+
+            <h3 className="text-lg font-medium text-gray-800 mt-4">10.1. Dados Coletados via WhatsApp</h3>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Numero de telefone celular cadastrado</li>
+              <li>Conteudo das mensagens enviadas e recebidas (confirmacoes, cancelamentos e respostas)</li>
+              <li>Status de entrega e leitura das mensagens</li>
+              <li>Data e horario das interacoes</li>
+            </ul>
+
+            <h3 className="text-lg font-medium text-gray-800 mt-4">10.2. Finalidades das Mensagens</h3>
+            <p>As mensagens via WhatsApp sao utilizadas exclusivamente para:</p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Envio de lembretes de consultas agendadas</li>
+              <li>Confirmacao ou cancelamento de agendamentos pelo paciente</li>
+              <li>Notificacoes sobre alteracoes em consultas</li>
+              <li>Comunicacao entre paciente e clinica relacionada ao atendimento</li>
+            </ul>
+            <p className="mt-2">
+              <strong>Nao enviamos mensagens de marketing, promocoes ou conteudo publicitario via WhatsApp.</strong>
+            </p>
+
+            <h3 className="text-lg font-medium text-gray-800 mt-4">10.3. Compartilhamento com a Meta</h3>
+            <p>
+              Ao utilizar o WhatsApp Business API, seu numero de telefone e metadados de mensagens
+              (como status de entrega) sao processados pela Meta Platforms, Inc., conforme a{" "}
+              <a href="https://www.whatsapp.com/legal/privacy-policy" className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">
+                Politica de Privacidade do WhatsApp
+              </a>. O conteudo das mensagens e criptografado em transito e nao e utilizado pela Meta
+              para fins de publicidade.
+            </p>
+
+            <h3 className="text-lg font-medium text-gray-800 mt-4">10.4. Opt-out (Cancelamento de Mensagens)</h3>
+            <p>
+              Voce pode optar por nao receber mensagens via WhatsApp a qualquer momento atraves das
+              seguintes opcoes:
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>Solicitando a desativacao diretamente a clinica ou secretaria</li>
+              <li>Enviando a palavra &quot;SAIR&quot; em resposta a qualquer mensagem recebida</li>
+              <li>Entrando em contato pelo e-mail: <strong>privacidade@prontivus.com</strong></li>
+            </ul>
+            <p className="mt-2">
+              A desativacao das mensagens via WhatsApp nao afeta seu cadastro ou atendimento na
+              plataforma. Voce continuara podendo utilizar todos os demais servicos normalmente.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900">11. Telemedicina</h2>
             <p>
               Os servicos de telemedicina sao prestados em conformidade com a Resolucao CFM 2.314/2022.
               As teleconsultas sao realizadas por medicos devidamente registrados no Conselho Regional
@@ -209,7 +263,7 @@ export default function PoliticaDePrivacidade() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900">11. Alteracoes nesta Politica</h2>
+            <h2 className="text-xl font-semibold text-gray-900">12. Alteracoes nesta Politica</h2>
             <p>
               Podemos atualizar esta Politica de Privacidade periodicamente. Alteracoes significativas
               serao comunicadas por meio do aplicativo ou por e-mail. Recomendamos a consulta periodica
@@ -218,7 +272,7 @@ export default function PoliticaDePrivacidade() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900">12. Contato</h2>
+            <h2 className="text-xl font-semibold text-gray-900">13. Contato</h2>
             <p>
               Para duvidas, solicitacoes ou exercicio de direitos relacionados a privacidade e protecao
               de dados:

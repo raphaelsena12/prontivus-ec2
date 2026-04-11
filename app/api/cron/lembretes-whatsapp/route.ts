@@ -27,6 +27,23 @@ export async function GET(request: NextRequest) {
   const inicioDia = new Date(agora.getTime() + 1430 * 60 * 1000); // +23h50
   const fimDia = new Date(agora.getTime() + 1450 * 60 * 1000);   // +24h10
 
+  console.log(`🔍 [CRON DEBUG] Agora (UTC): ${agora.toISOString()}`);
+  console.log(`🔍 [CRON DEBUG] Agora (BR): ${agora.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`);
+  console.log(`🔍 [CRON DEBUG] Janela início: ${inicioDia.toISOString()}`);
+  console.log(`🔍 [CRON DEBUG] Janela fim: ${fimDia.toISOString()}`);
+
+  // DEBUG: buscar todas as consultas futuras para comparar
+  const todasFuturas = await prisma.consulta.findMany({
+    where: {
+      dataHora: { gte: agora },
+      status: { in: ["AGENDADA", "CONFIRMADA"] },
+    },
+    select: { id: true, dataHora: true, status: true },
+    take: 10,
+    orderBy: { dataHora: "asc" },
+  });
+  console.log(`🔍 [CRON DEBUG] Consultas futuras:`, JSON.stringify(todasFuturas.map(c => ({ id: c.id, dataHora: c.dataHora.toISOString(), status: c.status }))));
+
   const consultas = await prisma.consulta.findMany({
     where: {
       dataHora: { gte: inicioDia, lte: fimDia },

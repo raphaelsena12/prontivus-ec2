@@ -133,6 +133,8 @@ export default withAuth(
           "/telemedicina",                              // Página de acesso público do paciente
           "/api/paciente/telemedicina/sessao",          // APIs públicas de telemedicina do paciente
           "/painel-chamadas",                           // Painel de chamadas para TVs (público)
+          "/privacidade",                                // Política de privacidade (exigida pelo Meta)
+          "/termos",                                     // Termos de uso
         ];
 
         // Rotas especiais que requerem auth mas não devem redirecionar
