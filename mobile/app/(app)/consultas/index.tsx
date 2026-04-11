@@ -21,8 +21,11 @@ const BASE_URL: string =
 const statusLabel: Record<string, string> = {
   AGENDADA: 'Agendada',
   CONFIRMADA: 'Confirmada',
+  EM_ATENDIMENTO: 'Em Atendimento',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
+  CONCLUIDA: 'Concluída',
+  FALTA: 'Falta',
   NAO_COMPARECEU: 'Não compareceu',
 };
 
@@ -95,8 +98,11 @@ function ConsultaDetailModal({
 
   function handleOpenTelemedicina() {
     if (!session?.patientToken) return;
+    onClose();
     const url = getTelemedicinaUrl(session.patientToken);
-    router.push({ pathname: '/(app)/agendamentos/consulta-web', params: { url, titulo: 'Teleconsulta' } });
+    setTimeout(() => {
+      router.push({ pathname: '/(app)/agendamentos/consulta-web', params: { url, titulo: 'Teleconsulta' } });
+    }, 300);
   }
 
   return (
@@ -245,16 +251,9 @@ function ConsultaDetailModal({
 
           {/* Footer */}
           <View style={modal.footer}>
-            {canJoinTelemedicina ? (
-              <TouchableOpacity onPress={handleOpenTelemedicina} style={modal.footerTeleBtn}>
-                <Ionicons name="videocam" size={18} color={Colors.white} />
-                <Text style={modal.footerTeleBtnText}>Entrar na Teleconsulta</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={onClose} style={modal.footerBtn}>
-                <Text style={modal.footerBtnText}>Fechar</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity onPress={onClose} style={modal.footerBtn}>
+              <Text style={modal.footerBtnText}>Fechar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>

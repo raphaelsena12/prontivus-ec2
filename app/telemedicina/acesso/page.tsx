@@ -128,9 +128,38 @@ function TelemedicineAccessContent() {
       } else if (data.identityVerified) {
         setStep("consent");
       } else if (skipConsent) {
-        // App mobile: identidade já verificada pelo backend (auto), pular info + consent
-        setStep("connecting");
-        await connectToRoom();
+        // App mobile: paciente já autenticado, verificar identidade e consentimento automaticamente
+        try {
+          setStep("connecting");
+          // Auto-verificar identidade
+          const verifyRes = await fetch(`/api/paciente/telemedicina/sessao/${token}/validar-identidade`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skipValidation: true }),
+          });
+          if (!verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            setErrorMsg(verifyData.error || "Erro na verificação de identidade.");
+            setStep("error");
+            return;
+          }
+          // Auto-registrar consentimento
+          const consentRes = await fetch(`/api/paciente/telemedicina/sessao/${token}/consentimento`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ consentGiven: true }),
+          });
+          if (!consentRes.ok) {
+            const consentData = await consentRes.json();
+            setErrorMsg(consentData.error || "Erro no consentimento.");
+            setStep("error");
+            return;
+          }
+          await connectToRoom();
+        } catch {
+          setErrorMsg("Erro ao preparar acesso à teleconsulta.");
+          setStep("error");
+        }
       } else {
         setStep("info");
       }

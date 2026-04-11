@@ -21,8 +21,12 @@ const BASE_URL: string =
 const statusLabel: Record<string, string> = {
   AGENDADA: 'Agendada',
   CONFIRMADA: 'Confirmada',
+  EM_ATENDIMENTO: 'Em Atendimento',
   CANCELADA: 'Cancelada',
   REALIZADA: 'Realizada',
+  CONCLUIDA: 'Concluída',
+  FALTA: 'Falta',
+  NAO_COMPARECEU: 'Não compareceu',
 };
 
 export default function AgendamentosScreen() {

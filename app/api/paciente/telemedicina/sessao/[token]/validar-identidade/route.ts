@@ -12,14 +12,7 @@ export async function POST(
     const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown";
 
     const body = await request.json();
-    const { cpfLastFour } = body;
-
-    if (!cpfLastFour || !/^\d{4}$/.test(cpfLastFour)) {
-      return NextResponse.json(
-        { error: "Informe os 4 últimos dígitos do CPF" },
-        { status: 400 }
-      );
-    }
+    const { cpfLastFour, skipValidation } = body;
 
     const sessao = await prisma.telemedicineSession.findUnique({
       where: { patientToken: token },
@@ -45,6 +38,33 @@ export async function POST(
     // Se já foi verificado, retorna sucesso
     if (sessao.identityVerifiedAt) {
       return NextResponse.json({ verified: true });
+    }
+
+    // App mobile: paciente já está autenticado, pular validação de CPF
+    if (skipValidation) {
+      const paciente = sessao.consulta.paciente;
+      await prisma.telemedicineSession.update({
+        where: { id: sessao.id },
+        data: { identityVerifiedAt: new Date() },
+      });
+      await prisma.telemedicineLog.create({
+        data: {
+          sessionId: sessao.id,
+          pacienteId: paciente.id,
+          role: "PATIENT",
+          eventType: "IDENTITY_VERIFIED",
+          ipAddress: ip,
+          metadata: { method: "APP_AUTHENTICATED", result: "success" },
+        },
+      });
+      return NextResponse.json({ verified: true });
+    }
+
+    if (!cpfLastFour || !/^\d{4}$/.test(cpfLastFour)) {
+      return NextResponse.json(
+        { error: "Informe os 4 últimos dígitos do CPF" },
+        { status: 400 }
+      );
     }
 
     // P1-4: Rate limiting baseado em logs — máximo 5 falhas na última hora por sessão
