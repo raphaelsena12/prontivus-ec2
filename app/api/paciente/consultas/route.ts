@@ -93,12 +93,40 @@ export async function GET(request: NextRequest) {
             nome: true,
           },
         },
+        clinica: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
+        telemedicineSession: {
+          select: {
+            id: true,
+            patientToken: true,
+            status: true,
+          },
+        },
       },
       orderBy: { dataHora: "desc" },
     });
 
+    // Normalizar dados para o formato esperado pelo app mobile
+    const consultasNormalizadas = consultas.map((c) => ({
+      ...c,
+      medico: c.medico
+        ? {
+            id: c.medico.id,
+            nome: c.medico.usuario?.nome ?? "",
+            crm: c.medico.crm,
+            especialidade: c.medico.especialidade,
+          }
+        : null,
+      tipo: c.tipoConsulta?.nome ?? null,
+      modalidade: c.modalidade,
+    }));
+
     return NextResponse.json({
-      consultas,
+      consultas: consultasNormalizadas,
     });
   } catch (error) {
     console.error("Erro ao listar consultas:", error);

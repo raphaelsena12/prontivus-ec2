@@ -28,6 +28,12 @@ export interface Clinica {
   nome: string;
 }
 
+export interface TelemedicineSessionInfo {
+  id: string;
+  patientToken: string;
+  status: string;
+}
+
 export interface Consulta {
   id: string;
   dataHora: string;
@@ -36,6 +42,8 @@ export interface Consulta {
   clinica?: Clinica;
   observacoes?: string;
   tipo?: string;
+  modalidade?: 'PRESENCIAL' | 'TELEMEDICINA';
+  telemedicineSession?: TelemedicineSessionInfo | null;
 }
 
 export interface Agendamento extends Consulta {

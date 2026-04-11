@@ -64,6 +64,75 @@ async function checkAuthorization() {
   return { authorized: true, clinicaId, pacienteId: paciente.id };
 }
 
+// GET /api/paciente/agendamentos
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await checkAuthorization();
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
+    const consultas = await prisma.consulta.findMany({
+      where: {
+        clinicaId: auth.clinicaId,
+        pacienteId: auth.pacienteId,
+      },
+      include: {
+        medico: {
+          include: {
+            usuario: {
+              select: {
+                nome: true,
+              },
+            },
+          },
+        },
+        tipoConsulta: {
+          select: {
+            nome: true,
+          },
+        },
+        clinica: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
+        telemedicineSession: {
+          select: {
+            id: true,
+            patientToken: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { dataHora: "desc" },
+    });
+
+    const agendamentos = consultas.map((c) => ({
+      ...c,
+      medico: c.medico
+        ? {
+            id: c.medico.id,
+            nome: c.medico.usuario?.nome ?? "",
+            crm: c.medico.crm,
+            especialidade: c.medico.especialidade,
+          }
+        : null,
+      tipo: c.tipoConsulta?.nome ?? null,
+      modalidade: c.modalidade,
+    }));
+
+    return NextResponse.json({ agendamentos });
+  } catch (error) {
+    console.error("Erro ao listar agendamentos:", error);
+    return NextResponse.json(
+      { error: "Erro ao listar agendamentos" },
+      { status: 500 }
+    );
+  }
+}
+
 // POST /api/paciente/agendamentos
 export async function POST(request: NextRequest) {
   try {

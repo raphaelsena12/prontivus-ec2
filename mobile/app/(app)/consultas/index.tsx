@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useConsultas } from '../../../hooks/useConsultas';
 import { Card } from '../../../components/ui/Card';
@@ -11,6 +12,11 @@ import { Colors, BorderRadius } from '../../../constants/colors';
 import { Consulta } from '../../../types/api.types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import Constants from 'expo-constants';
+
+const BASE_URL: string =
+  (Constants.expoConfig?.extra as { apiBaseUrl?: string })?.apiBaseUrl ??
+  'http://localhost:3000';
 
 const statusLabel: Record<string, string> = {
   AGENDADA: 'Agendada',
@@ -61,6 +67,10 @@ export default function ConsultasScreen() {
 
 // ── Modal de Detalhes ─────────────────────────────────────────────────────────
 
+function getTelemedicinaUrl(patientToken: string): string {
+  return `${BASE_URL}/telemedicina/acesso?token=${patientToken}&skipConsent=1`;
+}
+
 function ConsultaDetailModal({
   consulta,
   visible,
@@ -71,6 +81,18 @@ function ConsultaDetailModal({
   onClose: () => void;
 }) {
   if (!consulta) return null;
+
+  const isTelemedicina = consulta.modalidade === 'TELEMEDICINA';
+  const session = consulta.telemedicineSession;
+  const canJoinTelemedicina = isTelemedicina && session?.patientToken &&
+    ['scheduled', 'waiting', 'in_progress'].includes(session.status) &&
+    consulta.status !== 'CANCELADA' && consulta.status !== 'REALIZADA';
+
+  function handleOpenTelemedicina() {
+    if (!session?.patientToken) return;
+    const url = getTelemedicinaUrl(session.patientToken);
+    router.push({ pathname: '/(app)/agendamentos/consulta-web', params: { url, titulo: 'Teleconsulta' } });
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -134,6 +156,23 @@ function ConsultaDetailModal({
               </View>
             </View>
 
+            {/* Modalidade */}
+            <View style={modal.detailItem}>
+              <View style={[modal.detailIcon, { backgroundColor: isTelemedicina ? '#ECFDF5' : '#EFF6FF' }]}>
+                <Ionicons
+                  name={isTelemedicina ? 'videocam-outline' : 'location-outline'}
+                  size={16}
+                  color={isTelemedicina ? '#10B981' : '#3B82F6'}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={modal.detailLabel}>Modalidade</Text>
+                <Text style={modal.detailValue}>
+                  {isTelemedicina ? 'Telemedicina' : 'Presencial'}
+                </Text>
+              </View>
+            </View>
+
             {/* Clínica */}
             {consulta.clinica && (
               <View style={modal.detailItem}>
@@ -160,6 +199,31 @@ function ConsultaDetailModal({
               </View>
             )}
 
+            {/* Telemedicina - Link de acesso */}
+            {isTelemedicina && (
+              <View style={modal.detailItem}>
+                <View style={[modal.detailIcon, { backgroundColor: '#ECFDF5' }]}>
+                  <Ionicons name="link-outline" size={16} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={modal.detailLabel}>Acesso Telemedicina</Text>
+                  {canJoinTelemedicina ? (
+                    <TouchableOpacity onPress={handleOpenTelemedicina} style={modal.teleBtn}>
+                      <Ionicons name="videocam" size={16} color={Colors.white} />
+                      <Text style={modal.teleBtnText}>Entrar na consulta</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={[modal.detailValue, { color: Colors.textMuted }]}>
+                      {consulta.status === 'CANCELADA' ? 'Consulta cancelada' :
+                       consulta.status === 'REALIZADA' ? 'Consulta finalizada' :
+                       !session ? 'Link ainda não disponível' :
+                       'Indisponível'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
+
             {/* Observações */}
             {consulta.observacoes && (
               <View style={modal.detailItem}>
@@ -176,9 +240,16 @@ function ConsultaDetailModal({
 
           {/* Footer */}
           <View style={modal.footer}>
-            <TouchableOpacity onPress={onClose} style={modal.footerBtn}>
-              <Text style={modal.footerBtnText}>Fechar</Text>
-            </TouchableOpacity>
+            {canJoinTelemedicina ? (
+              <TouchableOpacity onPress={handleOpenTelemedicina} style={modal.footerTeleBtn}>
+                <Ionicons name="videocam" size={18} color={Colors.white} />
+                <Text style={modal.footerTeleBtnText}>Entrar na Teleconsulta</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={onClose} style={modal.footerBtn}>
+                <Text style={modal.footerBtnText}>Fechar</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -191,6 +262,7 @@ function ConsultaDetailModal({
 function ConsultaCard({ consulta, onPress }: { consulta: Consulta; onPress: () => void }) {
   const dataFormatada = format(new Date(consulta.dataHora), "dd MMM", { locale: ptBR });
   const horaFormatada = format(new Date(consulta.dataHora), "HH:mm");
+  const isTelemedicina = consulta.modalidade === 'TELEMEDICINA';
 
   return (
     <Card onPress={onPress} style={styles.card}>
@@ -221,11 +293,22 @@ function ConsultaCard({ consulta, onPress }: { consulta: Consulta; onPress: () =
           {consulta.medico?.especialidade && (
             <Text style={styles.especialidade}>{consulta.medico.especialidade}</Text>
           )}
-          <Badge
-            label={statusLabel[consulta.status] ?? consulta.status}
-            status={consulta.status}
-            size="sm"
-          />
+          {consulta.tipo && (
+            <Text style={styles.tipoConsulta}>{consulta.tipo}</Text>
+          )}
+          <View style={styles.badgeRow}>
+            <Badge
+              label={statusLabel[consulta.status] ?? consulta.status}
+              status={consulta.status}
+              size="sm"
+            />
+            {isTelemedicina && (
+              <View style={styles.teleBadge}>
+                <Ionicons name="videocam" size={10} color="#10B981" />
+                <Text style={styles.teleBadgeText}>Tele</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.arrowWrap}>
@@ -308,6 +391,18 @@ const modal = StyleSheet.create({
   },
   footerBtn: { alignItems: 'center', paddingVertical: 10 },
   footerBtnText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '600' },
+  teleBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#10B981', borderRadius: BorderRadius.md,
+    paddingHorizontal: 14, paddingVertical: 10, alignSelf: 'flex-start', marginTop: 4,
+  },
+  teleBtnText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
+  footerTeleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#10B981', borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+  },
+  footerTeleBtnText: { color: Colors.white, fontSize: 16, fontWeight: '700' },
 });
 
 const styles = StyleSheet.create({
@@ -335,6 +430,13 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1, gap: 3 },
   doctorName: { fontSize: 15, fontWeight: '700', color: Colors.text },
   especialidade: { fontSize: 13, color: Colors.textSecondary },
+  tipoConsulta: { fontSize: 12, color: Colors.textMuted },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  teleBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#ECFDF5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  teleBadgeText: { fontSize: 10, fontWeight: '700', color: '#10B981' },
   arrowWrap: {
     width: 32, height: 32, borderRadius: 10,
     backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center',
