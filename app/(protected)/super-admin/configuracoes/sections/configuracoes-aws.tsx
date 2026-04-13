@@ -62,7 +62,7 @@ export function ConfiguracoesAWS() {
         <CardHeader>
           <CardTitle>Configurações AWS</CardTitle>
           <CardDescription>
-            Configure as credenciais AWS para Transcribe e Comprehend Medical
+            Configure as credenciais AWS para os serviços utilizados
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -75,9 +75,7 @@ export function ConfiguracoesAWS() {
                 </p>
                 <p className="text-xs text-yellow-700 dark:text-yellow-300">
                   As credenciais AWS são informações sensíveis. Certifique-se de
-                  que estão sendo armazenadas de forma segura. O AWS Comprehend
-                  Medical está disponível apenas em us-east-1, us-west-2 ou
-                  eu-west-1.
+                  que estão sendo armazenadas de forma segura.
                 </p>
               </div>
             </div>
@@ -141,7 +139,7 @@ export function ConfiguracoesAWS() {
             <div>
               <p className="text-sm font-medium">Serviços AWS</p>
               <p className="text-xs text-muted-foreground">
-                Transcribe e Comprehend Medical
+                Transcribe, Polly, SES, S3, Chime
               </p>
             </div>
             <Badge variant="outline">Configurado</Badge>

@@ -17,9 +17,11 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: 3000,
         HOSTNAME: '0.0.0.0',
+        AWS_REGION: 'sa-east-1',
+        AWS_SECRET_NAME: 'prontivus/production',
       },
-      // Carregar variáveis de ambiente do arquivo .env
-      env_file: '/opt/prontivus/.env',
+      // Secrets são carregados do AWS Secrets Manager no bootstrap (server.ts)
+      // O .env local serve apenas como fallback (SKIP_SECRETS_MANAGER=true para usar .env)
       error_file: '/opt/prontivus/logs/pm2-error.log',
       out_file: '/opt/prontivus/logs/pm2-out.log',
       log_file: '/opt/prontivus/logs/pm2-combined.log',

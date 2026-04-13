@@ -19,24 +19,24 @@ import { startAWSTranscriptionStream } from "./lib/transcribe-websocket";
 import { TranscriptionResult } from "./lib/transcribe-service";
 import path from "path";
 import { existsSync, mkdirSync } from "fs";
+import { loadSecrets } from "./lib/aws-secrets";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = parseInt(process.env.PORT || "3000", 10);
 
-// Desabilitar Turbopack no Windows para evitar erros de permissão
-// Use webpack tradicional que é mais estável no Windows
-// No Windows, forçar uso do webpack através de variáveis de ambiente
-const app = next({ 
-  dev, 
-  hostname, 
-  port,
-  // Forçar uso do webpack ao invés do Turbopack no Windows
-  // O Turbopack causa erros de permissão no Windows
-});
-const handle = app.getRequestHandler();
+// Carregar secrets do AWS Secrets Manager ANTES de inicializar o Next.js
+async function bootstrap() {
+  await loadSecrets();
 
-app.prepare().then(() => {
+  const app = next({
+    dev,
+    hostname,
+    port,
+  });
+  const handle = app.getRequestHandler();
+
+  await app.prepare();
   const httpServer = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url!, true);
@@ -330,6 +330,11 @@ app.prepare().then(() => {
       console.log(`> Servidor pronto em http://${hostname}:${port}`);
       console.log(`> Socket.IO disponível em /api/socket`);
     });
+}
+
+bootstrap().catch((err) => {
+  console.error("Erro fatal ao iniciar o servidor:", err);
+  process.exit(1);
 });
 
 
