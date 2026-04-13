@@ -1,0 +1,118 @@
+{
+    "pipeline": {
+        "name": "prontivus-pipeline",
+        "roleArn": "arn:aws:iam::983740383268:role/ProntivusCodePipelineRole",
+        "artifactStore": {
+            "type": "S3",
+            "location": "codepipeline-sa-east-1-prontivus"
+        },
+        "stages": [
+            {
+                "name": "Source",
+                "actions": [
+                    {
+                        "name": "GitHub_Source",
+                        "actionTypeId": {
+                            "category": "Source",
+                            "owner": "AWS",
+                            "provider": "CodeStarSourceConnection",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "BranchName": "main",
+                            "ConnectionArn": "arn:aws:codeconnections:sa-east-1:983740383268:connection/16b79a72-8b87-46d6-a36e-8731603cafc6",
+                            "DetectChanges": "true",
+                            "FullRepositoryId": "raphaelsena12/prontivus-ec2",
+                            "OutputArtifactFormat": "CODE_ZIP"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "SourceOutput"
+                            }
+                        ],
+                        "inputArtifacts": []
+                    }
+                ]
+            },
+            {
+                "name": "Build",
+                "actions": [
+                    {
+                        "name": "CodeBuild",
+                        "actionTypeId": {
+                            "category": "Build",
+                            "owner": "AWS",
+                            "provider": "CodeBuild",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ProjectName": "prontivus-build"
+                        },
+                        "outputArtifacts": [
+                            {
+                                "name": "BuildOutput"
+                            }
+                        ],
+                        "inputArtifacts": [
+                            {
+                                "name": "SourceOutput"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "name": "Deploy",
+                "actions": [
+                    {
+                        "name": "CodeDeploy",
+                        "actionTypeId": {
+                            "category": "Deploy",
+                            "owner": "AWS",
+                            "provider": "CodeDeploy",
+                            "version": "1"
+                        },
+                        "runOrder": 1,
+                        "configuration": {
+                            "ApplicationName": "prontivus",
+                            "DeploymentGroupName": "prontivus-production"
+                        },
+                        "outputArtifacts": [],
+                        "inputArtifacts": [
+                            {
+                                "name": "BuildOutput"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "version": 2,
+        "executionMode": "SUPERSEDED",
+        "pipelineType": "V2",
+        "triggers": [
+            {
+                "providerType": "CodeStarSourceConnection",
+                "gitConfiguration": {
+                    "sourceActionName": "GitHub_Source",
+                    "push": [
+                        {
+                            "branches": {
+                                "includes": [
+                                    "main"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "metadata": {
+        "pipelineArn": "arn:aws:codepipeline:sa-east-1:983740383268:prontivus-pipeline",
+        "created": "2026-04-13T14:53:03.203000-03:00",
+        "updated": "2026-04-13T16:15:24.520000-03:00"
+    }
+}

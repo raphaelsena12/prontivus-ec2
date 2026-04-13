@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
-  drawFooterSignature,
+  drawFooterSignature, checkPageBreak,
   drawRichParagraph,
   MARGIN, CONTENT_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
@@ -36,6 +36,7 @@ export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer
 
   // Função auxiliar para desenhar um campo com label e valor
   const drawField = (label: string, value?: string): void => {
+    y = checkPageBreak(doc, y, 12);
     y = drawRichParagraph(doc, [
       { text: `${label}: `, bold: true },
       { text: value || "______________________________", bold: true },
@@ -45,6 +46,7 @@ export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer
 
   // Função auxiliar para desenhar um campo sem dois pontos (apenas label)
   const drawFieldNoColon = (label: string, value?: string): void => {
+    y = checkPageBreak(doc, y, 14);
     if (value) {
       y = drawRichParagraph(doc, [
         { text: label, bold: true },

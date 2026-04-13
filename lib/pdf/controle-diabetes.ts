@@ -3,7 +3,6 @@ import {
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
   drawDualSignature, drawFooterSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
-  formatCPF,
 } from "./pdf-base";
 
 // =====================================================
@@ -44,54 +43,8 @@ export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData)
   doc.text("*IMPORTANTE- manter jejum de 2 horas antes da verificação", MARGIN, y);
   y += 6; // Reduzido de 5
   
-  // ── Dados do paciente (fontes reduzidas em 2) ──
-  doc.setFontSize(7); // 9 - 2
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("IDENTIFICAÇÃO DO PACIENTE", MARGIN, y);
-  y += 6; // Reduzido de 7
-  
-  const ROW_H = 6; // Reduzido de 7
-  const colMid = 75;
-  const colDir = 125;
-  
-  /** Escreve label (cinza, normal 8pt) + valor (escuro, normal 8pt) na posição x, y */
-  const lv = (label: string, value: string, x: number, ly: number) => {
-    doc.setFontSize(8); // 10 - 2
-    doc.setFont(PDF_FONT, "normal");
-    doc.setTextColor(...COLORS.slate600);
-    doc.text(label, x, ly);
-    doc.setTextColor(...COLORS.slate800);
-    doc.text(value || "", x + doc.getTextWidth(label), ly);
-  };
-  
-  // Linha 1: Nº Matrícula | Nasc. | RG
-  lv("Nº Matrícula: ", data.pacienteMatricula || "", MARGIN, y);
-  lv("Nasc. ", data.pacienteDataNascimento, colMid, y);
-  lv("RG: ", data.pacienteRg || "", colDir, y);
-  y += ROW_H;
-  
-  // Linha 2: Nome | CPF
-  lv("Nome: ", data.pacienteNome.toUpperCase(), MARGIN, y);
-  lv("CPF: ", formatCPF(data.pacienteCpf), colDir, y);
-  y += ROW_H;
-  
-  // Linha 3: Endereço | Bairro
-  lv("Endereço: ", data.pacienteEndereco || "", MARGIN, y);
-  lv("Bairro: ", data.pacienteBairro || "", colDir, y);
-  y += ROW_H;
-  
-  // Linha 4: Cidade | CEP
-  lv("Cidade: ", data.pacienteCidade || "", MARGIN, y);
-  lv("CEP: ", data.pacienteCep || "", colDir, y);
-  y += ROW_H + 3; // Reduzido de 4
-  
-  // Separador
-  doc.setDrawColor(...COLORS.slate200);
-  doc.setLineWidth(0.3);
-  doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
-  y += 6; // Reduzido de 8
-  
+  // ── Dados do paciente (usa drawPatientCard centralizado) ──
+  y = drawPatientCard(doc, data, y);
   y -= 3; // Reduzindo espaço adicional após dados do paciente
 
   // ── Configurações da tabela ──
@@ -182,7 +135,7 @@ export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData)
   doc.line(tracoData1X + 20, y - 1, tracoData1X + 28, y - 1);
   // Horário fixo 02:30 (na mesma linha, logo após os traços da data)
   const horario1X = tracoData1X + 28 + 3;
-  doc.text("hórario 02:30", horario1X, y);
+  doc.text("horário 02:30", horario1X, y);
   // Traço para medição NOITE
   const tracoWidth = 15;
   doc.line(xNoite + 2, y - 1, xNoite + 2 + tracoWidth, y - 1);
@@ -205,7 +158,7 @@ export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData)
   doc.line(tracoData2X + 20, y - 1, tracoData2X + 28, y - 1);
   // Horário fixo 02:30 (na mesma linha, logo após os traços da data)
   const horario2X = tracoData2X + 28 + 3;
-  doc.text("hórario 02:30", horario2X, y);
+  doc.text("horário 02:30", horario2X, y);
   // Traço para medição NOITE
   doc.line(xNoite + 2, y - 1, xNoite + 2 + tracoWidth, y - 1);
   doc.setFontSize(5.5);
@@ -316,7 +269,7 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   doc.line(tracoData1X + 20, y - 1, tracoData1X + 28, y - 1);
   // Horário fixo 02:30 (na mesma linha, logo após os traços da data)
   const horario1X = tracoData1X + 28 + 3;
-  doc.text("hórario 02:30", horario1X, y);
+  doc.text("horário 02:30", horario1X, y);
   // Traço para medição
   const tracoMedicao1X = xMedicao + 2;
   const tracoMedicao1Width = colMedicaoWidth - 20;
@@ -340,7 +293,7 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   doc.line(tracoData2X + 20, y - 1, tracoData2X + 28, y - 1);
   // Horário fixo 02:30 (na mesma linha, logo após os traços da data)
   const horario2X = tracoData2X + 28 + 3;
-  doc.text("hórario 02:30", horario2X, y);
+  doc.text("horário 02:30", horario2X, y);
   // Traço para medição
   const tracoMedicao2X = xMedicao + 2;
   const tracoMedicao2Width = colMedicaoWidth - 20;

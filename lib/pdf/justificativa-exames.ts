@@ -37,16 +37,32 @@ export function generateJustificativaPedidosExamesPDF(data: JustificativaExamesD
   // ── Quebra de duas linhas ──
   y += 10;
 
+  // ── Exames Solicitados ──
+  if (data.examesSolicitados) {
+    y = drawRichParagraph(doc, [
+      { text: "Exames Solicitados: " },
+      { text: data.examesSolicitados },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 8;
+  } else {
+    y = drawRichParagraph(doc, [
+      { text: "Exames Solicitados: " },
+      { text: "______________________________" },
+    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+    y += 8;
+  }
+
+  // ── Quebra de duas linhas ──
+  y += 10;
+
   // ── Justificativa ──
   if (data.justificativa) {
-    // Se houver justificativa, mostra "Justificativa: " e o texto na mesma linha inicial
     y = drawRichParagraph(doc, [
       { text: "Justificativa: " },
       { text: data.justificativa },
     ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
     y += 8;
   } else {
-    // Se não houver justificativa, mostra linha tracejada na mesma linha
     y = drawRichParagraph(doc, [
       { text: "Justificativa: " },
       { text: "______________________________" },

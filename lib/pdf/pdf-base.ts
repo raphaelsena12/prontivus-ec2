@@ -116,6 +116,20 @@ export const MARGIN = 20;
 export const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 // =====================================================
+// CONTROLE DE PAGINAÇÃO
+// =====================================================
+const FOOTER_RESERVE = 28;
+
+/** Verifica se há espaço suficiente na página; se não, adiciona nova página e retorna Y no topo */
+export function checkPageBreak(doc: jsPDF, y: number, needed = 10): number {
+  if (y + needed > PAGE_HEIGHT - FOOTER_RESERVE) {
+    doc.addPage();
+    return MARGIN;
+  }
+  return y;
+}
+
+// =====================================================
 // FUNÇÕES DE LAYOUT COMPARTILHADAS
 // =====================================================
 
@@ -363,49 +377,91 @@ export function drawTitle(doc: jsPDF, title: string, subtitle?: string, startY?:
   return y + 8;
 }
 
-/** Desenha identificação do paciente em grid (Matrícula/Nasc/RG | Nome/CPF | End/Bairro | Cidade/CEP). Retorna Y após seção */
+/** Desenha identificação do paciente. Retorna Y após seção */
 export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): number {
-  // Título da seção
-  doc.setFontSize(9);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("IDENTIFICAÇÃO DO PACIENTE", MARGIN, y);
-  y += 7;
+  const FONT_SIZE = 8; // base reduzida em 2px
+  const ROW_H = 6;
 
-  const ROW_H = 7;
-  // posições absolutas das colunas (A4: margem 20mm)
-  const colMid = 75;  // "Nasc." na linha 1
-  const colDir = 125; // "RG", "CPF", "Bairro", "CEP" — coluna direita
+  /** Trunca texto se ultrapassar maxW (mm) */
+  const truncate = (text: string, maxW: number): string => {
+    if (!text) return "";
+    doc.setFontSize(FONT_SIZE);
+    doc.setFont(PDF_FONT, "normal");
+    if (doc.getTextWidth(text) <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && doc.getTextWidth(t + "…") > maxW) t = t.slice(0, -1);
+    return t + "…";
+  };
 
-  /** Escreve label (cinza, normal 10pt) + valor (escuro, normal 10pt) na posição x, y */
-  const lv = (label: string, value: string, x: number, ly: number) => {
-    doc.setFontSize(10);
+  /** Escreve label (cinza) + valor (escuro) na posição x, ly. Retorna X após o campo */
+  const lv = (label: string, value: string, x: number, ly: number, maxValueW?: number): number => {
+    doc.setFontSize(FONT_SIZE);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
     doc.text(label, x, ly);
+    const labelW = doc.getTextWidth(label);
+    const val = maxValueW ? truncate(value || "", maxValueW) : (value || "");
     doc.setTextColor(...COLORS.slate800);
-    doc.text(value || "", x + doc.getTextWidth(label), ly);
+    doc.text(val, x + labelW, ly);
+    return x + labelW + doc.getTextWidth(val);
   };
 
-  // Linha 1: Nº Matrícula | Nasc. | RG (acima do CPF)
-  lv("Nº Matrícula: ", data.pacienteMatricula || "", MARGIN, y);
-  lv("Nasc. ", data.pacienteDataNascimento, colMid, y);
-  lv("RG: ", data.pacienteRg || "", colDir, y);
+  // Título da seção
+  doc.setFontSize(FONT_SIZE);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("IDENTIFICAÇÃO DO PACIENTE", MARGIN, y);
   y += ROW_H;
 
-  // Linha 2: Nome | CPF (RG fica acima)
-  lv("Nome: ", data.pacienteNome.toUpperCase(), MARGIN, y);
-  lv("CPF: ", formatCPF(data.pacienteCpf), colDir, y);
+  // Linha 1: NºProntuário | Nome Completo
+  const prontuarioLabel = "Nº Prontuário: ";
+  const nomeLabel = "Nome Completo: ";
+  doc.setFontSize(FONT_SIZE);
+  doc.setFont(PDF_FONT, "normal");
+  const prontuarioLabelW = doc.getTextWidth(prontuarioLabel);
+  const prontuarioValW = 25; // espaço reservado para o valor do prontuário
+  const nomeStartX = MARGIN + prontuarioLabelW + prontuarioValW + 4;
+  const nomeMaxW = PAGE_WIDTH - MARGIN - nomeStartX - doc.getTextWidth(nomeLabel);
+
+  lv(prontuarioLabel, data.pacienteMatricula || "", MARGIN, y, prontuarioValW);
+  lv(nomeLabel, data.pacienteNome.toUpperCase(), nomeStartX, y, nomeMaxW);
   y += ROW_H;
 
-  // Linha 3: Endereço | Bairro
-  lv("Endereço: ", data.pacienteEndereco || "", MARGIN, y);
-  lv("Bairro: ", data.pacienteBairro || "", colDir, y);
+  // Linha 2: Data Nascimento | RG | CPF
+  const nascLabel = "Data Nascimento: ";
+  const rgLabel = "RG: ";
+  const cpfLabel = "CPF: ";
+  doc.setFontSize(FONT_SIZE);
+  doc.setFont(PDF_FONT, "normal");
+  const nascLabelW = doc.getTextWidth(nascLabel);
+  const nascValW = doc.getTextWidth("00/00/0000") + 1;
+  const rgStartX = MARGIN + nascLabelW + nascValW + 4;
+  const cpfVal = formatCPF(data.pacienteCpf);
+  const cpfTotalW = doc.getTextWidth(cpfLabel) + doc.getTextWidth(cpfVal);
+  const cpfStartX = PAGE_WIDTH - MARGIN - cpfTotalW;
+  const rgMaxW = cpfStartX - rgStartX - doc.getTextWidth(rgLabel) - 4;
+
+  lv(nascLabel, data.pacienteDataNascimento, MARGIN, y);
+  lv(rgLabel, data.pacienteRg || "", rgStartX, y, Math.max(rgMaxW, 15));
+  lv(cpfLabel, cpfVal, cpfStartX, y);
   y += ROW_H;
 
-  // Linha 4: Cidade | CEP
-  lv("Cidade: ", data.pacienteCidade || "", MARGIN, y);
-  lv("CEP: ", data.pacienteCep || "", colDir, y);
+  // Linha 3: Endereço | Bairro | Cidade
+  const endLabel = "Endereço: ";
+  const bairroLabel = "Bairro: ";
+  const cidadeLabel = "Cidade: ";
+  doc.setFontSize(FONT_SIZE);
+  doc.setFont(PDF_FONT, "normal");
+  const cidadeVal = data.pacienteCidade || "";
+  const cidadeTotalW = doc.getTextWidth(cidadeLabel) + doc.getTextWidth(cidadeVal);
+  const cidadeStartX = PAGE_WIDTH - MARGIN - cidadeTotalW;
+  const bairroStartX = 95;
+  const endMaxW = bairroStartX - MARGIN - doc.getTextWidth(endLabel) - 2;
+  const bairroMaxW = cidadeStartX - bairroStartX - doc.getTextWidth(bairroLabel) - 4;
+
+  lv(endLabel, data.pacienteEndereco || "", MARGIN, y, endMaxW);
+  lv(bairroLabel, data.pacienteBairro || "", bairroStartX, y, Math.max(bairroMaxW, 10));
+  lv(cidadeLabel, cidadeVal, cidadeStartX, y);
   y += ROW_H + 4;
 
   // Separador
@@ -413,7 +469,7 @@ export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): numb
   doc.setLineWidth(0.3);
   doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y);
 
-  return y + 8;
+  return y + 6;
 }
 
 /** Desenha rodapé com assinatura do médico. Posiciona fixo no fim da página, alinhada à direita */

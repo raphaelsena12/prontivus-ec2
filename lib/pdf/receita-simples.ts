@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawPatientCard,
-  drawFooterSignature,
+  drawFooterSignature, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -42,6 +42,7 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
   // ── Medicamentos ──
   if (data.medicamentos && data.medicamentos.length > 0) {
     data.medicamentos.forEach((med, index) => {
+      y = checkPageBreak(doc, y, 16);
       const numMed = index + 1;
       const startX = MARGIN;
       

@@ -112,7 +112,7 @@ export function generateAtestadoAptidaoFisicaPDF(data: AptidaoData): ArrayBuffer
 
   // ── Parágrafo 2 ──
   y = drawRichParagraph(doc, [
-    { text: "Em decorrência dos resultados apresentados, atesto que, o mesmo está apto pelo exame dermatológico a frequentar piscinas." },
+    { text: "Em decorrência dos resultados apresentados, atesto que, o mesmo está apto a exercer atividades físicas, visto que, não apresenta nenhuma patologia aparente." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 

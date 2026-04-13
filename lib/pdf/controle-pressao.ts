@@ -3,7 +3,6 @@ import {
   createDoc, drawClinicHeader, drawPatientCard,
   drawDualSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
-  formatCPF,
 } from "./pdf-base";
 
 // =====================================================

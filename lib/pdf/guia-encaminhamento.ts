@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard,
+  createDoc, drawClinicHeader, drawPatientCard, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -35,7 +35,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   doc.text("GUIA DE ENCAMINHAMENTO REFERÊNCIA E CONTRA REFERÊNCIA", MARGIN, y);
   y += 15;
   
-  // ── Seção II - PARA (esquerda) e IIII - PROCEDIMENTOS SOLICITADOS (direita) ──
+  // ── Seção II - PARA (esquerda) e III - PROCEDIMENTOS SOLICITADOS (direita) ──
   const midX = PAGE_WIDTH / 2;
   const leftColWidth = CONTENT_WIDTH / 2 - 5;
   const rightColWidth = CONTENT_WIDTH / 2 - 5;
@@ -62,11 +62,11 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
     leftY += 6;
   }
   
-  // IIII - PROCEDIMENTOS SOLICITADOS (direita) - alinhado no topo
+  // III - PROCEDIMENTOS SOLICITADOS (direita) - alinhado no topo
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text("IIII - PROCEDIMENTOS SOLICITADOS", midX + 5, sectionStartY);
+  doc.text("III - PROCEDIMENTOS SOLICITADOS", midX + 5, sectionStartY);
   
   let rightY = sectionStartY + 8;
   doc.setFontSize(9);
@@ -86,6 +86,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   y = Math.max(leftY, rightY) + 12;
   
   // ── IV - Resumo da História Clínica e Exames já Realizados ──
+  y = checkPageBreak(doc, y, 20);
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
@@ -106,6 +107,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   }
   
   // ── V - Hipótese Diagnóstica ──
+  y = checkPageBreak(doc, y, 20);
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
@@ -158,6 +160,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   y = sigY1 + 15;
   
   // ── CONTRA REFERÊNCIA ──
+  y = checkPageBreak(doc, y, 50);
   doc.setFontSize(14);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);

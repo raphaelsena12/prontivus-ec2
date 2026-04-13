@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard,
+  createDoc, drawClinicHeader, drawPatientCard, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -43,6 +43,7 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   // ── Medicamentos ──
   if (data.medicamentos && data.medicamentos.length > 0) {
     data.medicamentos.forEach((med, index) => {
+      y = checkPageBreak(doc, y, 16);
       const numMed = index + 1;
       const startX = MARGIN;
       
@@ -189,21 +190,38 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   doc.setDrawColor(...COLORS.slate800);
   doc.setLineWidth(0.5);
   doc.rect(rightBoxX, boxStartY, boxWidth, boxHeightFinal);
-  
+
   // Título do box direito
   doc.setFontSize(9);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("IDENTIFICAÇÃO DO FORNECEDOR", rightBoxX + boxWidth / 2, boxStartY + 6, { align: "center" });
-  
+
   let rightBoxY = boxStartY + 12;
-  
+
+  // Campos do fornecedor
+  doc.setFontSize(8);
+  doc.setFont(PDF_FONT, "normal");
+  doc.setTextColor(...COLORS.slate800);
+
+  // Data da dispensação
+  doc.text("Data:", rightBoxX + 3, rightBoxY);
+  doc.setDrawColor(...COLORS.slate800);
+  doc.setLineWidth(0.2);
+  doc.line(rightBoxX + 15, rightBoxY - 1, rightBoxX + boxWidth - 3, rightBoxY - 1);
+  rightBoxY += fieldSpacing;
+
+  // Carimbo da farmácia
+  doc.text("Carimbo:", rightBoxX + 3, rightBoxY);
+  doc.line(rightBoxX + 20, rightBoxY - 1, rightBoxX + boxWidth - 3, rightBoxY - 1);
+  rightBoxY += fieldSpacing + 8;
+
   // Linha de assinatura
   doc.setDrawColor(...COLORS.slate800);
   doc.setLineWidth(0.4);
   doc.line(rightBoxX + 5, rightBoxY, rightBoxX + boxWidth - 5, rightBoxY);
-  rightBoxY += 6;
-  
+  rightBoxY += 5;
+
   // Texto "ASSINATURA DO FARMACÊUTICO"
   doc.setFontSize(7);
   doc.setFont(PDF_FONT, "normal");

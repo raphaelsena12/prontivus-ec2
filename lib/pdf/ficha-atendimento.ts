@@ -1,7 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawPatientCard,
-  drawFooterSignature,
+  drawFooterSignature, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -84,17 +84,6 @@ function parseAnamneseSections(anamnese: string): Array<{ title: string; content
   }
   flush();
   return sections.length ? sections : [{ title: "", content: trimmed }];
-}
-
-const PAGE_HEIGHT = 297; // A4 mm
-const FOOTER_RESERVE = 28; // espaço reservado para rodapé
-
-function checkPageBreak(doc: ReturnType<typeof createDoc>, y: number, needed = 10): number {
-  if (y + needed > PAGE_HEIGHT - FOOTER_RESERVE) {
-    doc.addPage();
-    return MARGIN;
-  }
-  return y;
 }
 
 function drawSectionTitle(
