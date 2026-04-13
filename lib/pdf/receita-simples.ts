@@ -68,9 +68,10 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
         dosagemX += doc.getTextWidth(med.dosagem) + 3;
       }
       
-      // Linha de pontos até a duração
+      // Linha de pontos até a quantidade
       const pontosStartX = dosagemX;
       const rightEdge = PAGE_WIDTH - MARGIN;
+      const quantidadeText = med.quantidade || med.duracao;
 
       // Calcular largura de um ponto
       doc.setFontSize(10);
@@ -79,9 +80,9 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
 
       // Calcular espaço disponível para pontos
       let pontosEndX = rightEdge;
-      if (med.duracao) {
-        const duracaoWidth = doc.getTextWidth(med.duracao);
-        pontosEndX = rightEdge - duracaoWidth - 5;
+      if (quantidadeText) {
+        const quantidadeWidth = doc.getTextWidth(quantidadeText);
+        pontosEndX = rightEdge - quantidadeWidth - 5;
       }
 
       // Calcular número de pontos necessários
@@ -94,12 +95,12 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
         doc.text(".".repeat(numPontos), pontosStartX, y);
       }
 
-      // Duração — alinhada à direita da margem
-      if (med.duracao) {
+      // Quantidade — alinhada à direita da margem
+      if (quantidadeText) {
         doc.setFontSize(10);
         doc.setFont(PDF_FONT, "normal");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(med.duracao, rightEdge, y, { align: "right" });
+        doc.text(quantidadeText, rightEdge, y, { align: "right" });
       }
       
       y += 6;
@@ -108,7 +109,7 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
       if (med.posologia) {
         const posologiaX = startX + 12;
         let posologiaText = med.posologia;
-        if (med.duracao) {
+        if (med.quantidade || med.duracao) {
           posologiaText = posologiaText.replace(/\s*—\s*por\s+\d+\s*dias?/i, "");
           posologiaText = posologiaText.replace(/\s*por\s+\d+\s*dias?/i, "");
         }
