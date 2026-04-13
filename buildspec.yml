@@ -34,7 +34,8 @@ phases:
     runtime-versions:
       nodejs: 20
     commands:
-      - npm ci --legacy-peer-deps
+      # Instalar com devDependencies (prisma, dotenv, tsx são devDeps necessárias no build)
+      - npm ci --legacy-peer-deps --include=dev
 
   pre_build:
     commands:
