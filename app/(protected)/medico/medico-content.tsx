@@ -102,7 +102,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
   const [loading, setLoading] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
   const [loadingAgenda, setLoadingAgenda] = useState(true);
-  const [dateFilter, setDateFilter] = useState<DateFilter>("mensal");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("diario");
 
   const fetchChartsAndStats = (filter: DateFilter) => {
     setLoading(true);

@@ -1,101 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkMedicoAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
-import { brazilTodayStart, brazilMonthStart, getDateRangeFromFilter } from "@/lib/timezone-utils";
+import { getDateRangeFromFilter } from "@/lib/timezone-utils";
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await checkMedicoAuth();
     if (!auth.authorized) return auth.response;
 
-    // Obter filtro de data da query string (default: mensal)
     const { searchParams } = new URL(request.url);
-    const dateFilter = (searchParams.get("filter") || "mensal") as "diario" | "mensal" | "anual";
+    const dateFilter = (searchParams.get("filter") || "diario") as "diario" | "mensal" | "anual";
     const { start: dataInicio, end: dataFim } = getDateRangeFromFilter(dateFilter);
 
-    const hoje = brazilTodayStart();
+    const baseWhere = {
+      medicoId: auth.medicoId,
+      clinicaId: auth.clinicaId,
+      dataHora: { gte: dataInicio, lte: dataFim },
+    };
 
-    // Buscar estatísticas do médico
     const [
       totalConsultas,
       consultasPendentes,
       consultasRealizadas,
       consultasVencidas,
-      receitaMesAtual,
-      receitaTotal,
+      receitaParticular,
+      receitaConvenios,
+      retornos,
     ] = await Promise.all([
-      // Total de consultas
+      // Total de consultas no período
       prisma.consulta.count({
-        where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
-        },
+        where: baseWhere,
       }),
-      // Consultas pendentes (agendadas)
+      // Consultas pendentes (agendadas) no período
       prisma.consulta.count({
         where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
+          ...baseWhere,
           status: "AGENDADA",
-          dataHora: {
-            gte: hoje,
-          },
         },
       }),
-      // Consultas realizadas
+      // Consultas realizadas no período
       prisma.consulta.count({
         where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
+          ...baseWhere,
           status: "REALIZADA",
         },
       }),
-      // Consultas vencidas (agendadas mas passaram da data)
+      // Consultas vencidas no período (agendadas mas passaram da data)
       prisma.consulta.count({
         where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
+          ...baseWhere,
           status: "AGENDADA",
-          dataHora: {
-            lt: hoje,
-          },
+          dataHora: { gte: dataInicio, lt: new Date() },
         },
       }),
-      // Receita do período filtrado
+      // Receita particular no período
       prisma.consulta.aggregate({
         where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
+          ...baseWhere,
           status: "REALIZADA",
-          dataHora: {
-            gte: dataInicio,
-            lte: dataFim,
-          },
+          operadoraId: null,
         },
         _sum: {
           valorCobrado: true,
         },
       }),
-      // Receita total
+      // Receita convênios no período
       prisma.consulta.aggregate({
         where: {
-          medicoId: auth.medicoId,
-          clinicaId: auth.clinicaId,
+          ...baseWhere,
           status: "REALIZADA",
+          operadoraId: { not: null },
         },
         _sum: {
           valorCobrado: true,
+        },
+      }),
+      // Retornos no período
+      prisma.consulta.count({
+        where: {
+          ...baseWhere,
+          tipoConsulta: {
+            nome: { contains: "retorno", mode: "insensitive" },
+          },
         },
       }),
     ]);
+
+    const recParticular = Number(receitaParticular._sum.valorCobrado || 0);
+    const recConvenios = Number(receitaConvenios._sum.valorCobrado || 0);
 
     return NextResponse.json({
       totalPagamentos: totalConsultas,
       pagamentosPendentes: consultasPendentes,
       pagamentosPagos: consultasRealizadas,
       pagamentosVencidos: consultasVencidas,
-      receitaMesAtual: Number(receitaMesAtual._sum.valorCobrado || 0),
-      receitaTotal: Number(receitaTotal._sum.valorCobrado || 0),
+      receitaMesAtual: recParticular + recConvenios,
+      receitaTotal: recParticular + recConvenios,
+      receitaParticular: recParticular,
+      receitaConvenios: recConvenios,
+      retornos,
     });
   } catch (error) {
     console.error("Erro ao buscar estatísticas do médico:", error);
@@ -105,8 +108,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-
-
-
-

@@ -33,6 +33,10 @@ interface Agendamento {
   tipoConsulta: {
     nome: string;
   } | null;
+  procedimento: {
+    id: string;
+    nome: string;
+  } | null;
   operadora: {
     nomeFantasia: string | null;
     razaoSocial: string;
@@ -100,7 +104,10 @@ export function AgendamentosCalendar({
       const estaAtrasado = dataHora < agora && !statusConcluido;
       const emoji = estaAtrasado ? "😢" : "😊";
 
-      const title = `${emoji} ${agendamento.paciente.nome}${agendamento.tipoConsulta ? ` - ${agendamento.tipoConsulta.nome}` : ""}`;
+      const tipoNome = agendamento.tipoConsulta?.nome;
+      const procedimento = agendamento.procedimento?.nome;
+      const detalhes = [tipoNome, procedimento].filter(Boolean).join(" | ");
+      const title = `${emoji} ${agendamento.paciente.nome}${detalhes ? ` - ${detalhes}` : ""}`;
 
       return {
         id: agendamento.id,

@@ -121,6 +121,12 @@ export async function GET(request: NextRequest) {
             nome: true,
           },
         },
+        procedimento: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
       },
     });
 

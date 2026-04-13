@@ -21,7 +21,10 @@
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(xargs grep -l \"iniciar\\\\|atendimento\\\\|consulta\")",
-      "Bash(npx prisma db push)"
+      "Bash(npx prisma db push)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(curl -s -H \"Authorization: Bearer cc7c2e75bd5f603a72a6a4a17f6b7ba461addea576f58b06502489e5e92d0c16\" \"https://prontivus.com/api/cron/lembretes-whatsapp\")"
     ]
   }
 }

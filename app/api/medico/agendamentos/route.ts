@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         dataHora: true,
+        dataHoraFim: true,
         status: true,
         valorCobrado: true,
         paciente: {
@@ -122,6 +123,12 @@ export async function GET(request: NextRequest) {
         },
         planoSaude: {
           select: {
+            nome: true,
+          },
+        },
+        procedimento: {
+          select: {
+            id: true,
             nome: true,
           },
         },

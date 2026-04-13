@@ -124,6 +124,10 @@ interface Consulta {
   tipoConsulta: {
     nome: string;
   } | null;
+  procedimento: {
+    id: string;
+    nome: string;
+  } | null;
   pressaoSistolica?: number | null;
   pressaoDiastolica?: number | null;
   frequenciaCardiaca?: number | null;
@@ -2412,6 +2416,13 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     {consulta.tipoConsulta && (
                       <Badge className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
                         {consulta.tipoConsulta.nome}
+                      </Badge>
+                    )}
+
+                    {/* Procedimento badge - Violeta */}
+                    {consulta.procedimento && (
+                      <Badge className="text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
+                        {consulta.procedimento.nome}
                       </Badge>
                     )}
 

@@ -197,11 +197,22 @@ export function useTranscription() {
   // ─── Ping periódico para manter o WebSocket vivo ──────────────────────────
   const startPing = useCallback(() => {
     clearTimers();
+
+    // Pequeno buffer de silêncio PCM16 (480 samples = 20ms @ 24kHz)
+    const silenceSamples = 480;
+    const silenceBuffer = new Int16Array(silenceSamples); // zeros = silêncio
+    const uint8 = new Uint8Array(silenceBuffer.buffer);
+    let binary = "";
+    for (let i = 0; i < uint8.length; i += 0x8000) {
+      binary += String.fromCharCode(...uint8.subarray(i, i + 0x8000));
+    }
+    const silenceB64 = btoa(binary);
+
     pingIntervalRef.current = setInterval(() => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        // Enviar um buffer de áudio vazio como keepalive
+        // Enviar buffer de silêncio como keepalive (a API rejeita audio vazio)
         wsRef.current.send(
-          JSON.stringify({ type: "input_audio_buffer.append", audio: "" })
+          JSON.stringify({ type: "input_audio_buffer.append", audio: silenceB64 })
         );
       }
     }, PING_INTERVAL_MS);

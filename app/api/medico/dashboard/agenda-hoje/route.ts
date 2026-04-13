@@ -29,9 +29,7 @@ export async function GET() {
       orderBy: { dataHora: "asc" },
     });
 
-    const aguardando = agendamentos.filter((a) =>
-      ["AGENDADA", "CONFIRMADA"].includes(a.status)
-    );
+    const aguardando = agendamentos.filter((a) => a.status === "CONFIRMADA");
     const proximoAtendimento = aguardando.length > 0 ? aguardando[0] : null;
 
     return NextResponse.json({
