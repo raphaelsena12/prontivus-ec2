@@ -54,6 +54,10 @@ interface Consulta {
   planoSaude: {
     nome: string;
   } | null;
+  procedimento: {
+    id: string;
+    nome: string;
+  } | null;
 }
 
 export function FilaAtendimentoContent() {
@@ -358,7 +362,9 @@ export function FilaAtendimentoContent() {
                         </div>
                       </TableCell>
                       <TableCell className="text-xs py-3 px-4">
-                        {consulta.codigoTuss ? (
+                        {consulta.procedimento ? (
+                          <span className="text-xs text-foreground">{consulta.procedimento.nome}</span>
+                        ) : consulta.codigoTuss ? (
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-mono text-foreground">{consulta.codigoTuss.codigoTuss}</span>
                             <span className="text-[10px] text-muted-foreground truncate max-w-[180px]">

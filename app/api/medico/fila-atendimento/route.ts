@@ -130,6 +130,12 @@ export async function GET(request: NextRequest) {
             nome: true,
           },
         },
+        procedimento: {
+          select: {
+            id: true,
+            nome: true,
+          },
+        },
       },
       orderBy: {
         dataHora: "asc", // Ordenar por horário, mais antigo primeiro
