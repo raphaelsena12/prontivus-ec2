@@ -183,7 +183,10 @@ export function AgendamentosCalendar({
         ? new Date(agendamento.dataHoraFim)
         : (() => { const e = new Date(dataHora); e.setMinutes(e.getMinutes() + 30); return e; })();
 
-      const title = `${agendamento.paciente.nome}${agendamento.tipoConsulta ? ` - ${agendamento.tipoConsulta.nome}` : ""}`;
+      const tipoNome = agendamento.tipoConsulta?.nome;
+      const procedimentoNome = agendamento.procedimento?.nome;
+      const detalhes = [tipoNome, procedimentoNome].filter(Boolean).join(" | ");
+      const title = `${agendamento.paciente.nome}${detalhes ? ` - ${detalhes}` : ""}`;
 
       return {
         id: agendamento.id,
