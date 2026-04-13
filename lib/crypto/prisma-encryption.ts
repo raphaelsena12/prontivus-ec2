@@ -49,12 +49,70 @@ function decryptRecord(model: string, record: any): any {
   return result;
 }
 
+/**
+ * Percorre recursivamente um registro e decripta campos de relações aninhadas.
+ * Isso é necessário porque o Prisma $extends intercepta apenas o modelo principal,
+ * mas relações incluídas (include/select) podem conter campos criptografados.
+ */
+function decryptNestedRelations(record: any): any {
+  if (!record || typeof record !== "object") return record;
+  if (Array.isArray(record)) {
+    return record.map((r) => decryptNestedRelations(r));
+  }
+
+  const result = { ...record };
+
+  for (const key of Object.keys(result)) {
+    const value = result[key];
+    if (Array.isArray(value)) {
+      // Verificar se os itens do array correspondem a um modelo criptografado
+      const relModel = findModelForRelation(key);
+      if (relModel) {
+        result[key] = value.map((item: any) => {
+          const decrypted = decryptRecord(relModel, item);
+          return decryptNestedRelations(decrypted);
+        });
+      } else {
+        result[key] = value.map((item: any) => decryptNestedRelations(item));
+      }
+    } else if (value && typeof value === "object" && !(value instanceof Date)) {
+      const relModel = findModelForRelation(key);
+      if (relModel) {
+        result[key] = decryptNestedRelations(decryptRecord(relModel, value));
+      } else {
+        result[key] = decryptNestedRelations(value);
+      }
+    }
+  }
+
+  return result;
+}
+
+// Mapa de nomes de relação (no Prisma) → nome do modelo
+const RELATION_TO_MODEL: Record<string, string> = {
+  prontuarios: "Prontuario",
+  prontuario: "Prontuario",
+  paciente: "Paciente",
+  consulta: "Consulta",
+  consultas: "Consulta",
+  prescricaoMedicamentos: "PrescricaoMedicamento",
+  prescricaoMedicamento: "PrescricaoMedicamento",
+  consultaPrescricoes: "PrescricaoMedicamento",
+  solicitacaoExames: "SolicitacaoExame",
+  solicitacaoExame: "SolicitacaoExame",
+  consultaExames: "SolicitacaoExame",
+};
+
+function findModelForRelation(relationName: string): string | undefined {
+  return RELATION_TO_MODEL[relationName];
+}
+
 function decryptResults(model: string, result: any): any {
   if (result === null || result === undefined) return result;
   if (Array.isArray(result)) {
-    return result.map((r) => decryptRecord(model, r));
+    return result.map((r) => decryptNestedRelations(decryptRecord(model, r)));
   }
-  return decryptRecord(model, result);
+  return decryptNestedRelations(decryptRecord(model, result));
 }
 
 // ---------- Extensão Prisma ----------
@@ -100,40 +158,52 @@ export function applyFieldEncryption<T extends PrismaClient>(client: T): T {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          if (!model || !MODELS_WITH_ENCRYPTION.includes(model)) {
+          const modelName = model as string | undefined;
+          if (!modelName) {
             return query(args);
           }
+
+          const modelHasEncryption = MODELS_WITH_ENCRYPTION.includes(modelName);
 
           // Cast para any — necessário porque o union type de $allOperations
           // não garante .data/.create/.update em todas as operações
           const a = args as any;
 
           // --- ESCRITA: criptografar antes de salvar ---
-          if (WRITE_OPS.includes(operation as any)) {
+          if (modelHasEncryption && WRITE_OPS.includes(operation as any)) {
             if (operation === "upsert") {
               if (a.create) {
-                a.create = encryptDataFields(model, a.create);
+                a.create = encryptDataFields(modelName, a.create);
               }
               if (a.update) {
-                a.update = encryptDataFields(model, a.update);
+                a.update = encryptDataFields(modelName, a.update);
               }
             } else if (operation === "createMany" && a.data) {
               if (Array.isArray(a.data)) {
                 a.data = a.data.map((d: any) =>
-                  encryptDataFields(model, d)
+                  encryptDataFields(modelName, d)
                 );
               }
             } else if (a.data) {
-              a.data = encryptDataFields(model, a.data);
+              a.data = encryptDataFields(modelName, a.data);
             }
           }
 
           // Executar a query original
           const result = await query(args);
 
-          // --- LEITURA: decriptar depois de ler ---
+          // --- LEITURA: decriptar depois de ler (modelo principal + relações) ---
           if (READ_OPS.includes(operation as any)) {
-            return decryptResults(model, result);
+            if (modelHasEncryption) {
+              return decryptResults(modelName, result);
+            }
+            // Mesmo que o modelo principal não tenha criptografia,
+            // relações aninhadas podem ter — decriptar recursivamente
+            if (result === null || result === undefined) return result;
+            if (Array.isArray(result)) {
+              return result.map((r: any) => decryptNestedRelations(r));
+            }
+            return decryptNestedRelations(result);
           }
 
           // Para create/update, o Prisma retorna o registro — decriptar também
@@ -142,7 +212,10 @@ export function applyFieldEncryption<T extends PrismaClient>(client: T): T {
             operation !== "createMany" &&
             operation !== "updateMany"
           ) {
-            return decryptResults(model, result);
+            if (modelHasEncryption) {
+              return decryptResults(modelName, result);
+            }
+            return decryptNestedRelations(result);
           }
 
           return result;
