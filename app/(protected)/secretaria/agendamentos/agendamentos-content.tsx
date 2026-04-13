@@ -70,6 +70,10 @@ interface Agendamento {
   tipoConsulta: {
     nome: string;
   } | null;
+  procedimento: {
+    id: string;
+    nome: string;
+  } | null;
   operadora: {
     nomeFantasia: string | null;
     razaoSocial: string;
