@@ -1,0 +1,38 @@
+version: 0.0
+os: linux
+
+files:
+  - source: /
+    destination: /opt/prontivus
+    overwrite: true
+
+file_exists_behavior: OVERWRITE
+
+permissions:
+  - object: /opt/prontivus
+    owner: ubuntu
+    group: ubuntu
+    type:
+      - directory
+      - file
+
+hooks:
+  BeforeInstall:
+    - location: infrastructure/scripts/codedeploy/before-install.sh
+      timeout: 60
+      runas: ubuntu
+
+  AfterInstall:
+    - location: infrastructure/scripts/codedeploy/after-install.sh
+      timeout: 300
+      runas: ubuntu
+
+  ApplicationStart:
+    - location: infrastructure/scripts/codedeploy/start-server.sh
+      timeout: 60
+      runas: ubuntu
+
+  ValidateService:
+    - location: infrastructure/scripts/codedeploy/validate-service.sh
+      timeout: 60
+      runas: ubuntu

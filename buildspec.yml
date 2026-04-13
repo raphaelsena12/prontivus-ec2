@@ -1,0 +1,76 @@
+version: 0.2
+
+env:
+  secrets-manager:
+    DATABASE_URL: prontivus/production:DATABASE_URL
+    NEXTAUTH_URL: prontivus/production:NEXTAUTH_URL
+    NEXTAUTH_SECRET: prontivus/production:NEXTAUTH_SECRET
+    STRIPE_SECRET_KEY: prontivus/production:STRIPE_SECRET_KEY
+    STRIPE_PUBLISHABLE_KEY: prontivus/production:STRIPE_PUBLISHABLE_KEY
+    STRIPE_WEBHOOK_SECRET: prontivus/production:STRIPE_WEBHOOK_SECRET
+    STRIPE_PRICE_ID_BASICO: prontivus/production:STRIPE_PRICE_ID_BASICO
+    STRIPE_PRICE_ID_INTERMEDIARIO: prontivus/production:STRIPE_PRICE_ID_INTERMEDIARIO
+    STRIPE_PRICE_ID_PROFISSIONAL: prontivus/production:STRIPE_PRICE_ID_PROFISSIONAL
+    OPENAI_API_KEY: prontivus/production:OPENAI_API_KEY
+    OPENAI_MODEL: prontivus/production:OPENAI_MODEL
+    AWS_ACCESS_KEY_ID_APP: prontivus/production:AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY_APP: prontivus/production:AWS_SECRET_ACCESS_KEY
+    AWS_S3_BUCKET_NAME: prontivus/production:AWS_S3_BUCKET_NAME
+    AWS_CHIME_REGION: prontivus/production:AWS_CHIME_REGION
+    AWS_CHIME_MEDIA_REGION: prontivus/production:AWS_CHIME_MEDIA_REGION
+    USE_AWS_SES: prontivus/production:USE_AWS_SES
+    SES_FROM_EMAIL: prontivus/production:SES_FROM_EMAIL
+    SMTP_HOST: prontivus/production:SMTP_HOST
+    SMTP_PORT: prontivus/production:SMTP_PORT
+    SMTP_USER: prontivus/production:SMTP_USER
+    SMTP_PASSWORD: prontivus/production:SMTP_PASSWORD
+    CRON_SECRET: prontivus/production:CRON_SECRET
+    PFX_PASSWORD_ENC_KEY: prontivus/production:PFX_PASSWORD_ENC_KEY
+    FIELD_ENCRYPTION_KEY: prontivus/production:FIELD_ENCRYPTION_KEY
+    WHATSAPP_VERIFY_TOKEN: prontivus/production:WHATSAPP_VERIFY_TOKEN
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm ci --legacy-peer-deps
+
+  pre_build:
+    commands:
+      - echo "Gerando Prisma Client..."
+      - npx prisma generate
+      - mkdir -p lib/generated/prisma
+      - echo "export * from './enums';" > lib/generated/prisma/index.ts
+      - echo "Rodando migrations..."
+      - npx prisma migrate deploy
+
+  build:
+    commands:
+      - echo "Iniciando build do Next.js..."
+      # Variáveis do Secrets Manager já estão no env (seção env acima)
+      # Renomear as variáveis AWS para evitar conflito com credenciais do CodeBuild
+      - export AWS_ACCESS_KEY_ID_ORIG=$AWS_ACCESS_KEY_ID
+      - export AWS_SECRET_ACCESS_KEY_ORIG=$AWS_SECRET_ACCESS_KEY
+      - export NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY
+      - npm run build
+      # Restaurar credenciais do CodeBuild
+      - export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_ORIG
+      - export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_ORIG
+      - echo "Build concluido!"
+
+  post_build:
+    commands:
+      - echo "Preparando artefato para deploy..."
+
+artifacts:
+  files:
+    - '**/*'
+  exclude-paths:
+    - node_modules/**/*
+    - .git/**/*
+    - mobile/**/*
+
+cache:
+  paths:
+    - node_modules/**/*
