@@ -1,7 +1,15 @@
 #!/bin/bash
 set -e
 
+# CodeDeploy roda com PATH mínimo — adicionar paths do Node e AWS CLI
+export PATH="/usr/local/bin:/usr/bin:/bin:/home/ubuntu/.nvm/versions/node/$(ls /home/ubuntu/.nvm/versions/node/ 2>/dev/null | tail -1)/bin:$PATH"
+export NVM_DIR="/home/ubuntu/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 echo "[CodeDeploy] AfterInstall - Instalando dependências..."
+echo "[CodeDeploy] node: $(which node) — $(node -v)"
+echo "[CodeDeploy] npm: $(which npm)"
+echo "[CodeDeploy] aws: $(which aws)"
 
 cd /opt/prontivus
 
