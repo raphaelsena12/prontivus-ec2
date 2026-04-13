@@ -36,6 +36,18 @@ export default async function ProtectedLayout({
     }
   }
 
+  // Buscar avatar diretamente do banco (não está mais no JWT para evitar cookie gigante)
+  let avatarKey: string | null = null;
+  try {
+    const usr = await prisma.usuario.findUnique({
+      where: { id: session.user.id },
+      select: { avatar: true },
+    });
+    avatarKey = usr?.avatar ?? null;
+  } catch {
+    // Não bloquear o layout se falhar
+  }
+
   return (
     <DashboardLayout
       user={{
@@ -44,7 +56,7 @@ export default async function ProtectedLayout({
         email: session.user.email,
         tipo: session.user.tipo,
         clinicaId: session.user.clinicaId,
-        avatar: session.user.avatar,
+        avatar: avatarKey,
         planoNome,
       }}
     >

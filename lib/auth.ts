@@ -23,7 +23,6 @@ export const authOptions: NextAuthOptions = {
           // Buscar usuário no banco
           const usuario = await prisma.usuario.findUnique({
             where: { email: credentials.email },
-            // Removido include: { clinica: true } - pode estar causando erro se a relação não existir
           });
 
           if (!usuario) {
@@ -460,7 +459,6 @@ export const authOptions: NextAuthOptions = {
           };
         } catch (error) {
           console.error("Erro na autenticação:", error);
-          console.error("Stack trace:", error instanceof Error ? error.stack : "N/A");
           return null;
         }
       },
@@ -480,7 +478,9 @@ export const authOptions: NextAuthOptions = {
         token.nome = user.nome;
         token.tipo = user.tipo;
         token.clinicaId = user.clinicaId;
-        token.avatar = (user as any).avatar || null;
+        // Avatar NÃO vai no token JWT — URLs S3 presigned são muito grandes (15KB+)
+        // e estouram o limite de 4KB do cookie. Buscar via API quando necessário.
+        token.avatar = null;
         token.tenantIds = (user as any).tenantIds || [];
         token.requiresTenantSelection = user.requiresTenantSelection;
       }
