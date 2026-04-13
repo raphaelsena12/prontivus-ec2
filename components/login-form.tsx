@@ -260,7 +260,7 @@ function LoginFormContent({
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FieldLabel htmlFor="email" className="text-gray-700">Email</FieldLabel>
+                            <FieldLabel htmlFor="email" className="text-gray-700">E-mail</FieldLabel>
                             <FormControl>
                               <div className="relative">
                                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -485,7 +485,7 @@ function LoginFormContent({
                           name="email"
                           render={({ field }) => (
                             <FormItem>
-                              <FieldLabel htmlFor="recuperar-email" className="text-gray-700">Email</FieldLabel>
+                              <FieldLabel htmlFor="recuperar-email" className="text-gray-700">E-mail</FieldLabel>
                               <FormControl>
                                 <div className="relative">
                                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
