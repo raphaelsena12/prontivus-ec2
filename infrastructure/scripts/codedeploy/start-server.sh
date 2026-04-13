@@ -5,14 +5,14 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/home/ubuntu/.nvm/versions/node/$(ls /
 export NVM_DIR="/home/ubuntu/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-echo "[CodeDeploy] ApplicationStart - Iniciando servidor..."
+echo "[CodeDeploy] ApplicationStart - Reiniciando servidor..."
 
 cd /opt/prontivus
 
-# Deletar processo antigo se existir
+# Parar e deletar processo antigo (downtime começa aqui — apenas segundos)
 pm2 delete prontivus 2>/dev/null || true
 
-# Iniciar com ecosystem.config.js
+# Iniciar com ecosystem.config.js (downtime termina aqui)
 pm2 start infrastructure/ecosystem.config.js
 
 # Salvar para auto-restart no reboot

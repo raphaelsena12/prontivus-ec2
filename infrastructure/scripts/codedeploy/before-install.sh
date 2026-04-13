@@ -5,15 +5,10 @@ export PATH="/usr/local/bin:/usr/bin:/bin:/home/ubuntu/.nvm/versions/node/$(ls /
 export NVM_DIR="/home/ubuntu/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-echo "[CodeDeploy] BeforeInstall - Parando aplicação..."
+echo "[CodeDeploy] BeforeInstall - Preparando deploy..."
 
-# Parar PM2 se estiver rodando
-if pm2 describe prontivus > /dev/null 2>&1; then
-  pm2 stop prontivus
-  echo "[CodeDeploy] PM2 parado"
-else
-  echo "[CodeDeploy] PM2 não estava rodando"
-fi
+# NÃO parar o PM2 aqui — servidor antigo continua rodando
+# Se o deploy falhar antes do start-server.sh, o site não cai
 
 # Limpar cache do Next.js
 rm -rf /opt/prontivus/.next/cache 2>/dev/null || true
