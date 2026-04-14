@@ -2721,7 +2721,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
             </div>
 
             {/* Sidebar IA */}
-            <div className="col-span-3 min-w-0 overflow-x-hidden">
+            <div className="col-span-3 min-w-0 overflow-x-hidden self-start">
               <AISidebar
                   isProcessing={isProcessing}
                   analysisResults={analysisResults}

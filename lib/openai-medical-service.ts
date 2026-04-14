@@ -1,7 +1,23 @@
 import OpenAI from 'openai';
 import { prisma } from '@/lib/prisma';
-import { getSignedUrlFromS3 } from '@/lib/s3-service';
+import { getSignedUrlFromS3, getObjectBufferFromS3 } from '@/lib/s3-service';
 import { sanitizeTextForAI } from '@/lib/crypto/sanitize-pii';
+
+/**
+ * Extrai texto de um PDF usando pdf-parse.
+ * Retorna string vazia se não conseguir extrair.
+ */
+async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  try {
+    // Importar direto o lib interno para evitar bug do pdf-parse que tenta abrir arquivo de teste
+    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+    const result = await pdfParse(buffer);
+    return result.text || "";
+  } catch (err) {
+    console.error("[extractTextFromPdf] Erro:", err);
+    return "";
+  }
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -636,26 +652,49 @@ export async function generateMedicalSuggestions(context: SuggestionsContext): P
     contextText += `\n\nMEDICAMENTOS EM USO:\n${context.medicamentosEmUso.join(", ")}`;
   }
 
-  // Buscar dados dos exames se fornecidos (incluindo imagens para Vision API)
+  // Buscar dados dos exames se fornecidos (imagens para Vision API, PDFs para extração de texto)
   const imageUrls: string[] = [];
   const imageNames: string[] = [];
+  console.log("[gerar-sugestoes] examesIds recebidos:", context.examesIds);
   if (context.examesIds && context.examesIds.length > 0) {
     try {
       const exames = await prisma.documentoGerado.findMany({
         where: { id: { in: context.examesIds } },
         select: { id: true, nomeDocumento: true, tipoDocumento: true, s3Key: true },
       });
+      console.log("[gerar-sugestoes] exames encontrados no DB:", exames.map(e => ({ id: e.id, nome: e.nomeDocumento, tipo: e.tipoDocumento, temS3Key: !!e.s3Key })));
       if (exames.length > 0) {
         contextText += `\n\nEXAMES ANEXADOS:\n${exames.map((e) => `- ${e.nomeDocumento}`).join("\n")}`;
         for (const exame of exames) {
-          if (exame.s3Key && exame.tipoDocumento === "exame-imagem") {
-            try {
+          if (!exame.s3Key) continue;
+          try {
+            if (exame.tipoDocumento === "exame-imagem") {
               const signedUrl = await getSignedUrlFromS3(exame.s3Key, 3600);
               imageUrls.push(signedUrl);
               imageNames.push(exame.nomeDocumento);
-            } catch (err) {
-              console.error(`Erro ao obter URL do exame ${exame.id}:`, err);
+            } else if (exame.tipoDocumento === "exame-pdf") {
+              const buffer = await getObjectBufferFromS3(exame.s3Key);
+              let pdfText = await extractTextFromPdf(buffer);
+              // Remover caracteres de controle e excesso de espaços
+              pdfText = pdfText
+                .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+                .replace(/\s{3,}/g, '  ')
+                .trim();
+              console.log(`[gerar-sugestoes] PDF "${exame.nomeDocumento}" - texto extraído: ${pdfText.length} chars, preview: "${pdfText.substring(0, 100)}"`);
+              // Truncar texto muito longo para não estourar o limite de tokens
+              if (pdfText.length > 6000) {
+                pdfText = pdfText.substring(0, 6000) + "\n[...texto truncado]";
+              }
+              if (pdfText.length > 30) {
+                // PDF com texto legível - enviar como contexto textual
+                contextText += `\n\nCONTEÚDO DO EXAME "${exame.nomeDocumento}":\n${pdfText}`;
+              } else {
+                // PDF escaneado sem texto extraível - informar no contexto
+                contextText += `\n\nEXAME "${exame.nomeDocumento}": PDF escaneado sem texto extraível. Analise com base no nome do exame e no contexto clínico disponível.`;
+              }
             }
+          } catch (err) {
+            console.error(`Erro ao obter exame ${exame.id}:`, err);
           }
         }
       }
@@ -688,11 +727,14 @@ ETAPA 4 — Prescrições (baseadas nos protocolos):
 - Use nomes genéricos ou comerciais comuns no Brasil; dosagem em formato padrão (ex: "50mg", "500mg"); posologia clara (ex: "1 comprimido 1x ao dia", "1 cp 8/8h"); duração precisa (ex: "7 dias", "30 dias", "uso contínuo"). Máximo 5.
 
 ETAPA 5 — Raciocínio Clínico dos Exames (campo "raciocinioClinico"):
-- Este campo deve tratar EXCLUSIVAMENTE dos exames anexados analisados. NÃO contextualizar com anamnese ou sintomas.
-- Se houver imagens de exames, descreva detalhadamente o que foi observado: valores encontrados, padrões de imagem, alterações ou normalidades identificadas, e o que cada achado significa clinicamente.
+- Este campo deve tratar EXCLUSIVAMENTE dos exames/documentos anexados analisados. NÃO contextualizar com anamnese ou sintomas.
+- Se houver exames anexados (imagens, PDFs ou documentos), SEMPRE descreva o que foi encontrado no documento, mesmo que não seja um exame laboratorial tradicional.
+- Para exames laboratoriais: descreva valores encontrados, alterações ou normalidades, e o significado clínico.
+- Para outros documentos (dietas, planos alimentares, receitas, relatórios): descreva brevemente o conteúdo e sua relevância clínica para o paciente.
 - Mesmo que os resultados estejam dentro da normalidade, explique por que estão normais e o que isso indica positivamente para o paciente.
 - Se algum valor estiver alterado, explique o que significa, qual a gravidade e como isso impacta o quadro clínico.
-- Se não houver exames anexados, retorne uma string vazia "".
+- Se não houver NENHUM exame ou documento anexado, retorne uma string vazia "".
+- IMPORTANTE: Se há exames/documentos anexados, NUNCA retorne string vazia — sempre descreva o conteúdo encontrado.
 - Escreva em português brasileiro, tom clínico e acessível, sem marcadores ou listas — apenas texto corrido. Máximo 6 frases.
 
 Retorne APENAS um JSON válido no seguinte formato:
@@ -723,21 +765,51 @@ Retorne APENAS um JSON válido no seguinte formato:
     ? (process.env.OPENAI_VISION_MODEL || "gpt-4o")
     : (process.env.OPENAI_MODEL || "gpt-4o");
 
-  const completion = await withRetry(() => openai.chat.completions.create({
-    model,
-    messages: userMessages,
-    response_format: { type: "json_object" },
-    temperature: 0,
-    max_tokens: 2500,
-  }));
+  console.log("[gerar-sugestoes] Enviando para OpenAI - model:", model, "contextText length:", contextText.length, "imageUrls:", imageUrls.length);
 
-  const responseContent = completion.choices[0]?.message?.content;
-  if (!responseContent) throw new Error("Resposta vazia da OpenAI");
+  let completion: any;
+  try {
+    completion = await withRetry(() => openai.chat.completions.create({
+      model,
+      messages: userMessages,
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: 4000,
+    }));
+  } catch (apiErr: any) {
+    console.error("[gerar-sugestoes] Erro na chamada OpenAI:", apiErr?.message, apiErr?.status);
+    throw new Error(`Erro ao chamar OpenAI: ${apiErr?.message || "erro desconhecido"}`);
+  }
+
+  const choice = completion.choices?.[0];
+  let responseContent = choice?.message?.content;
+  const refusal = choice?.message?.refusal;
+
+  // Se a OpenAI recusou (ex: imagem médica bloqueada por content policy), gerar resposta sem análise do exame
+  if (refusal) {
+    console.warn("[gerar-sugestoes] OpenAI recusou análise de imagem:", refusal, "- reenviando sem imagens");
+    const retryCompletion = await withRetry(() => openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: contextText },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: 4000,
+    }));
+    responseContent = retryCompletion.choices?.[0]?.message?.content;
+  }
+
+  if (!responseContent) {
+    throw new Error(`Resposta vazia da OpenAI (finish_reason: ${choice?.finish_reason || "unknown"})`);
+  }
 
   let data: any;
   try {
     data = JSON.parse(responseContent);
   } catch {
+    console.error("[gerar-sugestoes] JSON inválido:", responseContent?.substring(0, 200));
     throw new Error("Resposta da OpenAI em formato inválido");
   }
 

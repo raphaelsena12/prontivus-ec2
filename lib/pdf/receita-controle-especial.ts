@@ -34,7 +34,7 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("RECEITA DE CONTROLE ESPECIAL", MARGIN, y);

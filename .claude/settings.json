@@ -22,7 +22,9 @@
       "Bash(unzip -o tiss_schemas.zip -d tiss_schemas)",
       "Read(//tmp/tiss_schemas/**)",
       "Bash(npx next:*)",
-      "Bash(grep -E \"\\\\.ts$\")"
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(npm ls:*)",
+      "Bash(node --input-type=module -e ':*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda",

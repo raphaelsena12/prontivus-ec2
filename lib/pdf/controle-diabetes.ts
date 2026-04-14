@@ -30,7 +30,7 @@ export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData)
   y += 11; // Duas quebras de linha
   
   // ── Título (fonte reduzida em 2) ──
-  doc.setFontSize(16); // 18 - 2
+  doc.setFontSize(14);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("CONTROLE DE DIABETES", MARGIN, y);
@@ -184,7 +184,7 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("CONTROLE DE DIABETES", MARGIN, y);

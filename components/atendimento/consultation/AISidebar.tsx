@@ -31,6 +31,7 @@ import {
   Send,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ExamDetailedAnalysisModal, DetailedExamAnalysis } from "./ExamDetailedAnalysisModal";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -39,6 +40,8 @@ interface ExameAnexado {
   id: string;
   nome: string;
   isFromCurrentConsulta?: boolean;
+  isImage?: boolean;
+  isPdf?: boolean;
 }
 
 interface AnalysisResults {
@@ -290,6 +293,9 @@ export function AISidebar({
 
   const [examAnalysisModalOpen, setExamAnalysisModalOpen] = useState(false);
   const [selectedExamForAnalysis, setSelectedExamForAnalysis] = useState<ExameAnexado | null>(null);
+  const [detailedExamModalOpen, setDetailedExamModalOpen] = useState(false);
+  const [selectedExamForDetailed, setSelectedExamForDetailed] = useState<ExameAnexado | null>(null);
+  const [cachedDetailedAnalyses, setCachedDetailedAnalyses] = useState<Record<string, DetailedExamAnalysis>>({});
 
 
   const filteredDocs = documentModels.filter(
@@ -546,6 +552,7 @@ export function AISidebar({
       .checkmark-anim {
         animation: checkmark-pop 0.18s cubic-bezier(0.34,1.56,0.64,1) forwards;
       }
+
     `}</style>
 
       {/* ── Box único: Assistente Clínico ── */}
@@ -571,8 +578,8 @@ export function AISidebar({
           </span>
         </div>
 
-        {/* Conteúdo scrollável */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden max-h-[900px]">
+        {/* Conteúdo */}
+        <div className="flex-1 overflow-x-hidden">
 
         {/* Contexto da IA — não é colapsável */}
         <div className="px-3 pt-3 pb-2.5">
@@ -751,48 +758,45 @@ export function AISidebar({
 
         {/* ── Análise de Exames ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
             <Brain className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Análise de Exames</span>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">✦ IA</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white">✦ IA</span>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 min-h-[60px]">
             {selectedContextExams.length === 0 ? (
-              <div className="px-3 py-2.5">
-                <p className="text-[11px] text-slate-400 italic">
+              <div className="px-3 py-4 flex items-center justify-center min-h-[60px]">
+                <p className="text-[11px] text-slate-400 italic text-center">
                   Selecione ao menos um exame no contexto da IA para ver a análise por exame.
                 </p>
               </div>
             ) : (
               selectedContextExams.map((exame) => {
-                const conclusao = hasExamAnalysisReady
-                  ? resolveExamConclusion(analysisResults?.raciocinioClinico)
-                  : null;
                 return (
                   <div key={`exam-analysis-${exame.id}`} className="px-3 py-2.5 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        if (!hasExamAnalysisReady) return;
-                        setSelectedExamForAnalysis(exame);
-                        setExamAnalysisModalOpen(true);
+                        setSelectedExamForDetailed(exame);
+                        setDetailedExamModalOpen(true);
                       }}
                       className="flex-1 min-w-0 text-left"
-                      title={hasExamAnalysisReady ? "Abrir análise completa" : "Aguardando análise da IA"}
+                      title="Abrir análise detalhada com pontos de atenção"
                     >
-                      <p className={`text-xs font-medium truncate ${hasExamAnalysisReady ? "text-slate-700 hover:text-blue-700 hover:underline cursor-pointer" : "text-slate-500"}`}>
+                      <p className="text-xs font-medium truncate text-slate-700 hover:text-blue-700 hover:underline cursor-pointer">
                         {exame.nome}
                       </p>
                     </button>
-                    {conclusao ? (
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getConclusionStyles(conclusao)}`}>
-                        {conclusao}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-slate-50 text-slate-500 border-slate-200">
-                        Aguardando IA
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedExamForDetailed(exame);
+                        setDetailedExamModalOpen(true);
+                      }}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer flex-shrink-0"
+                    >
+                      Analisar
+                    </button>
                   </div>
                 );
               })
@@ -810,15 +814,10 @@ export function AISidebar({
               </div>
             </div>
           )}
-          <div className={`px-3 py-2 flex items-center gap-2 border-b border-slate-100 transition-colors ${cidAlertVisible ? "bg-red-50" : "bg-slate-50"}`}>
+          <div className={`px-3 py-2 flex items-center gap-2 border-b border-slate-200 transition-colors ${cidAlertVisible ? "bg-red-50" : "bg-slate-100/80"}`}>
             <Stethoscope className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">CID-10 Diagnóstico</span>
             <div className="flex items-center gap-1">
-              {(analysisResults?.cidCodes?.length ?? 0) > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
-                  {analysisResults!.cidCodes.length}
-                </span>
-              )}
               <button
                 onClick={() => setCidSearchDialogOpen(true)}
                 className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
@@ -828,14 +827,14 @@ export function AISidebar({
               </button>
             </div>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 min-h-[60px]">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2">
+              <div className="px-3 py-3 space-y-2 min-h-[60px]">
                 <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "70%" }} />
                 <Skeleton className="h-3 rounded bg-blue-50/60" style={{ width: "50%" }} />
               </div>
             ) : (analysisResults?.cidCodes?.length ?? 0) === 0 && cidsManuais.length === 0 ? (
-              <div className="px-3 py-2 flex items-center gap-2">
+              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
                 <Stethoscope className="w-3 h-3 text-slate-300" />
                 <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
               </div>
@@ -845,7 +844,7 @@ export function AISidebar({
                   <div
                     key={i}
                     className={`px-3 py-2.5 flex items-center justify-between gap-2 transition-colors animate-in fade-in duration-300 ${
-                      selectedCids.has(i) ? "bg-blue-50/40" : "hover:bg-slate-50"
+                      ""
                     }`}
                   >
                     <button
@@ -883,14 +882,14 @@ export function AISidebar({
                       </div>
                     </button>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0">
+                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0">
                         ✦ IA
                       </span>
                     </div>
                   </div>
                 ))}
                 {cidsManuais.map((cid, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300 bg-blue-50/40">
+                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300">
                     <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
                       <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
                     </div>
@@ -914,15 +913,10 @@ export function AISidebar({
 
         {/* ── Exames ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
             <FlaskConical className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Exames</span>
             <div className="flex items-center gap-1">
-              {(analysisResults?.exames?.length ?? 0) > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
-                  {analysisResults!.exames.length}
-                </span>
-              )}
               <button
                 onClick={() => handleOpenRepetirDialog("exames")}
                 className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
@@ -939,14 +933,14 @@ export function AISidebar({
               </button>
             </div>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 min-h-[60px]">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2">
+              <div className="px-3 py-3 space-y-2 min-h-[60px]">
                 <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "65%" }} />
                 <Skeleton className="h-4 rounded bg-blue-50/60" style={{ width: "80%" }} />
               </div>
             ) : (analysisResults?.exames?.length ?? 0) === 0 && examesManuais.length === 0 ? (
-              <div className="px-3 py-2 flex items-center gap-2">
+              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
                 <FlaskConical className="w-3 h-3 text-slate-300" />
                 <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
               </div>
@@ -956,7 +950,7 @@ export function AISidebar({
                   <div
                     key={i}
                     className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
-                      selectedExamesAI.has(i) ? "bg-blue-50/40" : "hover:bg-slate-50"
+                      ""
                     }`}
                   >
                     <div
@@ -978,14 +972,14 @@ export function AISidebar({
                       </div>
                     </div>
                     <span
-                      className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0"
+                      className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0"
                     >
                       ✦ IA
                     </span>
                   </div>
                 ))}
                 {examesManuais.map((e, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 bg-blue-50/40">
+                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
                         <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
@@ -1008,15 +1002,10 @@ export function AISidebar({
 
         {/* ── Prescrições ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
             <Pill className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Prescrições</span>
             <div className="flex items-center gap-1">
-              {prescricoes.length > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white">
-                  {prescricoes.length}
-                </span>
-              )}
               <button
                 onClick={() => handleOpenRepetirDialog("prescricoes")}
                 className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
@@ -1036,14 +1025,14 @@ export function AISidebar({
               </button>
             </div>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 min-h-[60px]">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2">
+              <div className="px-3 py-3 space-y-2 min-h-[60px]">
                 <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "72%" }} />
                 <Skeleton className="h-3 rounded bg-blue-50/60" style={{ width: "45%" }} />
               </div>
             ) : prescricoes.length === 0 && (analysisResults?.prescricoes?.length ?? 0) === 0 ? (
-              <div className="px-3 py-2 flex items-center gap-2">
+              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
                 <Pill className="w-3 h-3 text-slate-300" />
                 <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
               </div>
@@ -1057,7 +1046,7 @@ export function AISidebar({
                     <div
                       key={`ai-rx-${i}`}
                       className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
-                        conflict ? "bg-red-50/60" : selected ? "bg-blue-50/40" : "hover:bg-slate-50"
+                        conflict ? "bg-red-50/60" : ""
                       }`}
                     >
                       <div
@@ -1085,7 +1074,7 @@ export function AISidebar({
                           )}
                         </div>
                       </div>
-                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-400 text-white flex-shrink-0">
+                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0">
                         ✦ IA
                       </span>
                     </div>
@@ -1096,7 +1085,7 @@ export function AISidebar({
                 {prescricoes.map((rx, i) => {
                   const conflict = hasAllergyConflict(rx.medicamento);
                   return (
-                    <div key={`rx-${i}`} className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 bg-blue-50/40 ${conflict ? "bg-red-50/60" : ""}`}>
+                    <div key={`rx-${i}`} className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${conflict ? "bg-red-50/60" : ""}`}>
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${conflict ? "bg-red-100 border-red-300" : "bg-blue-600 border-blue-600"}`}>
                           {conflict
@@ -1132,7 +1121,7 @@ export function AISidebar({
 
         {/* ── Orientações ── */}
         <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
             <ClipboardList className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Orientações</span>
           </div>
@@ -1151,7 +1140,7 @@ export function AISidebar({
 
         {/* ── Documentos ── */}
         <div className="border-t border-slate-100 flex flex-col min-h-[160px]">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-50 border-b border-slate-100">
+          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
             <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
             <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Documentos</span>
             {documentosGerados.length > 0 && (
@@ -1627,6 +1616,24 @@ export function AISidebar({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* New detailed exam analysis modal */}
+    {selectedExamForDetailed && (
+      <ExamDetailedAnalysisModal
+        open={detailedExamModalOpen}
+        onOpenChange={(open) => {
+          setDetailedExamModalOpen(open);
+          if (!open) setSelectedExamForDetailed(null);
+        }}
+        exameName={selectedExamForDetailed.nome}
+        exameId={selectedExamForDetailed.id}
+        exameType={selectedExamForDetailed.isImage ? "exame-imagem" : "exame-pdf"}
+        cachedAnalysis={cachedDetailedAnalyses[selectedExamForDetailed.id] || null}
+        onAnalysisFetched={(id, analysis) => {
+          setCachedDetailedAnalyses((prev) => ({ ...prev, [id]: analysis }));
+        }}
+      />
+    )}
     </>
   );
 }

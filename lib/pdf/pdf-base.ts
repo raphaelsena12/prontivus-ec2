@@ -360,14 +360,14 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
 export function drawTitle(doc: jsPDF, title: string, subtitle?: string, startY?: number): number {
   let y = startY ?? 64;
 
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text(title, MARGIN, y);
   y += 7;
 
   if (subtitle) {
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
     doc.text(subtitle, MARGIN, y);
@@ -377,10 +377,20 @@ export function drawTitle(doc: jsPDF, title: string, subtitle?: string, startY?:
   return y + 8;
 }
 
-/** Desenha identificação do paciente. Retorna Y após seção */
+/** Desenha identificação do paciente em grid de 3 colunas alinhadas. Retorna Y após seção */
 export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): number {
-  const FONT_SIZE = 8; // base reduzida em 2px
+  const FONT_SIZE = 9;
   const ROW_H = 6;
+
+  // ── Posições fixas das 3 colunas (A4 170mm de conteúdo) ──
+  const col1X = MARGIN;        // coluna esquerda
+  const col2X = MARGIN + 60;   // coluna do meio
+  const col3X = MARGIN + 120;  // coluna direita
+
+  // Largura disponível para valor em cada coluna
+  const col1ValMax = col2X - col1X - 2;
+  const col2ValMax = col3X - col2X - 2;
+  const col3ValMax = PAGE_WIDTH - MARGIN - col3X;
 
   /** Trunca texto se ultrapassar maxW (mm) */
   const truncate = (text: string, maxW: number): string => {
@@ -393,17 +403,16 @@ export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): numb
     return t + "…";
   };
 
-  /** Escreve label (cinza) + valor (escuro) na posição x, ly. Retorna X após o campo */
-  const lv = (label: string, value: string, x: number, ly: number, maxValueW?: number): number => {
+  /** Escreve label (cinza) + valor (escuro) na posição x, ly com truncamento */
+  const lv = (label: string, value: string, x: number, ly: number, colMaxW: number): void => {
     doc.setFontSize(FONT_SIZE);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
     doc.text(label, x, ly);
     const labelW = doc.getTextWidth(label);
-    const val = maxValueW ? truncate(value || "", maxValueW) : (value || "");
+    const val = truncate(value || "", colMaxW - labelW);
     doc.setTextColor(...COLORS.slate800);
     doc.text(val, x + labelW, ly);
-    return x + labelW + doc.getTextWidth(val);
   };
 
   // Título da seção
@@ -413,55 +422,21 @@ export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): numb
   doc.text("IDENTIFICAÇÃO DO PACIENTE", MARGIN, y);
   y += ROW_H;
 
-  // Linha 1: NºProntuário | Nome Completo
-  const prontuarioLabel = "Nº Prontuário: ";
-  const nomeLabel = "Nome Completo: ";
-  doc.setFontSize(FONT_SIZE);
-  doc.setFont(PDF_FONT, "normal");
-  const prontuarioLabelW = doc.getTextWidth(prontuarioLabel);
-  const prontuarioValW = 25; // espaço reservado para o valor do prontuário
-  const nomeStartX = MARGIN + prontuarioLabelW + prontuarioValW + 4;
-  const nomeMaxW = PAGE_WIDTH - MARGIN - nomeStartX - doc.getTextWidth(nomeLabel);
-
-  lv(prontuarioLabel, data.pacienteMatricula || "", MARGIN, y, prontuarioValW);
-  lv(nomeLabel, data.pacienteNome.toUpperCase(), nomeStartX, y, nomeMaxW);
+  // Linha 1: Nº Prontuário | Nome Completo |
+  lv("Nº Prontuário: ", data.pacienteMatricula || "", col1X, y, col1ValMax);
+  lv("Nome Completo: ", data.pacienteNome.toUpperCase(), col2X, y, col2ValMax + col3ValMax);
   y += ROW_H;
 
   // Linha 2: Data Nascimento | RG | CPF
-  const nascLabel = "Data Nascimento: ";
-  const rgLabel = "RG: ";
-  const cpfLabel = "CPF: ";
-  doc.setFontSize(FONT_SIZE);
-  doc.setFont(PDF_FONT, "normal");
-  const nascLabelW = doc.getTextWidth(nascLabel);
-  const nascValW = doc.getTextWidth("00/00/0000") + 1;
-  const rgStartX = MARGIN + nascLabelW + nascValW + 4;
-  const cpfVal = formatCPF(data.pacienteCpf);
-  const cpfTotalW = doc.getTextWidth(cpfLabel) + doc.getTextWidth(cpfVal);
-  const cpfStartX = PAGE_WIDTH - MARGIN - cpfTotalW;
-  const rgMaxW = cpfStartX - rgStartX - doc.getTextWidth(rgLabel) - 4;
-
-  lv(nascLabel, data.pacienteDataNascimento, MARGIN, y);
-  lv(rgLabel, data.pacienteRg || "", rgStartX, y, Math.max(rgMaxW, 15));
-  lv(cpfLabel, cpfVal, cpfStartX, y);
+  lv("Data Nasc.: ", data.pacienteDataNascimento, col1X, y, col1ValMax);
+  lv("RG: ", data.pacienteRg || "", col2X, y, col2ValMax);
+  lv("CPF: ", formatCPF(data.pacienteCpf), col3X, y, col3ValMax);
   y += ROW_H;
 
   // Linha 3: Endereço | Bairro | Cidade
-  const endLabel = "Endereço: ";
-  const bairroLabel = "Bairro: ";
-  const cidadeLabel = "Cidade: ";
-  doc.setFontSize(FONT_SIZE);
-  doc.setFont(PDF_FONT, "normal");
-  const cidadeVal = data.pacienteCidade || "";
-  const cidadeTotalW = doc.getTextWidth(cidadeLabel) + doc.getTextWidth(cidadeVal);
-  const cidadeStartX = PAGE_WIDTH - MARGIN - cidadeTotalW;
-  const bairroStartX = 95;
-  const endMaxW = bairroStartX - MARGIN - doc.getTextWidth(endLabel) - 2;
-  const bairroMaxW = cidadeStartX - bairroStartX - doc.getTextWidth(bairroLabel) - 4;
-
-  lv(endLabel, data.pacienteEndereco || "", MARGIN, y, endMaxW);
-  lv(bairroLabel, data.pacienteBairro || "", bairroStartX, y, Math.max(bairroMaxW, 10));
-  lv(cidadeLabel, cidadeVal, cidadeStartX, y);
+  lv("Endereço: ", data.pacienteEndereco || "", col1X, y, col1ValMax);
+  lv("Bairro: ", data.pacienteBairro || "", col2X, y, col2ValMax);
+  lv("Cidade: ", data.pacienteCidade || "", col3X, y, col3ValMax);
   y += ROW_H + 4;
 
   // Separador

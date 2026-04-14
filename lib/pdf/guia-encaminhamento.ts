@@ -29,7 +29,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("GUIA DE ENCAMINHAMENTO REFERÊNCIA E CONTRA REFERÊNCIA", MARGIN, y);
@@ -161,7 +161,7 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   
   // ── CONTRA REFERÊNCIA ──
   y = checkPageBreak(doc, y, 50);
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
   doc.text("CONTRA REFERÊNCIA", MARGIN, y);
