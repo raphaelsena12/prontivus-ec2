@@ -10,6 +10,7 @@ import { sanitizeTextForAI } from '@/lib/crypto/sanitize-pii';
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
     // Importar direto o lib interno para evitar bug do pdf-parse que tenta abrir arquivo de teste
+    // @ts-expect-error — pdf-parse has no type declarations
     const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
     const result = await pdfParse(buffer);
     return result.text || "";

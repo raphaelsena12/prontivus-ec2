@@ -11,6 +11,7 @@ const openai = new OpenAI({
 
 async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
+    // @ts-expect-error — pdf-parse has no type declarations
     const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
     const result = await pdfParse(buffer);
     return result.text || "";
