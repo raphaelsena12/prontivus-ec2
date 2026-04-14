@@ -558,36 +558,40 @@ export function AISidebar({
       {/* ── Box único: Assistente Clínico ── */}
       <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col w-full min-w-0 bg-white shadow-sm">
 
-        {/* Cabeçalho premium — único no box */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-blue-900" style={{ background: "linear-gradient(135deg, #1E40AF 0%, #1e3a8a 100%)" }}>
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 flex-shrink-0 ai-icon-highlight" style={{ color: "#FBBF24" }} />
-            <div>
-              <span className="text-xs font-bold text-white tracking-wide">IA Clínica</span>
-              <span className="text-[10px] text-blue-300 ml-1.5">Prontivus</span>
-            </div>
+        {/* Cabeçalho */}
+        <div className="px-4 py-3 flex items-center justify-between rounded-t-xl" style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #1E40AF 100%)" }}>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-300" />
+            <span className="text-sm font-semibold text-white">IA Clínica</span>
+            <span className="text-[10px] bg-white/15 text-blue-100 border border-white/20 rounded-full px-1.5 py-0.5">
+              Prontivus
+            </span>
           </div>
-          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-all duration-300 ${
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border transition-all duration-300 ${
             isProcessing
               ? "bg-amber-400/20 border-amber-400/40 text-amber-300 animate-pulse"
-              : hasAIData
-              ? "bg-emerald-400/20 border-emerald-400/40 text-emerald-300"
               : "bg-amber-400/15 border-amber-400/30 text-amber-300"
           }`}>
-            {isProcessing ? "Analisando..." : "✦ Ativa"}
+            {isProcessing ? "Analisando..." : "Ativa"}
           </span>
         </div>
 
         {/* Conteúdo */}
         <div className="flex-1 overflow-x-hidden">
 
-        {/* Contexto da IA — não é colapsável */}
-        <div className="px-3 pt-3 pb-2.5">
-          <p className="text-[10px] font-semibold text-[#1E40AF] uppercase tracking-widest mb-2.5">
-            Selecione para analisar com Inteligência Artificial:
-          </p>
-          <div className="space-y-2">
-            {/* Itens fixos: anamnese e medicamentos */}
+        {/* ── Contexto da IA ── */}
+        <div className="mx-3 mt-3 mb-2 rounded-xl border border-slate-200/80 bg-gradient-to-b from-slate-50/80 to-white overflow-hidden shadow-sm">
+          {/* Header do contexto */}
+          <div className="px-3 py-2 flex items-center gap-2 border-b border-slate-100/80">
+            <Brain className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800">Selecione para analisar com IA</span>
+            <span className="ml-auto text-[9px] text-slate-400 font-medium">{
+              (aiContext.anamnese ? 1 : 0) + (aiContext.medicamentos ? 1 : 0) + aiContext.examesIds.length
+            } selecionados</span>
+          </div>
+
+          {/* Dados clínicos */}
+          <div className="p-1.5 space-y-0.5">
             {FIXED_CONTEXT_ITEMS.map((item) => {
               const checked = aiContext[item.key] as boolean;
               return (
@@ -595,217 +599,164 @@ export function AISidebar({
                   key={item.key}
                   type="button"
                   onClick={() => setAiContext((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
-                  className="flex items-center gap-2.5 cursor-pointer group w-full text-left"
+                  className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                    checked ? "bg-blue-50/90 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.15)]" : "hover:bg-slate-50/80"
+                  }`}
                 >
-                  {/* Custom tech checkbox */}
                   <div
-                    className="relative flex-shrink-0 flex items-center justify-center transition-all duration-200"
+                    className="flex-shrink-0 w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all duration-200"
                     style={{
-                      width: "15px",
-                      height: "15px",
-                      borderRadius: "4px",
-                      background: checked
-                        ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)"
-                        : "transparent",
-                      border: checked ? "none" : "1.5px solid rgba(100,116,139,0.5)",
-                      boxShadow: checked
-                        ? "0 0 8px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.15)"
-                        : "none",
-                      transition: "all 0.2s ease",
+                      background: checked ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" : "transparent",
+                      border: checked ? "none" : "1.5px solid #cbd5e1",
+                      boxShadow: checked ? "0 2px 4px rgba(37,99,235,0.3)" : "inset 0 1px 2px rgba(0,0,0,0.06)",
                     }}
                   >
-                    {/* Corner accent lines when unchecked */}
-                    {!checked && (
-                      <>
-                        <div style={{ position: "absolute", top: 0, left: 0, width: "4px", height: "1.5px", background: "#3B82F6", borderRadius: "1px" }} />
-                        <div style={{ position: "absolute", top: 0, left: 0, width: "1.5px", height: "4px", background: "#3B82F6", borderRadius: "1px" }} />
-                        <div style={{ position: "absolute", bottom: 0, right: 0, width: "4px", height: "1.5px", background: "#3B82F6", borderRadius: "1px" }} />
-                        <div style={{ position: "absolute", bottom: 0, right: 0, width: "1.5px", height: "4px", background: "#3B82F6", borderRadius: "1px" }} />
-                      </>
-                    )}
                     {checked && (
-                      <svg className="checkmark-anim" width="9" height="7" viewBox="0 0 9 7" fill="none">
-                        <path d="M1 3.5L3.2 5.8L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                      <Check className="w-3 h-3 text-white checkmark-anim" strokeWidth={3} />
                     )}
                   </div>
-                  <span className="text-xs text-slate-600 group-hover:text-slate-900 transition-colors leading-none">
+                  <span className={`text-xs transition-colors ${checked ? "text-slate-800 font-semibold" : "text-slate-500 group-hover:text-slate-700"}`}>
                     {item.label}
                   </span>
                 </button>
               );
             })}
+          </div>
 
-            {/* Exames individuais */}
-            {(examesAnexados.length > 0 || onAttachExame) && (
-              <div className="pt-0.5">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                    Exames anexados
-                  </p>
+          {/* Exames anexados */}
+          {(examesAnexados.length > 0 || onAttachExame) && (
+            <>
+              <div className="mx-3 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+              <div className="p-1.5 pt-2">
+                <div className="flex items-center justify-between px-3 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <FlaskConical className="w-3 h-3 text-slate-400" />
+                    <span className="text-[13px] font-semibold text-slate-800">Exames</span>
+                    {examesAnexados.length > 0 && (
+                      <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{examesAnexados.length}</span>
+                    )}
+                  </div>
                   {onAttachExame && (
                     <button
                       type="button"
                       onClick={onAttachExame}
-                      className="p-0.5 rounded hover:bg-slate-100 transition-colors text-slate-400 hover:text-blue-600"
+                      className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 font-semibold transition-colors bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md"
                       title="Anexar exame"
                     >
-                      <Paperclip className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" />
+                      Anexar
                     </button>
                   )}
                 </div>
-                <div className="space-y-1.5">
-                  {examesAnexados.length === 0 && (
-                    <p className="text-[10px] text-slate-400 italic">Nenhum exame anexado</p>
-                  )}
-                  {examesAnexados.map((exame) => {
-                    const checked = aiContext.examesIds.includes(exame.id);
-                    return (
-                      <button
-                        key={exame.id}
-                        type="button"
-                        onClick={() => toggleExameContexto(exame.id)}
-                        className="flex items-center gap-2.5 cursor-pointer group w-full text-left"
-                      >
-                        <div
-                          className="relative flex-shrink-0 flex items-center justify-center transition-all duration-200"
-                          style={{
-                            width: "15px",
-                            height: "15px",
-                            borderRadius: "4px",
-                            background: checked
-                              ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)"
-                              : "transparent",
-                            border: checked ? "none" : "1.5px solid rgba(100,116,139,0.5)",
-                            boxShadow: checked
-                              ? "0 0 8px rgba(37,99,235,0.5), inset 0 1px 0 rgba(255,255,255,0.15)"
-                              : "none",
-                          }}
+                <div className="space-y-0.5">
+                  {examesAnexados.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic px-3 py-2">Nenhum exame anexado</p>
+                  ) : (
+                    examesAnexados.map((exame) => {
+                      const checked = aiContext.examesIds.includes(exame.id);
+                      return (
+                        <button
+                          key={exame.id}
+                          type="button"
+                          onClick={() => toggleExameContexto(exame.id)}
+                          className={`flex items-center gap-2.5 w-full text-left px-3 py-2 rounded-lg transition-all duration-200 group ${
+                            checked ? "bg-blue-50/90 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.15)]" : "hover:bg-slate-50/80"
+                          }`}
                         >
-                          {!checked && (
-                            <>
-                              <div style={{ position: "absolute", top: 0, left: 0, width: "4px", height: "1.5px", background: "#3B82F6", borderRadius: "1px" }} />
-                              <div style={{ position: "absolute", top: 0, left: 0, width: "1.5px", height: "4px", background: "#3B82F6", borderRadius: "1px" }} />
-                              <div style={{ position: "absolute", bottom: 0, right: 0, width: "4px", height: "1.5px", background: "#3B82F6", borderRadius: "1px" }} />
-                              <div style={{ position: "absolute", bottom: 0, right: 0, width: "1.5px", height: "4px", background: "#3B82F6", borderRadius: "1px" }} />
-                            </>
-                          )}
-                          {checked && (
-                            <svg className="checkmark-anim" width="9" height="7" viewBox="0 0 9 7" fill="none">
-                              <path d="M1 3.5L3.2 5.8L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
-                        </div>
-                        <span className="text-xs text-slate-600 group-hover:text-slate-900 transition-colors truncate">
-                          {exame.nome}
-                        </span>
-                      </button>
-                    );
-                  })}
+                          <div
+                            className="flex-shrink-0 w-[18px] h-[18px] rounded-[5px] flex items-center justify-center transition-all duration-200"
+                            style={{
+                              background: checked ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" : "transparent",
+                              border: checked ? "none" : "1.5px solid #cbd5e1",
+                              boxShadow: checked ? "0 2px 4px rgba(37,99,235,0.3)" : "inset 0 1px 2px rgba(0,0,0,0.06)",
+                            }}
+                          >
+                            {checked && (
+                              <Check className="w-3 h-3 text-white checkmark-anim" strokeWidth={3} />
+                            )}
+                          </div>
+                          <span className={`text-xs truncate transition-colors ${checked ? "text-slate-800 font-semibold" : "text-slate-500 group-hover:text-slate-700"}`}>
+                            {exame.nome}
+                          </span>
+                                </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
-        {/* Botão Gerar */}
-        <div className="px-3 pb-3 border-t border-slate-100 pt-2.5">
-          <div className="relative">
-            <Button
-              onClick={() => onGenerateSuggestions(aiContext)}
-              disabled={isProcessing || !hasAnamnese}
-              className={`relative w-full gap-1.5 h-8 text-xs border-blue-300 text-blue-700 hover:text-blue-800 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 hover:from-blue-100 hover:via-indigo-100 hover:to-blue-100 flex-shrink-0 overflow-hidden transition-all duration-300 font-semibold ${
-                !hasAnamnese || isProcessing ? "cursor-not-allowed opacity-50" : "ai-btn-glow"
-              }`}
-              style={{ 
-                borderRadius: "5px",
-                backgroundSize: '200% 100%',
-                animation: (!hasAnamnese || isProcessing) ? 'none' : 'ai-btn-glow 2s ease-in-out infinite',
-              }}
-              variant="outline"
-            >
-              {/* Efeito shimmer - só quando não está desabilitado */}
-              {hasAnamnese && !isProcessing && (
-                <div 
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                  style={{
-                    animation: 'ai-btn-shimmer 3s ease-in-out infinite',
-                    backgroundSize: '200% 100%',
-                  }}
-                />
-              )}
-              
-              {/* Conteúdo do botão */}
-              <div className="relative flex items-center gap-1.5 z-10">
-                {isProcessing ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : hasAIData ? (
-                  <RefreshCw className="w-3.5 h-3.5" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-                )}
-                <span className="font-semibold">
-                  {isProcessing
-                    ? "Analisando..."
-                    : hasAIData
-                    ? "Regenerar Sugestões"
-                    : "Analisar com IA"}
-                </span>
-              </div>
-            </Button>
-          </div>
+        {/* Botão Analisar */}
+        <div className="px-3 pb-3 pt-1">
+          <Button
+            onClick={() => onGenerateSuggestions(aiContext)}
+            disabled={isProcessing || !hasAnamnese}
+            className={`w-full h-9 text-xs font-semibold gap-2 rounded-lg transition-all duration-200 ${
+              isProcessing || !hasAnamnese
+                ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                : "text-white border-0 shadow-md hover:shadow-lg hover:brightness-110"
+            }`}
+            style={
+              !isProcessing && hasAnamnese
+                ? { background: "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" }
+                : undefined
+            }
+            variant="outline"
+          >
+            {isProcessing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : hasAIData ? (
+              <RefreshCw className="w-3.5 h-3.5" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            {isProcessing
+              ? "Analisando..."
+              : hasAIData
+              ? "Regenerar Sugestões"
+              : "Analisar com IA"}
+          </Button>
         </div>
 
         {/* ── Análise de Exames ── */}
-        <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
-            <Brain className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Análise de Exames</span>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white">✦ IA</span>
+        <div className="mx-3 mt-2 mb-1 rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100">
+            <Brain className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">Análise de Exames</span>
+            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-600 border border-amber-400/30">IA</span>
           </div>
-          <div className="divide-y divide-slate-50 min-h-[60px]">
+          <div className="divide-y divide-slate-100/60 bg-white">
             {selectedContextExams.length === 0 ? (
-              <div className="px-3 py-4 flex items-center justify-center min-h-[60px]">
-                <p className="text-[11px] text-slate-400 italic text-center">
-                  Selecione ao menos um exame no contexto da IA para ver a análise por exame.
-                </p>
+              <div className="px-3 py-4 text-center">
+                <FlaskConical className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+                <p className="text-[11px] text-slate-400">Selecione exames acima para análise</p>
               </div>
             ) : (
-              selectedContextExams.map((exame) => {
-                return (
-                  <div key={`exam-analysis-${exame.id}`} className="px-3 py-2.5 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedExamForDetailed(exame);
-                        setDetailedExamModalOpen(true);
-                      }}
-                      className="flex-1 min-w-0 text-left"
-                      title="Abrir análise detalhada com pontos de atenção"
-                    >
-                      <p className="text-xs font-medium truncate text-slate-700 hover:text-blue-700 hover:underline cursor-pointer">
-                        {exame.nome}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedExamForDetailed(exame);
-                        setDetailedExamModalOpen(true);
-                      }}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer flex-shrink-0"
-                    >
-                      Analisar
-                    </button>
+              selectedContextExams.map((exame) => (
+                <button
+                  key={`exam-analysis-${exame.id}`}
+                  type="button"
+                  onClick={() => { setSelectedExamForDetailed(exame); setDetailedExamModalOpen(true); }}
+                  className="w-full px-3 py-2.5 flex items-center justify-between gap-2 hover:bg-blue-50/60 transition-all duration-150 text-left group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FlaskConical className="w-3.5 h-3.5 text-slate-300 flex-shrink-0 group-hover:text-blue-500 transition-colors" />
+                    <span className="text-xs text-slate-700 truncate font-medium">{exame.nome}</span>
                   </div>
-                );
-              })
+                  <span className="text-[10px] font-semibold text-blue-600 flex-shrink-0 flex items-center gap-1 group-hover:gap-1.5 transition-all">
+                    Analisar
+                    <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                  </span>
+                </button>
+              ))
             )}
           </div>
         </div>
 
         {/* ── CID-10 ── */}
-        <div className="border-t border-slate-100 relative">
+        <div className="mx-3 mt-2 mb-1 rounded-xl border border-slate-200/80 overflow-hidden relative shadow-sm">
           {cidAlertVisible && (
             <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-50 animate-bounce">
               <div className="bg-red-500 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
@@ -814,94 +765,70 @@ export function AISidebar({
               </div>
             </div>
           )}
-          <div className={`px-3 py-2 flex items-center gap-2 border-b border-slate-200 transition-colors ${cidAlertVisible ? "bg-red-50" : "bg-slate-100/80"}`}>
-            <Stethoscope className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">CID-10 Diagnóstico</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCidSearchDialogOpen(true)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="Buscar CID"
-              >
-                <Search className="w-3 h-3" />
-              </button>
-            </div>
+          <div className={`px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100 transition-colors ${cidAlertVisible ? "bg-red-50" : ""}`}>
+            <Stethoscope className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">CID-10 Diagnóstico</span>
+            {(selectedCids.size + cidsManuais.length) > 0 && (
+              <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                {selectedCids.size + cidsManuais.length}
+              </span>
+            )}
+            <button onClick={() => setCidSearchDialogOpen(true)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Buscar CID">
+              <Search className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="divide-y divide-slate-50 min-h-[60px]">
+          <div className="divide-y divide-slate-100/60 bg-white">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2 min-h-[60px]">
-                <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "70%" }} />
-                <Skeleton className="h-3 rounded bg-blue-50/60" style={{ width: "50%" }} />
+              <div className="px-3 py-4 space-y-2.5">
+                <Skeleton className="h-4 rounded-md bg-blue-50/80" style={{ width: "70%" }} />
+                <Skeleton className="h-3 rounded-md bg-blue-50/60" style={{ width: "50%" }} />
               </div>
             ) : (analysisResults?.cidCodes?.length ?? 0) === 0 && cidsManuais.length === 0 ? (
-              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
-                <Stethoscope className="w-3 h-3 text-slate-300" />
-                <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
+              <div className="px-3 py-4 text-center">
+                <Stethoscope className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+                <p className="text-[11px] text-slate-400">Aguardando análise da IA</p>
               </div>
             ) : (
               <>
                 {analysisResults?.cidCodes?.map((cid, i) => (
-                  <div
-                    key={i}
-                    className={`px-3 py-2.5 flex items-center justify-between gap-2 transition-colors animate-in fade-in duration-300 ${
-                      ""
-                    }`}
-                  >
-                    <button
-                      onClick={() => toggleCid(i)}
-                      className="flex items-center gap-2.5 flex-1 text-left cursor-pointer"
+                  <button key={i} onClick={() => toggleCid(i)} className={`w-full px-3 py-2.5 flex items-center gap-2.5 text-left transition-all duration-150 ${selectedCids.has(i) ? "bg-blue-50/70" : "hover:bg-slate-50/80"}`}>
+                    <div
+                      className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                      style={{
+                        background: selectedCids.has(i) ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" : "transparent",
+                        border: selectedCids.has(i) ? "none" : "1.5px solid #cbd5e1",
+                        boxShadow: selectedCids.has(i) ? "0 2px 4px rgba(37,99,235,0.3)" : "inset 0 1px 2px rgba(0,0,0,0.06)",
+                      }}
                     >
-                      {selectedCids.has(i) ? (
-                        <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                        </div>
-                      ) : (
-                        <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
-                      )}
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <p className="text-xs font-medium text-slate-600 leading-none">{cid.code}</p>
-                          {/* Badge de confiança do diagnóstico */}
-                          <span className={`text-[9px] font-semibold px-1 py-0.5 rounded border ${
-                            cid.score >= 0.8
-                              ? "bg-red-50 text-red-600 border-red-200"
-                              : cid.score >= 0.5
-                              ? "bg-amber-50 text-amber-600 border-amber-200"
-                              : "bg-slate-50 text-slate-500 border-slate-200"
-                          }`}>
-                            {cid.score >= 0.8 ? "Alta" : cid.score >= 0.5 ? "Média" : "Diferencial"}
-                          </span>
-                          {/* CID não encontrado no catálogo oficial */}
-                          {cid.validado === false && (
-                            <span className="text-[9px] font-semibold px-1 py-0.5 rounded border bg-orange-50 text-orange-600 border-orange-200" title="Código não encontrado no catálogo CID-10 cadastrado. Verifique antes de usar.">
-                              ⚠ Não catalogado
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400 leading-tight mt-0.5">{cid.description}</p>
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0">
-                        ✦ IA
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {cidsManuais.map((cid, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 animate-in fade-in duration-300">
-                    <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                      {selectedCids.has(i) && <Check className="w-3 h-3 text-white checkmark-anim" strokeWidth={3} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-600">{cid.code}</p>
-                      <p className="text-xs text-slate-400">{cid.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-800">{cid.code}</span>
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
+                          cid.score >= 0.8 ? "bg-red-50 text-red-600 border border-red-100" : cid.score >= 0.5 ? "bg-amber-50 text-amber-600 border border-amber-100" : "bg-slate-100 text-slate-500 border border-slate-200"
+                        }`}>
+                          {cid.score >= 0.8 ? "Alta" : cid.score >= 0.5 ? "Média" : "Diferencial"}
+                        </span>
+                        {cid.validado === false && (
+                          <span className="text-[9px] font-medium px-1 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-100" title="Código não encontrado no catálogo CID-10 cadastrado.">⚠</span>
+                        )}
+                        <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-600 border border-amber-400/30 ml-auto flex-shrink-0">IA</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-tight mt-0.5 truncate">{cid.description}</p>
                     </div>
-                    <button
-                      onClick={() => setCidsManuais(cidsManuais.filter((_, idx) => idx !== i))}
-                      className="p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
-                      title="Remover CID"
-                    >
+                  </button>
+                ))}
+                {cidsManuais.map((cid, i) => (
+                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 bg-blue-50/70">
+                    <div className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)", boxShadow: "0 2px 4px rgba(37,99,235,0.3)" }}>
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs font-bold text-slate-800">{cid.code}</span>
+                      <p className="text-[11px] text-slate-400 truncate">{cid.description}</p>
+                    </div>
+                    <button onClick={() => setCidsManuais(cidsManuais.filter((_, idx) => idx !== i))} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0" title="Remover">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -912,85 +839,61 @@ export function AISidebar({
         </div>
 
         {/* ── Exames ── */}
-        <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
-            <FlaskConical className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Exames</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleOpenRepetirDialog("exames")}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="Histórico de exames anteriores"
-              >
-                <History className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => setExameSearchDialogOpen(true)}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="Buscar exame"
-              >
-                <Search className="w-3 h-3" />
-              </button>
-            </div>
+        <div className="mx-3 mt-2 mb-1 rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100">
+            <FlaskConical className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">Exames</span>
+            {(selectedExamesAI.size + examesManuais.length) > 0 && (
+              <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                {selectedExamesAI.size + examesManuais.length}
+              </span>
+            )}
+            <button onClick={() => handleOpenRepetirDialog("exames")} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Repetir anteriores">
+              <History className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setExameSearchDialogOpen(true)} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Buscar exame">
+              <Search className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="divide-y divide-slate-50 min-h-[60px]">
+          <div className="divide-y divide-slate-100/60 bg-white">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2 min-h-[60px]">
-                <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "65%" }} />
-                <Skeleton className="h-4 rounded bg-blue-50/60" style={{ width: "80%" }} />
+              <div className="px-3 py-4 space-y-2.5">
+                <Skeleton className="h-4 rounded-md bg-blue-50/80" style={{ width: "65%" }} />
+                <Skeleton className="h-4 rounded-md bg-blue-50/60" style={{ width: "80%" }} />
               </div>
             ) : (analysisResults?.exames?.length ?? 0) === 0 && examesManuais.length === 0 ? (
-              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
-                <FlaskConical className="w-3 h-3 text-slate-300" />
-                <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
+              <div className="px-3 py-4 text-center">
+                <FlaskConical className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+                <p className="text-[11px] text-slate-400">Aguardando análise da IA</p>
               </div>
             ) : (
               <>
                 {analysisResults?.exames?.map((exame, i) => (
-                  <div
-                    key={i}
-                    className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
-                      ""
-                    }`}
-                  >
+                  <button key={i} onClick={() => toggleExame(i)} className={`w-full px-3 py-2.5 flex items-center gap-2.5 text-left transition-all duration-150 ${selectedExamesAI.has(i) ? "bg-blue-50/70" : "hover:bg-slate-50/80"}`}>
                     <div
-                      className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
-                      onClick={() => toggleExame(i)}
+                      className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                      style={{
+                        background: selectedExamesAI.has(i) ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" : "transparent",
+                        border: selectedExamesAI.has(i) ? "none" : "1.5px solid #cbd5e1",
+                        boxShadow: selectedExamesAI.has(i) ? "0 2px 4px rgba(37,99,235,0.3)" : "inset 0 1px 2px rgba(0,0,0,0.06)",
+                      }}
                     >
-                      {selectedExamesAI.has(i) ? (
-                        <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
-                          <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                        </div>
-                      ) : (
-                        <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
-                      )}
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-600 truncate">{exame.nome}</p>
-                        {exame.justificativa && (
-                          <p className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-2">{exame.justificativa}</p>
-                        )}
-                      </div>
+                      {selectedExamesAI.has(i) && <Check className="w-3 h-3 text-white checkmark-anim" strokeWidth={3} />}
                     </div>
-                    <span
-                      className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0"
-                    >
-                      ✦ IA
-                    </span>
-                  </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-700 truncate">{exame.nome}</p>
+                      {exame.justificativa && <p className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-1">{exame.justificativa}</p>}
+                    </div>
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-600 border border-amber-400/30 flex-shrink-0">IA</span>
+                  </button>
                 ))}
                 {examesManuais.map((e, i) => (
-                  <div key={`m-${i}`} className="px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
-                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                      </div>
-                      <span className="text-xs text-slate-600">{e.nome}</span>
+                  <div key={`m-${i}`} className="px-3 py-2.5 flex items-center gap-2.5 bg-blue-50/70">
+                    <div className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)", boxShadow: "0 2px 4px rgba(37,99,235,0.3)" }}>
+                      <Check className="w-3 h-3 text-white" strokeWidth={3} />
                     </div>
-                    <button
-                      onClick={() => setExamesManuais(examesManuais.filter((_, idx) => idx !== i))}
-                      className="p-0.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors flex-shrink-0"
-                      title="Remover exame"
-                    >
+                    <span className="text-xs font-medium text-slate-700 flex-1 truncate">{e.nome}</span>
+                    <button onClick={() => setExamesManuais(examesManuais.filter((_, idx) => idx !== i))} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0" title="Remover">
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
@@ -1001,115 +904,91 @@ export function AISidebar({
         </div>
 
         {/* ── Prescrições ── */}
-        <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
-            <Pill className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Prescrições</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleOpenRepetirDialog("prescricoes")}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="Histórico de prescrições anteriores"
-              >
-                <History className="w-3 h-3" />
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedPrescricaoIndex(null);
-                  setMedicamentoDialogOpen(true);
-                }}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                title="Buscar medicamento"
-              >
-                <Search className="w-3 h-3" />
-              </button>
-            </div>
+        <div className="mx-3 mt-2 mb-1 rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100">
+            <Pill className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">Prescrições</span>
+            {(selectedPrescricoesAI.size + prescricoes.length) > 0 && (
+              <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                {selectedPrescricoesAI.size + prescricoes.length}
+              </span>
+            )}
+            <button onClick={() => handleOpenRepetirDialog("prescricoes")} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Repetir anteriores">
+              <History className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => { setSelectedPrescricaoIndex(null); setMedicamentoDialogOpen(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Buscar medicamento">
+              <Search className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="divide-y divide-slate-50 min-h-[60px]">
+          <div className="divide-y divide-slate-100/60 bg-white">
             {isProcessing ? (
-              <div className="px-3 py-3 space-y-2 min-h-[60px]">
-                <Skeleton className="h-4 rounded bg-blue-50/80" style={{ width: "72%" }} />
-                <Skeleton className="h-3 rounded bg-blue-50/60" style={{ width: "45%" }} />
+              <div className="px-3 py-4 space-y-2.5">
+                <Skeleton className="h-4 rounded-md bg-blue-50/80" style={{ width: "72%" }} />
+                <Skeleton className="h-3 rounded-md bg-blue-50/60" style={{ width: "45%" }} />
               </div>
             ) : prescricoes.length === 0 && (analysisResults?.prescricoes?.length ?? 0) === 0 ? (
-              <div className="px-3 py-4 flex items-center gap-2 min-h-[60px]">
-                <Pill className="w-3 h-3 text-slate-300" />
-                <p className="text-[11px] text-slate-300">Aguardando análise da IA</p>
+              <div className="px-3 py-4 text-center">
+                <Pill className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+                <p className="text-[11px] text-slate-400">Aguardando análise da IA</p>
               </div>
             ) : (
               <>
-                {/* Prescrições da IA — toggle igual Exames */}
                 {analysisResults?.prescricoes?.map((rx, i) => {
                   const selected = selectedPrescricoesAI.has(i);
                   const conflict = hasAllergyConflict(rx.medicamento);
                   return (
-                    <div
-                      key={`ai-rx-${i}`}
-                      className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${
-                        conflict ? "bg-red-50/60" : ""
-                      }`}
-                    >
+                    <button key={`ai-rx-${i}`} onClick={() => !conflict && togglePrescricaoAI(i)} className={`w-full px-3 py-2.5 flex items-center gap-2.5 text-left transition-all duration-150 ${conflict ? "bg-red-50/70" : selected ? "bg-blue-50/70" : "hover:bg-slate-50/80"}`}>
                       <div
-                        className="flex items-center gap-2 cursor-pointer flex-1 min-w-0"
-                        onClick={() => !conflict && togglePrescricaoAI(i)}
+                        className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0 transition-all duration-200"
+                        style={{
+                          background: conflict ? "#FEE2E2" : selected ? "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" : "transparent",
+                          border: conflict ? "1.5px solid #FCA5A5" : selected ? "none" : "1.5px solid #cbd5e1",
+                          boxShadow: selected && !conflict ? "0 2px 4px rgba(37,99,235,0.3)" : "inset 0 1px 2px rgba(0,0,0,0.06)",
+                        }}
                       >
-                        {selected && !conflict ? (
-                          <div className="w-4 h-4 rounded border-2 bg-blue-600 border-blue-600 flex items-center justify-center flex-shrink-0">
-                            <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                          </div>
-                        ) : conflict ? (
-                          <div className="w-4 h-4 rounded border-2 bg-red-100 border-red-300 flex items-center justify-center flex-shrink-0">
-                            <X className="w-2.5 h-2.5 text-red-400" strokeWidth={3} />
-                          </div>
-                        ) : (
-                          <div className="w-4 h-4 rounded border-2 border-slate-300 flex-shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-600 truncate">{rx.medicamento}</p>
-                          <p className="text-xs text-slate-400">
-                            {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
-                          </p>
-                          {conflict && (
-                            <p className="text-xs text-red-600 font-medium mt-0.5">Conflito de alergia</p>
-                          )}
-                        </div>
+                        {selected && !conflict && <Check className="w-3 h-3 text-white checkmark-anim" strokeWidth={3} />}
+                        {conflict && <X className="w-3 h-3 text-red-400" strokeWidth={3} />}
                       </div>
-                      <span className="inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-500 text-white flex-shrink-0">
-                        ✦ IA
-                      </span>
-                    </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-700 truncate">{rx.medicamento}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}</p>
+                        {conflict && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <AlertTriangle className="w-3 h-3 text-red-500" />
+                            <p className="text-[10px] text-red-600 font-semibold">Conflito de alergia</p>
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-600 border border-amber-400/30 flex-shrink-0">IA</span>
+                    </button>
                   );
                 })}
-
-                {/* Prescrições adicionadas manualmente */}
                 {prescricoes.map((rx, i) => {
                   const conflict = hasAllergyConflict(rx.medicamento);
                   return (
-                    <div key={`rx-${i}`} className={`px-3 py-2 flex items-center gap-2 animate-in fade-in duration-300 ${conflict ? "bg-red-50/60" : ""}`}>
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${conflict ? "bg-red-100 border-red-300" : "bg-blue-600 border-blue-600"}`}>
-                          {conflict
-                            ? <X className="w-2.5 h-2.5 text-red-400" strokeWidth={3} />
-                            : <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                          }
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-600 truncate">{rx.medicamento}</p>
-                          <p className="text-xs text-slate-400">
-                            {rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}
-                          </p>
-                          {conflict && (
-                            <p className="text-xs text-red-600 font-medium mt-0.5">Conflito de alergia</p>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPrescricoes(prescricoes.filter((_, idx) => idx !== i))}
-                        className="text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-0.5 transition-colors flex-shrink-0"
-                        title="Remover prescrição"
+                    <div key={`rx-${i}`} className={`px-3 py-2.5 flex items-center gap-2.5 ${conflict ? "bg-red-50/70" : "bg-blue-50/70"}`}>
+                      <div
+                        className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: conflict ? "#FEE2E2" : "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)",
+                          border: conflict ? "1.5px solid #FCA5A5" : "none",
+                          boxShadow: conflict ? "none" : "0 2px 4px rgba(37,99,235,0.3)",
+                        }}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        {conflict ? <X className="w-3 h-3 text-red-400" strokeWidth={3} /> : <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-700 truncate">{rx.medicamento}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{rx.dosagem}{rx.posologia ? ` · ${rx.posologia}` : ""}</p>
+                        {conflict && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <AlertTriangle className="w-3 h-3 text-red-500" />
+                            <p className="text-[10px] text-red-600 font-semibold">Conflito de alergia</p>
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => setPrescricoes(prescricoes.filter((_, idx) => idx !== i))} className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0" title="Remover">
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   );
@@ -1120,86 +999,72 @@ export function AISidebar({
         </div>
 
         {/* ── Orientações ── */}
-        <div className="border-t border-slate-100">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
-            <ClipboardList className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Orientações</span>
+        <div className="mx-3 mt-2 mb-1 rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100">
+            <ClipboardList className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">Orientações</span>
+            <span className={`text-[10px] tabular-nums font-medium px-1.5 py-0.5 rounded-md ${
+              orientacoes.length > 200 ? "bg-amber-50 text-amber-600" : "text-slate-400"
+            }`}>{orientacoes.length}/255</span>
           </div>
-          <div className="px-3 py-2">
+          <div className="p-2.5 bg-white">
             <textarea
               value={orientacoes}
               onChange={(e) => setOrientacoes(e.target.value.slice(0, 255))}
               maxLength={255}
               rows={3}
               placeholder="Digite orientações ao paciente..."
-              className="w-full text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none text-slate-700 placeholder:text-slate-300"
+              className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 resize-none text-slate-700 placeholder:text-slate-300 bg-slate-50/50 transition-all"
             />
-            <p className="text-[10px] text-slate-400 text-right mt-0.5">{orientacoes.length}/255</p>
           </div>
         </div>
 
         {/* ── Documentos ── */}
-        <div className="border-t border-slate-100 flex flex-col min-h-[160px]">
-          <div className="px-3 py-2 flex items-center gap-2 bg-slate-100/80 border-b border-slate-200">
-            <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide flex-1">Documentos</span>
+        <div className="mx-3 mt-2 mb-3 rounded-xl border border-slate-200/80 overflow-hidden shadow-sm">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100">
+            <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 flex-1">Documentos</span>
             {documentosGerados.length > 0 && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white">
+              <span className="text-[9px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                 {documentosGerados.length}
               </span>
             )}
           </div>
 
-          {/* Picklist digitável */}
-          <div className="px-3 pt-2 pb-2.5">
-            <div ref={docInputWrapperRef} className="flex items-center gap-1.5 border border-slate-200 rounded-lg px-2 py-2 bg-white focus-within:border-blue-400 transition-colors">
-              <Search className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          {/* Busca de documentos */}
+          <div className="px-2.5 py-2.5 bg-white">
+            <div ref={docInputWrapperRef} className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50/50 focus-within:border-blue-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-400/20 transition-all">
+              <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
               <input
                 ref={docInputRef}
                 type="text"
                 value={docSearch}
-                onChange={(e) => {
-                  setDocSearch(e.target.value);
-                  openDocDropdown();
-                }}
+                onChange={(e) => { setDocSearch(e.target.value); openDocDropdown(); }}
                 onFocus={openDocDropdown}
-                placeholder="Buscar documento..."
+                placeholder="Buscar modelo de documento..."
                 className="flex-1 text-xs text-slate-700 bg-transparent outline-none placeholder:text-slate-400 min-w-0"
               />
-              {loadingDoc && <Loader2 className="w-3 h-3 text-slate-400 animate-spin flex-shrink-0" />}
+              {loadingDoc && <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin flex-shrink-0" />}
             </div>
 
-            {/* Dropdown via portal para escapar do overflow-hidden */}
             {docDropdownOpen && filteredDocs.length > 0 && docDropdownRect && typeof document !== "undefined" && createPortal(
               <div
                 ref={docDropdownRef}
-                className="bg-white border border-slate-200 rounded-lg shadow-xl overflow-y-auto"
-                style={{
-                  position: "fixed",
-                  top: docDropdownRect.bottom + 4,
-                  left: docDropdownRect.left,
-                  width: docDropdownRect.width,
-                  maxHeight: 220,
-                  zIndex: 9999,
-                }}
+                className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto"
+                style={{ position: "fixed", top: docDropdownRect.bottom + 4, left: docDropdownRect.left, width: docDropdownRect.width, maxHeight: 220, zIndex: 9999 }}
               >
                 {filteredDocs.slice(0, 14).map((doc) => {
                   const alreadyGenerated = documentosGerados.some((d) => d.tipoDocumento === doc.id);
                   return (
-                    <button
-                      key={doc.id}
-                      onClick={() => handleGenDoc(doc.id)}
-                      disabled={loadingDoc === doc.id}
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-left transition-colors border-b border-slate-50 last:border-0"
-                    >
+                    <button key={doc.id} onClick={() => handleGenDoc(doc.id)} disabled={loadingDoc === doc.id} className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-all border-b border-slate-50 last:border-0 group">
                       {loadingDoc === doc.id ? (
-                        <Loader2 className="w-3.5 h-3.5 text-slate-400 animate-spin flex-shrink-0" />
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0" />
                       ) : alreadyGenerated ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                       ) : (
-                        <FileText className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                        <FileText className="w-4 h-4 text-slate-300 flex-shrink-0 group-hover:text-blue-400 transition-colors" />
                       )}
-                      <span className="text-xs text-slate-700 truncate">{doc.nome}</span>
+                      <span className="text-xs text-slate-700 truncate font-medium">{doc.nome}</span>
                     </button>
                   );
                 })}
@@ -1208,82 +1073,59 @@ export function AISidebar({
             )}
           </div>
 
-          {/* Lista de documentos gerados */}
-          {documentosGerados.length > 0 && (
-            <div className="px-3 pb-3">
-              <div className="space-y-1.5">
-                {documentosGerados.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700 truncate flex-1">{doc.nomeDocumento}</span>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {doc.pdfBlob && (
-                        <>
-                          <button
-                            onClick={() => openDoc(doc)}
-                            title="Abrir"
-                            className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => printDoc(doc)}
-                            title="Imprimir"
-                            className={`p-1.5 rounded-md transition-colors ${
-                              documentosImpressos.has(doc.id)
-                                ? "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                : "text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                            }`}
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                      {doc.erroAssinatura && (
-                        <span title={doc.erroAssinatura} className="p-1.5 rounded-md text-red-500 bg-red-50">
-                          <AlertCircle className="w-4 h-4" />
-                        </span>
-                      )}
-                      {onSignDocument && doc.pdfBlob && (
-                        <button
-                          onClick={() => onSignDocument(doc.id)}
-                          title={doc.assinando ? "Assinando..." : doc.assinado ? "Documento já assinado" : "Assinar digitalmente"}
-                          disabled={!!doc.assinado || !!doc.assinando}
-                          className={`p-1.5 rounded-md transition-colors ${
-                            doc.assinado ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                          } ${doc.assinando ? "opacity-70 cursor-not-allowed" : ""}`}
-                        >
-                          {doc.assinado ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                          ) : doc.assinando ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <FileCheck className="w-4 h-4" />
-                          )}
-                        </button>
-                      )}
-                      {onDeleteDocument && (
-                        <button
-                          onClick={() => onDeleteDocument(doc.id)}
-                          title="Remover"
-                          className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+          {/* Documentos gerados */}
+          {documentosGerados.length > 0 ? (
+            <div className="divide-y divide-slate-100/60 bg-white">
+              {documentosGerados.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-blue-50/50 hover:bg-blue-50/80 transition-colors group">
+                  <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-medium text-slate-700 truncate block">{doc.nomeDocumento}</span>
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(doc.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      {doc.assinado && <span className="text-emerald-500 ml-1">· Assinado</span>}
+                      {documentosImpressos.has(doc.id) && <span className="ml-1">· Impresso</span>}
+                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
+                    {doc.pdfBlob && (
+                      <>
+                        <button onClick={() => openDoc(doc)} title="Abrir" className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => printDoc(doc)} title="Imprimir" className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                    {doc.erroAssinatura && (
+                      <span title={doc.erroAssinatura} className="p-1.5 text-red-500">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                    {onSignDocument && doc.pdfBlob && !doc.assinado && (
+                      <button
+                        onClick={() => onSignDocument(doc.id)}
+                        title={doc.assinando ? "Assinando..." : "Assinar"}
+                        disabled={!!doc.assinando}
+                        className={`p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors ${doc.assinando ? "opacity-70 cursor-not-allowed" : ""}`}
+                      >
+                        {doc.assinando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                    {onDeleteDocument && (
+                      <button onClick={() => onDeleteDocument(doc.id)} title="Remover" className="p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
-
-          {documentosGerados.length === 0 && (
-            <div className="px-3 pb-3">
-              <p className="text-xs text-slate-400 text-center">Busque e clique para gerar</p>
+          ) : (
+            <div className="px-3 py-4 text-center bg-white">
+              <FileText className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
+              <p className="text-[11px] text-slate-400">Busque e clique para gerar</p>
             </div>
           )}
         </div>
@@ -1294,7 +1136,7 @@ export function AISidebar({
       {/* ── Chat de Telemedicina ── */}
       {isTelemedicina && onSendMessage && (
         <div className="border border-slate-200 rounded-xl overflow-hidden flex flex-col bg-white shadow-sm mt-3">
-          <div className="px-3 py-2.5 flex items-center gap-2 border-b border-slate-100 bg-slate-50">
+          <div className="px-3 py-2.5 flex items-center gap-2 bg-slate-50/80 border-b border-slate-100 bg-slate-50">
             <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
             <span className="text-xs font-bold text-slate-700">Chat com Paciente</span>
             {chatMessages && chatMessages.length > 0 && (

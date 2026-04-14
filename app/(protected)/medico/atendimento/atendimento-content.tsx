@@ -74,6 +74,7 @@ import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialo
 import { GuiaTissExamesModal, type ExameSolicitado, type PrioridadeTISS, type GuiaSADTDadosAdicionais } from '@/components/guia-tiss-exames-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search, CalendarDays } from 'lucide-react';
@@ -380,6 +381,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [retornoDias, setRetornoDias] = useState<number>(30);
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
+  const [docMedicamentosSelecionados, setDocMedicamentosSelecionados] = useState<Set<number>>(new Set());
   const [certStatus, setCertStatus] = useState<{ configured: boolean; expired: boolean; checked: boolean }>({ configured: false, expired: false, checked: false });
   const [docConfigOpts, setDocConfigOpts] = useState({
     cpf: true, endereco: false, assinar: false,
@@ -749,9 +751,18 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         body: formData,
       });
 
+      const contentType = response.headers.get("content-type") || "";
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao fazer upload");
+        if (contentType.includes("application/json")) {
+          const error = await response.json();
+          throw new Error(error.error || "Erro ao fazer upload");
+        }
+        throw new Error("Erro ao fazer upload. Verifique sua conexão ou faça login novamente.");
+      }
+
+      if (!contentType.includes("application/json")) {
+        throw new Error("Sessão expirada. Faça login novamente para continuar.");
       }
 
       const result = await response.json();
@@ -2143,6 +2154,15 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     if (modelId !== "guia-consulta-tiss" && !extraDados?._fromDocConfigModal) {
       setDocConfigModelId(modelId);
       setDocConfigOpts(prev => ({ ...prev, horaInicio: new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo", hour12: false }).format(new Date()) }));
+      // Para receitas, inicializar todos os medicamentos como selecionados
+      if (modelId === "receita-medica" || modelId === "receita-controle-especial" || modelId === "receita-tipo-ba") {
+        const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
+        const todasPrescricoes = [
+          ...prescricoes,
+          ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+        ].filter(p => p.medicamento && p.medicamento.trim() !== "");
+        setDocMedicamentosSelecionados(new Set(todasPrescricoes.map((_, i) => i)));
+      }
       setDocConfigModalOpen(true);
       return;
     }
@@ -2164,15 +2184,17 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         dados: { ...extraDados },
       };
 
-      // Adicionar prescrições se for receita (manuais + selecionadas da IA)
+      // Adicionar prescrições se for receita (manuais + selecionadas da IA), filtrando pelos medicamentos selecionados no modal
       if (modelId === "receita-medica" || modelId === "receita-controle-especial" || modelId === "receita-tipo-ba") {
         const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
         const todasPrescricoes = [
           ...prescricoes,
           ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
         ].filter(p => p.medicamento && p.medicamento.trim() !== "");
-        if (todasPrescricoes.length > 0) {
-          requestData.dados.prescricoes = todasPrescricoes;
+        // Filtrar apenas os medicamentos selecionados no modal de configuração
+        const prescricoesFiltradas = todasPrescricoes.filter((_, i) => docMedicamentosSelecionados.has(i));
+        if (prescricoesFiltradas.length > 0) {
+          requestData.dados.prescricoes = prescricoesFiltradas;
         }
       }
 
@@ -2357,8 +2379,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
             </div>
           )}
 
-          {/* Corpo principal */}
-          <div className="p-6 flex items-center justify-between gap-6 overflow-hidden w-full min-w-0">
+          {/* Corpo principal — layout em linhas */}
+          <div className="px-5 py-4 space-y-3 overflow-hidden w-full min-w-0">
             {/* Estilo customizado para o avatar do paciente */}
             <style dangerouslySetInnerHTML={{
               __html: `
@@ -2368,100 +2390,66 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 }
               `
             }} />
-            
-            {/* Coluna esquerda — identidade */}
-            <div className="flex items-center gap-4 min-w-0 flex-1 overflow-x-hidden">
-              <div className="flex-shrink-0 relative" id={`patient-avatar-${consulta.paciente.id}`}>
-                <AvatarWithS3
-                  avatar={consulta.paciente.usuario?.avatar || null}
-                  alt={consulta.paciente.nome}
-                  fallback={inicial}
-                  className="w-[72px] h-[72px]"
-                  fallbackClassName="text-lg font-bold select-none"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xl font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
-                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                    Em Atendimento
-                  </Badge>
-                  {isTelemedicina && (
-                    <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
-                      <Video className="w-3 h-3" />
-                      Telemedicina
-                    </Badge>
-                  )}
+
+            {/* Linha 1 — Avatar + Nome + Badges | Ações */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                <div className="flex-shrink-0" id={`patient-avatar-${consulta.paciente.id}`}>
+                  <AvatarWithS3
+                    avatar={consulta.paciente.usuario?.avatar || null}
+                    alt={consulta.paciente.nome}
+                    fallback={inicial}
+                    className="w-14 h-14"
+                    fallbackClassName="text-base font-bold select-none"
+                  />
                 </div>
-                <div className="flex items-end gap-2 mt-1.5 flex-wrap">
-                  {/* Demographics */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-800 whitespace-nowrap">{idade} anos</span>
-                    <span className="text-xs text-slate-300">·</span>
-                    <span className="text-xs text-slate-500 whitespace-nowrap">{formatDate(new Date(consulta.paciente.dataNascimento))}</span>
-                  </div>
-
-                  {/* Divider */}
-                  <span className="h-3.5 w-px bg-slate-200 mx-0.5" />
-
-                  {/* Badges alinhados no bottom */}
-                  <div className="flex items-end gap-2 flex-wrap">
-                    {/* ID badge - Azul */}
-                    <Badge className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
-                      {prontuarioLabel}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
+                    <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      Em Atendimento
                     </Badge>
-
-                    {/* Tipo consulta badge - Roxo/Indigo */}
+                    {isTelemedicina && (
+                      <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
+                        <Video className="w-3 h-3" />
+                        Telemedicina
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                    <span className="font-semibold text-slate-700">{prontuarioLabel}</span>
+                    <span className="text-slate-300">·</span>
+                    <span className="font-semibold text-slate-700">{idade} anos</span>
                     {consulta.tipoConsulta && (
-                      <Badge className="text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
-                        {consulta.tipoConsulta.nome}
-                      </Badge>
+                      <>
+                        <span className="text-slate-300">·</span>
+                        <span>{consulta.tipoConsulta.nome}</span>
+                      </>
                     )}
-
-                    {/* Procedimento badge - Violeta */}
-                    {consulta.procedimento && (
-                      <Badge className="text-[11px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
-                        {consulta.procedimento.nome}
-                      </Badge>
-                    )}
-
-                    {/* Plan badge - Verde para convênio, Laranja para particular */}
-                    {(consulta as any).operadora ? (
-                      <Badge className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
-                        {(consulta as any).operadora.nomeFantasia}
-                        {(consulta as any).planoSaude && ` · ${(consulta as any).planoSaude.nome}`}
-                      </Badge>
-                    ) : (
-                      <Badge className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full whitespace-nowrap shadow-sm">
-                        Particular
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Coluna direita — ações (topo) + vitais (baixo) */}
-            <div className="flex flex-col items-end gap-3 flex-shrink-0 min-w-0">
-              {/* Botões de ação */}
-              <div className="flex items-center gap-2.5 flex-shrink-0 flex-wrap justify-end">
-                <div className="relative flex items-center gap-2 px-4 py-2.5 flex-shrink-0">
-                  {/* Indicador pulsante */}
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-400 animate-ping opacity-75" />
-                    </div>
-                    <Clock className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                    <span className="text-sm font-bold text-slate-800 tabular-nums whitespace-nowrap tracking-tight">
-                      {sessionDuration}
+                    <span className="text-slate-300">·</span>
+                    <span>
+                      {(consulta as any).operadora
+                        ? `${(consulta as any).operadora.nomeFantasia}${(consulta as any).planoSaude ? ` · ${(consulta as any).planoSaude.nome}` : ""}`
+                        : "Particular"}
                     </span>
                   </div>
-                  <div className="border-l border-slate-200 pl-2 ml-1">
-                    <AutoSaveIndicator status={autoSaveStatus} lastSaveTime={lastAutoSaveTime} />
+                </div>
+              </div>
+
+              {/* Ações à direita */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Timer + Auto-save + Foco */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    </div>
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-700 tabular-nums">{sessionDuration}</span>
                   </div>
-                  <div className="border-l border-slate-200 pl-2 ml-1 flex items-center gap-1.5">
+                  <div className="w-px h-4 bg-slate-200" />
+                  <div className="flex items-center gap-1">
                     {isFullscreen ? (
                       <Minimize2 className="w-3 h-3 text-muted-foreground" />
                     ) : (
@@ -2472,7 +2460,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       onCheckedChange={toggleFocusMode}
                       className="scale-75"
                     />
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">Foco</span>
                   </div>
                 </div>
 
@@ -2480,18 +2467,17 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   size="sm"
                   variant="outline"
                   onClick={() => setResumoClinicoDialogOpen(true)}
-                  className="h-9 px-4 text-xs gap-1.5 border-blue-300 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 flex-shrink-0 font-semibold transition-colors"
+                  className="h-8 px-3 text-[11px] gap-1.5 border-blue-200 text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 flex-shrink-0 font-semibold transition-colors rounded-lg"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="whitespace-nowrap">Resumo Clínico</span>
+                  <Sparkles className="w-3 h-3 text-blue-600" />
+                  Resumo Clínico do Prontuário
                 </Button>
 
                 {isTelemedicina && telemedicinaProps && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* Controles A/V compactos */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => telemedicinaProps.onToggleMic(!telemedicinaProps.isMicOn)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                         telemedicinaProps.isMicOn
                           ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           : "bg-red-100 text-red-600 hover:bg-red-200"
@@ -2502,7 +2488,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     </button>
                     <button
                       onClick={() => telemedicinaProps.onToggleCamera(!telemedicinaProps.isCameraOn)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                         telemedicinaProps.isCameraOn
                           ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           : "bg-red-100 text-red-600 hover:bg-red-200"
@@ -2513,7 +2499,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     </button>
                     <button
                       onClick={() => telemedicinaProps.onToggleScreenSharing(!telemedicinaProps.isScreenSharing)}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                         telemedicinaProps.isScreenSharing
                           ? "bg-blue-100 text-blue-600 hover:bg-blue-200"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -2522,8 +2508,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     >
                       <Monitor className="w-3.5 h-3.5" />
                     </button>
-                    {/* Qualidade conexão */}
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-semibold ${
+                    <div className={`flex items-center gap-1 px-1.5 py-1 rounded-lg border text-[10px] font-semibold ${
                       telemedicinaProps.connectionQuality === "excellent" ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
                       telemedicinaProps.connectionQuality === "good" ? "bg-yellow-50 border-yellow-200 text-yellow-600" :
                       "bg-red-50 border-red-200 text-red-600"
@@ -2537,56 +2522,54 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Telemedicina PiP — vídeo compacto do paciente */}
-              {isTelemedicina && telemedicinaProps && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <div className="relative w-[180px] h-[120px] rounded-xl overflow-hidden bg-slate-900 border-2 border-slate-200 shadow-lg flex-shrink-0">
-                    {/* Placeholder quando paciente não conectou */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        telemedicinaProps.patientPresent
-                          ? "bg-emerald-500/20"
-                          : "bg-slate-700 animate-pulse"
-                      }`}>
-                        <User className="w-5 h-5 text-slate-400" />
-                      </div>
-                      <span className="text-[9px] text-slate-500 mt-1">
-                        {telemedicinaProps.patientPresent ? "" : "Aguardando..."}
-                      </span>
+            {/* Telemedicina PiP — vídeo compacto do paciente */}
+            {isTelemedicina && telemedicinaProps && (
+              <div className="flex items-center gap-2">
+                <div className="relative w-[180px] h-[120px] rounded-xl overflow-hidden bg-slate-900 border-2 border-slate-200 shadow-lg flex-shrink-0">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      telemedicinaProps.patientPresent
+                        ? "bg-emerald-500/20"
+                        : "bg-slate-700 animate-pulse"
+                    }`}>
+                      <User className="w-5 h-5 text-slate-400" />
                     </div>
-                    {/* Vídeo remoto */}
+                    <span className="text-[9px] text-slate-500 mt-1">
+                      {telemedicinaProps.patientPresent ? "" : "Aguardando..."}
+                    </span>
+                  </div>
+                  <video
+                    ref={telemedicinaProps.remoteVideoRef}
+                    autoPlay
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-cover z-10"
+                  />
+                  <div className="absolute bottom-1.5 right-1.5 w-[52px] h-[36px] rounded-lg overflow-hidden bg-slate-800 border border-white/20 shadow-md z-20">
                     <video
-                      ref={telemedicinaProps.remoteVideoRef}
+                      ref={telemedicinaProps.localVideoRef}
                       autoPlay
                       playsInline
-                      className="absolute inset-0 w-full h-full object-cover z-10"
+                      muted
+                      className="w-full h-full object-cover"
                     />
-                    {/* PiP local (miniatura) */}
-                    <div className="absolute bottom-1.5 right-1.5 w-[52px] h-[36px] rounded-lg overflow-hidden bg-slate-800 border border-white/20 shadow-md z-20">
-                      <video
-                        ref={telemedicinaProps.localVideoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {/* Badge de presença */}
-                    <div className={`absolute top-1.5 left-1.5 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
-                      telemedicinaProps.patientPresent
-                        ? "bg-emerald-500/90 text-white"
-                        : "bg-slate-700/80 text-slate-300"
-                    }`}>
-                      <span className={`w-1 h-1 rounded-full ${telemedicinaProps.patientPresent ? "bg-white animate-pulse" : "bg-slate-400"}`} />
-                      {telemedicinaProps.patientPresent ? "Online" : "Offline"}
-                    </div>
+                  </div>
+                  <div className={`absolute top-1.5 left-1.5 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[8px] font-bold ${
+                    telemedicinaProps.patientPresent
+                      ? "bg-emerald-500/90 text-white"
+                      : "bg-slate-700/80 text-slate-300"
+                  }`}>
+                    <span className={`w-1 h-1 rounded-full ${telemedicinaProps.patientPresent ? "bg-white animate-pulse" : "bg-slate-400"}`} />
+                    {telemedicinaProps.patientPresent ? "Online" : "Offline"}
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Vitais — chips compactos */}
-              <div className="flex items-center gap-1.5 flex-wrap justify-end max-w-full">
+            {/* Linha 2 — Sinais vitais */}
+            {vitals.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
                 {vitals.map((v, i) => {
                   const Icon = v.icon;
                   const isDroplet = Icon === Droplet;
@@ -2602,7 +2585,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   );
                 })}
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -2624,8 +2607,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
             })
           }
           onViewDocumentos={(consultaId) => {
-            setSelectedConsultaForDocumentos(consultaId);
-            setDocumentosDialogOpen(true);
+            handleViewFichaAtendimento(consultaId);
           }}
           onDownloadExame={handleDownloadExame}
           formatDate={formatDate}
@@ -2709,8 +2691,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 anamneseConfirmed={anamneseConfirmed}
                 onConfirmAnamnese={handleConfirmAnamnese}
                 onAdvance={() => {}}
-                consultationMode={consultationMode}
-                onToggleMode={setConsultationMode}
                 isTranscribing={isTranscribing}
                 startTranscription={startTranscription}
                 transcriptionText={transcription
@@ -2855,7 +2835,15 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         const hasUfValidade = id === "receita-controle-especial";
         const hasConvenio = id === "justificativa-exames-plano";
         const hasTextoLivre = id === "laudo-medico" || id === "pedido-exames";
-        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre;
+        const isReceita = id === "receita-medica" || id === "receita-controle-especial" || id === "receita-tipo-ba";
+        const medicamentosReceita = isReceita ? (() => {
+          const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
+          return [
+            ...prescricoes,
+            ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
+          ].filter(p => p.medicamento && p.medicamento.trim() !== "");
+        })() : [];
+        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre || isReceita;
 
         return (
           <Dialog open={docConfigModalOpen} onOpenChange={setDocConfigModalOpen}>
@@ -2870,6 +2858,61 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                 {/* ── Campos específicos do documento ── */}
                 {hasSpecific && (
                   <>
+                    {isReceita && medicamentosReceita.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs text-slate-500 font-medium">Medicamentos a incluir na receita</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (docMedicamentosSelecionados.size === medicamentosReceita.length) {
+                                setDocMedicamentosSelecionados(new Set());
+                              } else {
+                                setDocMedicamentosSelecionados(new Set(medicamentosReceita.map((_, i) => i)));
+                              }
+                            }}
+                            className="text-[10px] text-[#1E40AF] hover:text-[#1e3a8a] font-medium"
+                          >
+                            {docMedicamentosSelecionados.size === medicamentosReceita.length ? "Desmarcar todos" : "Selecionar todos"}
+                          </button>
+                        </div>
+                        <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                          {medicamentosReceita.map((med, idx) => (
+                            <label
+                              key={idx}
+                              className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
+                            >
+                              <Checkbox
+                                checked={docMedicamentosSelecionados.has(idx)}
+                                onCheckedChange={(checked) => {
+                                  setDocMedicamentosSelecionados(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(idx);
+                                    else next.delete(idx);
+                                    return next;
+                                  });
+                                }}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 truncate">{med.medicamento}</p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {[med.dosagem, med.posologia, med.duracao].filter(Boolean).join(" · ")}
+                                </p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        {docMedicamentosSelecionados.size === 0 && (
+                          <p className="text-[10px] text-amber-600 mt-1.5">Selecione ao menos um medicamento para gerar a receita.</p>
+                        )}
+                      </div>
+                    )}
+                    {isReceita && medicamentosReceita.length === 0 && (
+                      <div className="px-3 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p className="text-xs text-amber-700">Nenhum medicamento prescrito neste atendimento. Adicione prescrições antes de gerar a receita.</p>
+                      </div>
+                    )}
                     {hasDias && (
                       <div className="flex items-center justify-between gap-4">
                         <div>
@@ -3014,7 +3057,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   Cancelar
                 </button>
                 <button
-                  disabled={hasTextoLivre && opts.textoLivre.trim().length === 0}
+                  disabled={(hasTextoLivre && opts.textoLivre.trim().length === 0) || (isReceita && docMedicamentosSelecionados.size === 0)}
                   onClick={() => {
                     setDocConfigModalOpen(false);
                     handleGenerateDocument(docConfigModelId, {
@@ -3832,6 +3875,13 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
+                      const maxSize = 30 * 1024 * 1024; // 30MB
+                      if (file.size > maxSize) {
+                        toast.error(`Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). O tamanho máximo permitido é 30 MB.`);
+                        e.target.value = "";
+                        setArquivoExame(null);
+                        return;
+                      }
                       setArquivoExame(file);
                     }
                   }}
@@ -3847,7 +3897,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                     {arquivoExame ? arquivoExame.name : "Clique para selecionar arquivo"}
                   </span>
                   <span className="text-xs text-slate-400">
-                    JPEG, PNG, WebP ou PDF (máx. 10MB)
+                    JPEG, PNG, WebP ou PDF (máx. 30MB)
                   </span>
                 </label>
               </div>

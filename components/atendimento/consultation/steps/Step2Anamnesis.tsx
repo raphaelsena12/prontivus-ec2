@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -42,8 +41,6 @@ interface Step2AnamnesisProps {
   anamneseConfirmed: boolean;
   onConfirmAnamnese: () => void;
   onAdvance: () => void;
-  consultationMode?: "manual" | "ai";
-  onToggleMode?: (mode: "manual" | "ai") => void;
   isTranscribing?: boolean;
   startTranscription?: () => Promise<void>;
   transcriptionText?: string;
@@ -504,13 +501,6 @@ export function Step2Anamnesis({
   setEditedAnamnese,
   isAnamneseEdited,
   setIsAnamneseEdited,
-  isEditingAnamnese,
-  setIsEditingAnamnese,
-  anamneseConfirmed,
-  onConfirmAnamnese,
-  onAdvance,
-  consultationMode = "ai",
-  onToggleMode,
   isTranscribing,
   startTranscription,
   transcriptionText = "",
@@ -566,15 +556,12 @@ export function Step2Anamnesis({
   // ── Timer de gravação ──────────────────────────────────────────────────────
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [recordingVisible, setRecordingVisible] = useState(false);
 
   useEffect(() => {
     if (isTranscribing) {
       setRecordingSeconds(0);
-      setTimeout(() => setRecordingVisible(true), 10);
       timerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
     } else {
-      setRecordingVisible(false);
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       setRecordingSeconds(0);
     }
@@ -643,46 +630,110 @@ export function Step2Anamnesis({
     <div className="h-full overflow-x-hidden w-full min-w-0">
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm flex flex-col h-full overflow-x-hidden w-full min-w-0">
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center justify-between px-4 py-2.5 rounded-t-lg" style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #1E40AF 100%)" }}>
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#1E40AF]" />
-            <span className="text-base font-semibold text-slate-800">Anamnese</span>
+            <Sparkles className="w-4 h-4 text-blue-300" />
+            <span className="text-sm font-semibold text-white">Anamnese</span>
             {analysisResults && (
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full px-1.5 py-0.5">
+              <span className="text-[10px] bg-white/15 text-blue-100 border border-white/20 rounded-full px-1.5 py-0.5">
                 Gerada por IA
               </span>
             )}
           </div>
 
-          {/* Toggle Manual / Assistido por IA */}
-          {onToggleMode && (
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5">
-              <button
-                onClick={() => onToggleMode("manual")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  consultationMode === "manual"
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                Manual
-              </button>
-              <button
-                onClick={() => onToggleMode("ai")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
-                  consultationMode === "ai"
-                    ? "bg-white text-slate-800 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Sparkles className="w-3 h-3" />
-                Assistido por IA
-              </button>
-            </div>
+          {/* Botão Transcrição com IA */}
+          {startTranscription && !isTranscribing && (
+            <button
+              onClick={startTranscription}
+              className="h-8 px-4 rounded-lg text-xs font-semibold border transition-all duration-300 flex items-center gap-2 bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              Transcrição com IA
+            </button>
           )}
         </div>
 
-        {/* ── Corpo ── */}
+        {/* ── Painel de transcrição em tempo real ── */}
+        {isTranscribing && (
+          <>
+            <style>{`
+              @keyframes waveBar {
+                0%, 100% { height: 8px; }
+                50% { height: 20px; }
+              }
+            `}</style>
+            <div className="mx-3 mt-3 mb-1 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-1 duration-300">
+              {/* Header com glass-effect */}
+              <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-red-50/80 via-white/60 to-blue-50/40 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  {/* Ícone com anel animado */}
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-red-400/20 animate-ping" style={{ animationDuration: "2s" }} />
+                    <div className="relative w-8 h-8 rounded-full bg-red-500 flex items-center justify-center shadow-sm shadow-red-200">
+                      <Mic className="w-4 h-4 text-white" />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-800">Transcrição com IA</span>
+                      <span className="flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                        REC
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">Ouvindo e transcrevendo em tempo real</span>
+                  </div>
+                </div>
+                {/* Timer + waveform mini */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-end gap-[3px] h-5">
+                    {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.75].map((h, i) => (
+                      <div
+                        key={i}
+                        className="w-[3px] rounded-full"
+                        style={{
+                          background: `linear-gradient(to top, #ef4444, #3b82f6)`,
+                          animation: `waveBar ${0.5 + i * 0.08}s ease-in-out ${i * 0.06}s infinite`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm font-mono font-semibold text-slate-500 tabular-nums bg-slate-100 px-2.5 py-1 rounded-lg">
+                    {formatTimer(recordingSeconds)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Área de texto */}
+              <div
+                className="px-4 py-3 max-h-[180px] overflow-y-auto scroll-smooth"
+                ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+              >
+                {transcriptionText ? (
+                  <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {transcriptionText}
+                    <span className="inline-block w-[2px] h-[15px] bg-gradient-to-b from-red-400 to-blue-500 animate-pulse ml-1 align-text-bottom rounded-full" />
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2 py-2">
+                    <div className="flex gap-1">
+                      {[0, 150, 300].map((d) => (
+                        <div
+                          key={d}
+                          className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"
+                          style={{ animationDelay: `${d}ms` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-slate-400">Aguardando fala...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Corpo: sempre modo manual ── */}
         <div className="p-3 overflow-x-hidden flex-1 overflow-y-auto">
           {isProcessing ? (
             /* Loading IA */
@@ -698,143 +749,33 @@ export function Step2Anamnesis({
                 </div>
               ))}
             </div>
-          ) : consultationMode === "manual" ? (
-            /* ── Modo Manual: inputs por tópico ── */
-            <div className="divide-y divide-slate-100">
+          ) : (
+            <div className="space-y-4">
               {ANAMNESE_SECTIONS.map((section: { key: string; label: string; placeholder: string }) => (
-                <div key={section.key} className="space-y-1.5 pt-4 first:pt-0">
-                  <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    {section.label}
+                <div key={section.key} className="space-y-1.5">
+                  <label className="text-sm font-semibold text-slate-700 pl-0.5">
+                    {section.label.charAt(0) + section.label.slice(1).toLowerCase()}
                   </label>
                   <Textarea
                     value={sectionValues[section.key] || ""}
                     onChange={(e) => handleSectionChange(section.key, e.target.value)}
                     placeholder={section.placeholder}
-                    className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                    className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 placeholder:text-slate-350 transition-all"
                   />
                 </div>
               ))}
               {/* Campo manual exclusivo do médico */}
-              <div className="space-y-1.5 pt-4">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  ORIENTAÇÕES E CONDUTA
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700 pl-0.5">
+                  Orientações e conduta
                 </label>
                 <Textarea
                   value={orientacoesConduta}
                   onChange={(e) => handleOrientacoesCondutaChange(e.target.value)}
                   placeholder="Orientações ao paciente, plano terapêutico, encaminhamentos, retorno..."
-                  className="text-sm min-h-[72px] resize-none bg-slate-50 border-slate-200 focus-visible:ring-1 focus-visible:ring-[#1E40AF] focus-visible:bg-white transition-colors"
+                  className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 placeholder:text-slate-350 transition-all"
                 />
               </div>
-            </div>
-          ) : isTranscribing ? (
-            /* ── Estado de gravação ativo ── */
-            <>
-              <style>{`
-                @keyframes barWave {
-                  0%, 100% { transform: scaleY(0.25); }
-                  50% { transform: scaleY(1); }
-                }
-              `}</style>
-              <div
-                className="flex flex-col items-center justify-center py-10 px-6 text-center select-none"
-                style={{
-                  opacity: recordingVisible ? 1 : 0,
-                  transform: recordingVisible ? "translateY(0)" : "translateY(12px)",
-                  transition: "opacity 0.4s ease, transform 0.4s ease",
-                }}
-              >
-                {/* Badge */}
-                <div className="flex items-center gap-1.5 mb-8">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-xs font-bold text-red-600 uppercase tracking-widest">Em gravação</span>
-                  <span className="ml-2 text-sm font-mono font-semibold text-slate-500 tabular-nums">{formatTimer(recordingSeconds)}</span>
-                </div>
-
-                {/* Waveform */}
-                <div className="flex items-end gap-1 h-12 mb-8">
-                  {[0.55, 0.8, 1, 0.7, 0.9, 0.5, 0.75, 0.95, 0.6, 0.85].map((h, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: 4,
-                        height: `${h * 44}px`,
-                        borderRadius: 4,
-                        background: i < 5 ? "#dc2626" : "#1E40AF",
-                        transformOrigin: "bottom",
-                        animation: `barWave ${0.6 + i * 0.07}s ease-in-out ${i * 0.08}s infinite`,
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* Prévia da transcrição */}
-                {transcriptionText ? (
-                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed italic line-clamp-3 mb-2">
-                    &ldquo;{transcriptionText.slice(-180).trimStart()}&rdquo;
-                  </p>
-                ) : (
-                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-2">
-                    Aguardando fala...
-                  </p>
-                )}
-                <p className="text-[11px] text-slate-300 mt-4">
-                  A anamnese será gerada ao encerrar a gravação
-                </p>
-              </div>
-            </>
-          ) : (
-            /* ── Aba IA: CTA de gravação ── */
-            <div
-              className="flex flex-col items-center justify-center py-12 px-6 text-center select-none"
-              style={{ transition: "opacity 0.3s ease", opacity: 1 }}
-            >
-              {!anamneseText && (
-                <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-widest mb-5">
-                  Passo 1 — Iniciar consulta
-                </p>
-              )}
-              <div className="relative mb-6">
-                {!anamneseText && (
-                  <>
-                    <div className="absolute inset-0 rounded-full bg-blue-100 animate-ping opacity-30" style={{ animationDuration: "2s" }} />
-                    <div className="absolute inset-0 rounded-full bg-blue-50 animate-ping opacity-40" style={{ animationDuration: "2.5s", animationDelay: "0.5s" }} />
-                  </>
-                )}
-                <div className={`relative w-20 h-20 rounded-full flex items-center justify-center ${anamneseText ? "bg-emerald-50" : "bg-blue-600"}`}>
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${anamneseText ? "bg-emerald-100" : "bg-blue-500"}`}>
-                    <Mic className={`w-7 h-7 ${anamneseText ? "text-emerald-600" : "text-white"}`} />
-                  </div>
-                </div>
-              </div>
-              {anamneseText ? (
-                <>
-                  <p className="text-base font-semibold text-slate-700 mb-1.5">Anamnese gerada</p>
-                  <p className="text-sm text-slate-400 max-w-xs leading-relaxed mb-5">
-                    Os campos foram preenchidos na aba <strong>Manual</strong>. Grave novamente para atualizar.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-lg font-bold text-slate-800 mb-2">Pronto para começar</p>
-                  <p className="text-sm text-slate-500 max-w-xs leading-relaxed mb-7">
-                    Inicie a gravação. A anamnese será gerada automaticamente ao encerrar.
-                  </p>
-                </>
-              )}
-              {startTranscription && (
-                <Button
-                  onClick={startTranscription}
-                  className={`h-11 px-8 text-sm gap-2 font-semibold rounded-xl shadow-lg transition-all ${
-                    anamneseText
-                      ? "bg-slate-700 hover:bg-slate-800 text-white shadow-slate-200"
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200 hover:shadow-blue-300 hover:scale-[1.02]"
-                  }`}
-                >
-                  <Mic className="w-4 h-4" />
-                  {anamneseText ? "Gravar Novamente" : "Iniciar Gravação"}
-                </Button>
-              )}
             </div>
           )}
         </div>

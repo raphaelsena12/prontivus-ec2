@@ -30,6 +30,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Limite de 30MB
+    const maxSize = 30 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: `Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). O tamanho máximo permitido é 30 MB.` },
+        { status: 413 }
+      );
+    }
+
     // Verificar se a consulta pertence à clínica e ao médico
     // O exame será vinculado à consulta atual, mas será visível em todas as consultas do paciente
     const consulta = await prisma.consulta.findFirst({

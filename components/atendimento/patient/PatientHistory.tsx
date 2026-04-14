@@ -1,21 +1,20 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ChevronDown,
-  ChevronRight,
   FileText,
   FileImage,
   Calendar,
   ExternalLink,
-  Download,
   Loader2,
-  ClipboardList,
-  Clock,
   Stethoscope,
+  FlaskConical,
+  Pill,
+  History,
+  Video,
 } from "lucide-react";
 
 interface HistoricoConsulta {
@@ -68,7 +67,7 @@ const filterDisplay: Record<FilterType, string> = {
   medicamentos: "Medicamentos",
 };
 
-type TimelineEvent = 
+type TimelineEvent =
   | { type: "consulta"; data: HistoricoConsulta }
   | { type: "exame"; data: ExameAnexado };
 
@@ -77,9 +76,14 @@ function isRecente(data: Date | string): boolean {
   return Date.now() - d.getTime() < 30 * 24 * 60 * 60 * 1000;
 }
 
-function formatDateTime(dataHora: string | Date): string {
+function formatDateBR(dataHora: string | Date): string {
   const d = typeof dataHora === "string" ? new Date(dataHora) : dataHora;
-  return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function formatTimeBR(dataHora: string | Date): string {
+  const d = typeof dataHora === "string" ? new Date(dataHora) : dataHora;
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function getEventDate(event: TimelineEvent): Date {
@@ -88,6 +92,12 @@ function getEventDate(event: TimelineEvent): Date {
   } else {
     return event.data.data instanceof Date ? event.data.data : new Date(event.data.data);
   }
+}
+
+function getConsultaTypeIcon(tipoNome?: string) {
+  const nome = (tipoNome || "").toLowerCase();
+  if (nome.includes("tele")) return <Video className="w-3.5 h-3.5" />;
+  return <Stethoscope className="w-3.5 h-3.5" />;
 }
 
 export function PatientHistory({
@@ -104,200 +114,163 @@ export function PatientHistory({
 }: PatientHistoryProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("todos");
 
-  // Criar timeline unificada com consultas e exames
   const timelineEvents = useMemo(() => {
     const events: TimelineEvent[] = [];
-
-    // Adicionar consultas
-    historicoConsultas.forEach((consulta) => {
-      events.push({ type: "consulta", data: consulta });
-    });
-
-    // Adicionar exames anteriores (não da consulta atual)
+    historicoConsultas.forEach((c) => events.push({ type: "consulta", data: c }));
     examesAnexados
       .filter((e) => !e.isFromCurrentConsulta)
-      .forEach((exame) => {
-        events.push({ type: "exame", data: exame });
-      });
-
-    // Ordenar por data (mais recente primeiro)
-    events.sort((a, b) => {
-      const dateA = getEventDate(a);
-      const dateB = getEventDate(b);
-      return dateB.getTime() - dateA.getTime();
-    });
-
+      .forEach((e) => events.push({ type: "exame", data: e }));
+    events.sort((a, b) => getEventDate(b).getTime() - getEventDate(a).getTime());
     return events;
   }, [historicoConsultas, examesAnexados]);
 
-  // Filtrar eventos baseado no filtro ativo
   const filteredEvents = useMemo(() => {
     if (activeFilter === "todos") return timelineEvents;
-    if (activeFilter === "consultas") {
-      return timelineEvents.filter((e) => e.type === "consulta");
-    }
-    if (activeFilter === "exames") {
-      return timelineEvents.filter((e) => e.type === "exame");
-    }
-    if (activeFilter === "medicamentos") {
-      return []; // Medicamentos ainda não implementados
-    }
-    return timelineEvents;
+    if (activeFilter === "consultas") return timelineEvents.filter((e) => e.type === "consulta");
+    if (activeFilter === "exames") return timelineEvents.filter((e) => e.type === "exame");
+    return [];
   }, [timelineEvents, activeFilter]);
 
   const totalEvents = historicoConsultas.length + examesAnexados.filter((e) => !e.isFromCurrentConsulta).length;
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-      {/* Header colapsável */}
+      {/* Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors text-left"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/60 transition-colors text-left"
       >
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-slate-500" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-slate-500" />
-          )}
-          <span className="text-sm font-semibold text-slate-800">Histórico do Paciente</span>
-          {!isExpanded && totalEvents > 0 && (
-            <Badge variant="outline" className="text-xs text-slate-500 border-slate-200 bg-slate-50">
-              {totalEvents} evento{totalEvents !== 1 ? "s" : ""}
-            </Badge>
+        <div className="flex items-center gap-2.5">
+          <History className="w-4 h-4 text-blue-600" />
+          <span className="text-[13px] font-bold text-slate-800">Histórico do Paciente</span>
+          {totalEvents > 0 && (
+            <span className="text-[11px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
+              {totalEvents}
+            </span>
           )}
         </div>
-        <span className="text-xs text-[#1E40AF] font-medium">
-          {isExpanded ? "Recolher" : "Expandir"}
-        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "" : "-rotate-90"}`} />
       </button>
 
-      {/* Conteúdo colapsável */}
+      {/* Content */}
       {isExpanded && (
         <div className="border-t border-slate-100">
-          <div className="p-4">
-            {/* Filtros */}
-            <div className="flex gap-1.5 mb-3 flex-wrap">
-              {filterLabels.map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setActiveFilter(f)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    activeFilter === f
-                      ? "bg-[#1E40AF] text-white border-[#1E40AF]"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  {filterDisplay[f]}
-                </button>
-              ))}
-            </div>
+          {/* Filters */}
+          <div className="px-5 pt-3 pb-1 flex gap-1.5">
+            {filterLabels.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={`text-[11px] px-3 py-1.5 rounded-full font-semibold transition-all ${
+                  activeFilter === f
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                }`}
+              >
+                {filterDisplay[f]}
+              </button>
+            ))}
+          </div>
 
+          <div className="px-3 pb-3 pt-2">
             {loadingHistorico ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+              <div className="flex flex-col items-center justify-center py-10 gap-2">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                <span className="text-xs text-slate-400">Carregando histórico...</span>
               </div>
             ) : filteredEvents.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">Nenhum evento encontrado</p>
+              <div className="text-center py-10">
+                <Calendar className="w-7 h-7 text-slate-200 mx-auto mb-2" />
+                <p className="text-xs text-slate-400 font-medium">Nenhum evento encontrado</p>
               </div>
             ) : (
-              <ScrollArea className="max-h-96">
-                <div className="space-y-2">
+              <ScrollArea className="max-h-[400px]">
+                <div className="divide-y divide-slate-100">
                   {filteredEvents.map((event) => {
                     if (event.type === "consulta") {
                       const consulta = event.data;
                       const isOpen = expandedConsultas.has(consulta.id);
+                      const tipoNome = consulta.tipoConsulta?.nome || "";
                       return (
-                        <div
-                          key={`consulta-${consulta.id}`}
-                          className="border border-slate-100 rounded-lg overflow-hidden"
-                        >
+                        <div key={`c-${consulta.id}`}>
                           <button
                             onClick={() => onToggleConsulta(consulta.id)}
-                            className="w-full flex items-center justify-between p-3 hover:bg-slate-50 text-left gap-3"
+                            className="w-full flex items-center gap-3 px-3 py-3 hover:bg-slate-50 text-left transition-colors"
                           >
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                              <Stethoscope className="w-4 h-4 text-[#1E40AF] flex-shrink-0" />
-                              <span className="text-xs font-medium text-slate-800 whitespace-nowrap">
-                                {formatDateTime(consulta.dataHora)}
+                            <Stethoscope className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-800">
+                                  {tipoNome || "Consulta"}
+                                </span>
+                                {consulta.prontuario?.diagnostico && (
+                                  <span className="text-[11px] text-slate-400 truncate hidden sm:inline">
+                                    — {consulta.prontuario.diagnostico}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-slate-400">
+                                {formatDateBR(consulta.dataHora)} às {formatTimeBR(consulta.dataHora)}
                               </span>
-                              <span className="text-xs text-slate-500 whitespace-nowrap">Consulta</span>
-                              {consulta.tipoConsulta && (
-                                <span className="text-xs text-slate-500 truncate">
-                                  {consulta.tipoConsulta.nome}
-                                </span>
-                              )}
-                              {consulta.prontuario?.diagnostico && (
-                                <span className="text-xs text-slate-400 truncate">
-                                  {consulta.prontuario.diagnostico}
-                                </span>
-                              )}
                             </div>
-                            <ChevronDown
-                              className={`w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform ${
-                                isOpen ? "rotate-180" : ""
-                              }`}
-                            />
+                            <ChevronDown className={`w-4 h-4 text-slate-300 flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
                           </button>
                           {isOpen && (
-                            <div className="px-3 pb-3 border-t border-slate-50 bg-slate-50/50">
+                            <div className="mx-3 mb-3 px-3 py-2.5 bg-slate-50 rounded-lg border border-slate-100">
                               {consulta.prontuario?.anamnese && (
-                                <p className="text-xs text-slate-600 mt-2 line-clamp-3">
+                                <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">
                                   {consulta.prontuario.anamnese}
                                 </p>
                               )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              <button
                                 onClick={() => onViewDocumentos(consulta.id)}
-                                className="h-6 px-2 text-xs gap-1 text-[#1E40AF] hover:bg-blue-50 mt-2"
+                                className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1.5 transition-colors"
                               >
-                                <FileText className="w-3 h-3" />
-                                Ver documentos
-                              </Button>
+                                <FileText className="w-3.5 h-3.5" />
+                                Ver ficha de atendimento
+                              </button>
                             </div>
                           )}
                         </div>
                       );
                     } else {
-                      // Evento é um exame
                       const exame = event.data;
                       const exameDate = exame.data instanceof Date ? exame.data : new Date(exame.data);
+                      const recente = isRecente(exameDate);
                       return (
                         <div
-                          key={`exame-${exame.id}`}
-                          className="flex items-center justify-between p-3 border border-slate-100 rounded-lg hover:bg-slate-50 gap-3"
+                          key={`e-${exame.id}`}
+                          className="flex items-center gap-3 px-3 py-3 hover:bg-slate-50 transition-colors group"
                         >
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                            {exame.isImage ? (
-                              <FileImage className="w-4 h-4 text-blue-400 flex-shrink-0" />
-                            ) : (
-                              <FileText className="w-4 h-4 text-red-400 flex-shrink-0" />
-                            )}
-                            <span className="text-xs font-medium text-slate-800 whitespace-nowrap">
-                              {formatDateTime(exameDate)}
-                            </span>
-                            <span className="text-xs text-slate-500 whitespace-nowrap">Exame</span>
-                            <span className="text-xs font-medium text-slate-800 truncate">
-                              {exame.nome}
-                            </span>
-                            <span className="text-[10px] text-slate-400 whitespace-nowrap">{exame.tipo}</span>
-                            {isRecente(exameDate) && (
-                              <Badge className="text-[10px] px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 h-4 whitespace-nowrap">
-                                Recente
-                              </Badge>
-                            )}
+                          {exame.isImage ? (
+                            <FileImage className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800 truncate">{exame.nome}</span>
+                              {recente && (
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 flex-shrink-0">
+                                  Recente
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-400">
+                                {formatDateBR(exameDate)} às {formatTimeBR(exameDate)}
+                              </span>
+                              <span className="text-[11px] text-slate-300">·</span>
+                              <span className="text-[11px] text-slate-400">{exame.tipo}</span>
+                            </div>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
+                          <button
                             onClick={() => onDownloadExame(exame.id, exame.s3Key)}
-                            className="h-7 w-7 p-0 text-[#1E40AF] hover:bg-blue-50 flex-shrink-0"
+                            className="p-2 rounded-lg text-slate-300 hover:text-blue-600 hover:bg-blue-50 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                            title="Abrir exame"
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </Button>
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
                         </div>
                       );
                     }

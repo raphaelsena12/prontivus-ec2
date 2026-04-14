@@ -228,6 +228,9 @@ export async function POST(request: NextRequest) {
       pacienteNome: consulta.paciente.nome,
       pacienteCpf: dados?.ocultarCpf ? "" : consulta.paciente.cpf,
       pacienteDataNascimento: dataNascFormatada,
+      pacienteMatricula: consulta.paciente.numeroProntuario
+        ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
+        : undefined,
       dataEmissao,
       cidade: dados?.cidade || undefined,
     };

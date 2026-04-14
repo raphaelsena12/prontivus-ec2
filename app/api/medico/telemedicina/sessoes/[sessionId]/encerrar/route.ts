@@ -32,7 +32,7 @@ export async function POST(
             dataHora: true,
             pacienteId: true,
             paciente: {
-              select: { id: true, nome: true, cpf: true, dataNascimento: true },
+              select: { id: true, nome: true, cpf: true, dataNascimento: true, numeroProntuario: true },
             },
             medico: {
               select: {
@@ -147,6 +147,9 @@ export async function POST(
           pacienteNome: consulta.paciente.nome,
           pacienteCpf: consulta.paciente.cpf,
           pacienteDataNascimento: dataNascPronFmt,
+          pacienteMatricula: consulta.paciente.numeroProntuario
+            ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
+            : undefined,
           dataEmissao: dataEmissaoPron,
           dataConsulta: consulta.dataHora.toISOString().split("T")[0],
           anamnese: prontuarioExistente.anamnese || "",
@@ -258,6 +261,9 @@ export async function POST(
         pacienteNome: consulta.paciente.nome,
         pacienteCpf: consulta.paciente.cpf,
         pacienteDataNascimento: dataNascFormatada,
+        pacienteMatricula: consulta.paciente.numeroProntuario
+          ? String(consulta.paciente.numeroProntuario).padStart(6, "0")
+          : undefined,
         dataEmissao,
         fichaNumero,
         dataConsulta: dataConsultaFormatada,

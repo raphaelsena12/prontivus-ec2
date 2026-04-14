@@ -348,6 +348,10 @@ export function useTranscription() {
     async (_remoteAudioEl?: HTMLAudioElement | null) => {
       if (isTranscribingRef.current) return;
 
+      // Limpar transcrição anterior
+      setTranscription([]);
+      transcriptionRef.current = [];
+
       intentionalStopRef.current = false;
       reconnectAttemptsRef.current = 0;
 

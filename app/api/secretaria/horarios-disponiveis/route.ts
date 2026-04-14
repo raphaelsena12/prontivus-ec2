@@ -56,6 +56,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "medicoId e data são obrigatórios" }, { status: 400 });
     }
 
+    const dataInicio = new Date(`${dataParam}T00:00:00-03:00`);
+    if (isNaN(dataInicio.getTime())) {
+      return NextResponse.json({ error: "Data inválida" }, { status: 400 });
+    }
+
     const medico = await prisma.medico.findFirst({
       where: { id: medicoId, clinicaId: auth.clinicaId, ativo: true },
       select: { id: true },
@@ -64,7 +69,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Médico não encontrado" }, { status: 404 });
     }
 
-    const dataInicio = new Date(`${dataParam}T00:00:00-03:00`);
     const dataFimDia = new Date(`${dataParam}T23:59:59-03:00`);
     const faixas = await obterFaixasAgendaMedicoParaData(auth.clinicaId!, medicoId, dataInicio);
 
