@@ -46,14 +46,23 @@ interface CidsTableProps {
   data: Cid[];
   onEdit: (cid: Cid) => void;
   onDelete: (cid: Cid) => void;
+  /** Server-side pagination props (when provided, pagination and search are handled externally) */
+  serverPagination?: {
+    total: number;
+    page: number;
+    pageSize: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
-export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
+export function CidsTable({ data, onEdit, onDelete, serverPagination }: CidsTableProps) {
+  const isServerPaginated = !!serverPagination;
   const [search, setSearch] = React.useState("");
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
 
   const filtered = React.useMemo(() => {
+    if (isServerPaginated) return data;
     if (!search.trim()) return data;
     const s = search.toLowerCase();
     return data.filter((item) =>
@@ -67,7 +76,7 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
       (item.categoria || "").toLowerCase().includes(s) ||
       (item.subcategoria || "").toLowerCase().includes(s)
     );
-  }, [data, search]);
+  }, [data, search, isServerPaginated]);
 
   const columns = React.useMemo<ColumnDef<Cid>[]>(
     () => [
@@ -131,29 +140,42 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
     [onDelete, onEdit]
   );
 
+  const serverPageCount = serverPagination
+    ? Math.ceil(serverPagination.total / serverPagination.pageSize)
+    : undefined;
+
   const table = useReactTable({
     data: filtered,
     columns,
-    state: { sorting, pagination },
+    state: {
+      sorting,
+      pagination: isServerPaginated
+        ? { pageIndex: serverPagination!.page - 1, pageSize: serverPagination!.pageSize }
+        : pagination,
+    },
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    onPaginationChange: isServerPaginated ? undefined : setPagination,
+    manualPagination: isServerPaginated,
+    pageCount: serverPageCount,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: isServerPaginated ? undefined : getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
 
   return (
     <div className="px-6 py-4 space-y-4">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por grupo/categoria/subcategoria..."
-          className="pl-9"
-        />
-      </div>
+      {!isServerPaginated && (
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por grupo/categoria/subcategoria..."
+            className="pl-9"
+          />
+        </div>
+      )}
 
       <Table>
         <TableHeader className="bg-slate-100">
@@ -189,26 +211,40 @@ export function CidsTable({ data, onEdit, onDelete }: CidsTableProps) {
       </Table>
 
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{filtered.length} CID(s) encontrado(s)</p>
+        <p className="text-xs text-muted-foreground">
+          {isServerPaginated ? serverPagination!.total : filtered.length} CID(s) encontrado(s)
+        </p>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="icon"
             className="h-7 w-7"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            onClick={() => {
+              if (isServerPaginated) {
+                serverPagination!.onPageChange(serverPagination!.page - 1);
+              } else {
+                table.previousPage();
+              }
+            }}
+            disabled={isServerPaginated ? serverPagination!.page <= 1 : !table.getCanPreviousPage()}
           >
             <IconChevronLeft className="h-3.5 w-3.5" />
           </Button>
           <span className="text-xs">
-            Pagina {table.getState().pagination.pageIndex + 1} de {table.getPageCount() || 1}
+            Pagina {isServerPaginated ? serverPagination!.page : table.getState().pagination.pageIndex + 1} de {isServerPaginated ? (serverPageCount || 1) : (table.getPageCount() || 1)}
           </span>
           <Button
             variant="outline"
             size="icon"
             className="h-7 w-7"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            onClick={() => {
+              if (isServerPaginated) {
+                serverPagination!.onPageChange(serverPagination!.page + 1);
+              } else {
+                table.nextPage();
+              }
+            }}
+            disabled={isServerPaginated ? serverPagination!.page >= (serverPageCount || 1) : !table.getCanNextPage()}
           >
             <IconChevronRight className="h-3.5 w-3.5" />
           </Button>

@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = (searchParams.get("search") || "").trim();
     const ativo = searchParams.get("ativo");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "1000"), 5000);
+    const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
+    const pageSize = Math.min(Math.max(parseInt(searchParams.get("pageSize") || "50"), 1), 100);
 
     const where: any = {
       clinicaId: null,
@@ -64,13 +65,17 @@ export async function GET(request: NextRequest) {
       }),
     };
 
-    const cids = await prisma.cid.findMany({
-      where,
-      orderBy: [{ codigo: "asc" }],
-      take: limit,
-    });
+    const [cids, total] = await Promise.all([
+      prisma.cid.findMany({
+        where,
+        orderBy: [{ codigo: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.cid.count({ where }),
+    ]);
 
-    return NextResponse.json({ cids });
+    return NextResponse.json({ cids, total, page, pageSize });
   } catch (error) {
     console.error("Erro ao listar CIDs (super-admin):", error);
     return NextResponse.json({ error: "Erro ao listar CIDs" }, { status: 500 });

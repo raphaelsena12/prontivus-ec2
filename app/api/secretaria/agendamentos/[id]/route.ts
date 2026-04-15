@@ -107,6 +107,8 @@ export async function GET(
             select: {
               nome: true,
               email: true,
+              whatsappContatoNumero: true,
+              telefone: true,
             },
           },
           documentos: {
@@ -259,6 +261,8 @@ export async function PATCH(
             select: {
               nome: true,
               email: true,
+              whatsappContatoNumero: true,
+              telefone: true,
             },
           },
         },
@@ -470,6 +474,8 @@ export async function PATCH(
           select: {
             nome: true,
             email: true,
+            telefone: true,
+            whatsappContatoNumero: true,
           },
         },
       },
@@ -546,6 +552,7 @@ export async function PATCH(
               minute: "2-digit",
               timeZone: "America/Sao_Paulo",
             });
+            const numeroContatoClinica = (agendamentoAtualizado.clinica.whatsappContatoNumero || agendamentoAtualizado.clinica.telefone || "").replace(/\D/g, "");
             await service.sendTemplateMessage({
               to: celular,
               message: "",
@@ -556,6 +563,7 @@ export async function PATCH(
                 horaFormatada,
                 agendamentoAtualizado.clinica.nome,
                 agendamentoAtualizado.medico.usuario.nome,
+                numeroContatoClinica,
               ],
             });
           }
@@ -690,6 +698,8 @@ export async function DELETE(
           select: {
             nome: true,
             email: true,
+            telefone: true,
+            whatsappContatoNumero: true,
           },
         },
       },
@@ -742,6 +752,8 @@ export async function DELETE(
           select: {
             nome: true,
             email: true,
+            telefone: true,
+            whatsappContatoNumero: true,
           },
         },
       },
@@ -813,6 +825,7 @@ export async function DELETE(
             minute: "2-digit",
             timeZone: "America/Sao_Paulo",
           });
+          const numeroContatoClinica = (agendamentoCancelado.clinica.whatsappContatoNumero || agendamentoCancelado.clinica.telefone || "").replace(/\D/g, "");
           await service.sendTemplateMessage({
             to: celularCanc,
             message: "",
@@ -823,6 +836,7 @@ export async function DELETE(
               horaFormatada,
               agendamentoCancelado.clinica.nome,
               agendamentoCancelado.medico.usuario.nome,
+              numeroContatoClinica,
             ],
           });
         }

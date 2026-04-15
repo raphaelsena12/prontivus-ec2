@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Stethoscope, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Filter, Loader2, Plus, Search, Stethoscope, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { UploadExcelDialog } from "@/components/upload-excel-dialog";
 
@@ -29,42 +30,63 @@ interface Cid {
 }
 
 const API_BASE = "/api/super-admin/cids";
+const PAGE_SIZE = 50;
 
 export function CidsSuperAdminContent() {
   const [cids, setCids] = useState<Cid[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Cid | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Cid | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 400);
+  }, []);
 
   const fetchCids = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}?limit=5000`);
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      const res = await fetch(`${API_BASE}?${params}`);
       if (!res.ok) throw new Error("Erro ao carregar CIDs");
       const data = await res.json();
       setCids(data.cids || []);
+      setTotal(data.total || 0);
     } catch (e) {
       console.error(e);
       toast.error("Erro ao carregar CIDs");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
     fetchCids();
   }, [fetchCids]);
 
-  const handleSuccess = () => {
+  const handleSuccess = useCallback(() => {
     fetchCids();
     setDialogOpen(false);
     setDeleteOpen(false);
     setEditing(null);
     setToDelete(null);
-  };
+  }, [fetchCids]);
 
   return (
     <div className="@container/main flex flex-1 flex-col px-4 lg:px-6 py-6">
@@ -76,8 +98,21 @@ export function CidsSuperAdminContent() {
 
       <Card className="bg-white border shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
-          <CardTitle className="text-sm font-semibold">Lista de CIDs</CardTitle>
+          <div className="flex items-center gap-1.5">
+            <Filter className="h-3 w-3 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Lista de CIDs</CardTitle>
+          </div>
           <div className="flex items-center gap-2">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground z-10 pointer-events-none" />
+              <Input
+                type="search"
+                placeholder="Buscar por código ou descrição..."
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 h-8 text-xs bg-background w-64"
+              />
+            </div>
             <Button
               variant="outline"
               onClick={() => setUploadDialogOpen(true)}
@@ -121,6 +156,12 @@ export function CidsSuperAdminContent() {
               onDelete={(cid) => {
                 setToDelete(cid);
                 setDeleteOpen(true);
+              }}
+              serverPagination={{
+                total,
+                page,
+                pageSize: PAGE_SIZE,
+                onPageChange: setPage,
               }}
             />
           )}
