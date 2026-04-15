@@ -1860,7 +1860,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           tipoDocumento: "ficha-atendimento",
           consultaId,
           dados: {
-            anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+            anamnese: editedAnamnese || prontuario?.anamnese || analysisResults?.anamnese || "",
             cidCodes: selectedCidsList,
             exames: allExames,
             protocolos: allProtocolos,
@@ -1929,7 +1929,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         },
         body: JSON.stringify({
           consultaId,
-          anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+          anamnese: editedAnamnese || prontuario?.anamnese || analysisResults?.anamnese || "",
           exameFisico: prontuario?.exameFisico || "",
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
@@ -1980,7 +1980,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         },
         body: JSON.stringify({
           consultaId,
-          anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+          anamnese: editedAnamnese || prontuario?.anamnese || analysisResults?.anamnese || "",
           exameFisico: prontuario?.exameFisico || "",
           diagnostico: prontuario?.diagnostico || "",
           conduta: prontuario?.conduta || "",
@@ -2026,7 +2026,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
           tipoDocumento: "ficha-atendimento",
           consultaId,
           dados: {
-            anamnese: prontuario?.anamnese || analysisResults?.anamnese || "",
+            anamnese: editedAnamnese || prontuario?.anamnese || analysisResults?.anamnese || "",
             cidCodes: selectedCidsList,
             exames: allExames,
             protocolos: allProtocolos,
