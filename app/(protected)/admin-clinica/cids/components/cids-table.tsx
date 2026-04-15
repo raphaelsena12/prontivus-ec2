@@ -82,30 +82,25 @@ export function CidsTable({ data, onEdit, onDelete, serverPagination }: CidsTabl
     () => [
       {
         id: "categoria_cod",
-        header: "categoria_cod",
+        header: "Cód. Categoria",
         cell: ({ row }) => <Badge variant="outline">{row.original.categoriaCod || "-"}</Badge>,
       },
       {
         id: "categoria_nome",
-        header: "categoria_nome",
+        header: "Categoria",
         cell: ({ row }) => row.original.categoriaNome || "-",
       },
       {
         id: "subcategoria_cod",
-        header: "subcategoria_cod",
+        header: "Cód. Subcategoria",
         cell: ({ row }) => (
           <Badge variant="outline">{row.original.subcategoriaCod || row.original.codigo}</Badge>
         ),
       },
       {
         id: "subcategoria_nome",
-        header: "subcategoria_nome",
+        header: "Subcategoria",
         cell: ({ row }) => row.original.subcategoriaNome || row.original.descricao,
-      },
-      {
-        id: "grupo_nome",
-        header: "grupo_nome",
-        cell: ({ row }) => row.original.grupoNome || "-",
       },
       {
         accessorKey: "ativo",
