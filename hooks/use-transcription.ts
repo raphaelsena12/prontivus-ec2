@@ -15,6 +15,48 @@ export const TRANSCRIPTION_MIN_WORDS = 20;
 
 const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview";
 
+// ─── Filtros anti-alucinação ──────────────────────────────────────────────────
+// Padrões de alucinação conhecidos do Whisper/gpt-4o-transcribe em PT
+const HALLUCINATION_PATTERNS = [
+  // Despedidas e saudações isoladas (alucinação clássica com silêncio)
+  /^(obrigad[ao]|tchau|até logo|até mais|até a próxima|adeus|boa tarde|bom dia|boa noite)\.?[!]?$/i,
+  // Preenchimentos vocais isolados
+  /^(sim|não|ok|okay|tá|claro|certo|ahh?|umm?|hmm?|hã|né|pois|então)[!.,]?$/i,
+  // Pontuação isolada
+  /^[\s.,!?;:…\-–—]+$/,
+  // Alucinações de plataformas de vídeo
+  /^(se inscreva|inscreva-se|deixe um like|curta|compartilhe|ative o sino)/i,
+  // Alucinações de legenda
+  /^(legenda(do)?|legend|subtitle|closed caption|transcri(ção|bing))/i,
+  // Repetição de curtos ruídos
+  /^(.)\1{4,}$/,
+  // Músicas/jingles (alucinação com ruído de fundo)
+  /^(♪|🎵|🎶|\[música\]|\[music\]|\[ruído\]|\[noise\])/i,
+  // Tags de ação (alucinação de transcrições de vídeo)
+  /^\[.{1,30}\]$/,
+];
+
+const MIN_CHARS_FOR_ENTRY = 8; // mínimo de caracteres para aceitar
+const MIN_WORDS_FOR_ENTRY = 2; // mínimo de palavras para aceitar
+
+function isHallucination(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length < MIN_CHARS_FOR_ENTRY) return true;
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  if (wordCount < MIN_WORDS_FOR_ENTRY) return true;
+  return HALLUCINATION_PATTERNS.some((p) => p.test(trimmed));
+}
+
+function isDuplicate(text: string, prev: TranscriptionEntry[]): boolean {
+  if (prev.length === 0) return false;
+  const current = text.trim().toLowerCase().replace(/[.,!?;:]/g, "");
+  // Verifica as últimas 3 entradas para pegar repetições com variação de pontuação
+  const recent = prev.slice(-3).map((e) => e.text.trim().toLowerCase().replace(/[.,!?;:]/g, ""));
+  return recent.some(
+    (last) => last === current || last.endsWith(current) || current.endsWith(last)
+  );
+}
+
 export function useTranscription() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -153,7 +195,7 @@ export function useTranscription() {
       // Parcial: delta chegando enquanto o usuário fala
       case "conversation.item.input_audio_transcription.delta": {
         const delta: string = msg.delta || "";
-        if (!delta) return;
+        if (!delta || isHallucination(delta)) return;
         setTranscription((prev) => {
           if (hasPartialRef.current && prev.length > 0 && prev[prev.length - 1].isPartial) {
             const last = prev[prev.length - 1];
@@ -175,6 +217,8 @@ export function useTranscription() {
         setTranscription((prev) => {
           const base = hasPartialRef.current ? prev.slice(0, -1) : prev;
           hasPartialRef.current = false;
+          // Filtrar alucinações e duplicatas antes de adicionar
+          if (isHallucination(text) || isDuplicate(text, base)) return base;
           return [...base, { time: formatTime(new Date()), speaker: "Médico", text }];
         });
         break;
@@ -261,7 +305,6 @@ export function useTranscription() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        // Configurar sessão: VAD + transcrição PT
         ws.send(
           JSON.stringify({
             type: "session.update",
@@ -270,15 +313,20 @@ export function useTranscription() {
               instructions: "",
               input_audio_format: "pcm16",
               input_audio_transcription: {
-                model: "whisper-1",
+                model: "gpt-4o-transcribe",
                 language: "pt",
+                prompt:
+                  "Transcrição de consulta médica em português brasileiro. " +
+                  "Espere termos médicos, nomes de medicamentos, sintomas, diagnósticos e procedimentos clínicos. " +
+                  "Transcreva apenas o que for dito. Se não houver fala clara, não transcreva nada.",
               },
               turn_detection: {
-                type: "server_vad",
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 600,
+                type: "semantic_vad",
+                eagerness: "low",
                 create_response: false,
+              },
+              input_audio_noise_reduction: {
+                type: "far_field",
               },
             },
           })
