@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sendEmail, gerarEmailRecuperacaoSenha, gerarEmailRecuperacaoSenhaTexto } from "@/lib/email";
 import * as smtpService from "@/lib/email/smtp-service";
 import { randomBytes } from "crypto";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação
 const recuperarSenhaSchema = z.object({
@@ -28,8 +29,8 @@ export async function POST(request: NextRequest) {
     // Buscar usuário
     let usuario;
     try {
-      usuario = await prisma.usuario.findUnique({
-        where: { email },
+      usuario = await prisma.usuario.findFirst({
+        where: { emailHash: blindIndex(email) },
         select: { id: true, nome: true, email: true, ativo: true },
       });
     } catch (dbError) {

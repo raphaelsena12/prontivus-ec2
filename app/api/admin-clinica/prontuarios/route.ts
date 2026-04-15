@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { getTenantFilter } from "@/lib/prisma-helpers";
 import { auditLogFromRequest } from "@/lib/audit-log";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tenantFilter = getTenantFilter(auth.userType, auth.clinicaId);
+    const cpfOnly = search.replace(/\D/g, "");
 
     const where: any = {
       ...(tenantFilter && tenantFilter),
@@ -80,9 +82,8 @@ export async function GET(request: NextRequest) {
       ...(search && {
         OR: [
           { paciente: { nome: { contains: search, mode: "insensitive" as const } } },
-          { paciente: { cpf: { contains: search, mode: "insensitive" as const } } },
+          ...(cpfOnly.length === 11 ? [{ paciente: { cpfHash: blindIndex(cpfOnly) } }] : []),
           { medico: { usuario: { nome: { contains: search, mode: "insensitive" as const } } } },
-          { diagnostico: { contains: search, mode: "insensitive" as const } },
         ],
       }),
     };

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação para criação de usuário
 const createUsuarioSchema = z.object({
@@ -160,9 +161,10 @@ export async function POST(
     // Limpar CPF
     const cpfLimpo = data.cpf.replace(/\D/g, "");
 
-    // Verificar se email já existe
-    const emailExistente = await prisma.usuario.findUnique({
-      where: { email: data.email },
+    // Verificar se email já existe usando blind index
+    const emailExistente = await prisma.usuario.findFirst({
+      where: { emailHash: blindIndex(data.email) },
+      select: { id: true },
     });
 
     if (emailExistente) {

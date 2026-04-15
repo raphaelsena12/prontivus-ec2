@@ -6,6 +6,7 @@ import { z } from "zod";
 import { auditLogFromRequest } from "@/lib/audit-log";
 import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação para criação de usuário
 const createUsuarioSchema = z.object({
@@ -57,10 +58,7 @@ export async function GET(request: NextRequest) {
         ...(search && {
           OR: [
             { nome: { contains: search, mode: "insensitive" as const } },
-            { email: { contains: search, mode: "insensitive" as const } },
-            ...(cpfSearch
-              ? [{ cpf: { contains: cpfSearch, mode: "insensitive" as const } }]
-              : []),
+            ...(cpfSearch ? [{ cpfHash: blindIndex(cpfSearch) }] : []),
           ],
         }),
       },
@@ -116,9 +114,10 @@ export async function POST(request: NextRequest) {
     // Limpar CPF
     const cpfLimpo = data.cpf.replace(/\D/g, "");
 
-    // Verificar se email já existe
-    const emailExistente = await prisma.usuario.findUnique({
-      where: { email: data.email },
+    // Verificar se email já existe usando blind index
+    const emailExistente = await prisma.usuario.findFirst({
+      where: { emailHash: blindIndex(data.email) },
+      select: { id: true },
     });
 
     if (emailExistente) {
@@ -128,9 +127,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se CPF já existe
-    const cpfExistente = await prisma.usuario.findUnique({
-      where: { cpf: cpfLimpo },
+    // Verificar se CPF já existe usando blind index
+    const cpfExistente = await prisma.usuario.findFirst({
+      where: { cpfHash: blindIndex(cpfLimpo) },
+      select: { id: true },
     });
 
     if (cpfExistente) {

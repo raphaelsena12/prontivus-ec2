@@ -157,10 +157,13 @@ model Plano {
 model Usuario {
   id                String      @id @default(uuid())
   email             String      @unique
+  emailHash         String?     // Blind index HMAC-SHA256 do email (para busca após criptografia)
   senha             String
   nome              String
   cpf               String      @unique
+  cpfHash           String?     // Blind index HMAC-SHA256 do CPF (para busca após criptografia)
   telefone          String?
+  telefoneHash      String?     // Blind index HMAC-SHA256 do telefone
   avatar            String?
   tipo              TipoUsuario
   clinicaId         String?
@@ -181,6 +184,9 @@ model Usuario {
   mensagensMedicoSecretaria MensagemMedicoSecretaria[]
 
   @@index([email])
+  @@index([emailHash])
+  @@index([cpfHash])
+  @@index([telefoneHash])
   @@index([clinicaId])
   @@index([resetToken])
   @@map("usuarios")
@@ -249,12 +255,16 @@ model Paciente {
   numeroProntuario Int?     @unique
   nome             String
   cpf              String
+  cpfHash          String?  // Blind index HMAC-SHA256 do CPF (para busca sem expor plaintext)
   rg               String?
   dataNascimento   DateTime
   sexo             String
   email            String?
+  emailHash        String?  // Blind index HMAC-SHA256 do email
   telefone         String?
+  telefoneHash     String?  // Blind index HMAC-SHA256 do telefone
   celular          String?
+  celularHash      String?  // Blind index HMAC-SHA256 do celular
   cep              String?
   endereco         String?
   numero           String?
@@ -290,6 +300,10 @@ model Paciente {
   @@unique([clinicaId, usuarioId])
   @@index([clinicaId])
   @@index([cpf])
+  @@index([cpfHash])
+  @@index([emailHash])
+  @@index([telefoneHash])
+  @@index([celularHash])
   @@index([nome])
   @@index([usuarioId])
   @@index([numeroProntuario])

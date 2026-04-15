@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { parseExcelFile, normalizeColumnName, parseDate, cleanCPF, cleanPhone } from "@/lib/excel-utils";
 import { gerarNumeroProntuario } from "@/lib/paciente-helpers";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -122,10 +123,10 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Verificar se CPF já existe
+        // Verificar se CPF já existe usando blind index
         const pacienteExistente = await prisma.paciente.findFirst({
           where: {
-            cpf: cpf,
+            cpfHash: blindIndex(cpf),
             clinicaId: auth.clinicaId!,
           },
         });

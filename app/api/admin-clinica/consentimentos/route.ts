@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { VERSAO_TERMO_ATUAL } from "@/lib/lgpd/termo-consentimento";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 /**
  * GET /api/admin-clinica/consentimentos
@@ -29,6 +30,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim() || "";
     const statusFilter = searchParams.get("status") || "todos";
+    const cpfOnly = search.replace(/\D/g, "");
 
     // Buscar todos os pacientes ativos da clínica com seu consentimento mais recente
     const pacientes = await prisma.paciente.findMany({
@@ -38,7 +40,7 @@ export async function GET(request: NextRequest) {
         ...(search && {
           OR: [
             { nome: { contains: search, mode: "insensitive" as const } },
-            { cpf: { contains: search } },
+            ...(cpfOnly.length === 11 ? [{ cpfHash: blindIndex(cpfOnly) }] : []),
           ],
         }),
       },

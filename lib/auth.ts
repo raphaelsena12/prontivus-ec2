@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { TipoUsuario, StatusClinica } from "@/lib/generated/prisma/enums";
 import { TenantInfo } from "@/types/next-auth";
 import { brazilTodayStart } from "@/lib/timezone-utils";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -20,9 +21,9 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          // Buscar usuário no banco
-          const usuario = await prisma.usuario.findUnique({
-            where: { email: credentials.email },
+          // Buscar usuário pelo blind index do email (email está criptografado no banco)
+          const usuario = await prisma.usuario.findFirst({
+            where: { emailHash: blindIndex(credentials.email) },
           });
 
           if (!usuario) {
@@ -53,10 +54,11 @@ export const authOptions: NextAuthOptions = {
               });
 
               if (!pacienteVinculado) {
-                // Buscar paciente órfão pelo CPF
+                // Buscar paciente órfão pelo CPF usando blind index
+                const cpfHash = blindIndex(usuario.cpf);
                 const pacientePorCpf = await prisma.paciente.findFirst({
                   where: {
-                    cpf: usuario.cpf,
+                    cpfHash,
                     usuarioId: null,
                     ativo: true,
                   },
@@ -73,10 +75,11 @@ export const authOptions: NextAuthOptions = {
                     console.log(`[AUTH] Paciente ${pacientePorCpf.id} auto-vinculado ao usuario ${usuario.id} via CPF`);
                   }
                 } else if (usuario.email) {
-                  // Fallback: buscar por email
+                  // Fallback: buscar por email usando blind index
+                  const emailHash = blindIndex(usuario.email);
                   const pacientePorEmail = await prisma.paciente.findFirst({
                     where: {
-                      email: usuario.email,
+                      emailHash,
                       usuarioId: null,
                       ativo: true,
                     },

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação para atualização de usuário
 const updateUsuarioSchema = z.object({
@@ -118,10 +119,11 @@ export async function PUT(
       ativo?: boolean;
     } = {};
 
-    // Verificar se email já existe (se mudou)
+    // Verificar se email já existe (se mudou) usando blind index
     if (data.email && data.email !== usuarioExistente.email) {
-      const emailExistente = await prisma.usuario.findUnique({
-        where: { email: data.email },
+      const emailExistente = await prisma.usuario.findFirst({
+        where: { emailHash: blindIndex(data.email) },
+        select: { id: true },
       });
 
       if (emailExistente) {

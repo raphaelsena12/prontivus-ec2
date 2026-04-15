@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSecretariaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 export async function GET(req: NextRequest) {
   const auth = await checkSecretariaAuth();
@@ -26,9 +27,10 @@ export async function GET(req: NextRequest) {
   if (operadoraId) where.operadoraId = operadoraId;
 
   if (q) {
+    const cpfOnly = q.replace(/\D/g, "");
     where.OR = [
       { paciente: { nome: { contains: q, mode: "insensitive" } } },
-      { paciente: { cpf: { contains: q } } },
+      ...(cpfOnly.length === 11 ? [{ paciente: { cpfHash: blindIndex(cpfOnly) } }] : []),
     ];
   }
 

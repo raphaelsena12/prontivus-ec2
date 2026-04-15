@@ -8,6 +8,12 @@
  * permitindo migração gradual e rollback seguro.
  *
  * Algoritmo: AES-256-GCM (authenticated encryption)
+ *
+ * Blind Index:
+ *   Para campos que precisam de busca (CPF, email, telefone), usamos
+ *   HMAC-SHA256 com chave separada (BLIND_INDEX_KEY). O hash é armazenado
+ *   em campos auxiliares (*Hash) e os índices são criados sobre eles.
+ *   Isso permite busca exata sem expor o valor em plaintext.
  */
 import * as crypto from "crypto";
 
@@ -16,7 +22,29 @@ const ENC_PREFIX = "enc_v1:";
 // ---------- Configuração dos campos por modelo ----------
 
 export const ENCRYPTED_FIELDS: Record<string, string[]> = {
-  Paciente: ["rg", "endereco", "complemento", "bairro"],
+  Paciente: [
+    "cpf",
+    "rg",
+    "email",
+    "telefone",
+    "celular",
+    "cep",
+    "endereco",
+    "numero",
+    "complemento",
+    "bairro",
+    "cidade",
+    "estado",
+    "nomeMae",
+    "nomePai",
+    "cns",
+    "numeroCarteirinha",
+  ],
+  Usuario: [
+    "cpf",
+    "email",
+    "telefone",
+  ],
   Prontuario: [
     "anamnese",
     "exameFisico",
@@ -30,12 +58,31 @@ export const ENCRYPTED_FIELDS: Record<string, string[]> = {
   SolicitacaoExame: ["resultado", "observacoes"],
 };
 
-// ---------- Chave ----------
+/**
+ * Campos que precisam de blind index para busca.
+ * Mapa: modelo -> { campoOriginal -> campoHash }
+ */
+export const BLIND_INDEX_FIELDS: Record<string, Record<string, string>> = {
+  Paciente: {
+    cpf: "cpfHash",
+    email: "emailHash",
+    telefone: "telefoneHash",
+    celular: "celularHash",
+  },
+  Usuario: {
+    cpf: "cpfHash",
+    email: "emailHash",
+    telefone: "telefoneHash",
+  },
+};
 
-let _keyCache: Buffer | null = null;
+// ---------- Chaves ----------
+
+let _encKeyCache: Buffer | null = null;
+let _blindKeyCache: Buffer | null = null;
 
 function getFieldEncryptionKey(): Buffer {
-  if (_keyCache) return _keyCache;
+  if (_encKeyCache) return _encKeyCache;
 
   const keyB64 = process.env.FIELD_ENCRYPTION_KEY;
   if (!keyB64) {
@@ -49,8 +96,26 @@ function getFieldEncryptionKey(): Buffer {
       `FIELD_ENCRYPTION_KEY inválida. Esperado 32 bytes em Base64, recebido ${key.length}.`
     );
   }
-  _keyCache = key;
+  _encKeyCache = key;
   return key;
+}
+
+function getBlindIndexKey(): Buffer {
+  if (_blindKeyCache) return _blindKeyCache;
+
+  // Usa BLIND_INDEX_KEY se disponível, senão deriva da FIELD_ENCRYPTION_KEY
+  const keyB64 = process.env.BLIND_INDEX_KEY || process.env.FIELD_ENCRYPTION_KEY;
+  if (!keyB64) {
+    throw new Error("BLIND_INDEX_KEY ou FIELD_ENCRYPTION_KEY não configurada.");
+  }
+  const raw = Buffer.from(keyB64, "base64");
+  // Deriva uma chave separada para blind index via SHA256(key || label)
+  _blindKeyCache = crypto
+    .createHash("sha256")
+    .update(raw)
+    .update("blind-index-v1")
+    .digest();
+  return _blindKeyCache;
 }
 
 // ---------- Encrypt / Decrypt unitários ----------
@@ -95,10 +160,37 @@ export function isEncrypted(value: string): boolean {
   return value.startsWith(ENC_PREFIX);
 }
 
+// ---------- Blind Index ----------
+
+/**
+ * Gera um HMAC-SHA256 determinístico de um valor normalizado.
+ * Usado para criar blind indexes que permitem busca exata sem expor o plaintext.
+ *
+ * Normalização: lowercase + remove espaços extras + remove pontuação (para CPF/telefone)
+ */
+export function blindIndex(value: string): string {
+  const key = getBlindIndexKey();
+  // Normaliza: lowercase, sem espaços, sem pontuação (para CPF/telefone ficarem uniformes)
+  const normalized = value.toLowerCase().replace(/[\s.\-\/()]/g, "");
+  return crypto.createHmac("sha256", key).update(normalized, "utf8").digest("hex");
+}
+
+/**
+ * Gera o blind index de um valor para uso em queries de busca.
+ * Retorna null se o valor for vazio/nulo.
+ */
+export function blindIndexOrNull(value: string | null | undefined): string | null {
+  if (!value || value.trim().length === 0) return null;
+  // Se já estiver criptografado, não pode gerar blind index (dados legados sem hash)
+  if (isEncrypted(value)) return null;
+  return blindIndex(value);
+}
+
 // ---------- Helpers para objetos ----------
 
 /**
  * Criptografa os campos configurados de um objeto (para escrita no banco).
+ * Também gera blind indexes para os campos configurados em BLIND_INDEX_FIELDS.
  * Campos null/undefined são ignorados.
  */
 export function encryptFields(
@@ -109,9 +201,16 @@ export function encryptFields(
   if (!fields) return data;
 
   const result = { ...data };
+  const blindFields = BLIND_INDEX_FIELDS[model] || {};
+
   for (const field of fields) {
     const value = result[field];
     if (typeof value === "string" && value.length > 0 && !isEncrypted(value)) {
+      // Gerar blind index antes de criptografar
+      const hashField = blindFields[field];
+      if (hashField && !(hashField in result)) {
+        result[hashField] = blindIndex(value);
+      }
       result[field] = encryptField(value);
     }
   }

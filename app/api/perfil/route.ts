@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação para atualização de perfil
 const updatePerfilSchema = z.object({
@@ -110,8 +111,8 @@ export async function PATCH(request: NextRequest) {
 
     // Em atualização, só deve falhar se o e-mail já pertencer a OUTRO usuário
     if (data.email) {
-      const emailExistente = await prisma.usuario.findUnique({
-        where: { email: data.email },
+      const emailExistente = await prisma.usuario.findFirst({
+        where: { emailHash: blindIndex(data.email) },
         select: { id: true },
       });
 

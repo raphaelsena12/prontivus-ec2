@@ -576,6 +576,8 @@ export async function POST(request: NextRequest) {
           select: {
             nome: true,
             email: true,
+            whatsappContatoNumero: true,
+            telefone: true,
           },
         },
       },
@@ -648,6 +650,7 @@ export async function POST(request: NextRequest) {
               minute: "2-digit",
               timeZone: "America/Sao_Paulo",
             });
+            const numeroContatoClinica = (consulta.clinica.whatsappContatoNumero || consulta.clinica.telefone || "").replace(/\D/g, "");
             await service.sendTemplateMessage({
               to: celular,
               message: "",
@@ -658,6 +661,7 @@ export async function POST(request: NextRequest) {
                 horaFormatada,
                 consulta.clinica.nome,
                 consulta.medico.usuario.nome,
+                numeroContatoClinica,
               ],
             });
           }

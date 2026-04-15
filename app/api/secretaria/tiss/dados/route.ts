@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkSecretariaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 /**
  * Returns reference data needed for TISS forms:
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const tipo = searchParams.get("tipo"); // operadoras | pacientes | tuss
   const q = searchParams.get("q") ?? "";
+  const cpfOnly = q.replace(/\D/g, "");
 
   if (tipo === "operadoras") {
     const operadoras = await prisma.operadora.findMany({
@@ -45,14 +47,12 @@ export async function GET(req: NextRequest) {
       where: {
         clinicaId,
         ativo: true,
-        ...(q
-          ? {
-              OR: [
-                { nome: { contains: q, mode: "insensitive" } },
-                { cpf: { contains: q } },
-              ],
-            }
-          : {}),
+        ...(q && {
+          OR: [
+            { nome: { contains: q, mode: "insensitive" } },
+            ...(cpfOnly.length === 11 ? [{ cpfHash: blindIndex(cpfOnly) }] : []),
+          ],
+        }),
       },
       select: { id: true, nome: true, cpf: true },
       orderBy: { nome: "asc" },

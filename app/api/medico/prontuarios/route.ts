@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { auditLogFromRequest } from "@/lib/audit-log";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -66,14 +67,14 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
+    const cpfOnly = search.replace(/\D/g, "");
     const where: any = {
       clinicaId: auth.clinicaId,
       medicoId: auth.medicoId, // Filtrar apenas prontuários do médico logado
       ...(search && {
         OR: [
           { paciente: { nome: { contains: search, mode: "insensitive" as const } } },
-          { paciente: { cpf: { contains: search, mode: "insensitive" as const } } },
-          { diagnostico: { contains: search, mode: "insensitive" as const } },
+          ...(cpfOnly.length === 11 ? [{ paciente: { cpfHash: blindIndex(cpfOnly) } }] : []),
         ],
       }),
     };

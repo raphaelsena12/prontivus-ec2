@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 /**
  * GET /api/admin-clinica/dsar
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get("status");
     const tipoFilter = searchParams.get("tipo");
     const search = searchParams.get("search")?.trim();
+    const cpfOnly = search ? search.replace(/\D/g, "") : "";
 
     const solicitacoes = await prisma.solicitacaoDSAR.findMany({
       where: {
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
           paciente: {
             OR: [
               { nome: { contains: search, mode: "insensitive" as const } },
-              { cpf: { contains: search } },
+              ...(cpfOnly.length === 11 ? [{ cpfHash: blindIndex(cpfOnly) }] : []),
             ],
           },
         }),

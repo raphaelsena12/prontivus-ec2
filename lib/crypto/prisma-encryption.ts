@@ -4,13 +4,18 @@
  * Intercepta operações de leitura e escrita nos modelos configurados,
  * criptografando ao salvar e decriptando ao ler, de forma transparente
  * para o restante da aplicação.
+ *
+ * Também gera blind indexes (*Hash) automaticamente ao salvar campos
+ * que precisam de busca (CPF, email, telefone, celular).
  */
 import { PrismaClient } from "@/lib/generated/prisma/client";
 import {
   ENCRYPTED_FIELDS,
+  BLIND_INDEX_FIELDS,
   encryptField,
   decryptField,
   isEncrypted,
+  blindIndex,
 } from "./field-encryption";
 
 // ---------- Helpers internos ----------
@@ -21,9 +26,16 @@ function encryptDataFields(model: string, data: any): any {
   if (!fields) return data;
 
   const result = { ...data };
+  const blindFields = BLIND_INDEX_FIELDS[model] || {};
+
   for (const field of fields) {
     const value = result[field];
     if (typeof value === "string" && value.length > 0 && !isEncrypted(value)) {
+      // Gerar blind index antes de criptografar (somente se não foi fornecido explicitamente)
+      const hashField = blindFields[field];
+      if (hashField && !(hashField in result)) {
+        result[hashField] = blindIndex(value);
+      }
       result[field] = encryptField(value);
     }
   }
@@ -93,8 +105,11 @@ const RELATION_TO_MODEL: Record<string, string> = {
   prontuarios: "Prontuario",
   prontuario: "Prontuario",
   paciente: "Paciente",
+  pacientes: "Paciente",
   consulta: "Consulta",
   consultas: "Consulta",
+  usuario: "Usuario",
+  usuarios: "Usuario",
   prescricaoMedicamentos: "PrescricaoMedicamento",
   prescricaoMedicamento: "PrescricaoMedicamento",
   consultaPrescricoes: "PrescricaoMedicamento",

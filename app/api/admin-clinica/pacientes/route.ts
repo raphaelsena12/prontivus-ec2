@@ -7,6 +7,7 @@ import { zodValidationErrorPayload } from "@/lib/zod-validation-error";
 import bcrypt from "bcryptjs";
 import { gerarNumeroProntuario } from "@/lib/paciente-helpers";
 import { auditLogFromRequest } from "@/lib/audit-log";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 // Schema de validação
 const pacienteSchema = z.object({
@@ -108,7 +109,12 @@ export async function GET(request: NextRequest) {
     
     if (search) {
       const searchEscaped = search.replace(/'/g, "''");
-      whereConditions += ` AND (nome ILIKE '%${searchEscaped}%' OR cpf ILIKE '%${searchEscaped}%' OR email ILIKE '%${searchEscaped}%')`;
+      // CPF e email estão criptografados; busca por CPF usa blind index (cpfHash)
+      const cpfSearchOnly = search.replace(/\D/g, "");
+      const cpfHashCondition = cpfSearchOnly.length === 11
+        ? `OR "cpfHash" = '${blindIndex(cpfSearchOnly).replace(/'/g, "''")}'`
+        : "";
+      whereConditions += ` AND (nome ILIKE '%${searchEscaped}%' ${cpfHashCondition})`;
     }
     
     // Verificar se a coluna numeroProntuario existe no banco
@@ -213,16 +219,17 @@ export async function POST(request: NextRequest) {
     const data = validation.data;
     const cpfLimpo = data.cpf.replace(/\D/g, "");
 
-    // Verificar se CPF já existe (apenas em pacientes ativos) usando query raw
-    const pacienteExistenteCheck = await prisma.$queryRawUnsafe<Array<any>>(`
-      SELECT id FROM pacientes 
-      WHERE cpf = '${cpfLimpo.replace(/'/g, "''")}' 
-        AND "clinicaId" = '${auth.clinicaId?.replace(/'/g, "''") || ""}' 
-        AND ativo = true 
-      LIMIT 1
-    `);
+    // Verificar se CPF já existe usando blind index (CPF está criptografado no banco)
+    const pacienteExistenteCheck = await prisma.paciente.findFirst({
+      where: {
+        cpfHash: blindIndex(cpfLimpo),
+        clinicaId: auth.clinicaId!,
+        ativo: true,
+      },
+      select: { id: true },
+    });
 
-    if (pacienteExistenteCheck.length > 0) {
+    if (pacienteExistenteCheck) {
       return NextResponse.json(
         { error: "CPF já cadastrado" },
         { status: 409 }

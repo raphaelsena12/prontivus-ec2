@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
+import { blindIndex } from "@/lib/crypto/field-encryption";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -53,13 +54,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") || "ativo"; // Padrão: apenas ativos
 
+    const cpfOnly = search.replace(/\D/g, "");
     const where: any = {
       clinicaId: auth.clinicaId,
       ...(search && {
         OR: [
           { nome: { contains: search, mode: "insensitive" as const } },
-          { cpf: { contains: search, mode: "insensitive" as const } },
-          { email: { contains: search, mode: "insensitive" as const } },
+          // CPF exige 11 dígitos para blind index (busca exata, não parcial)
+          ...(cpfOnly.length === 11 ? [{ cpfHash: blindIndex(cpfOnly) }] : []),
         ],
       }),
     };
