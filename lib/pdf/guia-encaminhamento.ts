@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard, checkPageBreak,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -27,13 +27,9 @@ export function generateGuiaEncaminhamentoPDF(data: GuiaEncaminhamentoData): Arr
   
   // ── Dados do paciente ──
   y = drawPatientCard(doc, data, y);
-  
+
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("GUIA DE ENCAMINHAMENTO REFERÊNCIA E CONTRA REFERÊNCIA", MARGIN, y);
-  y += 15;
+  y = drawTitle(doc, "GUIA DE ENCAMINHAMENTO", "REFERÊNCIA E CONTRA REFERÊNCIA", y);
   
   // ── Seção II - PARA (esquerda) e III - PROCEDIMENTOS SOLICITADOS (direita) ──
   const midX = PAGE_WIDTH / 2;

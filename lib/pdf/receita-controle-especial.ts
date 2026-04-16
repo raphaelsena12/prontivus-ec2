@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard, checkPageBreak,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -34,11 +34,7 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("RECEITA DE CONTROLE ESPECIAL", MARGIN, y);
-  y += 10;
+  y = drawTitle(doc, "RECEITA DE CONTROLE ESPECIAL", "PORTARIA SVS/MS Nº 344/1998", y);
   
   // ── Medicamentos ──
   if (data.medicamentos && data.medicamentos.length > 0) {

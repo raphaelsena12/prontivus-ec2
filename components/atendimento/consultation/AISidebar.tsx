@@ -1053,7 +1053,7 @@ export function AISidebar({
                 className="bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto"
                 style={{ position: "fixed", top: docDropdownRect.bottom + 4, left: docDropdownRect.left, width: docDropdownRect.width, maxHeight: 220, zIndex: 9999 }}
               >
-                {filteredDocs.slice(0, 14).map((doc) => {
+                {filteredDocs.map((doc) => {
                   const alreadyGenerated = documentosGerados.some((d) => d.tipoDocumento === doc.id);
                   return (
                     <button key={doc.id} onClick={() => handleGenDoc(doc.id)} disabled={loadingDoc === doc.id} className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-blue-50/80 text-left transition-all border-b border-slate-50 last:border-0 group">
@@ -1075,7 +1075,7 @@ export function AISidebar({
 
           {/* Documentos gerados */}
           {documentosGerados.length > 0 ? (
-            <div className="divide-y divide-slate-100/60 bg-white">
+            <div className="divide-y divide-slate-100/60 bg-white min-h-[260px]">
               {documentosGerados.map((doc) => (
                 <div key={doc.id} className="flex items-center gap-2.5 px-3 py-2.5 bg-blue-50/50 hover:bg-blue-50/80 transition-colors group">
                   <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -1123,7 +1123,7 @@ export function AISidebar({
               ))}
             </div>
           ) : (
-            <div className="px-3 py-4 text-center bg-white">
+            <div className="px-3 py-28 text-center bg-white">
               <FileText className="w-5 h-5 text-slate-200 mx-auto mb-1.5" />
               <p className="text-[11px] text-slate-400">Busque e clique para gerar</p>
             </div>

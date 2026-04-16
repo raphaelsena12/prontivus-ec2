@@ -31,8 +31,8 @@ interface RiscoCirurgicoData extends BaseDocumentData {
 export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "RISCO CIRÚRGICO CARDÍACO", undefined, headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "RISCO CIRÚRGICO CARDÍACO", undefined, y);
 
   // Função auxiliar para desenhar um campo com label e valor
   const drawField = (label: string, value?: string): void => {
@@ -70,21 +70,20 @@ export function generateRiscoCirurgicoPDF(data: RiscoCirurgicoData): ArrayBuffer
   };
 
   // ── Campos do formulário ──
-  drawField("RISCO CIRÚRGICO CARDÍACO", data.riscoCirurgicoCardiaco);
-  drawField("GOLDMAN", data.goldman);
-  drawField("ASA", data.asa);
-  drawField("ECG", data.ecg);
-  drawField("ALERGIAS", data.alergias);
+  drawField("CLASSIFICAÇÃO DO RISCO CIRÚRGICO CARDÍACO", data.riscoCirurgicoCardiaco);
+  drawField("ÍNDICE DE GOLDMAN", data.goldman);
+  drawField("CLASSIFICAÇÃO ASA (Anesthesiologists)", data.asa);
+  drawField("ELETROCARDIOGRAMA (ECG)", data.ecg);
+  drawField("ALERGIAS E REAÇÕES ADVERSAS", data.alergias);
   drawField("CIRURGIAS ANTERIORES", data.cirurgiasAnteriores);
-  drawField("INTERCORRÊNCIAS", data.intercorrencias);
-  drawField("MEDICAÇÕES EM USO", data.medicacoesEmUso);
-  drawField("ANTECEDENTES PESSOAIS", data.antecedentesPessoais);
-  
-  // Campos sem dois pontos
+  drawField("INTERCORRÊNCIAS ANESTÉSICO-CIRÚRGICAS", data.intercorrencias);
+  drawField("MEDICAÇÕES EM USO CONTÍNUO", data.medicacoesEmUso);
+  drawField("ANTECEDENTES PESSOAIS E FAMILIARES", data.antecedentesPessoais);
+
   drawFieldNoColon("ECOCARDIOGRAMA", data.ecocardiograma);
-  drawFieldNoColon("ERGOMETRIA", data.ergometria);
-  drawFieldNoColon("RX - TORAX", data.rxTorax);
-  drawField("OBS", data.observacoes);
+  drawFieldNoColon("TESTE ERGOMÉTRICO", data.ergometria);
+  drawFieldNoColon("RADIOGRAFIA DE TÓRAX (PA e Perfil)", data.rxTorax);
+  drawField("OBSERVAÇÕES", data.observacoes);
 
   // ── Assinatura apenas do médico (centralizado) ──
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });

@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard,
   drawDualSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
@@ -31,11 +31,7 @@ export function generateControlePressaoAnaliticoPDF(data: ControlePressaoData): 
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("CONTROLE DE PRESSÃO ARTERIAL", MARGIN, y);
-  y += 8;
+  y = drawTitle(doc, "CONTROLE DE PRESSÃO ARTERIAL", undefined, y);
   
   // ── Configurações da tabela ──
   const startX = MARGIN;
@@ -136,11 +132,7 @@ export function generateControlePressaoPDF(data: ControlePressaoData): ArrayBuff
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("CONTROLE DE PRESSÃO ARTERIAL", MARGIN, y);
-  y += 8;
+  y = drawTitle(doc, "CONTROLE DE PRESSÃO ARTERIAL", undefined, y);
   
   // ── Instrução ──
   doc.setFontSize(10);

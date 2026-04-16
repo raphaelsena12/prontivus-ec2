@@ -356,25 +356,27 @@ export function drawClinicHeader(doc: jsPDF, data: ClinicaData, title?: string):
   }
 }
 
-/** Desenha título e subtítulo alinhados à esquerda. Retorna Y após título */
+/** Desenha título e subtítulo centralizados. Retorna Y após título */
 export function drawTitle(doc: jsPDF, title: string, subtitle?: string, startY?: number): number {
-  let y = startY ?? 64;
+  let y = (startY ?? 64) + 8;
+
+  const centerX = PAGE_WIDTH / 2;
 
   doc.setFontSize(16);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(title, MARGIN, y);
+  doc.text(title, centerX, y, { align: "center" });
   y += 7;
 
   if (subtitle) {
     doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
-    doc.text(subtitle, MARGIN, y);
+    doc.text(subtitle, centerX, y, { align: "center" });
     y += 5;
   }
 
-  return y + 8;
+  return y + 10;
 }
 
 /** Desenha identificação do paciente em grid de 3 colunas alinhadas. Retorna Y após seção */
@@ -392,26 +394,26 @@ export function drawPatientCard(doc: jsPDF, data: PacienteData, y: number): numb
   const col2ValMax = col3X - col2X - 2;
   const col3ValMax = PAGE_WIDTH - MARGIN - col3X;
 
-  /** Trunca texto se ultrapassar maxW (mm) */
+  /** Trunca texto (na fonte corrente) se ultrapassar maxW (mm) */
   const truncate = (text: string, maxW: number): string => {
     if (!text) return "";
-    doc.setFontSize(FONT_SIZE);
-    doc.setFont(PDF_FONT, "normal");
     if (doc.getTextWidth(text) <= maxW) return text;
     let t = text;
     while (t.length > 1 && doc.getTextWidth(t + "…") > maxW) t = t.slice(0, -1);
     return t + "…";
   };
 
-  /** Escreve label (cinza) + valor (escuro) na posição x, ly com truncamento */
+  /** Escreve label (cinza, normal) + valor (escuro, negrito) na posição x, ly com truncamento */
   const lv = (label: string, value: string, x: number, ly: number, colMaxW: number): void => {
     doc.setFontSize(FONT_SIZE);
     doc.setFont(PDF_FONT, "normal");
     doc.setTextColor(...COLORS.slate600);
     doc.text(label, x, ly);
     const labelW = doc.getTextWidth(label);
-    const val = truncate(value || "", colMaxW - labelW);
+    doc.setFont(PDF_FONT, "bold");
+    doc.setFontSize(FONT_SIZE);
     doc.setTextColor(...COLORS.slate800);
+    const val = truncate(value || "", colMaxW - labelW);
     doc.text(val, x + labelW, ly);
   };
 
@@ -548,12 +550,12 @@ export function drawDualSignature(
   doc.setFontSize(7.5);
   doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(data.medicoNome.toUpperCase(), rightCenter, sigY + 6, { align: "center" });
+  doc.text(`Dr(a). ${formatMedicoNome(data.medicoNome)}`, rightCenter, sigY + 6, { align: "center" });
 
   doc.setFontSize(6.5);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
-  doc.text(`CRM ${formatCRM(data.medicoCrm)}`, rightCenter, sigY + 11, { align: "center" });
+  doc.text(`CRM ${formatCRM(data.medicoCrm)} — ${data.medicoEspecialidade}`, rightCenter, sigY + 11, { align: "center" });
 }
 
 /**
@@ -644,7 +646,7 @@ export function drawObservationCard(doc: jsPDF, text: string, y: number): number
 }
 
 /**
- * Renderiza um parágrafo com trechos em negrito/normal inline, com quebra de linha automática.
+ * Renderiza um parágrafo com trechos em negrito/normal inline, justificado.
  * Retorna Y após a última linha.
  */
 export function drawRichParagraph(
@@ -656,42 +658,117 @@ export function drawRichParagraph(
   fontSize: number = 10,
   lineHeight: number = 5.5
 ): number {
-  // Tokeniza em (palavra, bold), preservando espaços como tokens separados
+  // Tokeniza em palavras (sem espaços), preservando bold
   const tokens: Array<{ word: string; bold: boolean }> = [];
   for (const seg of segments) {
-    const parts = seg.text.split(/(\s+)/);
-    for (const p of parts) {
-      if (p !== "") tokens.push({ word: p, bold: !!seg.bold });
+    const words = seg.text.split(/\s+/).filter(w => w !== "");
+    for (const word of words) {
+      tokens.push({ word, bold: !!seg.bold });
     }
   }
 
-  let curX = x;
-  let curY = startY;
-
-  for (const token of tokens) {
-    const isWS = /^\s+$/.test(token.word);
+  // Mede a largura de cada token na sua fonte correta
+  const widths = tokens.map(t => {
     doc.setFontSize(fontSize);
-    doc.setFont(PDF_FONT, token.bold ? "bold" : "normal");
-    doc.setTextColor(...COLORS.slate800);
-    const w = doc.getTextWidth(token.word);
+    doc.setFont(PDF_FONT, t.bold ? "bold" : "normal");
+    return doc.getTextWidth(t.word);
+  });
 
-    // Quebra de linha antes de palavras que ultrapassam o limite
-    if (!isWS && curX > x && curX + w > x + maxWidth) {
-      curX = x;
-      curY += lineHeight;
+  // Mede a largura de um espaço normal (font normal)
+  doc.setFontSize(fontSize);
+  doc.setFont(PDF_FONT, "normal");
+  const spaceW = doc.getTextWidth(" ");
+
+  // Tokens com flag indicando se devem ser colados ao token anterior (sem espaço)
+  const isPunct = (w: string) => /^[,;:.!?)»\-]/.test(w);
+
+  // Quebra os tokens em linhas, sem espaço antes de pontuação
+  const lines: Array<Array<{ word: string; bold: boolean; width: number; noSpaceBefore: boolean }>> = [];
+  let lineTokens: Array<{ word: string; bold: boolean; width: number; noSpaceBefore: boolean }> = [];
+  let lineUsed = 0;
+
+  for (let i = 0; i < tokens.length; i++) {
+    const w = widths[i];
+    const noSpaceBefore = isPunct(tokens[i].word);
+    const needsSpace = lineTokens.length > 0 && !noSpaceBefore ? spaceW : 0;
+    if (lineTokens.length > 0 && lineUsed + needsSpace + w > maxWidth) {
+      lines.push(lineTokens);
+      lineTokens = [{ ...tokens[i], width: w, noSpaceBefore: false }];
+      lineUsed = w;
+    } else {
+      lineTokens.push({ ...tokens[i], width: w, noSpaceBefore });
+      lineUsed += needsSpace + w;
+    }
+  }
+  if (lineTokens.length > 0) lines.push(lineTokens);
+
+  // Renderiza cada linha com justificação (exceto a última)
+  // Gaps = espaços entre tokens que não são pontuação colada
+  let curY = startY;
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const isLastLine = li === lines.length - 1;
+
+    const totalWordsW = line.reduce((s, t) => s + t.width, 0);
+    const gapCount = line.filter((t, i) => i > 0 && !t.noSpaceBefore).length;
+    const extraSpace = isLastLine || gapCount === 0
+      ? spaceW
+      : (maxWidth - totalWordsW) / gapCount;
+
+    let curX = x;
+    for (let ti = 0; ti < line.length; ti++) {
+      const t = line[ti];
       doc.setFontSize(fontSize);
-      doc.setFont(PDF_FONT, token.bold ? "bold" : "normal");
+      doc.setFont(PDF_FONT, t.bold ? "bold" : "normal");
       doc.setTextColor(...COLORS.slate800);
+      doc.text(t.word, curX, curY);
+      if (ti < line.length - 1) {
+        curX += t.width + (line[ti + 1].noSpaceBefore ? 0 : extraSpace);
+      }
     }
 
-    // Não renderiza espaços no início de linha
-    if (!isWS || curX > x) {
-      doc.text(token.word, curX, curY);
-    }
-    curX += w;
+    curY += lineHeight;
   }
 
-  return curY + lineHeight;
+  return curY;
+}
+
+/**
+ * Renderiza texto plano justificado linha a linha.
+ * As linhas devem ser pré-quebradas via doc.splitTextToSize().
+ * A última linha é alinhada à esquerda.
+ */
+export function drawJustifiedText(
+  doc: jsPDF,
+  lines: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+  fontSize: number = 11,
+  lineHeight: number = 6.5
+): number {
+  doc.setFontSize(fontSize);
+
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    const isLastLine = li === lines.length - 1;
+    const words = line.split(/\s+/).filter(w => w !== "");
+    const gaps = words.length - 1;
+
+    if (isLastLine || gaps === 0) {
+      doc.text(line, x, y);
+    } else {
+      const totalW = words.reduce((s, w) => s + doc.getTextWidth(w), 0);
+      const extra = (maxWidth - totalW) / gaps;
+      let curX = x;
+      for (let wi = 0; wi < words.length; wi++) {
+        doc.text(words[wi], curX, y);
+        curX += doc.getTextWidth(words[wi]) + (wi < words.length - 1 ? extra : 0);
+      }
+    }
+    y += lineHeight;
+  }
+  return y;
 }
 
 /** Desenha campo de formulário inline (label: valor) dentro de um card */

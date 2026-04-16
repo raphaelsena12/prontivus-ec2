@@ -58,7 +58,6 @@ import {
   Printer,
   Ruler,
   TrendingUp,
-  Thermometer,
   FileText as FileTextIcon,
   X,
   Wifi,
@@ -623,10 +622,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         ? `${sinaisVitaisForm.pressaoSistolica}/${sinaisVitaisForm.pressaoDiastolica}`
         : sinaisVitaisForm.pressaoSistolica || "-",
       unit: "mmHg",
-      iconColor: "text-rose-500",
-      cardColor: "bg-rose-50 border-rose-100 hover:border-rose-300 hover:bg-rose-50/80",
-      editColor: "border-rose-400 bg-rose-50",
-      inputW: "w-16",
+      status: "normal",
+      iconColor: "text-red-500"
     },
     {
       icon: Activity,
@@ -634,32 +631,17 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       field: "frequenciaCardiaca",
       value: sinaisVitaisForm.frequenciaCardiaca || "-",
       unit: "bpm",
-      iconColor: "text-blue-500",
-      cardColor: "bg-blue-50 border-blue-100 hover:border-blue-300 hover:bg-blue-50/80",
-      editColor: "border-blue-400 bg-blue-50",
-      inputW: "w-10",
+      status: "normal",
+      iconColor: "text-blue-500"
     },
     {
       icon: Droplet,
-      label: "Saturação O₂",
+      label: "Saturação",
       field: "saturacaoO2",
       value: sinaisVitaisForm.saturacaoO2 || "-",
       unit: "%",
-      iconColor: "text-cyan-500",
-      cardColor: "bg-cyan-50 border-cyan-100 hover:border-cyan-300 hover:bg-cyan-50/80",
-      editColor: "border-cyan-400 bg-cyan-50",
-      inputW: "w-10",
-    },
-    {
-      icon: Thermometer,
-      label: "Temperatura",
-      field: "temperatura",
-      value: sinaisVitaisForm.temperatura || "-",
-      unit: "°C",
-      iconColor: "text-amber-500",
-      cardColor: "bg-amber-50 border-amber-100 hover:border-amber-300 hover:bg-amber-50/80",
-      editColor: "border-amber-400 bg-amber-50",
-      inputW: "w-10",
+      status: "normal",
+      iconColor: "text-cyan-500"
     },
     {
       icon: Weight,
@@ -667,10 +649,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       field: "peso",
       value: sinaisVitaisForm.peso || "-",
       unit: "kg",
-      iconColor: "text-orange-500",
-      cardColor: "bg-orange-50 border-orange-100 hover:border-orange-300 hover:bg-orange-50/80",
-      editColor: "border-orange-400 bg-orange-50",
-      inputW: "w-10",
+      status: "normal",
+      iconColor: "text-orange-500"
     },
     {
       icon: Ruler,
@@ -678,10 +658,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       field: "altura",
       value: sinaisVitaisForm.altura || "-",
       unit: "m",
-      iconColor: "text-emerald-500",
-      cardColor: "bg-emerald-50 border-emerald-100 hover:border-emerald-300 hover:bg-emerald-50/80",
-      editColor: "border-emerald-400 bg-emerald-50",
-      inputW: "w-10",
+      status: "normal",
+      iconColor: "text-green-500"
     },
     {
       icon: TrendingUp,
@@ -689,10 +667,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       field: "imc",
       value: imc ? imc.toFixed(1) : "-",
       unit: "kg/m²",
-      iconColor: "text-violet-500",
-      cardColor: "bg-violet-50 border-violet-100",
-      editColor: "",
-      inputW: "w-10",
+      status: "normal",
+      iconColor: "text-purple-500"
     },
   ];
 
@@ -2656,81 +2632,66 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
             )}
 
             {/* Linha 2 — Sinais vitais (edição inline) */}
-            <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
               {vitals.map((v, i) => {
                 const Icon = v.icon;
+                const isDroplet = Icon === Droplet;
                 const isEditing = sinaisVitaisFocusField === v.field;
                 const isImc = v.field === "imc";
-                const isEmpty = v.value === "-";
                 return (
                   <div
                     key={i}
-                    className={`group relative flex flex-col gap-0.5 px-2.5 py-1.5 rounded-xl border flex-shrink-0 transition-all duration-150 min-w-[64px] ${
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border flex-shrink-0 transition-colors ${
                       isEditing
-                        ? `${v.editColor} ring-1 ring-offset-0 shadow-sm`
+                        ? "border-blue-400 bg-blue-50"
                         : isImc
-                        ? `${v.cardColor} opacity-80`
-                        : `${v.cardColor} cursor-pointer hover:shadow-sm`
+                        ? "bg-slate-50 border-slate-100"
+                        : "bg-slate-50 border-slate-100 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
                     }`}
                     onClick={() => { if (!isImc && !isEditing) setSinaisVitaisFocusField(v.field); }}
-                    title={isImc ? "Calculado automaticamente" : `Clique para editar ${v.label}`}
+                    title={isImc ? "Calculado automaticamente" : `Editar ${v.label}`}
                   >
-                    {/* Label + ícone */}
-                    <div className="flex items-center gap-1">
-                      <Icon className={`w-2.5 h-2.5 flex-shrink-0 ${v.iconColor}`} />
-                      <span className="text-[9px] font-medium text-slate-400 uppercase tracking-wide leading-none whitespace-nowrap">{v.label}</span>
-                    </div>
-                    {/* Valor + unidade */}
-                    <div className="flex items-baseline gap-1">
-                      {isEditing && v.field === "pressaoSistolica" ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          className={`text-sm font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none ${v.inputW} min-w-0`}
-                          defaultValue={`${sinaisVitaisForm.pressaoSistolica}${sinaisVitaisForm.pressaoDiastolica ? `/${sinaisVitaisForm.pressaoDiastolica}` : ""}`}
-                          placeholder="120/80"
-                          onBlur={e => {
-                            const parts = e.target.value.split("/");
-                            const next = {
-                              ...sinaisVitaisFormRef.current,
-                              pressaoSistolica: parts[0]?.trim() ?? "",
-                              pressaoDiastolica: parts[1]?.trim() ?? sinaisVitaisFormRef.current.pressaoDiastolica,
-                            };
-                            setVitaisForm(next);
-                            setSinaisVitaisFocusField(null);
-                            handleSaveSinaisVitais(next);
-                          }}
-                          onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
-                        />
-                      ) : isEditing ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          inputMode="decimal"
-                          className={`text-sm font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none ${v.inputW} min-w-0`}
-                          defaultValue={sinaisVitaisForm[v.field as keyof typeof sinaisVitaisForm] ?? ""}
-                          placeholder="—"
-                          onBlur={e => {
-                            const next = { ...sinaisVitaisFormRef.current, [v.field]: e.target.value.trim() };
-                            setVitaisForm(next);
-                            setSinaisVitaisFocusField(null);
-                            handleSaveSinaisVitais(next);
-                          }}
-                          onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
-                        />
-                      ) : (
-                        <span className={`text-sm font-bold tabular-nums leading-none whitespace-nowrap ${isEmpty ? "text-slate-300" : "text-slate-800"}`}>
-                          {v.value}
-                        </span>
-                      )}
-                      <span className="text-[9px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
-                    </div>
-                    {/* Indicador de edição */}
-                    {!isImc && !isEditing && (
-                      <span className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Pencil className="w-2 h-2 text-slate-400" />
-                      </span>
+                    {!isDroplet && <Icon className={`w-3 h-3 flex-shrink-0 ${v.iconColor}`} />}
+                    {isEditing && v.field === "pressaoSistolica" ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        className="text-[11px] font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none w-16 min-w-0"
+                        defaultValue={`${sinaisVitaisForm.pressaoSistolica}${sinaisVitaisForm.pressaoDiastolica ? `/${sinaisVitaisForm.pressaoDiastolica}` : ""}`}
+                        placeholder="120/80"
+                        onBlur={e => {
+                          const parts = e.target.value.split("/");
+                          const next = {
+                            ...sinaisVitaisFormRef.current,
+                            pressaoSistolica: parts[0]?.trim() ?? "",
+                            pressaoDiastolica: parts[1]?.trim() ?? sinaisVitaisFormRef.current.pressaoDiastolica,
+                          };
+                          setVitaisForm(next);
+                          setSinaisVitaisFocusField(null);
+                          handleSaveSinaisVitais(next);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : isEditing ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        inputMode="decimal"
+                        className="text-[11px] font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none w-14 min-w-0"
+                        defaultValue={sinaisVitaisForm[v.field as keyof typeof sinaisVitaisForm] ?? ""}
+                        placeholder={v.value === "-" ? "" : v.value}
+                        onBlur={e => {
+                          const next = { ...sinaisVitaisFormRef.current, [v.field]: e.target.value.trim() };
+                          setVitaisForm(next);
+                          setSinaisVitaisFocusField(null);
+                          handleSaveSinaisVitais(next);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : (
+                      <span className="text-[11px] font-bold text-slate-800 tabular-nums leading-none whitespace-nowrap">{v.value}</span>
                     )}
+                    <span className="text-[9px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
                   </div>
                 );
               })}

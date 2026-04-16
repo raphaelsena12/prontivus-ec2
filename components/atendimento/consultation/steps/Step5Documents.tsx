@@ -89,7 +89,7 @@ export function Step5Documents({
   documentoSuggestions,
 }: Step5DocumentsProps) {
   const [loadingDoc, setLoadingDoc] = useState<string | null>(null);
-  const [showAllDocs, setShowAllDocs] = useState(false);
+  const [showAllDocs, setShowAllDocs] = useState(true);
   const [documentosImpressos, setDocumentosImpressos] = useState<Set<string>>(new Set());
 
   const isGenerated = (id: string) =>
@@ -212,7 +212,7 @@ export function Step5Documents({
                     className="w-full text-xs bg-transparent outline-none text-slate-600 placeholder:text-slate-400"
                   />
                 </div>
-                <div className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                <div className="divide-y divide-slate-50 max-h-[480px] overflow-y-auto">
                   {(documentoSearch ? documentoSuggestions : documentModels).map((doc) => {
                     const generated = isGenerated(doc.id);
                     const loading = loadingDoc === doc.id;

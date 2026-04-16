@@ -22,24 +22,22 @@ interface AptidaoData extends BaseDocumentData {
 export function generateAtestadoAptidaoFisicaMentalPDF(data: AptidaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO FÍSICA E MENTAL", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO FÍSICA E MENTAL", y);
 
-  // ── Parágrafo 1 (data e hora em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação clínica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro armazenado na ficha de atendimento nº" },
-    { text: data.fichaNumero || "" },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
     { text: "." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Parágrafo 2 ──
   y = drawRichParagraph(doc, [
-    { text: "Em decorrência dos resultados apresentados, atesto que, o mesmo está apto a retornar as suas atividades laborais, visto que, não apresenta nenhuma patologia aparente." },
+    { text: "Ao exame clínico, o(a) paciente não apresenta alterações físicas ou mentais que contraindiquem o retorno às suas atividades laborais, encontrando-se em condições de plena aptidão física e mental para o exercício de suas funções." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
@@ -52,37 +50,28 @@ export function generateAtestadoAptidaoFisicaMentalPDF(data: AptidaoData): Array
 export function generateAtestadoAptidaoFisicaPiscinasPDF(data: AptidaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO PARA FREQUENTAR PISCINAS", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO FÍSICA — FREQUÊNCIA A PISCINAS", y);
 
-  // ── Parágrafo 1 (data e hora em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação clínica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro armazenado na ficha de atendimento nº " },
-    { text: data.fichaNumero || "" },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
     { text: "." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Parágrafo 2 ──
   y = drawRichParagraph(doc, [
-    { text: "Em decorrência dos resultados apresentados, atesto que, o mesmo está apto pelo exame dermatológico a frequentar piscinas." },
+    { text: "Ao exame dermatológico, o(a) paciente não apresenta lesões cutâneas, infecções fúngicas, bacterianas ou parasitárias que contraindiquem a frequência a piscinas e demais instalações aquáticas, encontrando-se apto(a) para tal atividade." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Sem mais ──
-  y = drawRichParagraph(doc, [
-    { text: "Sem mais." },
-  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-  y += 8;
-
-  // ── Validade ──
   const validade = data.mesesValidade ? String(data.mesesValidade) : "___";
   y = drawRichParagraph(doc, [
-    { text: `Atestado médico válido por ${validade} mês/meses.` },
+    { text: `Este atestado possui validade de ${validade} mês(es) a partir da data de sua emissão.` },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
@@ -95,37 +84,28 @@ export function generateAtestadoAptidaoFisicaPiscinasPDF(data: AptidaoData): Arr
 export function generateAtestadoAptidaoFisicaPDF(data: AptidaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO FÍSICA", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "APTIDÃO FÍSICA PARA ATIVIDADE LABORATIVA", y);
 
-  // ── Parágrafo 1 (data e hora em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação clínica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro armazenado na ficha de atendimento nº " },
-    { text: data.fichaNumero || "" },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
     { text: "." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Parágrafo 2 ──
   y = drawRichParagraph(doc, [
-    { text: "Em decorrência dos resultados apresentados, atesto que, o mesmo está apto a exercer atividades físicas, visto que, não apresenta nenhuma patologia aparente." },
+    { text: "Ao exame clínico, o(a) paciente não apresenta alterações que contraindiquem a prática de atividades físicas, encontrando-se em condições de plena aptidão física para o exercício de suas funções." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Sem mais ──
-  y = drawRichParagraph(doc, [
-    { text: "Sem mais." },
-  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-  y += 8;
-
-  // ── Validade ──
   const validade = data.mesesValidade ? String(data.mesesValidade) : "___";
   y = drawRichParagraph(doc, [
-    { text: `Atestado médico válido por ${validade} mês/meses.` },
+    { text: `Este atestado possui validade de ${validade} mês(es) a partir da data de sua emissão.` },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });

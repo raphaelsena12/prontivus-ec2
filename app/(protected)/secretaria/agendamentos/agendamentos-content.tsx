@@ -358,6 +358,13 @@ export function AgendamentosContent() {
             Cancelado
           </Badge>
         );
+      case "REALIZADA":
+        return (
+          <Badge variant="outline" className="bg-transparent border-green-500 text-green-700 dark:text-green-400 text-[10px] py-0.5 px-1.5 leading-tight">
+            <IconCircleCheckFilled className="mr-1 h-3 w-3 fill-green-500 dark:fill-green-400" />
+            Realizada
+          </Badge>
+        );
       case "AGUARDANDO_APROVACAO":
         return (
           <Badge variant="outline" className="bg-transparent border-orange-500 text-orange-700 dark:text-orange-400 text-[10px] py-0.5 px-1.5 leading-tight">
@@ -621,21 +628,20 @@ export function AgendamentosContent() {
                 <TableRow className="hover:bg-transparent border-b border-border/60">
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Data</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Hora</TableHead>
+                  <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Status</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Paciente</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Médico</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Tipo de Consulta</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Procedimento</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Código TUSS</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Convênio</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Valor</TableHead>
-                  <TableHead className="text-xs font-semibold py-3 text-muted-foreground">Status</TableHead>
                   <TableHead className="text-xs font-semibold py-3 text-right text-muted-foreground">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary/20 border-t-primary"></div>
                         <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
@@ -644,7 +650,7 @@ export function AgendamentosContent() {
                   </TableRow>
                 ) : agendamentos.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-12">
+                    <TableCell colSpan={10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
                           <Calendar className="h-7 w-7 text-muted-foreground/50" />
@@ -680,15 +686,9 @@ export function AgendamentosContent() {
                           <span className="font-medium">{formatTime(agendamento.dataHora)}</span>
                         </div>
                       </TableCell>
+                      <TableCell className="text-xs py-3">{getStatusBadge(agendamento.status)}</TableCell>
                       <TableCell className="text-xs py-3">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-foreground truncate max-w-[140px] block" title={agendamento.paciente.nome}>{agendamento.paciente.nome}</span>
-                          {agendamento.paciente.telefone && (
-                            <span className="text-[10px] text-muted-foreground/70">
-                              {agendamento.paciente.telefone}
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-medium text-foreground truncate max-w-[140px] block" title={agendamento.paciente.nome}>{agendamento.paciente.nome}</span>
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         <span className="text-foreground/90">
@@ -704,18 +704,6 @@ export function AgendamentosContent() {
                         <span className="text-foreground/90">
                           {agendamento.procedimento?.nome || <span className="text-muted-foreground/60">-</span>}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-xs py-3">
-                        {agendamento.codigoTuss ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-medium text-foreground">{agendamento.codigoTuss.codigoTuss}</span>
-                            <span className="text-[10px] text-muted-foreground/70 truncate max-w-[200px]">
-                              {agendamento.codigoTuss.descricao}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground/60">-</span>
-                        )}
                       </TableCell>
                       <TableCell className="text-xs py-3">
                         {agendamento.operadora ? (
@@ -740,7 +728,6 @@ export function AgendamentosContent() {
                           <span className="text-muted-foreground/60">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs py-3">{getStatusBadge(agendamento.status)}</TableCell>
                       <TableCell className="text-xs py-3 text-right">
                         <div className="flex justify-end gap-2">
                           <Button

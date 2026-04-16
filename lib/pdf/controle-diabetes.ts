@@ -23,29 +23,14 @@ interface ControleDiabetesData extends BaseDocumentData {
 // =====================================================
 export function generateControleDiabetesAnaliticoPDF(data: ControleDiabetesData): ArrayBuffer {
   const doc = createDoc();
-  const headerY = drawClinicHeader(doc, data) - 8; // Reduzindo espaço do cabeçalho
+  const headerY = drawClinicHeader(doc, data);
   let y = headerY;
-  
-  // ── Quebra de duas linhas acima do título ──
-  y += 11; // Duas quebras de linha
-  
-  // ── Título (fonte reduzida em 2) ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("CONTROLE DE DIABETES", MARGIN, y);
-  y += 6; // Reduzido de 7
-  
-  // ── Subtítulo (fonte reduzida em 2) ──
-  doc.setFontSize(8); // 10 - 2
-  doc.setFont(PDF_FONT, "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("*IMPORTANTE- manter jejum de 2 horas antes da verificação", MARGIN, y);
-  y += 6; // Reduzido de 5
-  
-  // ── Dados do paciente (usa drawPatientCard centralizado) ──
+
+  // ── Dados do paciente ──
   y = drawPatientCard(doc, data, y);
-  y -= 3; // Reduzindo espaço adicional após dados do paciente
+
+  // ── Título ──
+  y = drawTitle(doc, "CONTROLE DE DIABETES", "*IMPORTANTE- manter jejum de 2 horas antes da verificação", y);
 
   // ── Configurações da tabela ──
   const startX = MARGIN;
@@ -184,19 +169,8 @@ export function generateControleDiabetesPDF(data: ControleDiabetesData): ArrayBu
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("CONTROLE DE DIABETES", MARGIN, y);
-  y += 7;
-  
-  // ── Subtítulo ──
-  doc.setFontSize(10);
-  doc.setFont(PDF_FONT, "normal");
-  doc.setTextColor(...COLORS.slate600);
-  doc.text("*IMPORTANTE- manter jejum de 2 horas antes da verificação", MARGIN, y);
-  y += 8;
-  
+  y = drawTitle(doc, "CONTROLE DE DIABETES", "*IMPORTANTE- manter jejum de 2 horas antes da verificação", y);
+
   // ── Configurações da tabela ──
   const startX = MARGIN;
   const colNumWidth = 12; // Largura para número do dia

@@ -34,7 +34,9 @@
       "Bash(git commit -m ' *)",
       "Bash(npx dotenv-cli *)",
       "Bash(FIELD_ENCRYPTION_KEY=\"OKZJ7vi82YyRayccIKY0ddr3JIeeZQ3kDat3gb8nYWg=\" DATABASE_URL=\"postgresql://postgres:7MB5FqE7E9IRWMoZgvQePuvOL53lHcG@db-prontivus-new.crka8siog2ay.sa-east-1.rds.amazonaws.com:5432/db-prontivus-new\" npx tsx scripts/encrypt-existing-data.ts)",
-      "Bash(xargs sed *)"
+      "Bash(xargs sed *)",
+      "Bash(grep -rn \"documentModels\\\\|handleGenerateDocument\\\\|documentosGerados\" \"c:\\\\Users\\\\raphael.souza\\\\Desktop\\\\Prontivus\\\\prontivus-ec2\\\\components\\\\\" --include=\"*.tsx\" -l)",
+      "Bash(npx dotenv *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\raphael.souza\\Desktop\\Prontivus\\prontivus-ec2\\app\\api\\secretaria\\bloqueios-agenda",

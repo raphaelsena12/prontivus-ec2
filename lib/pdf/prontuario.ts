@@ -54,8 +54,8 @@ function drawSection(
 export function generateProntuarioPDF(data: ProntuarioData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "PRONTUÁRIO MÉDICO", `Consulta: ${data.dataConsulta}`, headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "PRONTUÁRIO MÉDICO", `Consulta: ${data.dataConsulta}`, y);
 
   if (data.anamnese?.trim()) {
     y = drawSection(doc, "ANAMNESE", data.anamnese, y);

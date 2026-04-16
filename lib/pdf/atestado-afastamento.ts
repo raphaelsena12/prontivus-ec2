@@ -2,7 +2,7 @@ import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard,
   drawDualSignature,
-  drawRichParagraph, drawSectionLabel,
+  drawRichParagraph, drawSectionLabel, extenso,
   MARGIN, CONTENT_WIDTH, COLORS, PDF_FONT,
 } from "./pdf-base";
 
@@ -26,33 +26,30 @@ interface AfastamentoData extends BaseDocumentData {
 export function generateAtestadoAfastamentoPDF(data: AfastamentoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO DAS ATIVIDADES", y);
 
   const dias = String(data.diasAfastamento || 1).padStart(2, "0");
 
-  // ── Parágrafo principal (data, hora e prontuário em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação médica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro, armazenado no Prontuário Nº " },
-    { text: data.fichaNumero || "" },
-    { text: ". Em decorrência dos resultados apresentados, o mesmo deverá ficar em repouso e afastado de suas atividades laborais por um período de " },
-    { text: dias },
-    { text: " Dias." },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
+    { text: ". Em razão da condição clínica apresentada, faz-se necessário afastamento das atividades laborais pelo período de " },
+    { text: `${Number(dias)} (${extenso(Number(dias))}) dia(s)`, bold: true },
+    { text: ", a contar da data de emissão deste documento." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: " autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste atestado." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
-  // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
@@ -63,25 +60,23 @@ export function generateAtestadoAfastamentoPDF(data: AfastamentoData): ArrayBuff
 export function generateAtestadoAfastamentoSemCidPDF(data: AfastamentoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", undefined, headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO DAS ATIVIDADES", y);
 
   const dias = String(data.diasAfastamento || 1).padStart(2, "0");
 
-  // ── Parágrafo principal (data, hora e prontuário em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação médica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro, armazenado no Prontuário Nº " },
-    { text: data.fichaNumero || "" },
-    { text: ". Em decorrência dos resultados apresentados, o mesmo deverá ficar em repouso e afastado de suas atividades laborais por um período de " },
-    { text: dias },
-    { text: " Dias." },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
+    { text: ". Em razão da condição clínica apresentada, faz-se necessário afastamento das atividades laborais pelo período de " },
+    { text: `${Number(dias)} (${extenso(Number(dias))}) dia(s)`, bold: true },
+    { text: ", a contar da data de emissão deste documento." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
-  // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
@@ -92,41 +87,37 @@ export function generateAtestadoAfastamentoSemCidPDF(data: AfastamentoData): Arr
 export function generateAtestadoAfastamentoComCidPDF(data: AfastamentoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO DAS ATIVIDADES", y);
 
   const dias = String(data.diasAfastamento || 1).padStart(2, "0");
 
-  // ── Parágrafo principal (data, hora e prontuário em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação médica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro, armazenado no Prontuário Nº " },
-    { text: data.fichaNumero || "" },
-    { text: ". Em decorrência dos resultados apresentados, o mesmo deverá ficar em repouso e afastado de suas atividades laborais por um período de " },
-    { text: dias },
-    { text: " Dias." },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
+    { text: ". Em razão da condição clínica apresentada, faz-se necessário afastamento das atividades laborais pelo período de " },
+    { text: `${Number(dias)} (${extenso(Number(dias))}) dia(s)`, bold: true },
+    { text: ", a contar da data de emissão deste documento." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: " autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste atestado." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 12;
 
-  // ── CID (mesmo estilo do corpo) ──
   doc.setFontSize(10);
-  doc.setFont(PDF_FONT, "normal");
+  doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`CID: ${data.cidCodigo || ""}`, MARGIN, y);
+  doc.text(`CID-10: ${data.cidCodigo || ""}`, MARGIN, y);
   y += 8;
 
-  // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
@@ -137,29 +128,27 @@ export function generateAtestadoAfastamentoComCidPDF(data: AfastamentoData): Arr
 export function generateAtestadoAfastamentoHistoricoCidPDF(data: AfastamentoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", undefined, headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO TEMPORÁRIO DAS ATIVIDADES", y);
 
-  // ── Parágrafo principal (data e hora em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação médica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro, armazenado no Prontuário Nº " },
-    { text: data.fichaNumero || "" },
-    { text: ". Com histórico de:" },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
+    { text: ". Apresenta histórico clínico de:" },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 2;
 
-  // ── Lista de CIDs históricos ──
   const cids = data.historicoCids || [];
   doc.setFontSize(10);
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate800);
   if (cids.length > 0) {
     for (const cid of cids) {
-      const linha = `${cid.codigo} - ${cid.descricao}`;
+      const linha = `${cid.codigo} — ${cid.descricao}`;
       const linhas = doc.splitTextToSize(linha, CONTENT_WIDTH - 6);
       doc.text(linhas, MARGIN + 4, y);
       y += linhas.length * 5.5;
@@ -167,14 +156,12 @@ export function generateAtestadoAfastamentoHistoricoCidPDF(data: AfastamentoData
   }
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: ", autorizo o médico a declarar nominalmente ou através do CID meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste atestado." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
 
-  // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
@@ -185,36 +172,34 @@ export function generateAtestadoAfastamentoHistoricoCidPDF(data: AfastamentoData
 export function generateAtestadoAfastamentoIndeterminadoPDF(data: AfastamentoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO POR TEMPO INDETERMINADO", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "ATESTADO MÉDICO", "AFASTAMENTO POR PRAZO INDETERMINADO", y);
 
-  // ── Parágrafo principal (data, hora e prontuário em negrito) ──
   y = drawRichParagraph(doc, [
-    { text: "O paciente acima identificado, foi submetido a consulta médica nesta unidade na data " },
+    { text: "Atesto, para os devidos fins, que o(a) paciente acima identificado(a) foi submetido(a) a avaliação médica nesta unidade de saúde em " },
     { text: data.dataConsulta || data.dataEmissao, bold: true },
     { text: ", às " },
     { text: data.horaConsulta || "", bold: true },
-    { text: ", como consta registro, armazenado no Prontuário Nº " },
-    { text: data.fichaNumero || "" },
-    { text: ". Em decorrência dos resultados apresentados, o mesmo deverá ficar em repouso e afastado de suas atividades laborais por tempo indeterminado." },
+    { text: "h, conforme registro em prontuário nº " },
+    { text: data.fichaNumero || "", bold: true },
+    { text: ". Em razão da condição clínica apresentada, faz-se necessário afastamento das atividades laborais por " },
+    { text: "prazo indeterminado", bold: true },
+    { text: ", até nova reavaliação médica." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: " autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste atestado." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 12;
 
-  // ── CID ──
   doc.setFontSize(10);
-  doc.setFont(PDF_FONT, "normal");
+  doc.setFont(PDF_FONT, "bold");
   doc.setTextColor(...COLORS.slate800);
-  doc.text(`CID: ${data.cidCodigo || ""}`, MARGIN, y);
+  doc.text(`CID-10: ${data.cidCodigo || ""}`, MARGIN, y);
 
-  // ── Rodapé duplo sem traço/data ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }

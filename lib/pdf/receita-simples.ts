@@ -1,6 +1,6 @@
 import {
   BaseDocumentData,
-  createDoc, drawClinicHeader, drawPatientCard,
+  createDoc, drawClinicHeader, drawTitle, drawPatientCard,
   drawFooterSignature, checkPageBreak,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PDF_FONT, COLORS,
 } from "./pdf-base";
@@ -33,11 +33,7 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
   y = drawPatientCard(doc, data, y);
   
   // ── Título ──
-  doc.setFontSize(14);
-  doc.setFont(PDF_FONT, "bold");
-  doc.setTextColor(...COLORS.slate800);
-  doc.text("RECEITA MÉDICA", MARGIN, y);
-  y += 10;
+  y = drawTitle(doc, "RECEITA MÉDICA", undefined, y);
   
   // ── Medicamentos ──
   if (data.medicamentos && data.medicamentos.length > 0) {

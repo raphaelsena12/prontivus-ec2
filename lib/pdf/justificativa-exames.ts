@@ -16,61 +16,34 @@ interface JustificativaExamesData extends BaseDocumentData {
 }
 
 // =====================================================
-// 17. JUSTIFICATIVA DE PEDIDOS DE EXAMES PARA PLANOS DE SAÚDE
+// 17. JUSTIFICATIVA DE SOLICITAÇÃO DE EXAMES
 // =====================================================
 export function generateJustificativaPedidosExamesPDF(data: JustificativaExamesData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "JUSTIFICATIVA DE SOLICITAÇÃO DE EXAME", undefined, headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "JUSTIFICATIVA DE SOLICITAÇÃO DE EXAMES", "PARA OPERADORA DE PLANO DE SAÚDE", y);
 
-  // ── Quebra de duas linhas antes de Convênio ──
-  y += 11;
+  y += 4;
 
-  // ── Convênio ──
   y = drawRichParagraph(doc, [
-    { text: "Convênio: " },
-    { text: data.convenio || "______________________________", bold: !!data.convenio },
+    { text: "Operadora / Convênio: ", bold: true },
+    { text: data.convenio || "______________________________" },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 10;
+
+  y = drawRichParagraph(doc, [
+    { text: "Exames Solicitados: ", bold: true },
+    { text: data.examesSolicitados || "______________________________" },
+  ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
+  y += 10;
+
+  y = drawRichParagraph(doc, [
+    { text: "Justificativa Clínica: ", bold: true },
+    { text: data.justificativa || "______________________________" },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Quebra de duas linhas ──
-  y += 10;
-
-  // ── Exames Solicitados ──
-  if (data.examesSolicitados) {
-    y = drawRichParagraph(doc, [
-      { text: "Exames Solicitados: " },
-      { text: data.examesSolicitados },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  } else {
-    y = drawRichParagraph(doc, [
-      { text: "Exames Solicitados: " },
-      { text: "______________________________" },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  }
-
-  // ── Quebra de duas linhas ──
-  y += 10;
-
-  // ── Justificativa ──
-  if (data.justificativa) {
-    y = drawRichParagraph(doc, [
-      { text: "Justificativa: " },
-      { text: data.justificativa },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  } else {
-    y = drawRichParagraph(doc, [
-      { text: "Justificativa: " },
-      { text: "______________________________" },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  }
-
-  // ── Assinatura apenas do médico (centralizado) ──
   drawFooterSignature(doc, data, y + 20, { hideDateLine: true });
   return doc.output("arraybuffer");
 }

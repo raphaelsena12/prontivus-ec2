@@ -21,121 +21,96 @@ interface DeclaracaoData extends BaseDocumentData {
 }
 
 // =====================================================
-// 13. DECLARAÇÃO DE COMPARECIMENTO ACOMPANHANTE
+// 13. DECLARAÇÃO DE COMPARECIMENTO — ACOMPANHANTE
 // =====================================================
 export function generateDeclaracaoComparecimentoAcompanhantePDF(data: DeclaracaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO DE ACOMPANHANTE", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO DE ACOMPANHANTE", y);
 
-  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
   const dataConsulta = data.dataConsulta || data.dataEmissao;
   const horaInicio = data.horaInicio || data.horaConsulta || "";
   const horaFim = data.horaFim || "";
   const fichaNumero = data.fichaNumero || "";
 
   y = drawRichParagraph(doc, [
-    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: "Declaramos, para os devidos fins, que o(a) paciente acima identificado(a) compareceu a esta unidade de saúde para atendimento médico, conforme registro em prontuário nº " },
     { text: fichaNumero, bold: true },
-    { text: " no dia " },
+    { text: ", no dia " },
     { text: dataConsulta, bold: true },
-    { text: " às " },
+    { text: ", das " },
     { text: horaInicio, bold: true },
-    { text: horaFim ? " até " : "" },
-    { text: horaFim, bold: horaFim ? true : false },
-    { text: ". Acompanhado(a) do Sr(a) " },
+    ...(horaFim ? [{ text: "h às " }, { text: horaFim, bold: true as const }] : []),
+    { text: "h, acompanhado(a) por " },
     { text: data.nomeAcompanhante || "______________________________", bold: !!data.nomeAcompanhante },
-    { text: "." },
+    { text: ", cujo afastamento temporário das atividades laborais se fez necessário para prestar assistência ao(à) paciente." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: ", autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste documento." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── CID ──
   if (data.cidCodigo || data.cidDescricao) {
     y = drawRichParagraph(doc, [
-      { text: "CID " },
-      { text: data.cidCodigo || "Z00.", bold: true },
+      { text: "CID-10: " },
+      { text: data.cidCodigo || "", bold: true },
       { text: data.cidDescricao ? ` — ${data.cidDescricao}` : "" },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  } else {
-    // Se não houver CID, mostra apenas "CID Z00."
-    y = drawRichParagraph(doc, [
-      { text: "CID " },
-      { text: "Z00.", bold: true },
     ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
     y += 8;
   }
 
-  // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
 
 // =====================================================
-// 14. DECLARAÇÃO DE COMPARECIMENTO DE HORÁRIO COM CID
+// 14. DECLARAÇÃO DE COMPARECIMENTO COM HORÁRIO E CID
 // =====================================================
 export function generateDeclaracaoComparecimentoHorarioCidPDF(data: DeclaracaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "COM REGISTRO DE HORÁRIO E CID", y);
 
-  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
   const dataConsulta = data.dataConsulta || data.dataEmissao;
   const horaInicio = data.horaInicio || data.horaConsulta || "____";
   const horaFim = data.horaFim || "_____";
   const fichaNumero = data.fichaNumero || "";
 
   y = drawRichParagraph(doc, [
-    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: "Declaramos, para os devidos fins, que o(a) paciente acima identificado(a) compareceu a esta unidade de saúde para atendimento médico, conforme registro em prontuário nº " },
     { text: fichaNumero, bold: true },
-    { text: " no dia " },
+    { text: ", no dia " },
     { text: dataConsulta, bold: true },
-    { text: " às " },
+    { text: ", das " },
     { text: horaInicio, bold: true },
-    { text: " até " },
+    { text: "h às " },
     { text: horaFim, bold: true },
-    { text: ". Acompanhado(a) do Sr(a) " },
-    { text: data.nomeAcompanhante || "______________________________", bold: !!data.nomeAcompanhante },
-    { text: "." },
+    { text: "h." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Autorização (nome do paciente em negrito) ──
   y = drawRichParagraph(doc, [
     { text: "Eu, " },
-    { text: data.pacienteNome.toUpperCase(), bold: true },
-    { text: ", autorizo o médico a declarar nominalmente, ou através do CID, meu diagnóstico, liberando-o da guarda do sigilo profissional." },
+    { text: `${data.pacienteNome.toUpperCase()},`, bold: true },
+    { text: " portador(a) do CPF acima identificado, autorizo expressamente o médico responsável a revelar o diagnóstico, inclusive por meio da Classificação Internacional de Doenças (CID), eximindo-o do dever de sigilo profissional para fins deste documento." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── CID ──
   if (data.cidCodigo || data.cidDescricao) {
     y = drawRichParagraph(doc, [
-      { text: "CID " },
-      { text: data.cidCodigo || "Z00.", bold: true },
+      { text: "CID-10: " },
+      { text: data.cidCodigo || "", bold: true },
       { text: data.cidDescricao ? ` — ${data.cidDescricao}` : "" },
-    ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
-    y += 8;
-  } else {
-    // Se não houver CID, mostra apenas "CID Z00."
-    y = drawRichParagraph(doc, [
-      { text: "CID " },
-      { text: "Z00.", bold: true },
     ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
     y += 8;
   }
 
-  // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
@@ -146,29 +121,27 @@ export function generateDeclaracaoComparecimentoHorarioCidPDF(data: DeclaracaoDa
 export function generateDeclaracaoComparecimentoPDF(data: DeclaracaoData): ArrayBuffer {
   const doc = createDoc();
   const headerY = drawClinicHeader(doc, data);
-  let y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", "AFASTAMENTO TEMPORÁRIO", headerY);
-  y = drawPatientCard(doc, data, y);
+  let y = drawPatientCard(doc, data, headerY);
+  y = drawTitle(doc, "DECLARAÇÃO DE COMPARECIMENTO", undefined, y);
 
-  // ── Parágrafo principal (data, hora início, hora fim e ficha em negrito) ──
   const dataConsulta = data.dataConsulta || data.dataEmissao;
   const horaInicio = data.horaInicio || data.horaConsulta || "____";
   const horaFim = data.horaFim || "_____";
   const fichaNumero = data.fichaNumero || "";
 
   y = drawRichParagraph(doc, [
-    { text: "Declaramos para os devidos fins que, o paciente identificado, compareceu a esta unidade médica, como consta registro armazenado na ficha de atendimento nº " },
+    { text: "Declaramos, para os devidos fins, que o(a) paciente acima identificado(a) compareceu a esta unidade de saúde para atendimento médico, conforme registro em prontuário nº " },
     { text: fichaNumero, bold: true },
-    { text: " no dia " },
+    { text: ", no dia " },
     { text: dataConsulta, bold: true },
-    { text: " às " },
+    { text: ", das " },
     { text: horaInicio, bold: true },
-    { text: " até " },
+    { text: "h às " },
     { text: horaFim, bold: true },
-    { text: "." },
+    { text: "h." },
   ], MARGIN, y, CONTENT_WIDTH, 10, 5.5);
   y += 8;
 
-  // ── Assinaturas do paciente e médico ──
   drawDualSignature(doc, data, y + 10, { hideDateLine: true });
   return doc.output("arraybuffer");
 }
