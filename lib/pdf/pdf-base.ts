@@ -452,7 +452,7 @@ export function drawFooterSignature(
   doc: jsPDF,
   data: MedicoData & { dataEmissao: string; cidade?: string },
   minY?: number,
-  options?: { hideDateLine?: boolean; hideSignatureLine?: boolean }
+  options?: { hideDateLine?: boolean; hideSignatureLine?: boolean; hideSeparatorLine?: boolean }
 ): void {
   const sigY = options?.hideDateLine
     ? PAGE_HEIGHT - 30
@@ -460,9 +460,12 @@ export function drawFooterSignature(
 
   if (!options?.hideDateLine) {
     const footerY = sigY - 28;
-    doc.setDrawColor(...COLORS.slate200);
-    doc.setLineWidth(0.3);
-    doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
+
+    if (!options?.hideSeparatorLine) {
+      doc.setDrawColor(...COLORS.slate200);
+      doc.setLineWidth(0.3);
+      doc.line(MARGIN, footerY, PAGE_WIDTH - MARGIN, footerY);
+    }
 
     const localData = data.cidade
       ? `${data.cidade}, ${data.dataEmissao}`

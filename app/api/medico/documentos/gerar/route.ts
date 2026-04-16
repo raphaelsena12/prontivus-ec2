@@ -461,6 +461,12 @@ export async function POST(request: NextRequest) {
       }
 
       case "receita-controle-especial": {
+        const medicamentosControle = (dados?.prescricoes || dados?.medicamentos || []).map((p: any) => ({
+          nome: p.medicamento || p.nome || "",
+          dosagem: p.dosagem || undefined,
+          posologia: p.posologia || "",
+          quantidade: p.duracao || p.quantidade || undefined,
+        }));
         pdfBuffer = generateReceitaControleEspecialPDF({
           ...baseData,
           pacienteEndereco: dados?.pacienteEndereco || undefined,
@@ -468,7 +474,7 @@ export async function POST(request: NextRequest) {
           pacienteIdade: idade,
           uf: dados?.uf || undefined,
           dataValidade: dados?.dataValidade || undefined,
-          medicamentos: dados?.medicamentos || [],
+          medicamentos: medicamentosControle,
         });
         break;
       }

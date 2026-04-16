@@ -70,11 +70,17 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
         dosagemX += doc.getTextWidth(med.dosagem) + 3;
       }
       
+      // Número final (quantidade) — calcular largura antes de desenhar a linha
+      const quantidadeText = med.quantidade ? String(med.quantidade) : "";
+      doc.setFontSize(10);
+      doc.setFont(PDF_FONT, "normal");
+      const quantidadeWidth = quantidadeText ? doc.getTextWidth(quantidadeText) + 4 : 0;
+
       // Linha tracejada para quantidade
-      const linhaStartX = dosagemX;
-      const linhaEndX = PAGE_WIDTH - MARGIN - 15; // Deixa espaço para o número final
+      const linhaStartX = dosagemX + 3;
+      const linhaEndX = PAGE_WIDTH - MARGIN - quantidadeWidth;
       const linhaY = y - 1;
-      
+
       // Desenhar linha tracejada
       doc.setDrawColor(...COLORS.slate800);
       doc.setLineWidth(0.2);
@@ -86,14 +92,12 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
         doc.line(currentX, linhaY, dashEnd, linhaY);
         currentX = dashEnd + gapLength;
       }
-      
-      // Número final (quantidade)
-      const numFinalX = PAGE_WIDTH - MARGIN - 10;
-      if (med.quantidade) {
+
+      if (quantidadeText) {
         doc.setFontSize(10);
         doc.setFont(PDF_FONT, "normal");
         doc.setTextColor(...COLORS.slate800);
-        doc.text(String(med.quantidade), numFinalX, y);
+        doc.text(quantidadeText, PAGE_WIDTH - MARGIN, y, { align: "right" });
       }
       
       y += 6;

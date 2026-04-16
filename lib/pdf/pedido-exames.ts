@@ -40,7 +40,7 @@ export function generatePedidoExamesPDF(data: PedidoExamesData): ArrayBuffer {
   y += 10;
 
   // ── Assinatura ──
-  drawFooterSignature(doc, data, y);
+  drawFooterSignature(doc, data, y, { hideSeparatorLine: true, hideDateLine: true });
 
   return doc.output("arraybuffer");
 }
