@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaRaw } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { uploadPDFToS3, areAwsCredentialsConfigured } from "@/lib/s3-service";
 import sharp from "sharp";
@@ -322,9 +322,28 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Buscar campos Decimal diretamente pelo prismaRaw (sem extensão de criptografia),
+    // pois o spread do prisma-encryption destrói o objeto Prisma Decimal.
+    const consultaDecimal = await prismaRaw.consulta.findUnique({
+      where: { id: consultaId as string },
+      select: { saturacaoO2: true, temperatura: true, peso: true, altura: true },
+    });
+    const toNum = (v: unknown) => {
+      if (v == null) return null;
+      const n = typeof v === "object" ? parseFloat((v as any).toString()) : parseFloat(String(v));
+      return isFinite(n) ? n : null;
+    };
+    const consultaSerializada = {
+      ...consulta,
+      saturacaoO2: toNum(consultaDecimal?.saturacaoO2),
+      temperatura: toNum(consultaDecimal?.temperatura),
+      peso: toNum(consultaDecimal?.peso),
+      altura: toNum(consultaDecimal?.altura),
+    };
+
     return NextResponse.json(
       {
-        consulta,
+        consulta: consultaSerializada,
         prontuario,
         savedCids,
         savedExames,

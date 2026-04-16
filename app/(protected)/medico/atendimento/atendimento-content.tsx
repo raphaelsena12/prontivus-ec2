@@ -382,6 +382,20 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
   const [docMedicamentosSelecionados, setDocMedicamentosSelecionados] = useState<Set<number>>(new Set());
+  const [sinaisVitaisFocusField, setSinaisVitaisFocusField] = useState<string | null>(null);
+  const [sinaisVitaisForm, setSinaisVitaisForm] = useState({
+    pressaoSistolica: "", pressaoDiastolica: "", frequenciaCardiaca: "",
+    saturacaoO2: "", temperatura: "", peso: "", altura: "",
+  });
+  const sinaisVitaisFormRef = React.useRef({
+    pressaoSistolica: "", pressaoDiastolica: "", frequenciaCardiaca: "",
+    saturacaoO2: "", temperatura: "", peso: "", altura: "",
+  });
+  const setVitaisForm = (v: typeof sinaisVitaisForm) => {
+    sinaisVitaisFormRef.current = v;
+    setSinaisVitaisForm(v);
+  };
+  const [savingSinaisVitais, setSavingSinaisVitais] = useState(false);
   const [certStatus, setCertStatus] = useState<{ configured: boolean; expired: boolean; checked: boolean }>({ configured: false, expired: false, checked: false });
   const [docConfigOpts, setDocConfigOpts] = useState({
     cpf: true, endereco: false, assinar: false,
@@ -594,18 +608,19 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consultaId, prontuario, editedAnamnese, analysisResults, cidsManuais, examesManuais, prescricoes, orientacoes, selectedCids, selectedExamesAI, selectedPrescricoesAI]);
 
-  // Calculate IMC if peso and altura are available
-  const peso = consulta?.peso ? Number(consulta.peso) : null;
-  const altura = consulta?.altura ? Number(consulta.altura) : null;
-  const imc = peso && altura && altura > 0 ? peso / (altura * altura) : null;
+  // Exibe valores do form (fonte de verdade para edição inline)
+  const _pesoNum = sinaisVitaisForm.peso ? Number(sinaisVitaisForm.peso) : null;
+  const _alturaNum = sinaisVitaisForm.altura ? Number(sinaisVitaisForm.altura) : null;
+  const imc = _pesoNum && _alturaNum && _alturaNum > 0 ? _pesoNum / (_alturaNum * _alturaNum) : null;
 
   const vitals = [
     {
       icon: Heart,
       label: "Pressão",
-      value: consulta?.pressaoSistolica && consulta?.pressaoDiastolica
-        ? `${consulta.pressaoSistolica}/${consulta.pressaoDiastolica}`
-        : "-",
+      field: "pressaoSistolica",
+      value: sinaisVitaisForm.pressaoSistolica && sinaisVitaisForm.pressaoDiastolica
+        ? `${sinaisVitaisForm.pressaoSistolica}/${sinaisVitaisForm.pressaoDiastolica}`
+        : sinaisVitaisForm.pressaoSistolica || "-",
       unit: "mmHg",
       status: "normal",
       iconColor: "text-red-500"
@@ -613,7 +628,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     {
       icon: Activity,
       label: "Frequência",
-      value: consulta?.frequenciaCardiaca ? String(consulta.frequenciaCardiaca) : "-",
+      field: "frequenciaCardiaca",
+      value: sinaisVitaisForm.frequenciaCardiaca || "-",
       unit: "bpm",
       status: "normal",
       iconColor: "text-blue-500"
@@ -621,7 +637,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     {
       icon: Droplet,
       label: "Saturação",
-      value: consulta?.saturacaoO2 ? String(Number(consulta.saturacaoO2)) : "-",
+      field: "saturacaoO2",
+      value: sinaisVitaisForm.saturacaoO2 || "-",
       unit: "%",
       status: "normal",
       iconColor: "text-cyan-500"
@@ -629,7 +646,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     {
       icon: Weight,
       label: "Peso",
-      value: peso ? peso.toFixed(1) : "-",
+      field: "peso",
+      value: sinaisVitaisForm.peso || "-",
       unit: "kg",
       status: "normal",
       iconColor: "text-orange-500"
@@ -637,7 +655,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     {
       icon: Ruler,
       label: "Altura",
-      value: altura ? altura.toFixed(2) : "-",
+      field: "altura",
+      value: sinaisVitaisForm.altura || "-",
       unit: "m",
       status: "normal",
       iconColor: "text-green-500"
@@ -645,6 +664,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     {
       icon: TrendingUp,
       label: "IMC",
+      field: "imc",
       value: imc ? imc.toFixed(1) : "-",
       unit: "kg/m²",
       status: "normal",
@@ -1538,6 +1558,16 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       }
       
       setConsulta(data.consulta);
+      const toStr = (v: unknown) => v != null ? String(v) : "";
+      setVitaisForm({
+        pressaoSistolica: toStr(data.consulta.pressaoSistolica),
+        pressaoDiastolica: toStr(data.consulta.pressaoDiastolica),
+        frequenciaCardiaca: toStr(data.consulta.frequenciaCardiaca),
+        saturacaoO2: toStr(data.consulta.saturacaoO2),
+        temperatura: toStr(data.consulta.temperatura),
+        peso: toStr(data.consulta.peso),
+        altura: toStr(data.consulta.altura),
+      });
 
       if (data.prontuario) {
         setProntuario(data.prontuario);
@@ -1964,6 +1994,31 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       console.error(error);
     } finally {
       setSaving(false);
+    }
+  };
+
+const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
+    setSavingSinaisVitais(true);
+    try {
+      // Só envia campos que têm valor preenchido — campos vazios são omitidos para não apagar dados existentes
+      const body: Record<string, unknown> = { consultaId };
+      if (form.pressaoSistolica.trim()) body.pressaoSistolica = form.pressaoSistolica.trim();
+      if (form.pressaoDiastolica.trim()) body.pressaoDiastolica = form.pressaoDiastolica.trim();
+      if (form.frequenciaCardiaca.trim()) body.frequenciaCardiaca = form.frequenciaCardiaca.trim();
+      if (form.saturacaoO2.trim()) body.saturacaoO2 = form.saturacaoO2.trim();
+      if (form.temperatura.trim()) body.temperatura = form.temperatura.trim();
+      if (form.peso.trim()) body.peso = form.peso.trim();
+      if (form.altura.trim()) body.altura = form.altura.trim();
+      const res = await fetch("/api/medico/sinais-vitais", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Erro ao salvar");
+    } catch {
+      alert("Erro ao salvar sinais vitais. Tente novamente.");
+    } finally {
+      setSavingSinaisVitais(false);
     }
   };
 
@@ -2404,8 +2459,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                   />
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="text-2xl font-bold text-slate-900 truncate">{consulta.paciente.nome}</span>
                     <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 border flex-shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
                       Em Atendimento
@@ -2417,18 +2472,27 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                    <span className="font-semibold text-slate-700">{prontuarioLabel}</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="font-semibold text-slate-700">{idade} anos</span>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {/* Prontuário */}
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      {prontuarioLabel}
+                    </span>
+                    {/* Idade */}
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+                      {idade} anos
+                    </span>
+                    {/* Tipo de Consulta */}
                     {consulta.tipoConsulta && (
-                      <>
-                        <span className="text-slate-300">·</span>
-                        <span>{consulta.tipoConsulta.nome}</span>
-                      </>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        {consulta.tipoConsulta.nome}
+                      </span>
                     )}
-                    <span className="text-slate-300">·</span>
-                    <span>
+                    {/* Convênio */}
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                       {(consulta as any).operadora
                         ? `${(consulta as any).operadora.nomeFantasia}${(consulta as any).planoSaude ? ` · ${(consulta as any).planoSaude.nome}` : ""}`
                         : "Particular"}
@@ -2567,25 +2631,71 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
               </div>
             )}
 
-            {/* Linha 2 — Sinais vitais */}
-            {vitals.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
-                {vitals.map((v, i) => {
-                  const Icon = v.icon;
-                  const isDroplet = Icon === Droplet;
-                  return (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0"
-                    >
-                      {!isDroplet && <Icon className={`w-3 h-3 flex-shrink-0 ${v.iconColor}`} />}
+            {/* Linha 2 — Sinais vitais (edição inline) */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
+              {vitals.map((v, i) => {
+                const Icon = v.icon;
+                const isDroplet = Icon === Droplet;
+                const isEditing = sinaisVitaisFocusField === v.field;
+                const isImc = v.field === "imc";
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border flex-shrink-0 transition-colors ${
+                      isEditing
+                        ? "border-blue-400 bg-blue-50"
+                        : isImc
+                        ? "bg-slate-50 border-slate-100"
+                        : "bg-slate-50 border-slate-100 hover:border-blue-300 hover:bg-blue-50 cursor-pointer"
+                    }`}
+                    onClick={() => { if (!isImc && !isEditing) setSinaisVitaisFocusField(v.field); }}
+                    title={isImc ? "Calculado automaticamente" : `Editar ${v.label}`}
+                  >
+                    {!isDroplet && <Icon className={`w-3 h-3 flex-shrink-0 ${v.iconColor}`} />}
+                    {isEditing && v.field === "pressaoSistolica" ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        className="text-[11px] font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none w-16 min-w-0"
+                        defaultValue={`${sinaisVitaisForm.pressaoSistolica}${sinaisVitaisForm.pressaoDiastolica ? `/${sinaisVitaisForm.pressaoDiastolica}` : ""}`}
+                        placeholder="120/80"
+                        onBlur={e => {
+                          const parts = e.target.value.split("/");
+                          const next = {
+                            ...sinaisVitaisFormRef.current,
+                            pressaoSistolica: parts[0]?.trim() ?? "",
+                            pressaoDiastolica: parts[1]?.trim() ?? sinaisVitaisFormRef.current.pressaoDiastolica,
+                          };
+                          setVitaisForm(next);
+                          setSinaisVitaisFocusField(null);
+                          handleSaveSinaisVitais(next);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : isEditing ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        inputMode="decimal"
+                        className="text-[11px] font-bold text-slate-800 tabular-nums leading-none bg-transparent outline-none w-14 min-w-0"
+                        defaultValue={sinaisVitaisForm[v.field as keyof typeof sinaisVitaisForm] ?? ""}
+                        placeholder={v.value === "-" ? "" : v.value}
+                        onBlur={e => {
+                          const next = { ...sinaisVitaisFormRef.current, [v.field]: e.target.value.trim() };
+                          setVitaisForm(next);
+                          setSinaisVitaisFocusField(null);
+                          handleSaveSinaisVitais(next);
+                        }}
+                        onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+                      />
+                    ) : (
                       <span className="text-[11px] font-bold text-slate-800 tabular-nums leading-none whitespace-nowrap">{v.value}</span>
-                      <span className="text-[9px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    )}
+                    <span className="text-[9px] text-slate-400 leading-none whitespace-nowrap">{v.unit}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

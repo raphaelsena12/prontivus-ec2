@@ -9,20 +9,14 @@ async function checkAuthorization() {
   if (!session) {
     return {
       authorized: false,
-      response: NextResponse.json(
-        { error: "Não autenticado" },
-        { status: 401 }
-      ),
+      response: NextResponse.json({ error: "Não autenticado" }, { status: 401 }),
     };
   }
 
   if (session.user.tipo !== TipoUsuario.MEDICO) {
     return {
       authorized: false,
-      response: NextResponse.json(
-        { error: "Acesso negado. Apenas médicos podem acessar esta rota." },
-        { status: 403 }
-      ),
+      response: NextResponse.json({ error: "Acesso negado." }, { status: 403 }),
     };
   }
 
@@ -30,82 +24,83 @@ async function checkAuthorization() {
   if (!clinicaId) {
     return {
       authorized: false,
-      response: NextResponse.json(
-        { error: "Clínica não encontrada" },
-        { status: 403 }
-      ),
+      response: NextResponse.json({ error: "Clínica não encontrada" }, { status: 403 }),
     };
   }
 
   return { authorized: true, clinicaId };
 }
 
-// PATCH /api/medico/sinais-vitais - Médico atualiza sinais vitais durante atendimento
+// PATCH /api/medico/sinais-vitais
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await checkAuthorization();
-    if (!auth.authorized) {
-      return auth.response;
-    }
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const {
-      consultaId,
-      pressaoSistolica,
-      pressaoDiastolica,
-      frequenciaCardiaca,
-      saturacaoO2,
-      temperatura,
-      peso,
-      altura,
-    } = body;
+    const { consultaId, pressaoSistolica, pressaoDiastolica, frequenciaCardiaca, saturacaoO2, temperatura, peso, altura } = body;
 
     if (!consultaId) {
-      return NextResponse.json(
-        { error: "ID da consulta é obrigatório" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ID da consulta é obrigatório" }, { status: 400 });
     }
 
-    // Verificar se a consulta pertence à clínica
     const consulta = await prisma.consulta.findFirst({
-      where: {
-        id: consultaId,
-        clinicaId: auth.clinicaId,
-      },
+      where: { id: consultaId, clinicaId: auth.clinicaId },
     });
 
     if (!consulta) {
-      return NextResponse.json(
-        { error: "Consulta não encontrada" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Consulta não encontrada" }, { status: 404 });
     }
 
-    // Montar apenas os campos enviados para atualização parcial
+    const toInt = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = parseInt(String(v), 10);
+      return isNaN(n) ? null : n;
+    };
+
+    const toFloat = (v: unknown): number | null => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = parseFloat(String(v).replace(",", "."));
+      return isNaN(n) ? null : n;
+    };
+
+    // Só inclui campos com valor não-nulo
     const data: Record<string, unknown> = {};
-    if (pressaoSistolica !== undefined) data.pressaoSistolica = pressaoSistolica;
-    if (pressaoDiastolica !== undefined) data.pressaoDiastolica = pressaoDiastolica;
-    if (frequenciaCardiaca !== undefined) data.frequenciaCardiaca = frequenciaCardiaca;
-    if (saturacaoO2 !== undefined) data.saturacaoO2 = saturacaoO2;
-    if (temperatura !== undefined) data.temperatura = temperatura;
-    if (peso !== undefined) data.peso = peso;
-    if (altura !== undefined) data.altura = altura;
+    const ps = toInt(pressaoSistolica);
+    const pd = toInt(pressaoDiastolica);
+    const fc = toInt(frequenciaCardiaca);
+    const so = toFloat(saturacaoO2);
+    const te = toFloat(temperatura);
+    const pe = toFloat(peso);
+    const al = toFloat(altura);
+
+    if (ps !== null) data.pressaoSistolica = ps;
+    if (pd !== null) data.pressaoDiastolica = pd;
+    if (fc !== null) data.frequenciaCardiaca = fc;
+    if (so !== null) data.saturacaoO2 = so;
+    if (te !== null) data.temperatura = te;
+    if (pe !== null) data.peso = pe;
+    if (al !== null) data.altura = al;
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ consulta, message: "Nenhum campo para atualizar" }, { status: 200 });
+    }
 
     const consultaAtualizada = await prisma.consulta.update({
       where: { id: consultaId },
       data,
     });
 
-    return NextResponse.json(
-      { consulta: consultaAtualizada, message: "Sinais vitais atualizados com sucesso" },
-      { status: 200 }
-    );
+    const consultaSerializada = {
+      ...consultaAtualizada,
+      saturacaoO2: consultaAtualizada.saturacaoO2 != null ? parseFloat(consultaAtualizada.saturacaoO2.toString()) : null,
+      temperatura: consultaAtualizada.temperatura != null ? parseFloat(consultaAtualizada.temperatura.toString()) : null,
+      peso: consultaAtualizada.peso != null ? parseFloat(consultaAtualizada.peso.toString()) : null,
+      altura: consultaAtualizada.altura != null ? parseFloat(consultaAtualizada.altura.toString()) : null,
+    };
+    return NextResponse.json({ consulta: consultaSerializada, message: "Sinais vitais atualizados com sucesso" }, { status: 200 });
   } catch (error) {
     console.error("Erro ao atualizar sinais vitais:", error);
-    return NextResponse.json(
-      { error: "Erro ao atualizar sinais vitais" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Erro ao atualizar sinais vitais" }, { status: 500 });
   }
 }

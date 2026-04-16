@@ -5,6 +5,7 @@ import { applyFieldEncryption } from "@/lib/crypto/prisma-encryption";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaRaw: PrismaClient | undefined;
 };
 
 if (!process.env.DATABASE_URL) {
@@ -47,3 +48,14 @@ export const prisma =
   );
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+// Cliente sem criptografia — usar apenas para ler campos Decimal que o spread do
+// prisma-encryption destrói (saturacaoO2, temperatura, peso, altura, etc.)
+export const prismaRaw =
+  globalForPrisma.prismaRaw ??
+  new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development" ? ["error"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prismaRaw = prismaRaw;
