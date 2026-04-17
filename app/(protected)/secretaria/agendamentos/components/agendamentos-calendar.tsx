@@ -53,6 +53,7 @@ interface Agendamento {
   valorCobrado: number | string | null;
   status: string;
   observacoes: string | null;
+  encaixe?: boolean;
 }
 
 interface BloqueioAgenda {
@@ -112,7 +113,13 @@ const STATUS_LEGENDA = [
   { status: "CONFIRMADA", label: "Confirmada" },
   { status: "CANCELADA", label: "Cancelada" },
   { status: "REALIZADA", label: "Realizada" },
+  { status: "ENCAIXE", label: "Encaixe" },
 ];
+
+const getStatusColorComEncaixe = (status: string) => {
+  if (status === "ENCAIXE") return { bg: "#f97316", border: "#ea580c" };
+  return getStatusColor(status);
+};
 
 export function AgendamentosCalendar({
   agendamentos,
@@ -307,9 +314,11 @@ export function AgendamentosCalendar({
       };
     }
 
-    // Estilo para agendamentos - cor baseada no status
+    // Estilo para agendamentos - encaixe tem prioridade visual (laranja)
     const agendamento = event.resource as Agendamento;
-    const tipoCor = getStatusColor(agendamento.status);
+    const tipoCor = agendamento.encaixe
+      ? { bg: "#f97316", border: "#ea580c" }
+      : getStatusColor(agendamento.status);
 
     return {
       style: {
@@ -370,7 +379,7 @@ export function AgendamentosCalendar({
       {/* Legenda */}
       <div className="mb-3 flex flex-wrap gap-3">
         {STATUS_LEGENDA.map(({ status, label }) => {
-          const cor = getStatusColor(status);
+          const cor = getStatusColorComEncaixe(status);
           return (
             <div key={status} className="flex items-center gap-1.5">
               <div

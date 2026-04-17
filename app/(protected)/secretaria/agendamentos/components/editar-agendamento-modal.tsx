@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { maskCPF, removeMask } from "@/lib/masks";
+import { maskCPF, removeMask, maskMoeda, parseMoeda } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 import { CodigoTussSearchInput } from "./codigo-tuss-search-input";
 import { OperadoraSearchInput } from "./operadora-search-input";
@@ -48,9 +48,12 @@ const agendamentoSchema = z.object({
   formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
-  valorCobrado: z.number().min(0).optional().nullable(),
+  valorCobrado: z.number().nullable().optional(),
+  desconto: z.number().nullable().optional(),
+  valorFinal: z.number().nullable().optional(),
   observacoes: z.string().optional(),
   anexos: z.array(z.instanceof(File)).optional(),
+  encaixe: z.boolean(),
 });
 
 type AgendamentoFormData = z.infer<typeof agendamentoSchema>;
@@ -117,7 +120,10 @@ interface Agendamento {
   operadoraId: string | null;
   numeroCarteirinha: string | null;
   valorCobrado: number | string | null;
+  desconto: number | string | null;
+  valorFinal: number | string | null;
   documentos?: DocumentoExistente[];
+  encaixe?: boolean;
 }
 
 interface EditarAgendamentoModalProps {
@@ -413,6 +419,7 @@ export function EditarAgendamentoModal({
   const [loadingCancel, setLoadingCancel] = useState(false);
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<string[]>([]);
   const [loadingHorarios, setLoadingHorarios] = useState(false);
+  const [isEncaixe, setIsEncaixe] = useState(false);
   const horarioOriginalRef = useRef<{ hora: string; horaFim: string } | null>(null);
   const medicoDataCarregadoRef = useRef<string | null>(null);
   const [agendamentoCarregado, setAgendamentoCarregado] = useState(false);
@@ -432,8 +439,11 @@ export function EditarAgendamentoModal({
       operadoraId: null,
       numeroCarteirinha: "",
       valorCobrado: null,
+      desconto: null,
+      valorFinal: null,
       observacoes: "",
       anexos: [],
+      encaixe: false,
     },
   });
 
@@ -491,6 +501,7 @@ export function EditarAgendamentoModal({
       horarioOriginalRef.current = null;
       medicoDataCarregadoRef.current = null;
       setAgendamentoCarregado(false);
+      setIsEncaixe(false);
       return;
     }
 
@@ -574,6 +585,9 @@ export function EditarAgendamentoModal({
         if (cancelado) return;
 
         // 6. Preencher formulário por último (horários já carregados, sem race condition)
+        const encaixeValue = !!consulta.encaixe;
+        setIsEncaixe(encaixeValue);
+
         form.reset({
           pacienteId: consulta.pacienteId,
           medicoId: consulta.medicoId,
@@ -587,16 +601,24 @@ export function EditarAgendamentoModal({
           operadoraId: consulta.operadoraId,
           numeroCarteirinha: consulta.numeroCarteirinha || "",
           valorCobrado: consulta.valorCobrado ? Number(consulta.valorCobrado) : null,
+          desconto: consulta.desconto ? Number(consulta.desconto) : null,
+          valorFinal: consulta.valorFinal
+            ? Number(consulta.valorFinal)
+            : consulta.valorCobrado
+            ? Math.max(0, Number(consulta.valorCobrado) - (consulta.desconto ? Number(consulta.desconto) : 0))
+            : null,
           observacoes: consulta.observacoes || "",
           anexos: [],
+          encaixe: encaixeValue,
         });
 
         setDocumentosExistentes(consulta.documentos || []);
         setAgendamentoCarregado(true);
-      } catch (error) {
+      } catch (error: any) {
         if (!cancelado) {
-          toast.error("Erro ao carregar agendamento");
-          console.error(error);
+          const msg = error?.message || "Erro desconhecido ao carregar agendamento";
+          toast.error(msg);
+          console.error("[editar-modal] erro ao carregar:", error);
           onOpenChange(false);
         }
       } finally {
@@ -787,10 +809,14 @@ export function EditarAgendamentoModal({
         if (data.tipoConsultaId) formData.append("tipoConsultaId", data.tipoConsultaId);
         if (data.procedimentoId) formData.append("procedimentoId", data.procedimentoId);
         if (data.formaPagamentoId) formData.append("formaPagamentoId", data.formaPagamentoId);
+        if (data.formaPagamentoId) formData.append("formaPagamentoId", data.formaPagamentoId);
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
         if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
         if (data.valorCobrado != null) formData.append("valorCobrado", String(data.valorCobrado));
+        if (data.desconto != null) formData.append("desconto", String(data.desconto));
+        if (data.valorFinal != null) formData.append("valorFinal", String(data.valorFinal));
         if (data.observacoes) formData.append("observacoes", data.observacoes);
+        formData.append("encaixe", String(data.encaixe ?? false));
         anexos.forEach((file) => formData.append("anexos", file));
 
         response = await fetch(`/api/secretaria/agendamentos/${agendamentoId}`, {
@@ -812,6 +838,9 @@ export function EditarAgendamentoModal({
             formaPagamentoId: data.formaPagamentoId || null,
             operadoraId: data.operadoraId || null,
             valorCobrado: data.valorCobrado || null,
+            desconto: data.desconto || null,
+            valorFinal: data.valorFinal || null,
+            encaixe: data.encaixe ?? false,
           }),
         });
       }
@@ -1020,27 +1049,39 @@ export function EditarAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Início *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={!medicoId || !data || loadingHorarios}>
+                          {isEncaixe ? (
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder={loadingHorarios ? "Carregando..." : "Selecione"} />
-                              </SelectTrigger>
+                              <Input
+                                type="time"
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs"
+                                disabled={!medicoId || !data}
+                              />
                             </FormControl>
-                            <SelectContent position="popper" className="max-h-60">
-                              {(() => {
-                                const opcoes = [...horariosDisponiveis];
-                                if (field.value && !opcoes.includes(field.value)) {
-                                  opcoes.push(field.value);
-                                  opcoes.sort();
-                                }
-                                return opcoes.map((horario) => (
-                                  <SelectItem key={horario} value={horario} className="text-xs">
-                                    {horario}
-                                  </SelectItem>
-                                ));
-                              })()}
-                            </SelectContent>
-                          </Select>
+                          ) : (
+                            <Select onValueChange={field.onChange} value={field.value || ""} disabled={!medicoId || !data || loadingHorarios}>
+                              <FormControl>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder={loadingHorarios ? "Carregando..." : "Selecione"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent position="popper" className="max-h-60">
+                                {(() => {
+                                  const opcoes = [...horariosDisponiveis];
+                                  if (field.value && !opcoes.includes(field.value)) {
+                                    opcoes.push(field.value);
+                                    opcoes.sort();
+                                  }
+                                  return opcoes.map((horario) => (
+                                    <SelectItem key={horario} value={horario} className="text-xs">
+                                      {horario}
+                                    </SelectItem>
+                                  ));
+                                })()}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -1052,35 +1093,76 @@ export function EditarAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Fim *</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value || ""}
-                            disabled={!hora || loadingHorarios}
-                          >
+                          {isEncaixe ? (
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
+                              <Input
+                                type="time"
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs"
+                                disabled={!hora}
+                              />
                             </FormControl>
-                            <SelectContent position="popper" className="max-h-60">
-                              {(() => {
-                                const opcoes = horariosDisponiveis.filter((horario) => horario > (hora || ""));
-                                if (field.value && !opcoes.includes(field.value) && field.value > (hora || "")) {
-                                  opcoes.push(field.value);
-                                  opcoes.sort();
-                                }
-                                return opcoes.map((horario) => (
-                                  <SelectItem key={horario} value={horario} className="text-xs">
-                                    {horario}
-                                  </SelectItem>
-                                ));
-                              })()}
-                            </SelectContent>
-                          </Select>
+                          ) : (
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={!hora || loadingHorarios}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent position="popper" className="max-h-60">
+                                {(() => {
+                                  const opcoes = horariosDisponiveis.filter((horario) => horario > (hora || ""));
+                                  if (field.value && !opcoes.includes(field.value) && field.value > (hora || "")) {
+                                    opcoes.push(field.value);
+                                    opcoes.sort();
+                                  }
+                                  return opcoes.map((horario) => (
+                                    <SelectItem key={horario} value={horario} className="text-xs">
+                                      {horario}
+                                    </SelectItem>
+                                  ));
+                                })()}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
+
+                    {/* Checkbox Encaixe */}
+                    <FormItem className="flex flex-col justify-end min-w-[110px]">
+                      <FormLabel className="text-xs font-medium text-transparent select-none">.</FormLabel>
+                      <label
+                        className={cn(
+                          "h-8 px-3 flex items-center gap-2 rounded-md border text-xs font-medium cursor-pointer transition-colors select-none",
+                          isEncaixe
+                            ? "bg-blue-50 border-blue-400 text-blue-700"
+                            : "bg-background border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isEncaixe}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setIsEncaixe(next);
+                            form.setValue("encaixe", next);
+                            if (!next) {
+                              form.setValue("hora", "");
+                              form.setValue("horaFim", "");
+                            }
+                          }}
+                          className="accent-blue-600 h-3.5 w-3.5"
+                        />
+                        Encaixe
+                      </label>
+                    </FormItem>
                   </div>
 
                   {/* Row 3: Tipo Consulta, Forma Pagamento, Procedimento, Convênio e Carteirinha */}
@@ -1090,7 +1172,7 @@ export function EditarAgendamentoModal({
                       name="tipoConsultaId"
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
-                          <FormLabel className="text-xs font-medium">Tipo de Consulta</FormLabel>
+                          <FormLabel className="text-xs font-medium">Tipo de Consulta *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger className="h-8 text-xs w-full">
@@ -1326,23 +1408,92 @@ export function EditarAgendamentoModal({
                     )}
                   </div>
 
-                  {/* Row 6: Valor */}
+                  {/* Row 6: Valor / Desconto / Valor Final */}
                   <div className="flex flex-wrap items-start gap-2.5 justify-end">
                     <FormField
                       control={form.control}
                       name="valorCobrado"
                       render={({ field }) => (
-                        <FormItem className="min-w-[200px]">
-                          <FormLabel className="text-xs font-medium">Valor Cobrado</FormLabel>
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Valor</FormLabel>
                           <FormControl>
                             <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="R$ 0,00"
                               {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              value={field.value || ""}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                if (!digits) {
+                                  field.onChange(null);
+                                  form.setValue("valorFinal", null);
+                                  e.target.value = "";
+                                } else {
+                                  const masked = maskMoeda(e.target.value);
+                                  const valor = parseMoeda(masked);
+                                  field.onChange(valor);
+                                  const desconto = form.getValues("desconto") || 0;
+                                  form.setValue("valorFinal", Math.max(0, valor - desconto));
+                                  e.target.value = masked;
+                                }
+                              }}
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
                               className="h-10 text-base font-semibold text-right"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="desconto"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Desconto</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="R$ 0,00"
+                              {...field}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                if (!digits) {
+                                  field.onChange(null);
+                                  const valor = form.getValues("valorCobrado") || 0;
+                                  form.setValue("valorFinal", valor > 0 ? valor : null);
+                                  e.target.value = "";
+                                } else {
+                                  const masked = maskMoeda(e.target.value);
+                                  const desconto = parseMoeda(masked);
+                                  field.onChange(desconto);
+                                  const valor = form.getValues("valorCobrado") || 0;
+                                  form.setValue("valorFinal", Math.max(0, valor - desconto));
+                                  e.target.value = masked;
+                                }
+                              }}
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
+                              className="h-10 text-base font-semibold text-right"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="valorFinal"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Valor Final</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="R$ 0,00"
+                              readOnly
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
+                              className="h-10 text-base font-semibold text-right bg-muted cursor-default"
                             />
                           </FormControl>
                           <FormMessage className="text-xs" />

@@ -27,7 +27,10 @@ const agendamentoSchema = z.object({
   planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
   valorCobrado: z.number().optional().nullable(),
+  desconto: z.number().optional().nullable(),
+  valorFinal: z.number().optional().nullable(),
   observacoes: z.string().optional(),
+  encaixe: z.boolean().optional().default(false),
 });
 
 async function checkAuthorization() {
@@ -230,7 +233,10 @@ export async function POST(request: NextRequest) {
         planoSaudeId: fd("planoSaudeId") ?? null,
         numeroCarteirinha: fd("numeroCarteirinha") ?? undefined,
         valorCobrado: fd("valorCobrado") ? parseFloat(fd("valorCobrado")!) : null,
+        desconto: fd("desconto") ? parseFloat(fd("desconto")!) : null,
+        valorFinal: fd("valorFinal") ? parseFloat(fd("valorFinal")!) : null,
         observacoes: fd("observacoes") ?? undefined,
+        encaixe: fd("encaixe") === "true",
       };
       const anexosFormData = formData.getAll("anexos");
       anexosFiles = anexosFormData.filter((item: any): item is File => item instanceof File);
@@ -241,8 +247,11 @@ export async function POST(request: NextRequest) {
     const validation = agendamentoSchema.safeParse(body);
 
     if (!validation.success) {
+      const firstIssue = validation.error.issues[0];
+      const field = firstIssue?.path?.join(".") || "campo desconhecido";
+      const message = firstIssue?.message || "Valor inválido";
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        { error: `Campo inválido: ${field} — ${message}`, details: validation.error.issues },
         { status: 400 }
       );
     }
@@ -349,97 +358,94 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar todos os agendamentos do médico que não estão cancelados
-    const agendamentosMedico = await prisma.consulta.findMany({
-      where: {
-        clinicaId: auth.clinicaId,
-        medicoId: data.medicoId,
-        status: {
-          notIn: ["CANCELADA"], // Ignorar agendamentos cancelados
-        },
-      },
-      include: {
-        paciente: {
-          select: {
-            nome: true,
+    // Encaixe: pula validação de conflito de horário e bloqueio de agenda.
+    // A secretaria assume a responsabilidade de que há tempo disponível.
+    if (!data.encaixe) {
+      // Buscar todos os agendamentos do médico que não estão cancelados
+      const agendamentosMedico = await prisma.consulta.findMany({
+        where: {
+          clinicaId: auth.clinicaId,
+          medicoId: data.medicoId,
+          status: {
+            notIn: ["CANCELADA"], // Ignorar agendamentos cancelados
           },
         },
-      },
-    });
-
-    // Verificar conflitos de horário
-    for (const agendamentoExistente of agendamentosMedico) {
-      const inicioExistente = new Date(agendamentoExistente.dataHora);
-      const fimExistente = agendamentoExistente.dataHoraFim
-        ? new Date(agendamentoExistente.dataHoraFim)
-        : (() => { const f = new Date(inicioExistente); f.setMinutes(f.getMinutes() + 30); return f; })();
-
-      // Verificar se há sobreposição de horários
-      // Conflito ocorre quando:
-      // 1. Novo agendamento começa durante um existente (inicioNovo >= inicioExistente && inicioNovo < fimExistente)
-      // 2. Novo agendamento termina durante um existente (fimNovo > inicioExistente && fimNovo <= fimExistente)
-      // 3. Novo agendamento engloba um existente (inicioNovo <= inicioExistente && fimNovo >= fimExistente)
-      const haConflito = 
-        (dataHoraInicio >= inicioExistente && dataHoraInicio < fimExistente) || // Novo começa durante existente
-        (dataHoraFim > inicioExistente && dataHoraFim <= fimExistente) || // Novo termina durante existente
-        (dataHoraInicio <= inicioExistente && dataHoraFim >= fimExistente); // Novo engloba existente
-
-      if (haConflito) {
-        return NextResponse.json(
-          {
-            error: "Não é possível agendar neste horário. Já existe um agendamento para este médico neste período.",
-            detalhes: {
-              agendamentoExistente: {
-                paciente: agendamentoExistente.paciente?.nome || "Paciente",
-                dataHora: agendamentoExistente.dataHora,
-                status: agendamentoExistente.status,
-              },
-              horarioSolicitado: {
-                inicio: dataHoraInicio,
-                fim: dataHoraFim,
-              },
+        include: {
+          paciente: {
+            select: {
+              nome: true,
             },
           },
-          { status: 400 }
-        );
+        },
+      });
+
+      // Verificar conflitos de horário
+      for (const agendamentoExistente of agendamentosMedico) {
+        const inicioExistente = new Date(agendamentoExistente.dataHora);
+        const fimExistente = agendamentoExistente.dataHoraFim
+          ? new Date(agendamentoExistente.dataHoraFim)
+          : (() => { const f = new Date(inicioExistente); f.setMinutes(f.getMinutes() + 30); return f; })();
+
+        const haConflito =
+          (dataHoraInicio >= inicioExistente && dataHoraInicio < fimExistente) ||
+          (dataHoraFim > inicioExistente && dataHoraFim <= fimExistente) ||
+          (dataHoraInicio <= inicioExistente && dataHoraFim >= fimExistente);
+
+        if (haConflito) {
+          return NextResponse.json(
+            {
+              error: "Não é possível agendar neste horário. Já existe um agendamento para este médico neste período.",
+              detalhes: {
+                agendamentoExistente: {
+                  paciente: agendamentoExistente.paciente?.nome || "Paciente",
+                  dataHora: agendamentoExistente.dataHora,
+                  status: agendamentoExistente.status,
+                },
+                horarioSolicitado: {
+                  inicio: dataHoraInicio,
+                  fim: dataHoraFim,
+                },
+              },
+            },
+            { status: 400 }
+          );
+        }
       }
-    }
 
-    // Verificar se existe bloqueio de agenda no horário do agendamento
-    const bloqueios = await prisma.bloqueioAgenda.findMany({
-      where: {
-        clinicaId: auth.clinicaId,
-        medicoId: data.medicoId,
-      },
-    });
+      // Verificar se existe bloqueio de agenda no horário do agendamento
+      const bloqueios = await prisma.bloqueioAgenda.findMany({
+        where: {
+          clinicaId: auth.clinicaId,
+          medicoId: data.medicoId,
+        },
+      });
 
-    // Verificar se o horário do agendamento está dentro de algum bloqueio
-    for (const bloqueio of bloqueios) {
-      const dataInicioBloqueio = new Date(
-        `${bloqueio.dataInicio.toISOString().split("T")[0]}T${bloqueio.horaInicio}:00`
-      );
-      const dataFimBloqueio = new Date(
-        `${bloqueio.dataFim.toISOString().split("T")[0]}T${bloqueio.horaFim}:00`
-      );
-
-      // Verificar se há sobreposição com o bloqueio
-      const haConflitoBloqueio = 
-        (dataHoraInicio >= dataInicioBloqueio && dataHoraInicio < dataFimBloqueio) ||
-        (dataHoraFim > dataInicioBloqueio && dataHoraFim <= dataFimBloqueio) ||
-        (dataHoraInicio <= dataInicioBloqueio && dataHoraFim >= dataFimBloqueio);
-
-      if (haConflitoBloqueio) {
-        return NextResponse.json(
-          {
-            error: "Não é possível agendar neste horário. Existe um bloqueio de agenda neste período.",
-            detalhes: {
-              dataInicio: dataInicioBloqueio,
-              dataFim: dataFimBloqueio,
-              observacoes: bloqueio.observacoes,
-            },
-          },
-          { status: 400 }
+      for (const bloqueio of bloqueios) {
+        const dataInicioBloqueio = new Date(
+          `${bloqueio.dataInicio.toISOString().split("T")[0]}T${bloqueio.horaInicio}:00`
         );
+        const dataFimBloqueio = new Date(
+          `${bloqueio.dataFim.toISOString().split("T")[0]}T${bloqueio.horaFim}:00`
+        );
+
+        const haConflitoBloqueio =
+          (dataHoraInicio >= dataInicioBloqueio && dataHoraInicio < dataFimBloqueio) ||
+          (dataHoraFim > dataInicioBloqueio && dataHoraFim <= dataFimBloqueio) ||
+          (dataHoraInicio <= dataInicioBloqueio && dataHoraFim >= dataFimBloqueio);
+
+        if (haConflitoBloqueio) {
+          return NextResponse.json(
+            {
+              error: "Não é possível agendar neste horário. Existe um bloqueio de agenda neste período.",
+              detalhes: {
+                dataInicio: dataInicioBloqueio,
+                dataFim: dataFimBloqueio,
+                observacoes: bloqueio.observacoes,
+              },
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -555,8 +561,11 @@ export async function POST(request: NextRequest) {
         planoSaudeId: data.planoSaudeId,
         numeroCarteirinha: data.numeroCarteirinha,
         valorCobrado: data.valorCobrado,
+        desconto: data.desconto,
+        valorFinal: data.valorFinal,
         modalidade,
-        observacoes: motivoAprovacao 
+        encaixe: data.encaixe ?? false,
+        observacoes: motivoAprovacao
           ? `${data.observacoes || ''}\n\n[Motivo para aprovação: ${motivoAprovacao}]`.trim()
           : data.observacoes,
         status: precisaAprovacao ? "AGUARDANDO_APROVACAO" : "AGENDADA",

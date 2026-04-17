@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaRaw } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { z } from "zod";
+import { decryptFields } from "@/lib/crypto/field-encryption";
 import { uploadPDFToS3, areAwsCredentialsConfigured } from "@/lib/s3-service";
 import {
   sendEmail,
@@ -20,14 +21,18 @@ const atualizarAgendamentoSchema = z.object({
   medicoId: z.string().uuid().optional(),
   dataHora: z.string().transform((str) => new Date(str)).optional(),
   dataHoraFim: z.string().transform((str) => new Date(str)).optional(),
-  codigoTussId: z.string().uuid().optional(),
+  codigoTussId: z.string().uuid().optional().nullable(),
   tipoConsultaId: z.string().uuid().optional().nullable(),
   procedimentoId: z.string().uuid().optional().nullable(),
+  formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
   planoSaudeId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional().nullable(),
   valorCobrado: z.number().optional().nullable(),
+  desconto: z.number().optional().nullable(),
+  valorFinal: z.number().optional().nullable(),
   observacoes: z.string().optional().nullable(),
+  encaixe: z.boolean().optional(),
   status: z.enum(["AGENDADA", "CONFIRMADA", "REALIZADA", "CANCELADA"]).optional(),
   motivoCancelamento: z.string().optional(),
   motivoAlteracao: z.string().optional(),
@@ -83,10 +88,10 @@ export async function GET(
 
     const { id } = await params;
 
-    // Tentar incluir procedimento, mas se o campo não existir no banco, fazer sem ele
+    // Usar prismaRaw para evitar que o middleware de criptografia destrua campos Decimal
     let agendamento;
     try {
-      agendamento = await prisma.consulta.findFirst({
+      agendamento = await prismaRaw.consulta.findFirst({
         where: {
           id,
           clinicaId: auth.clinicaId,
@@ -119,10 +124,9 @@ export async function GET(
         },
       });
     } catch (includeError: any) {
-      // Se falhar ao incluir procedimento (campo pode não existir no banco), tentar sem ele
       if (includeError?.message?.includes("procedimento") || includeError?.code === "P2021") {
         console.warn("Campo procedimento não encontrado, buscando sem include de procedimento");
-        agendamento = await prisma.consulta.findFirst({
+        agendamento = await prismaRaw.consulta.findFirst({
           where: {
             id,
             clinicaId: auth.clinicaId,
@@ -163,7 +167,23 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ consulta: agendamento }, { status: 200 });
+    const toNum = (v: any) => (v != null ? parseFloat(v.toString()) : null);
+
+    // Descriptografar campos da Consulta (observacoes) e do Paciente (cpf, email, etc.)
+    // usando prismaRaw os campos não são descriptografados automaticamente
+    const consultaDecrypted = decryptFields("Consulta", agendamento as any) as any;
+    if (consultaDecrypted.paciente) {
+      consultaDecrypted.paciente = decryptFields("Paciente", consultaDecrypted.paciente);
+    }
+
+    const consultaSerializada = {
+      ...consultaDecrypted,
+      valorCobrado: toNum(agendamento.valorCobrado),
+      desconto: toNum(agendamento.desconto),
+      valorFinal: toNum(agendamento.valorFinal),
+      valorRepassado: toNum(agendamento.valorRepassado),
+    };
+    return NextResponse.json({ consulta: consultaSerializada }, { status: 200 });
   } catch (error: any) {
     console.error("Erro ao buscar agendamento:", error);
     
@@ -213,11 +233,15 @@ export async function PATCH(
         codigoTussId: fd("codigoTussId") ?? undefined,
         tipoConsultaId: fd("tipoConsultaId") ?? undefined,
         procedimentoId: fd("procedimentoId") ?? null,
+        formaPagamentoId: fd("formaPagamentoId") ?? null,
         operadoraId: fd("operadoraId") ?? null,
         planoSaudeId: fd("planoSaudeId") ?? null,
         numeroCarteirinha: fd("numeroCarteirinha") ?? undefined,
         valorCobrado: fd("valorCobrado") ? parseFloat(fd("valorCobrado")!) : null,
+        desconto: fd("desconto") ? parseFloat(fd("desconto")!) : null,
+        valorFinal: fd("valorFinal") ? parseFloat(fd("valorFinal")!) : null,
         observacoes: fd("observacoes") ?? undefined,
+        encaixe: fd("encaixe") === "true" ? true : fd("encaixe") === "false" ? false : undefined,
       };
       const anexosFormData = formData.getAll("anexos");
       anexosFiles = anexosFormData.filter((item: any): item is File => item instanceof File);
@@ -228,8 +252,11 @@ export async function PATCH(
     const validation = atualizarAgendamentoSchema.safeParse(body);
 
     if (!validation.success) {
+      const firstIssue = validation.error.issues[0];
+      const field = firstIssue?.path?.join(".") || "campo desconhecido";
+      const message = firstIssue?.message || "Valor inválido";
       return NextResponse.json(
-        { error: "Dados inválidos", details: validation.error.issues },
+        { error: `Campo inválido: ${field} — ${message}`, details: validation.error.issues },
         { status: 400 }
       );
     }
@@ -316,15 +343,23 @@ export async function PATCH(
     if (data.codigoTussId) updateData.codigoTussId = data.codigoTussId;
     if (data.tipoConsultaId !== undefined) updateData.tipoConsultaId = data.tipoConsultaId;
     if (data.procedimentoId !== undefined) updateData.procedimentoId = data.procedimentoId;
+    if (data.formaPagamentoId !== undefined) updateData.formaPagamentoId = data.formaPagamentoId;
     if (data.operadoraId !== undefined) updateData.operadoraId = data.operadoraId;
     if (data.planoSaudeId !== undefined) updateData.planoSaudeId = data.planoSaudeId;
     if (data.numeroCarteirinha !== undefined) updateData.numeroCarteirinha = data.numeroCarteirinha;
     if (data.valorCobrado !== undefined) updateData.valorCobrado = data.valorCobrado;
+    if (data.desconto !== undefined) updateData.desconto = data.desconto;
+    if (data.valorFinal !== undefined) updateData.valorFinal = data.valorFinal;
     if (data.observacoes !== undefined) updateData.observacoes = data.observacoes;
+    if (data.encaixe !== undefined) updateData.encaixe = data.encaixe;
     if (data.status) updateData.status = data.status;
 
+    // Encaixe: usar o valor enviado ou, se não enviado, o valor atual do banco
+    const isEncaixe = data.encaixe !== undefined ? data.encaixe : agendamentoAtual.encaixe;
+
     // Se a data/hora ou médico foi alterado, verificar conflitos e bloqueios
-    if (data.dataHora || data.medicoId) {
+    // Encaixe pula validação de conflito (igual ao POST)
+    if (!isEncaixe && (data.dataHora || data.medicoId)) {
       const medicoIdParaVerificar = data.medicoId || agendamentoAtual.medicoId;
       const dataHoraParaVerificar = data.dataHora ? new Date(data.dataHora) : agendamentoAtual.dataHora;
 

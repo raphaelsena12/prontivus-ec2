@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession, hasUserType } from "@/lib/auth-helpers";
 import { TipoUsuario } from "@/lib/generated/prisma";
-import { AgendamentosContent } from "./agendamentos-content";
+import { AgendamentosClientWrapper } from "./agendamentos-client-wrapper";
 
 export default async function AgendamentosPage() {
   const session = await getSession();
@@ -16,5 +16,5 @@ export default async function AgendamentosPage() {
     redirect("/dashboard");
   }
 
-  return <AgendamentosContent />;
+  return <AgendamentosClientWrapper />;
 }

@@ -84,6 +84,7 @@ interface Agendamento {
   valorCobrado: number | string | null;
   status: string;
   observacoes: string | null;
+  encaixe?: boolean;
 }
 
 interface BloqueioAgenda {
@@ -686,7 +687,16 @@ export function AgendamentosContent() {
                           <span className="font-medium">{formatTime(agendamento.dataHora)}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs py-3">{getStatusBadge(agendamento.status)}</TableCell>
+                      <TableCell className="text-xs py-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {getStatusBadge(agendamento.status)}
+                          {agendamento.encaixe && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-semibold border border-blue-300">
+                              Encaixe
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs py-3">
                         <span className="font-medium text-foreground truncate max-w-[140px] block" title={agendamento.paciente.nome}>{agendamento.paciente.nome}</span>
                       </TableCell>

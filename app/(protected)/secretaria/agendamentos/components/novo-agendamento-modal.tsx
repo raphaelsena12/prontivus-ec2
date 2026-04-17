@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { Loader2, AlertTriangle, Search, X, FileCheck, UserPlus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { maskCPF, maskCelular, removeMask } from "@/lib/masks";
+import { maskCPF, maskCelular, removeMask, maskMoeda, parseMoeda } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 import { CodigoTussSearchInput } from "./codigo-tuss-search-input";
 import { OperadoraSearchInput } from "./operadora-search-input";
@@ -39,9 +39,12 @@ const agendamentoSchema = z.object({
   formaPagamentoId: z.string().uuid().optional().nullable(),
   operadoraId: z.string().uuid().optional().nullable(),
   numeroCarteirinha: z.string().optional(),
-  valorCobrado: z.number().min(0).optional().nullable(),
+  valorCobrado: z.number().nullable().optional(),
+  desconto: z.number().nullable().optional(),
+  valorFinal: z.number().nullable().optional(),
   observacoes: z.string().optional(),
   anexos: z.array(z.instanceof(File)).optional(),
+  encaixe: z.boolean(),
 });
 
 type AgendamentoFormData = z.infer<typeof agendamentoSchema>;
@@ -568,6 +571,7 @@ export function NovoAgendamentoModal({
   const [novoPacienteOpen, setNovoPacienteOpen] = useState(false);
   const [horariosDisponiveis, setHorariosDisponiveis] = useState<string[]>([]);
   const [loadingHorarios, setLoadingHorarios] = useState(false);
+  const [isEncaixe, setIsEncaixe] = useState(false);
 
   const form = useForm<AgendamentoFormData>({
     resolver: zodResolver(agendamentoSchema),
@@ -586,6 +590,7 @@ export function NovoAgendamentoModal({
       valorCobrado: null,
       observacoes: "",
       anexos: [],
+      encaixe: false,
     },
   });
 
@@ -688,6 +693,7 @@ export function NovoAgendamentoModal({
       setPacienteSelecionado(null);
       setPacienteSearchValue("");
       setAnexos([]);
+      setIsEncaixe(false);
     }
   }, [open, form, initialData]);
 
@@ -795,7 +801,8 @@ export function NovoAgendamentoModal({
         const horarios = responseData.horarios || [];
         setHorariosDisponiveis(horarios);
 
-        if (hora && !horarios.includes(hora)) {
+        const horaAtual = form.getValues("hora");
+        if (!isEncaixe && horaAtual && !horarios.includes(horaAtual)) {
           form.setValue("hora", "");
           form.setValue("horaFim", "");
         }
@@ -808,7 +815,8 @@ export function NovoAgendamentoModal({
     };
 
     carregarHorarios();
-  }, [medicoId, data, form, hora]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medicoId, data]);
 
   useEffect(() => {
     if (!hora) {
@@ -873,7 +881,10 @@ export function NovoAgendamentoModal({
         if (data.operadoraId) formData.append("operadoraId", data.operadoraId);
         if (data.numeroCarteirinha) formData.append("numeroCarteirinha", data.numeroCarteirinha);
         if (data.valorCobrado != null) formData.append("valorCobrado", String(data.valorCobrado));
+        if (data.desconto != null) formData.append("desconto", String(data.desconto));
+        if (data.valorFinal != null) formData.append("valorFinal", String(data.valorFinal));
         if (data.observacoes) formData.append("observacoes", data.observacoes);
+        formData.append("encaixe", String(data.encaixe ?? false));
         anexos.forEach((file) => formData.append("anexos", file));
 
         response = await fetch("/api/secretaria/agendamentos", {
@@ -894,6 +905,9 @@ export function NovoAgendamentoModal({
             procedimentoId: data.procedimentoId || null,
             operadoraId: data.operadoraId || null,
             valorCobrado: data.valorCobrado || null,
+            desconto: data.desconto || null,
+            valorFinal: data.valorFinal || null,
+            encaixe: data.encaixe ?? false,
           }),
         });
       }
@@ -923,9 +937,18 @@ export function NovoAgendamentoModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-6xl sm:!max-w-6xl max-h-[90vh] p-0 gap-0 flex flex-col">
         <DialogHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
-          <DialogTitle className="text-base font-semibold">Novo Agendamento</DialogTitle>
+          <DialogTitle className="text-base font-semibold flex items-center gap-2">
+            Novo Agendamento
+            {isEncaixe && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-semibold border border-blue-300">
+                Encaixe
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Preencha os dados para criar um novo agendamento
+            {isEncaixe
+              ? "Modo encaixe: o horário é livre e não valida conflitos de agenda."
+              : "Preencha os dados para criar um novo agendamento"}
           </DialogDescription>
         </DialogHeader>
 
@@ -1073,9 +1096,9 @@ export function NovoAgendamentoModal({
                         <FormItem className="min-w-[150px]">
                           <FormLabel className="text-xs font-medium">Data *</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
+                            <Input
+                              type="date"
+                              {...field}
                               value={field.value || ""}
                               className="h-8 text-xs"
                             />
@@ -1091,20 +1114,32 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Início *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={!medicoId || !data || loadingHorarios}>
+                          {isEncaixe ? (
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder={loadingHorarios ? "Carregando..." : "Selecione"} />
-                              </SelectTrigger>
+                              <Input
+                                type="time"
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs"
+                                disabled={!medicoId || !data}
+                              />
                             </FormControl>
-                            <SelectContent position="popper" className="max-h-60">
-                              {horariosDisponiveis.map((horario) => (
-                                <SelectItem key={horario} value={horario} className="text-xs">
-                                  {horario}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          ) : (
+                            <Select onValueChange={field.onChange} value={field.value || ""} disabled={!medicoId || !data || loadingHorarios}>
+                              <FormControl>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder={loadingHorarios ? "Carregando..." : "Selecione"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent position="popper" className="max-h-60">
+                                {horariosDisponiveis.map((horario) => (
+                                  <SelectItem key={horario} value={horario} className="text-xs">
+                                    {horario}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
@@ -1116,30 +1151,69 @@ export function NovoAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="min-w-[120px]">
                           <FormLabel className="text-xs font-medium">Hora Fim *</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value || ""}
-                            disabled={!hora || loadingHorarios}
-                          >
+                          {isEncaixe ? (
                             <FormControl>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Selecione" />
-                              </SelectTrigger>
+                              <Input
+                                type="time"
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs"
+                                disabled={!hora}
+                              />
                             </FormControl>
-                            <SelectContent position="popper" className="max-h-60">
-                              {horariosDisponiveis
-                                .filter((horario) => horario > (hora || ""))
-                                .map((horario) => (
-                                  <SelectItem key={horario} value={horario} className="text-xs">
-                                    {horario}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                          ) : (
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={!hora || loadingHorarios}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Selecione" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent position="popper" className="max-h-60">
+                                {horariosDisponiveis
+                                  .filter((horario) => horario > (hora || ""))
+                                  .map((horario) => (
+                                    <SelectItem key={horario} value={horario} className="text-xs">
+                                      {horario}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
+
+                    {/* Checkbox Encaixe */}
+                    <FormItem className="flex flex-col justify-end min-w-[110px]">
+                      <FormLabel className="text-xs font-medium text-transparent select-none">.</FormLabel>
+                      <label
+                        className={cn(
+                          "h-8 px-3 flex items-center gap-2 rounded-md border text-xs font-medium cursor-pointer transition-colors select-none",
+                          isEncaixe
+                            ? "bg-blue-50 border-blue-400 text-blue-700"
+                            : "bg-background border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isEncaixe}
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setIsEncaixe(next);
+                            form.setValue("encaixe", next);
+                            form.setValue("hora", "");
+                            form.setValue("horaFim", "");
+                          }}
+                          className="accent-blue-600 h-3.5 w-3.5"
+                        />
+                        Encaixe
+                      </label>
+                    </FormItem>
                   </div>
 
                   {/* Row 3: Tipo Consulta, Procedimento, Convênio e Carteirinha */}
@@ -1149,7 +1223,7 @@ export function NovoAgendamentoModal({
                       name="tipoConsultaId"
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
-                          <FormLabel className="text-xs font-medium">Tipo de Consulta</FormLabel>
+                          <FormLabel className="text-xs font-medium">Tipo de Consulta *</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value || ""}>
                             <FormControl>
                               <SelectTrigger className="h-8 text-xs w-full">
@@ -1365,23 +1439,92 @@ export function NovoAgendamentoModal({
                     )}
                   </div>
 
-                  {/* Row 6: Valor */}
+                  {/* Row 6: Valor / Desconto / Valor Final */}
                   <div className="flex flex-wrap items-start gap-2.5 justify-end">
                     <FormField
                       control={form.control}
                       name="valorCobrado"
                       render={({ field }) => (
-                        <FormItem className="min-w-[200px]">
-                          <FormLabel className="text-xs font-medium">Valor Cobrado</FormLabel>
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Valor</FormLabel>
                           <FormControl>
                             <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="R$ 0,00"
                               {...field}
-                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              value={field.value || ""}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                if (!digits) {
+                                  field.onChange(null);
+                                  form.setValue("valorFinal", null);
+                                  e.target.value = "";
+                                } else {
+                                  const masked = maskMoeda(e.target.value);
+                                  const valor = parseMoeda(masked);
+                                  field.onChange(valor);
+                                  const desconto = form.getValues("desconto") || 0;
+                                  form.setValue("valorFinal", Math.max(0, valor - desconto));
+                                  e.target.value = masked;
+                                }
+                              }}
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
                               className="h-10 text-base font-semibold text-right"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="desconto"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Desconto</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="R$ 0,00"
+                              {...field}
+                              onChange={(e) => {
+                                const digits = e.target.value.replace(/\D/g, "");
+                                if (!digits) {
+                                  field.onChange(null);
+                                  const valor = form.getValues("valorCobrado") || 0;
+                                  form.setValue("valorFinal", valor > 0 ? valor : null);
+                                  e.target.value = "";
+                                } else {
+                                  const masked = maskMoeda(e.target.value);
+                                  const desconto = parseMoeda(masked);
+                                  field.onChange(desconto);
+                                  const valor = form.getValues("valorCobrado") || 0;
+                                  form.setValue("valorFinal", Math.max(0, valor - desconto));
+                                  e.target.value = masked;
+                                }
+                              }}
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
+                              className="h-10 text-base font-semibold text-right"
+                            />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="valorFinal"
+                      render={({ field }) => (
+                        <FormItem className="min-w-[160px]">
+                          <FormLabel className="text-xs font-medium">Valor Final</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="R$ 0,00"
+                              readOnly
+                              value={field.value != null && !isNaN(field.value) ? maskMoeda(String(Math.round(field.value * 100))) : ""}
+                              className="h-10 text-base font-semibold text-right bg-muted cursor-default"
                             />
                           </FormControl>
                           <FormMessage className="text-xs" />

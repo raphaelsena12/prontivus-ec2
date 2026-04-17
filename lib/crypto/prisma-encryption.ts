@@ -25,7 +25,11 @@ function encryptDataFields(model: string, data: any): any {
   const fields = ENCRYPTED_FIELDS[model];
   if (!fields) return data;
 
-  const result = { ...data };
+  // Spread seguro: preserva instâncias de Decimal, Date e outros objetos especiais
+  const result: any = {};
+  for (const key of Object.keys(data)) {
+    result[key] = data[key];
+  }
   const blindFields = BLIND_INDEX_FIELDS[model] || {};
 
   for (const field of fields) {
@@ -47,7 +51,12 @@ function decryptRecord(model: string, record: any): any {
   const fields = ENCRYPTED_FIELDS[model];
   if (!fields) return record;
 
-  const result = { ...record };
+  // Spread seguro: preserva instâncias de Decimal, Date e outros objetos especiais
+  const result: any = {};
+  for (const key of Object.keys(record)) {
+    result[key] = record[key];
+  }
+
   for (const field of fields) {
     const value = result[field];
     if (typeof value === "string" && value.length > 0) {
@@ -72,7 +81,11 @@ function decryptNestedRelations(record: any): any {
     return record.map((r) => decryptNestedRelations(r));
   }
 
-  const result = { ...record };
+  // Spread seguro: preserva instâncias de Decimal, Date e outros objetos especiais
+  const result: any = {};
+  for (const key of Object.keys(record)) {
+    result[key] = record[key];
+  }
 
   for (const key of Object.keys(result)) {
     const value = result[key];

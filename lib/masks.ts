@@ -86,6 +86,30 @@ export const maskTelefoneAuto = (value: string): string => {
 };
 
 /**
+ * Aplica máscara de moeda brasileira: R$ 1.000.000,00
+ */
+export const maskMoeda = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  const number = parseInt(digits, 10) / 100;
+  return number.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+/**
+ * Converte string com máscara de moeda para número (nunca retorna NaN)
+ */
+export const parseMoeda = (value: string): number => {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return 0;
+  return parseInt(digits, 10) / 100;
+};
+
+/**
  * Remove máscara de um valor (remove todos os caracteres não numéricos)
  */
 export const removeMask = (value: string): string => {
