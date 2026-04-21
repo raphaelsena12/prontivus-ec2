@@ -9,6 +9,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isTransient = error.status === 429 || error.status === 500 || error.status === 503;
+      if (isTransient && attempt < retries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`OpenAI erro ${error.status}, tentativa ${attempt}/${retries}. Aguardando ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verificar autenticação
@@ -157,16 +175,16 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     }
 
     // Chamar OpenAI
-    const completion = await openai.chat.completions.create({
+    const completion = await withRetry(() => openai.chat.completions.create({
       model: process.env.OPENAI_VISION_MODEL || "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
+      temperature: 0,
       max_tokens: 2000,
-    });
+    }));
 
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {

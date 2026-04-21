@@ -28,6 +28,17 @@ const openai = new OpenAI({
  * Executa uma função com retry exponencial para erros transientes da OpenAI.
  * Retenta em: 429 (rate limit), 500, 503 (instabilidade).
  */
+/**
+ * Garante que um campo retornado pela OpenAI seja array.
+ * Se o modelo retornar string/objeto quando esperamos array, loga e retorna [].
+ */
+function ensureArray(value: unknown, fieldName: string): any[] {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null) return [];
+  console.warn(`[openai-medical-service] Campo "${fieldName}" veio como ${typeof value}, esperado array. Valor:`, value);
+  return [];
+}
+
 async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -83,9 +94,53 @@ export interface MedicalAnalysis {
  * e gera anamnese, CID e exames sugeridos
  * Suporta análise de imagens e PDFs de exames
  */
+export interface PacienteContexto {
+  idade?: number | null;
+  sexo?: string | null;
+  peso?: number | null;
+  alergias?: string[];
+  medicamentosEmUso?: Array<{ nome: string; posologia?: string }>;
+  comorbidades?: string[];
+  observacoesClinicas?: string | null;
+  tfgEstimada?: number | null;
+  gestante?: boolean;
+}
+
+/**
+ * Constrói o bloco de contexto do paciente a ser injetado no prompt.
+ * Retorna string vazia se nenhum dado útil foi fornecido.
+ */
+function buildPacienteContextoBlock(ctx?: PacienteContexto): string {
+  if (!ctx) return "";
+  const linhas: string[] = [];
+  if (ctx.idade != null) linhas.push(`- Idade: ${ctx.idade} anos`);
+  if (ctx.sexo) linhas.push(`- Sexo: ${ctx.sexo}`);
+  if (ctx.peso != null) linhas.push(`- Peso: ${ctx.peso} kg`);
+  if (ctx.tfgEstimada != null) linhas.push(`- TFG estimada: ${ctx.tfgEstimada} mL/min/1.73m²`);
+  if (ctx.gestante) linhas.push(`- GESTANTE: evitar medicamentos categoria D/X`);
+  if (ctx.alergias?.length) linhas.push(`- ALERGIAS CONHECIDAS: ${ctx.alergias.join(", ")}`);
+  if (ctx.comorbidades?.length) linhas.push(`- Comorbidades: ${ctx.comorbidades.join(", ")}`);
+  if (ctx.medicamentosEmUso?.length) {
+    const meds = ctx.medicamentosEmUso
+      .slice(0, 15)
+      .map((m) => `${m.nome}${m.posologia ? ` (${m.posologia})` : ""}`)
+      .join("; ");
+    linhas.push(`- Medicações em uso: ${meds}`);
+  }
+  if (ctx.observacoesClinicas) {
+    linhas.push(`- Observações clínicas prévias: ${ctx.observacoesClinicas.substring(0, 300)}`);
+  }
+  if (linhas.length === 0) return "";
+  return `\n\nDADOS CRÍTICOS DO PACIENTE (use para validar cada sugestão de CID, exame e prescrição):
+${linhas.join("\n")}
+
+Ao sugerir prescrições, VERIFIQUE contra alergias, medicamentos em uso (interações) e comorbidades. Se houver contraindicação, NÃO prescreva o medicamento — escolha alternativa segura ou deixe o array vazio.\n`;
+}
+
 export async function processTranscriptionWithOpenAI(
   transcriptionText: string,
-  examesIds: string[] = []
+  examesIds: string[] = [],
+  pacienteContexto?: PacienteContexto
 ): Promise<MedicalAnalysis & { _usage?: number }> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error(
@@ -145,6 +200,20 @@ Classifique as hipóteses considerando:
 - urgência terapêutica
 
 Diagnósticos potencialmente graves ou cirúrgicos devem receber prioridade quando compatíveis com os achados.
+
+5. CHECAGEM OBRIGATÓRIA DE RED FLAGS (sinais de alarme)
+Antes de finalizar, verifique SEMPRE se há sinais de gravidade associados aos sintomas relatados. Errar um red flag é o pior erro clínico possível.
+
+Mapeamento obrigatório de checagem por sintoma principal:
+- DOR TORÁCICA → sudorese, irradiação (MSE/mandíbula/dorso), dispneia, síncope, náusea → considerar SCA (I20-I21), TEP (I26), dissecção de aorta (I71), pericardite (I30).
+- CEFALEIA → início súbito ("pior da vida"), febre, rigidez de nuca, déficit focal, alteração do nível de consciência, idade >50 com cefaleia nova → considerar HSA (I60), meningite (G00-G03), AVC (I63-I64), arterite temporal (M31.6).
+- DOR ABDOMINAL → defesa, Blumberg, febre, sangramento digestivo, icterícia, distensão, ausência de ruídos → considerar abdome agudo inflamatório/obstrutivo/vascular (K35, K80, K85, K56, K55).
+- DISPNEIA → ortopneia, DPN, edema MMII, turgência jugular → considerar ICC descompensada (I50); hemoptise, dor pleurítica, imobilização recente → TEP (I26), TB (A15), neoplasia (C34).
+- LOMBALGIA → déficit motor/sensitivo em MMII, retenção/incontinência urinária ou fecal, anestesia em sela, febre, perda ponderal → síndrome da cauda equina (G83.4), espondilodiscite (M46), neoplasia vertebral (C79.5).
+- FEBRE + SINAIS FOCAIS → sepse (A41), meningite (G00), pielonefrite (N10), endocardite (I33).
+- SINTOMAS NEUROLÓGICOS FOCAIS → déficit motor/sensitivo súbito, afasia, disartria → AVC (I63-I64), AIT (G45).
+
+REGRA: Se um red flag for identificado na transcrição, inclua o CID correspondente com score ≥ 0.5 (mesmo que a probabilidade global seja baixa), sugira o exame de exclusão apropriado e mencione na justificativa que se trata de hipótese a ser afastada por gravidade.
 
 EXEMPLO IMPORTANTE — DOR ABDOMINAL:
 Sempre avaliar:
@@ -236,6 +305,23 @@ Sempre verificar:
 - alergias mencionadas
 - possíveis interações medicamentosas
 
+REGRAS DE INCERTEZA (anti-alucinação):
+- Se a transcrição NÃO mencionar uma informação, NÃO a invente. Use "[INFORMAÇÃO NÃO RELATADA]" em vez de preencher com suposições.
+- NUNCA cite valores numéricos (PA, FC, FR, SatO2, glicemia, temperatura, peso, escalas como EVA) que não tenham sido explicitamente ditos na transcrição.
+- NUNCA invente antecedentes pessoais, familiares, alergias, medicamentos em uso ou cirurgias prévias que não apareçam na transcrição.
+- Se não houver base clínica suficiente para estabelecer nenhum CID com score ≥ 0.5, retorne cidCodes: [] e utilize o campo "exames" para propor a propedêutica necessária à elucidação diagnóstica.
+- Se um protocolo ou diretriz específica não for conhecido com certeza, cite de forma genérica ("protocolo institucional para [condição]") em vez de inventar ano/versão da diretriz.
+- Se a transcrição for muito curta, incompleta ou de baixa qualidade (ex: apenas ruído, frases soltas sem conteúdo clínico), retorne anamnese com "[TRANSCRIÇÃO INSUFICIENTE PARA GERAÇÃO DE ANAMNESE]" e arrays vazios para CIDs, exames e prescrições.
+
+AUTO-VERIFICAÇÃO OBRIGATÓRIA (antes de emitir o JSON final, revise internamente):
+1. Cada CID sugerido está COMPATÍVEL com os achados da transcrição? Se algum não estiver, remova.
+2. Há red flag na apresentação clínica que não foi considerado? Se sim, adicione o CID correspondente.
+3. Alguma prescrição tem contraindicação clara pelos antecedentes mencionados (ex: AINE em IRC, betabloqueador em asma grave, IECA em gestante)? Se sim, substitua ou remova.
+4. As doses e posologias estão apropriadas para a faixa etária mencionada? Em idosos (>65 anos) ou crianças, revise doses ajustadas.
+5. Há interação medicamentosa relevante entre as prescrições sugeridas? Se sim, ajuste o esquema.
+6. Todo CID com score ≥ 0.5 tem ao menos um exame confirmatório sugerido quando aplicável?
+7. Algum valor numérico na anamnese (PA, FC, etc.) foi realmente mencionado na transcrição? Se não, remova.
+
 Retorne APENAS um JSON válido, sem texto adicional.
 
 REGRAS DE QUANTIDADE:
@@ -277,9 +363,12 @@ Formato JSON esperado:
   "entities": []
 }`;
 
+    const pacienteContextoBlock = buildPacienteContextoBlock(pacienteContexto);
+    const finalSystemPrompt = systemPrompt + pacienteContextoBlock;
+
     // Preparar mensagens com exames se fornecidos
     const messages: any[] = [
-      { role: "system", content: systemPrompt }
+      { role: "system", content: finalSystemPrompt }
     ];
 
     // Se houver exames selecionados, buscar e processar
@@ -446,7 +535,7 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     const completion = await withRetry(() => openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || "gpt-4o",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: finalSystemPrompt },
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" },
@@ -472,29 +561,29 @@ Retorne APENAS o JSON no formato especificado, sem comentários ou texto adicion
     // Validar e garantir estrutura correta
     const validatedAnalysis: MedicalAnalysis = {
       anamnese: analysis.anamnese || "Anamnese não gerada pela IA",
-      cidCodes: (analysis.cidCodes || []).map((cid: any) => ({
+      cidCodes: ensureArray(analysis.cidCodes, 'cidCodes').map((cid: any) => ({
         code: cid.code || "",
         description: cid.description || "",
         score: typeof cid.score === 'number' ? Math.max(0, Math.min(1, cid.score)) : 0.7,
       })).filter((cid: any) => cid.code && cid.description && cid.score > 0.5),
-      protocolos: (analysis.protocolos || []).map((p: any) => ({
+      protocolos: ensureArray(analysis.protocolos, 'protocolos').map((p: any) => ({
         nome: p.nome || "",
         descricao: p.descricao || "",
         justificativa: p.justificativa || "",
       })).filter((p: any) => p.nome),
-      exames: (analysis.exames || []).map((exame: any) => ({
+      exames: ensureArray(analysis.exames, 'exames').map((exame: any) => ({
         nome: exame.nome || "",
         tipo: exame.tipo || "Laboratorial",
         justificativa: exame.justificativa || "",
       })).filter((exame: any) => exame.nome),
-      prescricoes: (analysis.prescricoes || []).map((presc: any) => ({
+      prescricoes: ensureArray(analysis.prescricoes, 'prescricoes').map((presc: any) => ({
         medicamento: presc.medicamento || "",
         dosagem: presc.dosagem || "",
         posologia: presc.posologia || "",
         quantidade: presc.quantidade || presc.duracao || "",
         justificativa: presc.justificativa || "",
       })).filter((presc: any) => presc.medicamento),
-      entities: analysis.entities || [],
+      entities: ensureArray(analysis.entities, 'entities'),
     };
 
     console.log("=== RESULTADO OPENAI ===");

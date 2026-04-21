@@ -6,6 +6,24 @@ import { sanitizeTextForAI } from '@/lib/crypto/sanitize-pii';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isTransient = error.status === 429 || error.status === 500 || error.status === 503;
+      if (isTransient && attempt < retries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.warn(`OpenAI erro ${error.status}, tentativa ${attempt}/${retries}. Aguardando ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getSession();
@@ -95,13 +113,13 @@ INSTRUÇÕES:
   "nivelComplexidade": "baixo" | "moderado" | "alto"
 }`, { patientName: paciente?.nome });
 
-    const response = await openai.chat.completions.create({
+    const response = await withRetry(() => openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
+      temperature: 0.1,
       max_tokens: 800,
-    });
+    }));
 
     const content = response.choices[0]?.message?.content;
     if (!content) {

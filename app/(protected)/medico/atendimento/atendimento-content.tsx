@@ -83,6 +83,7 @@ import { Label } from '@/components/ui/label';
 // ─── Novos componentes do redesign ───────────────────────────────────────────
 import { PatientHistory } from '@/components/atendimento/patient/PatientHistory';
 import { TranscriptionBar } from '@/components/atendimento/consultation/TranscriptionBar';
+import { TranscriptionChatPanel } from '@/components/atendimento/consultation/TranscriptionChatPanel';
 import { Step2Anamnesis } from '@/components/atendimento/consultation/steps/Step2Anamnesis';
 import { AISidebar, type AIContext } from '@/components/atendimento/consultation/AISidebar';
 import { AvatarWithS3 } from '@/components/avatar-with-s3';
@@ -431,6 +432,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   // Hook de transcrição
   const {
     isTranscribing,
+    isPreparing,
     isPaused,
     transcription,
     stoppedUnexpectedly,
@@ -440,6 +442,10 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
     stopTranscription,
     processTranscription,
   } = useTranscription();
+
+  // Controla se o painel de chat da transcrição está minimizado.
+  // Quando minimizado, mostra apenas a pill flutuante (TranscriptionBar) no rodapé.
+  const [chatMinimized, setChatMinimized] = useState(false);
 
   // ── Verificação de certificado digital ──────────────────────────────────────
   const checkCertificado = useCallback(async (): Promise<{ configured: boolean; expired: boolean }> => {
@@ -710,6 +716,12 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       }
     }
   }, [activeTab, isTranscribing, stopTranscription]);
+
+  // Ao iniciar uma nova transcrição (ou começar a preparar),
+  // garantir que o painel de chat abra (não minimizado).
+  useEffect(() => {
+    if (isTranscribing || isPreparing) setChatMinimized(false);
+  }, [isTranscribing, isPreparing]);
 
   useEffect(() => {
     if (consulta?.paciente?.id) {
@@ -1816,7 +1828,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
       setTimeout(() => setProcessingStage('generating'), 2000);
 
       // Passar o modelo selecionado e os exames selecionados para o processamento
-      const results = await processTranscription();
+      const results = await processTranscription({ consultaId });
       
       console.log("=== Resultados do processamento ===");
       console.log("Results:", results);
@@ -1843,7 +1855,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
         } as Prontuario));
         // Mostrar visualização formatada por padrão
         setIsEditingAnamnese(false);
-        toast.success("Transcrição processada com sucesso!");
         console.log("analysisResults definido, modal deve fechar e resultados devem aparecer");
       } else {
         console.warn("processTranscription retornou null ou undefined");
@@ -2909,24 +2920,43 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         </div>
       </div>
 
-      {/* Pill flutuante de transcrição */}
+      {/* Painel de chat flutuante + pill (mutuamente exclusivos) */}
       {consultationMode === 'ai' && (
-        <TranscriptionBar
-          isTranscribing={isTranscribing}
-          isPaused={isPaused}
-          transcricaoFinalizada={transcricaoFinalizada}
-          hasAnamnese={!!(analysisResults?.anamnese || prontuario?.anamnese)}
-          isProcessing={isProcessing}
-          stoppedUnexpectedly={stoppedUnexpectedly}
-          sessionDuration={sessionDuration}
-          pauseTranscription={pauseTranscription}
-          resumeTranscription={resumeTranscription}
-          stopTranscription={stopTranscription}
-          setTranscricaoFinalizada={setTranscricaoFinalizada}
-          setIsMicrophoneSelectorOpen={setIsMicrophoneSelectorOpen}
-          onProcessAndAdvance={handleStep1Complete}
-          startTranscription={startTranscription}
-        />
+        <>
+          <TranscriptionChatPanel
+            isTranscribing={isTranscribing}
+            isPreparing={isPreparing}
+            isPaused={isPaused}
+            transcription={transcription}
+            sessionDuration={sessionDuration}
+            pauseTranscription={pauseTranscription}
+            resumeTranscription={resumeTranscription}
+            stopTranscription={stopTranscription}
+            setTranscricaoFinalizada={setTranscricaoFinalizada}
+            setIsMicrophoneSelectorOpen={setIsMicrophoneSelectorOpen}
+            minimized={chatMinimized}
+            setMinimized={setChatMinimized}
+          />
+          <TranscriptionBar
+            isTranscribing={isTranscribing}
+            isPreparing={isPreparing}
+            isPaused={isPaused}
+            transcricaoFinalizada={transcricaoFinalizada}
+            hasAnamnese={!!(analysisResults?.anamnese || prontuario?.anamnese)}
+            isProcessing={isProcessing}
+            stoppedUnexpectedly={stoppedUnexpectedly}
+            sessionDuration={sessionDuration}
+            pauseTranscription={pauseTranscription}
+            resumeTranscription={resumeTranscription}
+            stopTranscription={stopTranscription}
+            setTranscricaoFinalizada={setTranscricaoFinalizada}
+            setIsMicrophoneSelectorOpen={setIsMicrophoneSelectorOpen}
+            onProcessAndAdvance={handleStep1Complete}
+            startTranscription={startTranscription}
+            chatMinimized={chatMinimized}
+            onExpandChat={() => setChatMinimized(false)}
+          />
+        </>
       )}
 
 

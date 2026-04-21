@@ -11,39 +11,36 @@ export interface TranscriptionEntry {
   speakerLabel?: string;
 }
 
-export const TRANSCRIPTION_MIN_WORDS = 20;
-
 const REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview";
 
 // ─── Filtros anti-alucinação ──────────────────────────────────────────────────
-// Padrões de alucinação conhecidos do Whisper/gpt-4o-transcribe em PT
+// Padrões de alucinação conhecidos do Whisper/gpt-4o-transcribe em PT.
+// IMPORTANTE: aqui só entram padrões que NUNCA fazem sentido numa consulta médica.
+// Frases clínicas plausíveis (dor no peito, medicação, sintomas) NÃO devem estar aqui —
+// elas podem ser reais. Para bloquear alucinações de frases clínicas em silêncio,
+// o gate de energia (RMS do microfone) é quem faz o trabalho.
 const HALLUCINATION_PATTERNS = [
-  // Despedidas e saudações isoladas (alucinação clássica com silêncio)
-  /^(obrigad[ao]|tchau|até logo|até mais|até a próxima|adeus|boa tarde|bom dia|boa noite)\.?[!]?$/i,
-  // Preenchimentos vocais isolados
-  /^(sim|não|ok|okay|tá|claro|certo|ahh?|umm?|hmm?|hã|né|pois|então)[!.,]?$/i,
   // Pontuação isolada
   /^[\s.,!?;:…\-–—]+$/,
-  // Alucinações de plataformas de vídeo
+  // Alucinações de plataformas de vídeo (modelo treinou com muito YouTube)
   /^(se inscreva|inscreva-se|deixe um like|curta|compartilhe|ative o sino)/i,
-  // Alucinações de legenda
-  /^(legenda(do)?|legend|subtitle|closed caption|transcri(ção|bing))/i,
-  // Repetição de curtos ruídos
+  // Alucinações de legenda / créditos
+  /^(legenda(do)?|legend|subtitle|closed caption|transcri(ção|bing) por)/i,
+  // Repetição de um mesmo caractere (ruído puro)
   /^(.)\1{4,}$/,
   // Músicas/jingles (alucinação com ruído de fundo)
   /^(♪|🎵|🎶|\[música\]|\[music\]|\[ruído\]|\[noise\])/i,
-  // Tags de ação (alucinação de transcrições de vídeo)
+  // Tags de ação curtas em colchetes (típico de transcrição de vídeo)
   /^\[.{1,30}\]$/,
 ];
 
-const MIN_CHARS_FOR_ENTRY = 8; // mínimo de caracteres para aceitar
-const MIN_WORDS_FOR_ENTRY = 2; // mínimo de palavras para aceitar
-
 function isHallucination(text: string): boolean {
   const trimmed = text.trim();
-  if (!trimmed || trimmed.length < MIN_CHARS_FOR_ENTRY) return true;
-  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
-  if (wordCount < MIN_WORDS_FOR_ENTRY) return true;
+  if (!trimmed) return true;
+  // Apenas padrões explícitos são descartados.
+  // Não filtramos por comprimento/número de palavras: falas curtas legítimas
+  // ("sim", "dói aqui", "não doutor") devem passar. O gate de energia é o
+  // responsável por bloquear alucinações em silêncio.
   return HALLUCINATION_PATTERNS.some((p) => p.test(trimmed));
 }
 
@@ -59,6 +56,7 @@ function isDuplicate(text: string, prev: TranscriptionEntry[]): boolean {
 
 export function useTranscription() {
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [transcription, setTranscription] = useState<TranscriptionEntry[]>([]);
   const [stoppedUnexpectedly, setStoppedUnexpectedly] = useState(false);
@@ -195,7 +193,7 @@ export function useTranscription() {
       // Parcial: delta chegando enquanto o usuário fala
       case "conversation.item.input_audio_transcription.delta": {
         const delta: string = msg.delta || "";
-        if (!delta || isHallucination(delta)) return;
+        if (!delta) return;
         setTranscription((prev) => {
           if (hasPartialRef.current && prev.length > 0 && prev[prev.length - 1].isPartial) {
             const last = prev[prev.length - 1];
@@ -217,7 +215,8 @@ export function useTranscription() {
         setTranscription((prev) => {
           const base = hasPartialRef.current ? prev.slice(0, -1) : prev;
           hasPartialRef.current = false;
-          // Filtrar alucinações e duplicatas antes de adicionar
+          // Só rejeita padrões inequivocamente não-clínicos (legenda de vídeo,
+          // jingle de YouTube etc) e duplicatas exatas. Fala real SEMPRE passa.
           if (isHallucination(text) || isDuplicate(text, base)) return base;
           return [...base, { time: formatTime(new Date()), speaker: "Médico", text }];
         });
@@ -238,40 +237,32 @@ export function useTranscription() {
     }
   }, []);
 
-  // ─── Ping periódico para manter o WebSocket vivo ──────────────────────────
+  // ─── Keepalive do WebSocket ───────────────────────────────────────────────
+  // NOTA: não enviamos mais buffers de silêncio como ping — isso causava
+  // alucinações ("falas fantasmas") no gpt-4o-transcribe durante períodos
+  // de silêncio prolongado. O áudio real capturado pelo microfone (mesmo em
+  // silêncio de fundo) já serve como keepalive natural via processor.onaudioprocess.
   const startPing = useCallback(() => {
     clearTimers();
-
-    // Pequeno buffer de silêncio PCM16 (480 samples = 20ms @ 24kHz)
-    const silenceSamples = 480;
-    const silenceBuffer = new Int16Array(silenceSamples); // zeros = silêncio
-    const uint8 = new Uint8Array(silenceBuffer.buffer);
-    let binary = "";
-    for (let i = 0; i < uint8.length; i += 0x8000) {
-      binary += String.fromCharCode(...uint8.subarray(i, i + 0x8000));
-    }
-    const silenceB64 = btoa(binary);
-
-    pingIntervalRef.current = setInterval(() => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        // Enviar buffer de silêncio como keepalive (a API rejeita audio vazio)
-        wsRef.current.send(
-          JSON.stringify({ type: "input_audio_buffer.append", audio: silenceB64 })
-        );
-      }
-    }, PING_INTERVAL_MS);
+    // Intencionalmente vazio: o fluxo de áudio contínuo do microfone
+    // mantém a conexão viva sem injetar dados sintéticos.
   }, [clearTimers]);
 
   // ─── Conectar WebSocket (usado tanto no start quanto no reconnect) ────────
   const connectWebSocket = useCallback(
-    async (stream: MediaStream, isReconnect = false): Promise<void> => {
-      // 1. Token efêmero — API key nunca sai do servidor
-      const tokenRes = await fetch("/api/medico/transcribe-realtime", { method: "POST" });
-      if (!tokenRes.ok) {
-        const err = await tokenRes.json().catch(() => ({}));
-        throw new Error(err.error || "Erro ao criar sessão de transcrição");
+    async (stream: MediaStream, isReconnect = false, presetToken?: string): Promise<void> => {
+      // 1. Token efêmero — API key nunca sai do servidor.
+      // Se já veio pronto (fluxo paralelo do startTranscription), pula o fetch.
+      let token = presetToken;
+      if (!token) {
+        const tokenRes = await fetch("/api/medico/transcribe-realtime", { method: "POST" });
+        if (!tokenRes.ok) {
+          const err = await tokenRes.json().catch(() => ({}));
+          throw new Error(err.error || "Erro ao criar sessão de transcrição");
+        }
+        const json = await tokenRes.json();
+        token = json.token;
       }
-      const { token } = await tokenRes.json();
       if (!token) throw new Error("Token de sessão inválido");
 
       // 2. Limpar WebSocket anterior (se reconexão)
@@ -305,33 +296,9 @@ export function useTranscription() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        ws.send(
-          JSON.stringify({
-            type: "session.update",
-            session: {
-              modalities: ["text"],
-              instructions: "",
-              input_audio_format: "pcm16",
-              input_audio_transcription: {
-                model: "gpt-4o-transcribe",
-                language: "pt",
-                prompt:
-                  "Transcrição de consulta médica em português brasileiro. " +
-                  "Espere termos médicos, nomes de medicamentos, sintomas, diagnósticos e procedimentos clínicos. " +
-                  "Transcreva apenas o que for dito. Se não houver fala clara, não transcreva nada.",
-              },
-              turn_detection: {
-                type: "semantic_vad",
-                eagerness: "low",
-                create_response: false,
-              },
-              input_audio_noise_reduction: {
-                type: "far_field",
-              },
-            },
-          })
-        );
-
+        // NÃO enviar session.update aqui — a sessão já vem do servidor
+        // com prompt anti-alucinação, server_vad threshold 0.85, near_field.
+        // Sobrescrever aqui reintroduzia as alucinações.
         startAudioPipeline(stream, ws);
         startPing();
 
@@ -340,11 +307,7 @@ export function useTranscription() {
         setIsTranscribing(true);
         setStoppedUnexpectedly(false);
 
-        if (isReconnect) {
-          toast.success("Transcrição reconectada automaticamente");
-        } else {
-          toast.success("Transcrição iniciada");
-        }
+        // (toasts de início/reconexão removidos — o próprio chat abrindo já sinaliza)
       };
 
       ws.onmessage = handleWsMessage;
@@ -370,7 +333,6 @@ export function useTranscription() {
             reconnectAttemptsRef.current += 1;
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 8000);
             console.log(`Reconectando transcrição (tentativa ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS}) em ${delay}ms...`);
-            toast.info(`Reconectando transcrição... (tentativa ${reconnectAttemptsRef.current})`);
 
             reconnectTimerRef.current = setTimeout(() => {
               if (!intentionalStopRef.current && streamRef.current) {
@@ -394,35 +356,58 @@ export function useTranscription() {
   // ─── Iniciar ──────────────────────────────────────────────────────────────
   const startTranscription = useCallback(
     async (_remoteAudioEl?: HTMLAudioElement | null) => {
+      // Nota: usa o ref de isPreparing para evitar fechar sobre valor antigo do state.
       if (isTranscribingRef.current) return;
 
-      // Limpar transcrição anterior
+      // Se havia sessão anterior (WS/stream/AudioContext ainda referenciados),
+      // derruba tudo antes de começar — evita estado corrompido em 2ª transcrição.
+      teardown();
+
+      // Feedback imediato: mostra estado "preparando" e limpa transcrição anterior.
+      // A UI pode ler `isPreparing` para renderizar controles/loading instantaneamente.
+      setIsPreparing(true);
       setTranscription([]);
       transcriptionRef.current = [];
+      hasPartialRef.current = false;
 
       intentionalStopRef.current = false;
       reconnectAttemptsRef.current = 0;
 
       try {
-        // Microfone
-        const stream = await navigator.mediaDevices.getUserMedia({
+        // Paraleliza getUserMedia + POST do token efêmero.
+        // Antes era sequencial (~1-3s cada). Em paralelo, roda no tempo do mais lento.
+        const micPromise = navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
           },
         });
+        const tokenPromise = fetch("/api/medico/transcribe-realtime", { method: "POST" })
+          .then(async (res) => {
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || "Erro ao criar sessão de transcrição");
+            }
+            const json = await res.json();
+            if (!json.token) throw new Error("Token de sessão inválido");
+            return json.token as string;
+          });
+
+        const [stream, token] = await Promise.all([micPromise, tokenPromise]);
         streamRef.current = stream;
 
-        await connectWebSocket(stream);
+        await connectWebSocket(stream, false, token);
       } catch (error: any) {
         console.error("Erro ao iniciar transcrição:", error);
         isTranscribingRef.current = false;
         setIsTranscribing(false);
         toast.error(error.message || "Erro ao acessar o microfone.");
+      } finally {
+        setIsPreparing(false);
       }
     },
-    [connectWebSocket]
+    [connectWebSocket, teardown]
   );
 
   // ─── Pausar ───────────────────────────────────────────────────────────────
@@ -431,7 +416,6 @@ export function useTranscription() {
     setIsPaused(true);
     // Silencia o microfone — o WebSocket continua aberto
     streamRef.current?.getTracks().forEach((t) => { t.enabled = false; });
-    toast.info("Transcrição pausada");
   }, []);
 
   // ─── Retomar ──────────────────────────────────────────────────────────────
@@ -439,7 +423,6 @@ export function useTranscription() {
     isPausedRef.current = false;
     setIsPaused(false);
     streamRef.current?.getTracks().forEach((t) => { t.enabled = true; });
-    toast.success("Transcrição retomada");
   }, []);
 
   // ─── Parar ────────────────────────────────────────────────────────────────
@@ -452,11 +435,13 @@ export function useTranscription() {
     setIsPaused(false);
     setStoppedUnexpectedly(false);
     teardown();
-    toast.info("Transcrição parada");
   }, [teardown]);
 
   // ─── Processar com IA ─────────────────────────────────────────────────────
-  const processTranscription = useCallback(async (): Promise<{
+  const processTranscription = useCallback(async (options?: {
+    consultaId?: string;
+    examesIds?: string[];
+  }): Promise<{
     anamnese: string;
     cidCodes: Array<{ code: string; description: string; score: number }>;
     exames: Array<{ nome: string; tipo: string; justificativa: string }>;
@@ -475,7 +460,11 @@ export function useTranscription() {
     const response = await fetch("/api/medico/process-transcription", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcription: transcriptionText }),
+      body: JSON.stringify({
+        transcription: transcriptionText,
+        consultaId: options?.consultaId,
+        examesIds: options?.examesIds,
+      }),
     });
 
     if (!response.ok) {
@@ -489,6 +478,7 @@ export function useTranscription() {
 
   return {
     isTranscribing,
+    isPreparing,
     isPaused,
     transcription,
     stoppedUnexpectedly,

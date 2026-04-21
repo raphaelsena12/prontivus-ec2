@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Sparkles,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 
 interface TranscriptionEntry {
@@ -24,6 +25,7 @@ interface TranscriptionEntry {
 
 interface Step1TranscriptionProps {
   isTranscribing: boolean;
+  isPreparing?: boolean;
   isPaused: boolean;
   transcription: TranscriptionEntry[];
   sessionDuration: string;
@@ -49,6 +51,7 @@ function formatTranscriptionTime(timeStr: string): string {
 
 export function Step1Transcription({
   isTranscribing,
+  isPreparing,
   isPaused,
   transcription,
   sessionDuration,
@@ -152,10 +155,20 @@ export function Step1Transcription({
               <Button
                 onClick={startTranscription}
                 size="sm"
-                className="h-8 px-4 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white text-xs gap-2"
+                disabled={isPreparing}
+                className="h-8 px-4 bg-[#1E40AF] hover:bg-[#1e3a8a] text-white text-xs gap-2 disabled:opacity-90"
               >
-                <Play className="w-3.5 h-3.5" fill="currentColor" />
-                Iniciar Gravação
+                {isPreparing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Preparando…
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5" fill="currentColor" />
+                    Iniciar Gravação
+                  </>
+                )}
               </Button>
             ) : isPaused ? (
               <>

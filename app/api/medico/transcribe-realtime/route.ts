@@ -36,24 +36,31 @@ export async function POST() {
         instructions: "",
         input_audio_format: "pcm16",
         input_audio_transcription: {
-          model: "gpt-4o-transcribe", // Muito mais resistente a alucinações que whisper-1
+          model: "gpt-4o-transcribe",
           language: "pt",
-          // Prompt âncora médico: reduz drasticamente alucinações ao contextualizar o modelo
+          // Prompt neutro e restritivo: evita que o modelo "complete" diálogos
+          // plausíveis quando há silêncio ou ruído. NÃO mencionar consulta/médico/paciente
+          // aqui, pois isso induz alucinação de diálogo clínico.
           prompt:
-            "Transcrição de consulta médica em português brasileiro. " +
-            "Espere termos médicos, nomes de medicamentos, sintomas, diagnósticos e procedimentos clínicos. " +
-            "Transcreva apenas o que for dito. Se não houver fala clara, não transcreva nada.",
+            "Transcreva literalmente apenas as palavras faladas em português brasileiro. " +
+            "Se houver silêncio, ruído ou fala ininteligível, NÃO transcreva nada — retorne vazio. " +
+            "Não invente palavras, não complete frases, não adicione saudações ou perguntas que não foram ditas.",
         },
-        // Semantic VAD: decide quando o turno termina por semântica, não só por silêncio
-        // Elimina transcrições de fragmentos incompletos e ruídos
+        // server_vad com threshold muito alto (0.85): só abre turno em fala
+        // claramente acima do ruído. Estratégia: preferir perder meia palavra
+        // no começo de uma fala baixa a aceitar alucinação em silêncio.
+        // Fala normal de consulta (voz próxima ao mic) fica bem acima de 0.85.
         turn_detection: {
-          type: "semantic_vad",
-          eagerness: "low", // espera a frase ser semanticamente completa antes de fechar
+          type: "server_vad",
+          threshold: 0.85,
+          prefix_padding_ms: 300,
+          silence_duration_ms: 900,
           create_response: false,
         },
-        // Redução de ruído far_field: ideal para consultório (microfone de laptop/mesa)
+        // near_field é melhor quando o usuário fala próximo ao mic (laptop/headset).
+        // far_field amplifica ruído ambiente e aumenta falsos positivos de VAD.
         input_audio_noise_reduction: {
-          type: "far_field",
+          type: "near_field",
         },
       }),
     });

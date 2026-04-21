@@ -375,7 +375,15 @@ IMPORTANTE:
 - Se não houver informações suficientes em alguma área, indique claramente`;
 
     // LGPD: sanitizar todo o contexto clínico antes de enviar à OpenAI
-    const contextoSanitizado = sanitizeTextForAI(contextoClinico, { patientName: paciente.nome });
+    let contextoSanitizado = sanitizeTextForAI(contextoClinico, { patientName: paciente.nome });
+
+    // Budget de contexto: ~4 chars/token. Reservamos 3000 para resposta + 500 para system prompt.
+    // Limite seguro de contexto do usuário: ~32k chars (~8k tokens), evita truncamento silencioso.
+    const MAX_CONTEXT_CHARS = 32000;
+    if (contextoSanitizado.length > MAX_CONTEXT_CHARS) {
+      console.warn(`[resumo-clinico] Contexto (${contextoSanitizado.length} chars) excedeu limite, truncando para ${MAX_CONTEXT_CHARS}.`);
+      contextoSanitizado = contextoSanitizado.substring(0, MAX_CONTEXT_CHARS) + "\n\n[...histórico truncado devido ao tamanho; o resumo reflete os registros mais antigos primeiro]";
+    }
 
     // Chamar OpenAI
     const completion = await openai.chat.completions.create({
@@ -384,7 +392,7 @@ IMPORTANTE:
         { role: "system", content: systemPrompt },
         { role: "user", content: `Analise o seguinte histórico clínico completo e gere um resumo clínico estruturado:\n\n${contextoSanitizado}` }
       ],
-      temperature: 0.3,
+      temperature: 0.1,
       max_tokens: 3000,
     });
 

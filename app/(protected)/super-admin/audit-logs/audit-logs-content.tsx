@@ -62,6 +62,15 @@ const ACTION_LABELS: Record<string, { label: string; variant: "default" | "secon
   LOGIN: { label: "Login", variant: "secondary" },
   LOGOUT: { label: "Logout", variant: "secondary" },
   ACCESS_DENIED: { label: "Acesso Negado", variant: "destructive" },
+  // IA clínica
+  "process-transcription": { label: "IA: Processar transcrição", variant: "default" },
+  "anamnese-stream": { label: "IA: Anamnese (stream)", variant: "default" },
+  "generate-anamnese": { label: "IA: Gerar anamnese", variant: "default" },
+  "analisar-exames": { label: "IA: Analisar exames", variant: "default" },
+  "analisar-exame-detalhado": { label: "IA: Exame detalhado", variant: "default" },
+  "resumo-clinico": { label: "IA: Resumo clínico", variant: "default" },
+  "resumo-paciente": { label: "IA: Resumo paciente", variant: "default" },
+  "sugerir-prescricao": { label: "IA: Sugerir prescrição", variant: "default" },
 };
 
 const RESOURCE_LABELS: Record<string, string> = {
@@ -73,6 +82,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   Documento: "Documento",
   Usuario: "Usuário",
   ClinicalRoute: "Rota Clínica",
+  clinical_ai: "IA Clínica",
 };
 
 const TIPO_LABELS: Record<string, string> = {
@@ -105,6 +115,12 @@ function formatDetailsSummary(details: Record<string, unknown> | null): string {
   if (details.operacao) parts.push(`${details.operacao}`);
   if (details.operation) parts.push(`${details.operation}`);
 
+  // IA clínica
+  if (details.model) parts.push(`Modelo: ${details.model}`);
+  if (typeof details.tokensUsed === "number") parts.push(`Tokens: ${details.tokensUsed}`);
+  if (typeof details.latencyMs === "number") parts.push(`Latência: ${details.latencyMs}ms`);
+  if (details.success === false) parts.push(`❌ ${details.errorMessage || "falha"}`);
+
   if (details.camposAlterados && typeof details.camposAlterados === "object") {
     const campos = Object.keys(details.camposAlterados as Record<string, unknown>);
     if (campos.length > 0) {
@@ -135,6 +151,35 @@ function DetailDialog({ details, action, resource }: { details: Record<string, a
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
+          {/* Bloco de IA clínica */}
+          {resource === "clinical_ai" && (
+            <div className="space-y-1.5 rounded border bg-blue-50/40 p-3">
+              <div className="font-medium text-blue-900 text-xs mb-1">Registro de IA Clínica</div>
+              {details.model && <div className="text-xs"><span className="font-medium text-muted-foreground">Modelo:</span> {String(details.model)}</div>}
+              {details.consultaId && <div className="text-xs"><span className="font-medium text-muted-foreground">Consulta:</span> <span className="font-mono">{String(details.consultaId)}</span></div>}
+              {details.pacienteId && <div className="text-xs"><span className="font-medium text-muted-foreground">Paciente:</span> <span className="font-mono">{String(details.pacienteId)}</span></div>}
+              {typeof details.tokensUsed === "number" && <div className="text-xs"><span className="font-medium text-muted-foreground">Tokens:</span> {details.tokensUsed}</div>}
+              {typeof details.latencyMs === "number" && <div className="text-xs"><span className="font-medium text-muted-foreground">Latência:</span> {details.latencyMs} ms</div>}
+              {typeof details.success === "boolean" && (
+                <div className="text-xs">
+                  <span className="font-medium text-muted-foreground">Status:</span>{" "}
+                  {details.success ? (
+                    <Badge variant="secondary">Sucesso</Badge>
+                  ) : (
+                    <Badge variant="destructive">Falha</Badge>
+                  )}
+                </div>
+              )}
+              {details.errorMessage && (
+                <div className="text-xs text-red-700">
+                  <span className="font-medium">Erro:</span> {String(details.errorMessage)}
+                </div>
+              )}
+              {details.promptHash && <div className="text-xs"><span className="font-medium text-muted-foreground">Prompt hash:</span> <span className="font-mono">{String(details.promptHash)}</span></div>}
+              {details.outputHash && <div className="text-xs"><span className="font-medium text-muted-foreground">Output hash:</span> <span className="font-mono">{String(details.outputHash)}</span></div>}
+            </div>
+          )}
+
           {details.pacienteNome && (
             <div><span className="font-medium text-muted-foreground">Paciente:</span> {String(details.pacienteNome)}</div>
           )}

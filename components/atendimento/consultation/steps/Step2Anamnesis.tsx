@@ -641,97 +641,25 @@ export function Step2Anamnesis({
             )}
           </div>
 
-          {/* Botão Transcrição com IA */}
-          {startTranscription && !isTranscribing && (
-            <button
-              onClick={startTranscription}
-              className="h-8 px-4 rounded-lg text-xs font-semibold border transition-all duration-300 flex items-center gap-2 bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25"
-            >
-              <Mic className="w-3.5 h-3.5" />
-              Transcrição com IA
-            </button>
-          )}
+          {/* Botão Transcrição com IA — sempre visível quando existe a função,
+             muda o label se já houver anamnese (regravar). */}
+          {startTranscription && !isTranscribing && (() => {
+            const hasExistingAnamnese =
+              !!(analysisResults?.anamnese || prontuario?.anamnese);
+            return (
+              <button
+                onClick={startTranscription}
+                className="h-8 px-4 rounded-lg text-xs font-semibold border transition-all duration-300 flex items-center gap-2 bg-amber-400/15 border-amber-400/30 text-amber-300 hover:bg-amber-400/25"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                {hasExistingAnamnese ? "Gravar novamente" : "Transcrição com IA"}
+              </button>
+            );
+          })()}
         </div>
 
-        {/* ── Painel de transcrição em tempo real ── */}
-        {isTranscribing && (
-          <>
-            <style>{`
-              @keyframes waveBar {
-                0%, 100% { height: 8px; }
-                50% { height: 20px; }
-              }
-            `}</style>
-            <div className="mx-3 mt-3 mb-1 rounded-xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-1 duration-300">
-              {/* Header com glass-effect */}
-              <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-red-50/80 via-white/60 to-blue-50/40 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  {/* Ícone com anel animado */}
-                  <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-red-400/20 animate-ping" style={{ animationDuration: "2s" }} />
-                    <div className="relative w-8 h-8 rounded-full bg-red-500 flex items-center justify-center shadow-sm shadow-red-200">
-                      <Mic className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-800">Transcrição com IA</span>
-                      <span className="flex items-center gap-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                        REC
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-slate-400">Ouvindo e transcrevendo em tempo real</span>
-                  </div>
-                </div>
-                {/* Timer + waveform mini */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-end gap-[3px] h-5">
-                    {[0.4, 0.7, 1, 0.6, 0.85, 0.5, 0.75].map((h, i) => (
-                      <div
-                        key={i}
-                        className="w-[3px] rounded-full"
-                        style={{
-                          background: `linear-gradient(to top, #ef4444, #3b82f6)`,
-                          animation: `waveBar ${0.5 + i * 0.08}s ease-in-out ${i * 0.06}s infinite`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm font-mono font-semibold text-slate-500 tabular-nums bg-slate-100 px-2.5 py-1 rounded-lg">
-                    {formatTimer(recordingSeconds)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Área de texto */}
-              <div
-                className="px-4 py-3 max-h-[180px] overflow-y-auto scroll-smooth"
-                ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
-              >
-                {transcriptionText ? (
-                  <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {transcriptionText}
-                    <span className="inline-block w-[2px] h-[15px] bg-gradient-to-b from-red-400 to-blue-500 animate-pulse ml-1 align-text-bottom rounded-full" />
-                  </p>
-                ) : (
-                  <div className="flex items-center gap-2 py-2">
-                    <div className="flex gap-1">
-                      {[0, 150, 300].map((d) => (
-                        <div
-                          key={d}
-                          className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce"
-                          style={{ animationDelay: `${d}ms` }}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-slate-400">Aguardando fala...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
+        {/* Painel de transcrição in-place removido — substituído pelo
+           TranscriptionChatPanel flutuante (renderizado em atendimento-content). */}
 
         {/* ── Corpo: sempre modo manual ── */}
         <div className="p-3 overflow-x-hidden flex-1 overflow-y-auto">
@@ -759,8 +687,7 @@ export function Step2Anamnesis({
                   <Textarea
                     value={sectionValues[section.key] || ""}
                     onChange={(e) => handleSectionChange(section.key, e.target.value)}
-                    placeholder={section.placeholder}
-                    className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 placeholder:text-slate-350 transition-all"
+                    className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 transition-all"
                   />
                 </div>
               ))}
@@ -772,8 +699,7 @@ export function Step2Anamnesis({
                 <Textarea
                   value={orientacoesConduta}
                   onChange={(e) => handleOrientacoesCondutaChange(e.target.value)}
-                  placeholder="Orientações ao paciente, plano terapêutico, encaminhamentos, retorno..."
-                  className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 placeholder:text-slate-350 transition-all"
+                  className="text-sm min-h-[72px] resize-none rounded-lg border-slate-200 bg-slate-50/60 px-3.5 py-2.5 focus-visible:ring-2 focus-visible:ring-blue-500/20 focus-visible:border-blue-400 focus-visible:bg-white text-slate-700 transition-all"
                 />
               </div>
             </div>

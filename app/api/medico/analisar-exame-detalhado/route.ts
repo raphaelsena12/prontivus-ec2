@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
           { role: "user", content: userContent },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 4000,
       })
     );
