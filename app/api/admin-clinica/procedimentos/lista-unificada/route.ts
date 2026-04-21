@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkAdminClinicaAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
+import { decimalToNumber } from "@/lib/prisma-helpers";
 import {
   buildCodigoTussCatalogoAndParts,
   whereFromAndParts,
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
         descricao: [p.nome, p.descricao].filter(Boolean).join(" — ") || p.nome,
         tipo: null,
         categoria: null,
-        valor: String(p.valor),
+        valor: p.valor != null ? decimalToNumber(p.valor).toString() : null,
         ativo: p.ativo,
       })
     );
@@ -84,8 +85,8 @@ export async function GET(request: NextRequest) {
       ativo: c.ativo,
     }));
 
-    const byDescricao = (a: { descricao: string }, b: { descricao: string }) =>
-      a.descricao.localeCompare(b.descricao, "pt-BR", { sensitivity: "base" });
+    const byDescricao = (a: { descricao: string | null }, b: { descricao: string | null }) =>
+      (a.descricao ?? "").localeCompare(b.descricao ?? "", "pt-BR", { sensitivity: "base" });
 
     // Clínica sempre no topo; depois TUSS. Dentro de cada grupo, ordem alfabética.
     const merged = [

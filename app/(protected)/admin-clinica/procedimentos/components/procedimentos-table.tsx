@@ -140,9 +140,7 @@ export function ProcedimentosTable({
         accessorKey: "valor",
         header: "Valor",
         cell: ({ row }) => {
-          const valor = typeof row.original.valor === 'string' 
-            ? parseFloat(row.original.valor) 
-            : row.original.valor;
+          const valor = Number(row.original.valor);
           return (
             <div className="font-medium">
               {formatCurrency(valor)}

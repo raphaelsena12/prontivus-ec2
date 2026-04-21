@@ -35,6 +35,7 @@ import { maskCPF, removeMask, maskMoeda, parseMoeda } from "@/lib/masks";
 import { cn } from "@/lib/utils";
 import { CodigoTussSearchInput } from "./codigo-tuss-search-input";
 import { OperadoraSearchInput } from "./operadora-search-input";
+import { ProcedimentoSearchInput } from "./procedimento-search-input";
 
 const agendamentoSchema = z.object({
   pacienteId: z.string().uuid("Paciente é obrigatório"),
@@ -1227,26 +1228,23 @@ export function EditarAgendamentoModal({
                       render={({ field }) => (
                         <FormItem className="flex-1 min-w-[200px]">
                           <FormLabel className="text-xs font-medium">Procedimento</FormLabel>
-                          <Select
-                            onValueChange={(value) => {
-                              field.onChange(value === "null" ? null : value);
-                            }}
-                            value={field.value === null ? "null" : field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-8 text-xs w-full">
-                                <SelectValue placeholder="Selecione o procedimento" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent position="popper" className="max-h-60">
-                              <SelectItem value="null" className="text-xs">Nenhum</SelectItem>
-                              {procedimentos.map((procedimento) => (
-                                <SelectItem key={procedimento.id} value={procedimento.id} className="text-xs">
-                                  {procedimento.codigo} - {procedimento.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <ProcedimentoSearchInput
+                              procedimentoId={field.value}
+                              onSelect={(item) => {
+                                if (!item) {
+                                  field.onChange(null);
+                                } else if (item.origem === "CLINICA") {
+                                  field.onChange(item.id);
+                                  form.setValue("codigoTussId", null);
+                                } else {
+                                  field.onChange(null);
+                                  form.setValue("codigoTussId", item.id);
+                                }
+                              }}
+                              error={form.formState.errors.procedimentoId?.message}
+                            />
+                          </FormControl>
                           <FormMessage className="text-xs" />
                         </FormItem>
                       )}

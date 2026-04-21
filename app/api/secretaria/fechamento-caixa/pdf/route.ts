@@ -6,6 +6,7 @@ import { brazilDayStart, brazilDayEnd } from "@/lib/timezone-utils";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { generateRelatorioFechamentoCaixaPDF } from "@/lib/pdf/relatorio-fechamento-caixa";
+import { decimalToNumber } from "@/lib/prisma-helpers";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -79,14 +80,33 @@ export async function GET(request: NextRequest) {
     const totalPorConvenio: Record<string, number> = {};
     let totalGeral = 0;
 
+    const consultasComPagamento = new Set(pagamentos.map((p) => p.consultaId).filter(Boolean));
+
     pagamentos.forEach((p) => {
-      const forma = p.metodoPagamento || "NÃO_INFORMADO";
-      const valor = Number(p.valor);
+      const forma = p.metodoPagamento || "Não Informado";
+      const valor = decimalToNumber(p.valor);
       totalPorFormaPagamento[forma] = (totalPorFormaPagamento[forma] || 0) + valor;
       totalGeral += valor;
 
       const convenio = p.consulta?.operadora
         ? p.consulta.operadora.nomeFantasia || p.consulta.operadora.razaoSocial || "Particular"
+        : "Particular";
+      totalPorConvenio[convenio] = (totalPorConvenio[convenio] || 0) + valor;
+    });
+
+    // Consultas sem pagamento registrado entram como "Não Informado"
+    consultas.forEach((c) => {
+      if (consultasComPagamento.has(c.id)) return;
+      const valor = c.valorFinal != null
+        ? decimalToNumber(c.valorFinal)
+        : c.valorCobrado != null
+        ? decimalToNumber(c.valorCobrado)
+        : 0;
+      if (valor === 0) return;
+      totalPorFormaPagamento["Não Informado"] = (totalPorFormaPagamento["Não Informado"] || 0) + valor;
+      totalGeral += valor;
+      const convenio = c.operadora
+        ? c.operadora.nomeFantasia || c.operadora.razaoSocial || "Particular"
         : "Particular";
       totalPorConvenio[convenio] = (totalPorConvenio[convenio] || 0) + valor;
     });
@@ -181,7 +201,11 @@ export async function GET(request: NextRequest) {
 
     const consultasNormalized = consultas.map((c) => ({
       ...c,
-      valorCobrado: c.valorCobrado != null ? Number(c.valorCobrado) : null,
+      valorCobrado: c.valorFinal != null
+        ? decimalToNumber(c.valorFinal)
+        : c.valorCobrado != null
+        ? decimalToNumber(c.valorCobrado)
+        : null,
     }));
 
     const pdfBuffer = generateRelatorioFechamentoCaixaPDF(

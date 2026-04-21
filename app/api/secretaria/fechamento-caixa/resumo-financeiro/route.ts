@@ -3,6 +3,7 @@ import { getSession, getUserClinicaId } from "@/lib/auth-helpers";
 import { prisma } from "@/lib/prisma";
 import { TipoUsuario } from "@/lib/generated/prisma";
 import { brazilDayStart, brazilDayEnd } from "@/lib/timezone-utils";
+import { decimalToNumber } from "@/lib/prisma-helpers";
 
 async function checkAuthorization() {
   const session = await getSession();
@@ -188,7 +189,7 @@ export async function GET(request: NextRequest) {
 
     pagamentos.forEach((pagamento) => {
       const formaPagamento = pagamento.metodoPagamento || "NÃO_INFORMADO";
-      const valor = Number(pagamento.valor);
+      const valor = decimalToNumber(pagamento.valor);
 
       totalPorFormaPagamento[formaPagamento] = (totalPorFormaPagamento[formaPagamento] || 0) + valor;
       totalGeral += valor;

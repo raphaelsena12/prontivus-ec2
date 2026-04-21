@@ -10,6 +10,17 @@
 
 import { TipoUsuario } from "@/lib/generated/prisma";
 
+// Prisma 7 Decimal instances don't coerce to number via Number() — reconstruct from internal decimal.js fields (s, e, d)
+export function decimalToNumber(v: unknown): number {
+  if (v == null) return 0;
+  if (typeof v === "number") return v;
+  const d = v as any;
+  if (typeof d.d?.[0] !== "number") return 0;
+  const digits = String(d.d[0]);
+  const num = d.s * parseFloat(digits[0] + (digits.length > 1 ? "." + digits.slice(1) : "") + "e" + d.e);
+  return isNaN(num) ? 0 : num;
+}
+
 /**
  * Verifica se o usuário é Super Admin
  */

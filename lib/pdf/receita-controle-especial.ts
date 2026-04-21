@@ -1,6 +1,7 @@
 import {
   BaseDocumentData,
   createDoc, drawClinicHeader, drawTitle, drawPatientCard, checkPageBreak,
+  drawFooterSignature,
   MARGIN, CONTENT_WIDTH, PAGE_WIDTH, PAGE_HEIGHT, PDF_FONT, COLORS,
 } from "./pdf-base";
 
@@ -119,17 +120,17 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   }
   
   // ── Espaço em branco no meio ──
-  // Posicionar os boxes no final da página
+  // Posicionar os boxes acima da assinatura do médico (que ocupa ~30mm no rodapé)
   const boxHeight = 50;
-  const boxStartY = PAGE_HEIGHT - boxHeight - 20; // 20mm do rodapé
-  
+  const boxStartY = PAGE_HEIGHT - boxHeight - 48; // sobe para dar espaço à assinatura
+
   // Se os medicamentos não chegaram até os boxes, deixar espaço em branco
   if (y < boxStartY - 10) {
     y = boxStartY - 10;
   } else {
     y += 20; // Adicionar espaço mínimo
   }
-  
+
   // ── Boxes de identificação ──
   const boxWidth = CONTENT_WIDTH / 2 - 5;
   const boxHeightFinal = 50;
@@ -227,6 +228,9 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
   doc.setFont(PDF_FONT, "normal");
   doc.setTextColor(...COLORS.slate600);
   doc.text("ASSINATURA DO FARMACÊUTICO", rightBoxX + boxWidth / 2, rightBoxY, { align: "center" });
-  
+
+  // ── Assinatura do médico ──
+  drawFooterSignature(doc, data, undefined, { hideDateLine: true });
+
   return doc.output("arraybuffer");
 }

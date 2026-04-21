@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { maskCPF } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 import { PacienteDeleteDialog } from "./components/paciente-delete-dialog";
 import { PacienteDialog } from "./components/paciente-dialog";
@@ -227,7 +228,7 @@ export function PacientesContent({ clinicaId }: PacientesContentProps) {
                         {paciente.numeroProntuario ? String(paciente.numeroProntuario).padStart(6, "0") : "-"}
                       </TableCell>
                       <TableCell className="font-medium text-xs py-3">{paciente.nome}</TableCell>
-                      <TableCell className="text-xs py-3">{paciente.cpf || "-"}</TableCell>
+                      <TableCell className="text-xs py-3">{maskCPF(paciente.cpf)}</TableCell>
                       <TableCell className="text-xs py-3">{paciente.email || "-"}</TableCell>
                       <TableCell className="text-xs py-3">{paciente.telefone || "-"}</TableCell>
                       <TableCell className="text-xs py-3">

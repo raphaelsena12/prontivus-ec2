@@ -359,7 +359,12 @@ export async function PATCH(
 
     // Se a data/hora ou médico foi alterado, verificar conflitos e bloqueios
     // Encaixe pula validação de conflito (igual ao POST)
-    if (!isEncaixe && (data.dataHora || data.medicoId)) {
+    const dataHoraRealmeteAlterada = data.dataHora && data.dataHora.getTime() !== new Date(agendamentoAtual.dataHora).getTime();
+    const dataHoraFimRealmenteAlterada = data.dataHoraFim && agendamentoAtual.dataHoraFim
+      ? data.dataHoraFim.getTime() !== new Date(agendamentoAtual.dataHoraFim).getTime()
+      : !!data.dataHoraFim !== !!agendamentoAtual.dataHoraFim;
+    const medicoAlterado = data.medicoId && data.medicoId !== agendamentoAtual.medicoId;
+    if (!isEncaixe && (dataHoraRealmeteAlterada || dataHoraFimRealmenteAlterada || medicoAlterado)) {
       const medicoIdParaVerificar = data.medicoId || agendamentoAtual.medicoId;
       const dataHoraParaVerificar = data.dataHora ? new Date(data.dataHora) : agendamentoAtual.dataHora;
 

@@ -240,22 +240,37 @@ export function ListaEsperaContent() {
                     <button
                       key={medico.id}
                       onClick={() => setMedicoSelecionado(medico.id)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all ${
+                      className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all min-w-[100px] ${
                         medicoSelecionado === medico.id
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50"
+                          ? "border-primary bg-primary/5 shadow-sm"
+                          : "border-border/60 hover:border-primary/50 hover:bg-muted/50"
                       }`}
                     >
                       <AvatarWithS3
                         avatar={medico.usuario.avatar}
                         alt={medico.usuario.nome}
                         fallback={getInitials(medico.usuario.nome)}
-                        className="h-10 w-10"
+                        className={`w-16 h-16 border-2 ${
+                          medicoSelecionado === medico.id
+                            ? "border-primary"
+                            : "border-border"
+                        }`}
+                        fallbackClassName={`text-sm font-semibold ${
+                          medicoSelecionado === medico.id
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        }`}
                       />
-                      <div className="text-left">
-                        <p className="text-sm font-medium">{medico.usuario.nome}</p>
-                        {medico.crm && (
-                          <p className="text-xs text-muted-foreground">CRM: {medico.crm}</p>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className={`text-xs font-medium text-center max-w-[90px] truncate ${
+                          medicoSelecionado === medico.id ? "text-primary" : "text-foreground"
+                        }`}>
+                          {medico.usuario.nome}
+                        </span>
+                        {medico.especialidade && (
+                          <span className="text-[10px] text-muted-foreground text-center max-w-[90px] truncate">
+                            {medico.especialidade}
+                          </span>
                         )}
                       </div>
                     </button>

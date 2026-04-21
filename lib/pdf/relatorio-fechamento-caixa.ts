@@ -271,76 +271,72 @@ export function generateRelatorioFechamentoCaixaPDF(
     y += 4;
   }
 
-  // ── Totais por Forma de Pagamento ─────────────────────────────────────────
-  y = checkPageBreak(doc, y, 20);
-  y = drawSectionTitle(doc, "Totais por Forma de Pagamento", y);
-
-  const colsPagamento: ColDef[] = [
-    { label: "Forma de Pagamento", width: 150 },
-    { label: "Valor", width: 20, align: "right" },
-  ];
-
+  // ── Totais (forma de pagamento + convênio + total geral) — fixos acima da assinatura ──
   const entPagamento = Object.entries(resumo.totalPorFormaPagamento);
-
-  if (entPagamento.length === 0) {
-    doc.setFontSize(8.5);
-    doc.setFont(PDF_FONT, "normal");
-    doc.setTextColor(...COLORS.slate400);
-    doc.text("Nenhum pagamento registrado.", MARGIN, y);
-    y += 10;
-  } else {
-    y = drawTableHeader(doc, colsPagamento, y);
-    for (let i = 0; i < entPagamento.length; i++) {
-      y = checkPageBreak(doc, y, 8);
-      const [forma, valor] = entPagamento[i];
-      y = drawTableRow(
-        doc,
-        colsPagamento,
-        [forma.replace(/_/g, " "), fmtCurrency(Number(valor))],
-        y,
-        i % 2 === 0
-      );
-    }
-    y = checkPageBreak(doc, y, 8);
-    y = drawTotalRow(doc, "TOTAL GERAL", fmtCurrency(resumo.totalGeral), y);
-    y += 4;
-  }
-
-  // ── Totais por Convênio ───────────────────────────────────────────────────
-  y = checkPageBreak(doc, y, 20);
-  y = drawSectionTitle(doc, "Totais por Convênio", y);
-
-  const colsConvenio: ColDef[] = [
-    { label: "Convênio", width: 150 },
-    { label: "Valor", width: 20, align: "right" },
-  ];
-
   const entConvenio = Object.entries(resumo.totalPorConvenio);
 
-  if (entConvenio.length === 0) {
-    doc.setFontSize(8.5);
+  // Calcular altura total do bloco para ancorá-lo acima das assinaturas
+  const lineH = 6;
+  const blockHeight =
+    (5 + 1 + 4 + entPagamento.length * lineH) + // forma de pagamento
+    (8 + 5 + 1 + 4 + entConvenio.length * lineH) + // convênio
+    (4 + 6); // total geral
+
+  const sigY = PAGE_HEIGHT - 30;
+  let by = sigY - 20 - blockHeight; // 20mm de espaço antes das assinaturas
+
+  // Forma de Pagamento
+  doc.setFontSize(7.5);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text("Forma de Pagamento", MARGIN, by);
+  by += 5;
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, by, MARGIN + CONTENT_WIDTH, by);
+  by += 4;
+
+  for (const [forma, valor] of entPagamento) {
+    doc.setFontSize(8);
     doc.setFont(PDF_FONT, "normal");
-    doc.setTextColor(...COLORS.slate400);
-    doc.text("Nenhum convênio registrado.", MARGIN, y);
-    y += 10;
-  } else {
-    y = drawTableHeader(doc, colsConvenio, y);
-    for (let i = 0; i < entConvenio.length; i++) {
-      y = checkPageBreak(doc, y, 8);
-      const [convenio, valor] = entConvenio[i];
-      y = drawTableRow(
-        doc,
-        colsConvenio,
-        [convenio, fmtCurrency(Number(valor))],
-        y,
-        i % 2 === 0
-      );
-    }
-    y += 4;
+    doc.setTextColor(...COLORS.slate800);
+    doc.text(forma.replace(/_/g, " "), MARGIN, by);
+    doc.text(fmtCurrency(valor), MARGIN + CONTENT_WIDTH, by, { align: "right" });
+    by += lineH;
   }
 
-  // ── Assinaturas — fixas no rodapé, igual aos demais documentos ──────────
-  const sigY = PAGE_HEIGHT - 30;
+  // Convênio
+  by += 8;
+  doc.setFontSize(7.5);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate600);
+  doc.text("Convênio", MARGIN, by);
+  by += 5;
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, by, MARGIN + CONTENT_WIDTH, by);
+  by += 4;
+
+  for (const [convenio, valor] of entConvenio) {
+    doc.setFontSize(8);
+    doc.setFont(PDF_FONT, "normal");
+    doc.setTextColor(...COLORS.slate800);
+    doc.text(convenio, MARGIN, by);
+    doc.text(fmtCurrency(valor), MARGIN + CONTENT_WIDTH, by, { align: "right" });
+    by += lineH;
+  }
+
+  // Total Geral
+  by += 4;
+  doc.setDrawColor(...COLORS.slate200);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, by, MARGIN + CONTENT_WIDTH, by);
+  by += 5;
+  doc.setFontSize(8.5);
+  doc.setFont(PDF_FONT, "bold");
+  doc.setTextColor(...COLORS.slate800);
+  doc.text("Total Geral", MARGIN, by);
+  doc.text(fmtCurrency(resumo.totalGeral), MARGIN + CONTENT_WIDTH, by, { align: "right" });
 
   const leftCenter = MARGIN + CONTENT_WIDTH / 4;
   const rightCenter = MARGIN + (CONTENT_WIDTH * 3) / 4;
