@@ -383,6 +383,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
   const [docMedicamentosSelecionados, setDocMedicamentosSelecionados] = useState<Set<number>>(new Set());
+  const [docExamesSelecionados, setDocExamesSelecionados] = useState<Set<number>>(new Set());
   const [sinaisVitaisFocusField, setSinaisVitaisFocusField] = useState<string | null>(null);
   const [sinaisVitaisForm, setSinaisVitaisForm] = useState({
     pressaoSistolica: "", pressaoDiastolica: "", frequenciaCardiaca: "",
@@ -2229,6 +2230,12 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         ].filter(p => p.medicamento && p.medicamento.trim() !== "");
         setDocMedicamentosSelecionados(new Set(todasPrescricoes.map((_, i) => i)));
       }
+      // Para pedido de exames, inicializar todos os exames do box como selecionados
+      if (modelId === "pedido-exames") {
+        const examesIA = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)) || [];
+        const totalExames = examesIA.length + examesManuais.length;
+        setDocExamesSelecionados(new Set(Array.from({ length: totalExames }, (_, i) => i)));
+      }
       setDocConfigModalOpen(true);
       return;
     }
@@ -2974,7 +2981,12 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         const hasAcomp = ["declaracao-comparecimento-acompanhante","declaracao-comparecimento-horario-cid"].includes(id);
         const hasUfValidade = id === "receita-controle-especial";
         const hasConvenio = id === "justificativa-exames-plano";
-        const hasTextoLivre = id === "laudo-medico" || id === "pedido-exames";
+        const hasTextoLivre = id === "laudo-medico";
+        const isPedidoExames = id === "pedido-exames";
+        const examesIABox = analysisResults?.exames?.filter((_, i) => selectedExamesAI.has(i)).map(e => ({ nome: e.nome, tipo: e.tipo })) || [];
+        const examesBox: Array<{ nome: string; tipo: string | null }> = isPedidoExames
+          ? [...examesIABox, ...examesManuais.map(e => ({ nome: e.nome, tipo: e.tipo }))]
+          : [];
         const isReceita = id === "receita-medica" || id === "receita-controle-especial" || id === "receita-tipo-ba";
         const medicamentosReceita = isReceita ? (() => {
           const prescricoesIA = analysisResults?.prescricoes?.filter((_, i) => selectedPrescricoesAI.has(i)) || [];
@@ -2983,7 +2995,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
             ...prescricoesIA.filter(rx => !prescricoes.find(p => p.medicamento === rx.medicamento)),
           ].filter(p => p.medicamento && p.medicamento.trim() !== "");
         })() : [];
-        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre || isReceita;
+        const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre || isReceita || isPedidoExames;
 
         return (
           <Dialog open={docConfigModalOpen} onOpenChange={setDocConfigModalOpen}>
@@ -3181,11 +3193,75 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                   <>
                     <div className="border-t border-slate-100" />
                     <div>
-                      <p className="text-xs text-slate-500 mb-1">{id === "pedido-exames" ? "Texto do Pedido" : "Texto do Laudo"}</p>
-                      <textarea rows={5} placeholder={id === "pedido-exames" ? "Digite os exames solicitados..." : "Digite o conteúdo do laudo médico..."}
+                      <p className="text-xs text-slate-500 mb-1">Texto do Laudo</p>
+                      <textarea rows={5} placeholder="Digite o conteúdo do laudo médico..."
                         value={opts.textoLivre} onChange={e => { if (e.target.value.length <= 1000) set({ textoLivre: e.target.value }); }}
                         className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
                       <p className="text-[10px] text-slate-400 mt-1 text-right">{opts.textoLivre.length}/1000</p>
+                    </div>
+                  </>
+                )}
+
+                {isPedidoExames && (
+                  <>
+                    <div className="border-t border-slate-100" />
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-slate-500 font-medium">Exames a incluir no pedido</p>
+                        {examesBox.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (docExamesSelecionados.size === examesBox.length) {
+                                setDocExamesSelecionados(new Set());
+                              } else {
+                                setDocExamesSelecionados(new Set(examesBox.map((_, i) => i)));
+                              }
+                            }}
+                            className="text-[10px] text-[#1E40AF] hover:text-[#1e3a8a] font-medium"
+                          >
+                            {docExamesSelecionados.size === examesBox.length ? "Desmarcar todos" : "Selecionar todos"}
+                          </button>
+                        )}
+                      </div>
+                      {examesBox.length === 0 ? (
+                        <div className="px-3 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-xs text-amber-700">Nenhum exame no box "Exames". Adicione exames no atendimento antes de gerar o pedido.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="border border-slate-200 rounded-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                            {examesBox.map((ex, idx) => (
+                              <label
+                                key={idx}
+                                className="flex items-start gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-slate-50 transition-colors"
+                              >
+                                <Checkbox
+                                  checked={docExamesSelecionados.has(idx)}
+                                  onCheckedChange={(checked) => {
+                                    setDocExamesSelecionados(prev => {
+                                      const next = new Set(prev);
+                                      if (checked) next.add(idx);
+                                      else next.delete(idx);
+                                      return next;
+                                    });
+                                  }}
+                                  className="mt-0.5"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-slate-700 truncate">{ex.nome}</p>
+                                  {ex.tipo && (
+                                    <p className="text-[10px] text-slate-400 truncate">{ex.tipo}</p>
+                                  )}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          {docExamesSelecionados.size === 0 && (
+                            <p className="text-[10px] text-amber-600 mt-1.5">Selecione ao menos um exame para gerar o pedido.</p>
+                          )}
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -3197,9 +3273,19 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                   Cancelar
                 </button>
                 <button
-                  disabled={(hasTextoLivre && opts.textoLivre.trim().length === 0) || (isReceita && docMedicamentosSelecionados.size === 0)}
+                  disabled={
+                    (hasTextoLivre && opts.textoLivre.trim().length === 0) ||
+                    (isReceita && docMedicamentosSelecionados.size === 0) ||
+                    (isPedidoExames && (examesBox.length === 0 || docExamesSelecionados.size === 0))
+                  }
                   onClick={() => {
                     setDocConfigModalOpen(false);
+                    const examesSelecionadosTexto = isPedidoExames
+                      ? examesBox
+                          .filter((_, i) => docExamesSelecionados.has(i))
+                          .map((ex, i) => `${i + 1}. ${ex.nome}`)
+                          .join("\n")
+                      : undefined;
                     handleGenerateDocument(docConfigModelId, {
                       _fromDocConfigModal: true,
                       ocultarCpf: !opts.cpf,
@@ -3215,7 +3301,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                       dataValidade: opts.dataValidade || undefined,
                       convenio: opts.convenio || undefined,
                       justificativa: opts.justificativa || undefined,
-                      textoLaudo: opts.textoLivre || undefined,
+                      textoLaudo: isPedidoExames ? examesSelecionadosTexto : (opts.textoLivre || undefined),
                     });
                   }}
                   className="flex items-center gap-1.5 px-5 py-2 text-xs font-semibold text-white rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
