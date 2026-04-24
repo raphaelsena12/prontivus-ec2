@@ -2671,57 +2671,6 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
 
             {/* Linha 2 — Sinais vitais + Alergias/Medicamentos (edição inline) */}
             <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-100">
-              {/* Badge de Alergias */}
-              {hasAllergies && (
-                <div
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-red-200 bg-red-50 flex-shrink-0 cursor-pointer hover:bg-red-100 transition-colors"
-                  onClick={() => setDadosSaudeDialogOpen(true)}
-                  title="Editar alergias"
-                >
-                  <AlertCircle className="w-3 h-3 flex-shrink-0 text-red-600" />
-                  <span className="text-[10px] font-bold text-red-700 uppercase tracking-wide whitespace-nowrap">Alergias:</span>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {patient.allergies.map((a, i) => (
-                      <span key={i} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap">
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Badge de Medicamentos em uso */}
-              {hasMedicamentosEmUso && (
-                <div
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 flex-shrink-0 cursor-pointer hover:bg-amber-100 transition-colors"
-                  onClick={() => setDadosSaudeDialogOpen(true)}
-                  title="Editar medicamentos em uso"
-                >
-                  <Pill className="w-3 h-3 flex-shrink-0 text-amber-600" />
-                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide whitespace-nowrap">Medicamentos:</span>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {patient.medicamentosEmUsoList.map((m, i) => (
-                      <span key={i} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
-                        {m}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Badge "Registrar" quando nenhum dado de saúde cadastrado */}
-              {!hasAllergies && !hasMedicamentosEmUso && (
-                <div
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 flex-shrink-0 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                  onClick={() => setDadosSaudeDialogOpen(true)}
-                  title="Registrar alergias e medicamentos"
-                >
-                  <AlertCircle className="w-3 h-3 flex-shrink-0 text-slate-400" />
-                  <span className="text-[10px] font-medium text-slate-500 whitespace-nowrap">Sem alergias / medicamentos</span>
-                  <span className="text-[10px] font-semibold text-blue-600 whitespace-nowrap">Registrar</span>
-                </div>
-              )}
-
               {vitals.map((v, i) => {
                 const Icon = v.icon;
                 const isDroplet = Icon === Droplet;
@@ -2784,6 +2733,57 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                   </div>
                 );
               })}
+
+              {/* Badge de Alergias — alinhado à direita */}
+              {hasAllergies && (
+                <div
+                  className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-lg border border-red-200 bg-red-50 flex-shrink-0 cursor-pointer hover:bg-red-100 transition-colors"
+                  onClick={() => setDadosSaudeDialogOpen(true)}
+                  title="Editar alergias"
+                >
+                  <AlertCircle className="w-3 h-3 flex-shrink-0 text-red-600" />
+                  <span className="text-[10px] font-bold text-red-700 uppercase tracking-wide whitespace-nowrap">Alergias:</span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {patient.allergies.map((a, i) => (
+                      <span key={i} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap">
+                        {a}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Badge de Medicamentos em uso */}
+              {hasMedicamentosEmUso && (
+                <div
+                  className={`${!hasAllergies ? "ml-auto " : ""}flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 flex-shrink-0 cursor-pointer hover:bg-amber-100 transition-colors`}
+                  onClick={() => setDadosSaudeDialogOpen(true)}
+                  title="Editar medicamentos em uso"
+                >
+                  <Pill className="w-3 h-3 flex-shrink-0 text-amber-600" />
+                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide whitespace-nowrap">Medicamentos:</span>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {patient.medicamentosEmUsoList.map((m, i) => (
+                      <span key={i} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Badge "Registrar" quando nenhum dado de saúde cadastrado */}
+              {!hasAllergies && !hasMedicamentosEmUso && (
+                <div
+                  className="ml-auto flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 flex-shrink-0 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  onClick={() => setDadosSaudeDialogOpen(true)}
+                  title="Registrar alergias e medicamentos"
+                >
+                  <AlertCircle className="w-3 h-3 flex-shrink-0 text-slate-400" />
+                  <span className="text-[10px] font-medium text-slate-500 whitespace-nowrap">Sem alergias / medicamentos</span>
+                  <span className="text-[10px] font-semibold text-blue-600 whitespace-nowrap">Registrar</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
