@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
         celular: true,
         dataNascimento: true,
         ativo: true,
+        alergias: true,
+        medicamentosEmUso: true,
       },
       orderBy: { nome: "asc" },
       take: 100, // Limitar a 100 resultados para o select

@@ -1,12 +1,14 @@
 "use client";
 
-import { formatDateToInput } from "@/lib/utils";
+import { cn, formatDateToInput } from "@/lib/utils";
 import { useCallback, useMemo, useState } from "react";
-import { Calendar, dateFnsLocalizer, type View } from "react-big-calendar";
+import { Calendar, dateFnsLocalizer, Views, type View, type ToolbarProps } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const localizer = dateFnsLocalizer({
   format,
@@ -88,6 +90,86 @@ interface AgendamentosCalendarProps {
   onEventClick?: (agendamento: Agendamento) => void;
   onBloqueioClick?: (bloqueio: BloqueioAgenda) => void;
   onSlotSelect?: (slotInfo: { start: Date; end: Date }) => void;
+  toolbarActions?: React.ReactNode;
+}
+
+const VIEW_OPTIONS: { key: View; label: string }[] = [
+  { key: Views.AGENDA, label: "Agenda" },
+  { key: Views.DAY, label: "Dia" },
+  { key: Views.WEEK, label: "Semana" },
+  { key: Views.MONTH, label: "Mês" },
+];
+
+function makeCustomToolbar(actions?: React.ReactNode) {
+  return function CustomToolbar(props: ToolbarProps) {
+    const { label, onNavigate, onView, view } = props;
+
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+        {/* Esquerda: navegação */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onNavigate("PREV")}
+            aria-label="Anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs font-medium"
+            onClick={() => onNavigate("TODAY")}
+          >
+            Hoje
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onNavigate("NEXT")}
+            aria-label="Próximo"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Centro: label */}
+        <div className="flex-1 text-center">
+          <span className="text-sm font-semibold text-foreground capitalize">
+            {label}
+          </span>
+        </div>
+
+        {/* Direita: segmented control + actions */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center rounded-lg bg-muted p-0.5">
+            {VIEW_OPTIONS.map((opt) => {
+              const active = view === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onView(opt.key)}
+                  className={cn(
+                    "h-7 rounded-md px-3 text-xs font-medium transition-all",
+                    active
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+        </div>
+      </div>
+    );
+  };
 }
 
 // Função para obter cor por status da consulta
@@ -129,10 +211,11 @@ export function AgendamentosCalendar({
   onEventClick,
   onBloqueioClick,
   onSlotSelect,
+  toolbarActions,
 }: AgendamentosCalendarProps) {
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [currentView, setCurrentView] = useState<View>("week");
+  const [currentView, setCurrentView] = useState<View>(Views.WEEK);
 
   const handleNavigate = useCallback((newDate: Date) => {
     setCurrentDate(newDate);
@@ -141,6 +224,8 @@ export function AgendamentosCalendar({
   const handleViewChange = useCallback((newView: View) => {
     setCurrentView(newView);
   }, []);
+
+  const toolbarComponent = useMemo(() => makeCustomToolbar(toolbarActions), [toolbarActions]);
 
   const escalaPorDia = useMemo(() => {
     const map = new Map<number, Array<{ inicio: number; fim: number }>>();
@@ -294,27 +379,25 @@ export function AgendamentosCalendar({
   }, [agendamentos, bloqueios]);
 
   const eventStyleGetter = (event: any) => {
-    // Se for um bloqueio, usar estilo diferente
     if (event.tipo === "bloqueio") {
       return {
         className: "evento-bloqueio",
         style: {
           backgroundColor: "#000000",
-          borderColor: "#1a1a1a",
-          borderWidth: "1px",
-          borderRadius: "3px",
+          border: "none",
+          borderLeft: "2px solid #1a1a1a",
+          borderRadius: "4px",
           color: "white",
-          padding: "4px 6px",
-          opacity: 0.8,
-          fontWeight: "500",
-          fontSize: "14px",
-          lineHeight: "1.2",
+          padding: "2px 6px",
+          opacity: 0.85,
+          fontWeight: 500,
+          fontSize: "12px",
+          lineHeight: "1.25",
           cursor: "pointer",
         },
       };
     }
 
-    // Estilo para agendamentos - encaixe tem prioridade visual (laranja)
     const agendamento = event.resource as Agendamento;
     const tipoCor = agendamento.encaixe
       ? { bg: "#f97316", border: "#ea580c" }
@@ -323,14 +406,15 @@ export function AgendamentosCalendar({
     return {
       style: {
         backgroundColor: tipoCor.bg,
-        borderColor: tipoCor.border,
-        borderWidth: "1px",
-        borderRadius: "3px",
+        border: "none",
+        borderLeft: `2px solid ${tipoCor.border}`,
+        borderRadius: "4px",
         color: "white",
-        padding: "1px 3px",
-        fontSize: "10px",
-        lineHeight: "1.2",
-        fontWeight: "500",
+        padding: "2px 6px",
+        fontSize: "13px",
+        lineHeight: "1.25",
+        fontWeight: 500,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
       },
     };
   };
@@ -375,120 +459,144 @@ export function AgendamentosCalendar({
   };
 
   return (
-    <div className="w-full">
-      {/* Legenda */}
-      <div className="mb-3 flex flex-wrap gap-3">
-        {STATUS_LEGENDA.map(({ status, label }) => {
-          const cor = getStatusColorComEncaixe(status);
-          return (
-            <div key={status} className="flex items-center gap-1.5">
-              <div
-                className="w-3 h-3 rounded border"
-                style={{ backgroundColor: cor.bg, borderColor: cor.border }}
-              />
-              <span className="text-[13px] text-foreground font-medium">{label}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Calendário com estilos customizados */}
-      <div className="h-[500px] w-full calendar-compact">
+    <div className="flex flex-col w-full">
+      <div className="flex flex-col min-h-[640px] w-full calendar-modern">
         <style dangerouslySetInnerHTML={{__html: `
-          .calendar-compact .rbc-calendar {
-            font-size: 15px !important;
+          .calendar-modern {
+            --cal-line: #f1f3f5;
+            --cal-line-strong: #e7eaee;
           }
-          .calendar-compact .rbc-toolbar {
-            font-size: 14px !important;
-            position: relative !important;
-            z-index: 10 !important;
+          .calendar-modern .rbc-calendar {
+            font-size: 13px;
+            font-family: inherit;
           }
-          .calendar-compact .rbc-toolbar button {
-            font-size: 14px !important;
-            padding: 4px 8px !important;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-            opacity: 1 !important;
-            display: inline-block !important;
-            visibility: visible !important;
-            position: relative !important;
-            z-index: 11 !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            -moz-user-select: none !important;
-            -ms-user-select: none !important;
+          .calendar-modern .rbc-header {
+            padding: 10px 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: hsl(var(--muted-foreground));
+            border-bottom: 1px solid var(--cal-line-strong);
+            background: transparent;
           }
-          .calendar-compact .rbc-toolbar button:hover {
-            opacity: 0.8 !important;
-            transform: scale(1.05) !important;
+          .calendar-modern .rbc-header + .rbc-header {
+            border-left: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-toolbar button:active {
-            transform: scale(0.95) !important;
+          .calendar-modern .rbc-month-view,
+          .calendar-modern .rbc-time-view,
+          .calendar-modern .rbc-agenda-view {
+            border: 1px solid var(--cal-line-strong);
+            border-radius: 8px;
+            overflow: hidden;
+            background: hsl(var(--background));
           }
-          .calendar-compact .rbc-toolbar button:disabled {
-            opacity: 0.5 !important;
+          .calendar-modern .rbc-month-row + .rbc-month-row {
+            border-top: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-day-bg + .rbc-day-bg {
+            border-left: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-time-content > * + * > * {
+            border-left: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-day-slot .rbc-time-slot {
+            border-top: 1px solid transparent;
+          }
+          .calendar-modern .rbc-timeslot-group {
+            border-bottom: 1px solid var(--cal-line);
+            min-height: 40px;
+          }
+          .calendar-modern .rbc-time-header.rbc-overflowing {
+            border-right: none;
+          }
+          .calendar-modern .rbc-time-header-content {
+            border-left: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-time-header-content > .rbc-row.rbc-row-resource {
+            border-bottom: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-off-range-bg {
+            background: hsl(var(--muted) / 0.35);
+          }
+          .calendar-modern .rbc-off-range {
+            color: hsl(var(--muted-foreground) / 0.6);
+          }
+          .calendar-modern .rbc-today {
+            background-color: hsl(var(--primary) / 0.05) !important;
+          }
+          .calendar-modern .rbc-date-cell {
+            padding: 6px 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: hsl(var(--foreground));
+            text-align: right;
+          }
+          .calendar-modern .rbc-date-cell.rbc-now > button {
+            color: hsl(var(--primary));
+            font-weight: 700;
+          }
+          .calendar-modern .rbc-time-gutter,
+          .calendar-modern .rbc-time-header-gutter {
+            font-size: 11px;
+            color: hsl(var(--muted-foreground));
+          }
+          .calendar-modern .rbc-time-gutter .rbc-timeslot-group {
+            border-bottom: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-time-slot {
+            border-top: 1px solid transparent;
+          }
+          .calendar-modern .rbc-timeslot-group > .rbc-time-slot + .rbc-time-slot {
+            border-top: 1px dashed var(--cal-line);
+          }
+          .calendar-modern .rbc-time-content {
+            border-top: 1px solid var(--cal-line-strong);
+          }
+          .calendar-modern .rbc-current-time-indicator {
+            background-color: hsl(var(--primary));
+            height: 2px;
+          }
+          .calendar-modern .rbc-event {
+            font-size: 12px !important;
+            line-height: 1.25 !important;
+            padding: 2px 6px !important;
+          }
+          .calendar-modern .rbc-event-label {
+            font-size: 11px;
+            opacity: 0.9;
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table {
+            font-size: 13px;
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+            padding: 10px 12px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: hsl(var(--muted-foreground));
+            font-weight: 600;
+            border-bottom: 1px solid var(--cal-line-strong);
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--cal-line);
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table tbody > tr:hover {
+            background: hsl(var(--muted) / 0.4);
+          }
+          .calendar-modern .rbc-show-more {
+            font-size: 11px;
+            font-weight: 500;
+            color: hsl(var(--primary));
+            background: transparent;
+          }
+          /* Slot bloqueado (fora de escala) */
+          .calendar-modern .rbc-time-slot.slot-bloqueado {
+            background-color: rgba(17, 24, 39, 0.05) !important;
             cursor: not-allowed !important;
           }
-          .calendar-compact .rbc-toolbar button.rbc-active {
-            background-color: hsl(var(--primary)) !important;
-            color: hsl(var(--primary-foreground)) !important;
-            font-weight: 600 !important;
-          }
-          .calendar-compact .rbc-toolbar-label {
-            font-size: 14px !important;
-            font-weight: 600 !important;
-          }
-          .calendar-compact .rbc-header {
-            font-size: 14px !important;
-            padding: 4px 2px !important;
-            font-weight: 600 !important;
-          }
-          .calendar-compact .rbc-time-header-content {
-            font-size: 14px !important;
-          }
-          .calendar-compact .rbc-time-slot {
-            font-size: 14px !important;
-          }
-          .calendar-compact .rbc-event {
-            font-size: 14px !important;
-            padding: 1px 3px !important;
-            min-height: 16px !important;
-            line-height: 1.2 !important;
-            font-weight: 500 !important;
-          }
-          .calendar-compact .rbc-event-content {
-            font-size: 14px !important;
-            line-height: 1.2 !important;
-          }
-          .calendar-compact .rbc-event-label {
-            font-size: 13px !important;
-          }
-          .calendar-compact .rbc-day-slot .rbc-time-slot {
-            border-top: 1px solid #e5e7eb !important;
-          }
-          .calendar-compact .rbc-time-content {
-            border-top: 1px solid #d1d5db !important;
-          }
-          .calendar-compact .rbc-time-header-gutter {
-            font-size: 14px !important;
-            padding: 2px !important;
-          }
-          .calendar-compact .rbc-time-gutter {
-            font-size: 14px !important;
-          }
-          .calendar-compact .rbc-day-slot {
-            min-height: 50px !important;
-          }
-          .calendar-compact .rbc-time-view {
-            border: 1px solid #e5e7eb !important;
-          }
-          .calendar-compact .rbc-today {
-            background-color: rgba(0, 0, 0, 0.02) !important;
-          }
-          .calendar-compact .rbc-time-slot.slot-bloqueado {
-            background-color: rgba(17, 24, 39, 0.08) !important;
-            cursor: not-allowed !important;
-          }
+          /* Evento de bloqueio (hachurado) */
           .evento-bloqueio .rbc-event-label {
             display: none !important;
           }
@@ -514,7 +622,7 @@ export function AgendamentosCalendar({
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: "100%" }}
+          style={{ height: "640px" }}
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleEventClick}
           onSelecting={(slotInfo) => isSlotDisponivel(slotInfo.start)}
@@ -532,7 +640,8 @@ export function AgendamentosCalendar({
           onNavigate={handleNavigate}
           view={currentView}
           onView={handleViewChange}
-          views={["month", "week", "day", "agenda"]}
+          views={["agenda", "day", "week", "month"]}
+          components={{ toolbar: toolbarComponent }}
           messages={messages}
           culture="pt-BR"
           step={10}
@@ -540,6 +649,29 @@ export function AgendamentosCalendar({
           min={new Date(2000, 0, 1, 6, 0)}
           max={new Date(2000, 0, 1, 23, 0)}
         />
+
+        {/* Legenda discreta */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {STATUS_LEGENDA.map(({ status, label }) => {
+            const cor = getStatusColorComEncaixe(status);
+            return (
+              <div key={status} className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: cor.bg }}
+                />
+                <span className="text-[11px] text-muted-foreground">{label}</span>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: "#000000" }}
+            />
+            <span className="text-[11px] text-muted-foreground">Bloqueio</span>
+          </div>
+        </div>
       </div>
     </div>
   );

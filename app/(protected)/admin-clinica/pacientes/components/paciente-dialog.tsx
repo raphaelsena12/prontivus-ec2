@@ -58,6 +58,8 @@ interface Paciente {
   profissao: string | null;
   estadoCivil: string | null;
   observacoes: string | null;
+  alergias: string | null;
+  medicamentosEmUso: string | null;
   ativo: boolean;
 }
 
@@ -87,6 +89,8 @@ const pacienteSchema = z.object({
   profissao: z.string().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).optional(),
   observacoes: z.string().optional(),
+  alergias: z.string().optional(),
+  medicamentosEmUso: z.string().optional(),
   ativo: z.boolean().optional(),
 });
 
@@ -124,6 +128,8 @@ export function PacienteDialog({
       profissao: "",
       estadoCivil: undefined,
       observacoes: "",
+      alergias: "",
+      medicamentosEmUso: "",
       ativo: true,
     },
   });
@@ -151,6 +157,8 @@ export function PacienteDialog({
         profissao: paciente.profissao || "",
         estadoCivil: paciente.estadoCivil as "SOLTEIRO" | "CASADO" | "DIVORCIADO" | "VIUVO" | undefined,
         observacoes: paciente.observacoes || "",
+        alergias: paciente.alergias || "",
+        medicamentosEmUso: paciente.medicamentosEmUso || "",
         ativo: paciente.ativo ?? true,
       });
     } else {
@@ -173,6 +181,8 @@ export function PacienteDialog({
         profissao: "",
         estadoCivil: undefined,
         observacoes: "",
+        alergias: "",
+        medicamentosEmUso: "",
         ativo: true,
       });
       setConsentimentoLGPD(false);
@@ -206,6 +216,8 @@ export function PacienteDialog({
       if (data.profissao && data.profissao.trim()) payload.profissao = data.profissao;
       if (data.estadoCivil) payload.estadoCivil = data.estadoCivil;
       if (data.observacoes && data.observacoes.trim()) payload.observacoes = data.observacoes;
+      payload.alergias = data.alergias?.trim() ? data.alergias.trim() : null;
+      payload.medicamentosEmUso = data.medicamentosEmUso?.trim() ? data.medicamentosEmUso.trim() : null;
 
       if (isEditing) {
         payload.ativo = data.ativo;
@@ -658,6 +670,53 @@ export function PacienteDialog({
                             {...field}
                             placeholder="UF"
                             maxLength={2}
+                            disabled={loading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-4 text-lg font-semibold">
+                  Dados de Saúde
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="alergias"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-red-700">Alergias</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            rows={2}
+                            maxLength={500}
+                            placeholder="Ex.: Dipirona, penicilina, frutos do mar..."
+                            disabled={loading}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="medicamentosEmUso"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-amber-700">Medicamentos em uso</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            {...field}
+                            rows={2}
+                            maxLength={1000}
+                            placeholder="Ex.: Losartana 50mg 1x/dia; Metformina 850mg 2x/dia..."
                             disabled={loading}
                           />
                         </FormControl>

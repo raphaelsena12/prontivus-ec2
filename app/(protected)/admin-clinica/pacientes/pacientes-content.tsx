@@ -50,6 +50,8 @@ interface Paciente {
   profissao: string | null;
   estadoCivil: string | null;
   observacoes: string | null;
+  alergias: string | null;
+  medicamentosEmUso: string | null;
   ativo: boolean;
   createdAt?: Date;
 }

@@ -20,12 +20,19 @@ export async function POST(request: NextRequest) {
 
     const formData = (await request.formData()) as any;
     const consultaId = formData.get("consultaId") as string;
-    const nomeExame = formData.get("nomeExame") as string;
+    const categoria = formData.get("categoria") as string;
     const file = formData.get("file") as File | null;
 
-    if (!consultaId || !nomeExame || !file) {
+    const CATEGORIAS_VALIDAS = ["Laboratorial", "Imagem", "Outros"] as const;
+    if (!consultaId || !categoria || !file) {
       return NextResponse.json(
-        { error: "Consulta ID, nome do exame e arquivo são obrigatórios" },
+        { error: "Consulta ID, categoria e arquivo são obrigatórios" },
+        { status: 400 }
+      );
+    }
+    if (!CATEGORIAS_VALIDAS.includes(categoria as typeof CATEGORIAS_VALIDAS[number])) {
+      return NextResponse.json(
+        { error: "Categoria inválida. Use Laboratorial, Imagem ou Outros" },
         { status: 400 }
       );
     }
@@ -95,6 +102,36 @@ export async function POST(request: NextRequest) {
     const isImage = allowedImageTypes.includes(fileType);
     const tipoDocumento = isImage ? "exame-imagem" : "exame-pdf";
     const contentType = fileType;
+
+    // Calcular próxima numeração sequencial da categoria para este paciente
+    const consultasDoPaciente = await prisma.consulta.findMany({
+      where: { pacienteId: consulta.pacienteId, clinicaId },
+      select: { id: true },
+    });
+    const consultasIdsDoPaciente = consultasDoPaciente.map((c) => c.id);
+
+    const examesExistentes = consultasIdsDoPaciente.length > 0
+      ? await prisma.documentoGerado.findMany({
+          where: {
+            clinicaId,
+            consultaId: { in: consultasIdsDoPaciente },
+            tipoDocumento: { in: ["exame-imagem", "exame-pdf"] },
+            nomeDocumento: { startsWith: `${categoria} ` },
+          },
+          select: { nomeDocumento: true },
+        })
+      : [];
+
+    const regexNumeracao = new RegExp(`^${categoria} (\\d{3,})$`);
+    let maiorNumero = 0;
+    for (const { nomeDocumento } of examesExistentes) {
+      const match = nomeDocumento?.match(regexNumeracao);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (n > maiorNumero) maiorNumero = n;
+      }
+    }
+    const nomeExame = `${categoria} ${String(maiorNumero + 1).padStart(3, "0")}`;
 
     console.log(`[Exames Upload] Tipo determinado:`, {
       isImage,

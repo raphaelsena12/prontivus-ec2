@@ -203,9 +203,19 @@ function parseAntecedentesHabitosSocialMerged(anamnese: string): string {
   return [ap, habitosBlock].filter(Boolean).join("\n\n");
 }
 
-function sectionValueFromAnamnese(base: string, sectionKey: string, sectionLabel: string): string {
+function sectionValueFromAnamnese(
+  base: string,
+  sectionKey: string,
+  sectionLabel: string,
+  opts?: { skipExamesFisicos?: boolean }
+): string {
   if (sectionKey === "antecedentesHabitosSocial") {
     return parseAntecedentesHabitosSocialMerged(base);
+  }
+  // Exame físico é preenchido exclusivamente pelo médico — a IA nunca deve popular este campo.
+  // Quando a origem do texto é a IA (analysisResults), ignorar qualquer conteúdo gerado.
+  if (sectionKey === "examesFisicos" && opts?.skipExamesFisicos) {
+    return "";
   }
   return parseAnamneseSection(base, sectionLabel);
 }
@@ -589,23 +599,34 @@ export function Step2Anamnesis({
 
   const [sectionEdits, setSectionEdits] = useState<Record<number, string>>({});
   const [sectionValues, setSectionValues] = useState<Record<string, string>>(() => {
-    const base = analysisResults?.anamnese || prontuario?.anamnese || "";
+    // Na inicialização, prontuario.anamnese (salvo pelo médico) tem precedência — preserva o que ele digitou em Exame Físico.
+    // Se só houver analysisResults (IA), NÃO popular o Exame Físico.
+    const fromProntuario = prontuario?.anamnese || "";
+    const base = fromProntuario || analysisResults?.anamnese || "";
     if (!base) return {};
+    const isFromAI = !fromProntuario && !!analysisResults?.anamnese;
     return Object.fromEntries(
       ANAMNESE_SECTIONS.map((s: { key: string; label: string; placeholder: string }) => [
         s.key,
-        sectionValueFromAnamnese(base, s.key, s.label),
+        sectionValueFromAnamnese(base, s.key, s.label, { skipExamesFisicos: isFromAI }),
       ])
     );
   });
 
   // Quando a IA gera (ou atualiza) a anamnese, repopula os campos do modo manual
+  // — mas NUNCA preenche "Exame Físico", que é digitado apenas pelo médico.
   useEffect(() => {
     const base = analysisResults?.anamnese || "";
     if (!base) return;
-    setSectionValues(
+    setSectionValues((prev) =>
       Object.fromEntries(
-        ANAMNESE_SECTIONS.map((s) => [s.key, sectionValueFromAnamnese(base, s.key, s.label)])
+        ANAMNESE_SECTIONS.map((s) => {
+          if (s.key === "examesFisicos") {
+            // Preserva o que o médico já digitou manualmente.
+            return [s.key, prev[s.key] || ""];
+          }
+          return [s.key, sectionValueFromAnamnese(base, s.key, s.label, { skipExamesFisicos: true })];
+        })
       )
     );
     setSectionEdits({});

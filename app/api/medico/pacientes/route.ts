@@ -94,6 +94,8 @@ export async function GET(request: NextRequest) {
         celular: true,
         dataNascimento: true,
         ativo: true,
+        alergias: true,
+        medicamentosEmUso: true,
       },
       orderBy: {
         nome: "asc",

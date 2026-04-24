@@ -78,6 +78,43 @@ export function ChatFlutuante({ userId, clinicaId, userTipo, showFloatingButton 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const statusMenuRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  // Tocar aviso sonoro de nova mensagem (dois beeps curtos)
+  const tocarSomNotificacao = useCallback(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioCtx();
+      }
+      const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+
+      const tocarBeep = (freq: number, inicio: number, duracao: number) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(freq, ctx.currentTime + inicio);
+        gain.gain.setValueAtTime(0, ctx.currentTime + inicio);
+        gain.gain.linearRampToValueAtTime(0.25, ctx.currentTime + inicio + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + inicio + duracao);
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        oscillator.start(ctx.currentTime + inicio);
+        oscillator.stop(ctx.currentTime + inicio + duracao);
+      };
+
+      tocarBeep(880, 0, 0.15);
+      tocarBeep(1175, 0.18, 0.18);
+    } catch (error) {
+      console.error("Erro ao tocar notificação sonora:", error);
+    }
+  }, []);
 
   // Garantir que o componente só renderize no cliente
   useEffect(() => {
@@ -260,6 +297,8 @@ export function ChatFlutuante({ userId, clinicaId, userTipo, showFloatingButton 
               : u
           )
         );
+        // Tocar aviso sonoro
+        tocarSomNotificacao();
       }
     });
 
@@ -298,7 +337,7 @@ export function ChatFlutuante({ userId, clinicaId, userTipo, showFloatingButton 
     return () => {
       newSocket.disconnect();
     };
-  }, [userId, clinicaId, userTipo, session, isOpen, usuarioSelecionado, recarregarContador, meuStatus]);
+  }, [userId, clinicaId, userTipo, session, isOpen, usuarioSelecionado, recarregarContador, meuStatus, tocarSomNotificacao]);
 
   // Carregar usuários disponíveis
   useEffect(() => {

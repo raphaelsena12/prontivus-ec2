@@ -188,6 +188,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
 
   const confirmados = agendaData?.agendamentosHoje.filter((a) => a.status === "CONFIRMADA") ?? [];
   const realizados = agendaData?.agendamentosHoje.filter((a) => a.status === "REALIZADA") ?? [];
+  const emAberto = agendaData?.agendamentosHoje.filter((a) => a.status !== "REALIZADA") ?? [];
   const total = agendaData?.agendamentosHoje.length ?? 0;
   const progressPct = total > 0 ? Math.round((realizados.length / total) * 100) : 0;
 
@@ -497,21 +498,18 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                   </div>
                 )}
 
-                {/* Patient list */}
-                {agendaData && total > 0 ? (
+                {/* Patient list — somente em aberto (ocultar REALIZADA) */}
+                {emAberto.length > 0 ? (
                   <div className="flex flex-col gap-1.5 max-h-[180px] overflow-y-auto pr-0.5">
-                    {agendaData.agendamentosHoje.map((ag, idx) => {
+                    {emAberto.map((ag, idx) => {
                       const av = getAvatarStyle(ag.paciente.nome);
                       const isActive = ag.status === "EM_ATENDIMENTO";
-                      const isDone = ag.status === "REALIZADA";
                       return (
                         <div
                           key={ag.id}
                           className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition-all duration-200 animate-slide-up ${
                             isActive
                               ? "border-blue-200 bg-blue-50/50 shadow-sm shadow-blue-100"
-                              : isDone
-                              ? "border-transparent bg-slate-50/50 opacity-55"
                               : "border-transparent bg-white/70 hover:bg-slate-50 hover:border-slate-100"
                           }`}
                           style={{ animationDelay: `${idx * 40}ms` }}
@@ -527,7 +525,7 @@ export function MedicoContent({ nome }: MedicoContentProps) {
 
                           {/* Patient info */}
                           <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-semibold truncate ${isDone ? "text-slate-400 line-through decoration-slate-300" : "text-slate-700"}`}>
+                            <p className="text-xs font-semibold truncate text-slate-700">
                               {ag.paciente.nome}
                             </p>
                             <p className="text-[10px] text-slate-400 truncate">
@@ -548,6 +546,16 @@ export function MedicoContent({ nome }: MedicoContentProps) {
                         </div>
                       );
                     })}
+                  </div>
+                ) : total > 0 ? (
+                  <div className="h-[200px] flex flex-col items-center justify-center gap-3">
+                    <div className="h-14 w-14 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                      <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold text-slate-500">Todos os atendimentos concluídos</p>
+                      <p className="text-[11px] text-slate-300 mt-0.5">{realizados.length} paciente{realizados.length > 1 ? "s" : ""} realizado{realizados.length > 1 ? "s" : ""} hoje</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="h-[200px] flex flex-col items-center justify-center gap-3">

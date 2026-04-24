@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
-import { Calendar, dateFnsLocalizer } from "react-big-calendar";
+import { useMemo, useState, useCallback } from "react";
+import { Calendar, dateFnsLocalizer, Views, View, ToolbarProps } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const localizer = dateFnsLocalizer({
   format,
@@ -51,6 +54,7 @@ interface Agendamento {
 interface AgendamentosCalendarProps {
   agendamentos: Agendamento[];
   onEventClick?: (agendamento: Agendamento) => void;
+  toolbarActions?: React.ReactNode;
 }
 
 // Função para obter cor por status da consulta
@@ -83,11 +87,103 @@ const STATUS_LEGENDA = [
   { status: "CANCELADA", label: "Cancelada" },
 ];
 
+const VIEW_OPTIONS: { key: View; label: string }[] = [
+  { key: Views.AGENDA, label: "Agenda" },
+  { key: Views.DAY, label: "Dia" },
+  { key: Views.WEEK, label: "Semana" },
+  { key: Views.MONTH, label: "Mês" },
+];
+
+function makeCustomToolbar(actions?: React.ReactNode) {
+  return function CustomToolbar(props: ToolbarProps) {
+    const { label, onNavigate, onView, view } = props;
+
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+        {/* Esquerda: navegação */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onNavigate("PREV")}
+            aria-label="Anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-3 text-xs font-medium"
+            onClick={() => onNavigate("TODAY")}
+          >
+            Hoje
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onNavigate("NEXT")}
+            aria-label="Próximo"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Centro: label */}
+        <div className="flex-1 text-center">
+          <span className="text-sm font-semibold text-foreground capitalize">
+            {label}
+          </span>
+        </div>
+
+        {/* Direita: segmented control + actions */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center rounded-lg bg-muted p-0.5">
+            {VIEW_OPTIONS.map((opt) => {
+              const active = view === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onView(opt.key)}
+                  className={cn(
+                    "h-7 rounded-md px-3 text-xs font-medium transition-all",
+                    active
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+          {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+        </div>
+      </div>
+    );
+  };
+}
+
 export function AgendamentosCalendar({
   agendamentos,
   onEventClick,
+  toolbarActions,
 }: AgendamentosCalendarProps) {
   const router = useRouter();
+  const [view, setView] = useState<View>(Views.AGENDA);
+  const [date, setDate] = useState<Date>(new Date());
+
+  const handleView = useCallback((newView: View) => {
+    setView(newView);
+  }, []);
+
+  const handleNavigate = useCallback((newDate: Date) => {
+    setDate(newDate);
+  }, []);
+
+  const toolbarComponent = useMemo(() => makeCustomToolbar(toolbarActions), [toolbarActions]);
 
   const events = useMemo(() => {
     const agora = new Date();
@@ -98,16 +194,13 @@ export function AgendamentosCalendar({
         ? new Date(agendamento.dataHoraFim)
         : (() => { const e = new Date(dataHora); e.setMinutes(e.getMinutes() + 30); return e; })();
 
-      // Verificar se está atrasado
-      // Um agendamento está atrasado se a data/hora já passou e não foi concluído/realizado
       const statusConcluido = agendamento.status === "CONCLUIDO" || agendamento.status === "REALIZADA";
       const estaAtrasado = dataHora < agora && !statusConcluido;
-      const emoji = estaAtrasado ? "😢" : "😊";
 
       const tipoNome = agendamento.tipoConsulta?.nome;
       const procedimento = agendamento.procedimento?.nome;
-      const detalhes = [tipoNome, procedimento].filter(Boolean).join(" | ");
-      const title = `${emoji} ${agendamento.paciente.nome}${detalhes ? ` - ${detalhes}` : ""}`;
+      const detalhes = [tipoNome, procedimento].filter(Boolean).join(" • ");
+      const title = `${agendamento.paciente.nome}${detalhes ? ` — ${detalhes}` : ""}`;
 
       return {
         id: agendamento.id,
@@ -117,26 +210,28 @@ export function AgendamentosCalendar({
         resource: agendamento,
         tipo: "agendamento" as const,
         tipoConsulta: agendamento.tipoConsulta?.nome || null,
+        estaAtrasado,
       };
     });
   }, [agendamentos]);
 
   const eventStyleGetter = (event: any) => {
-    // Estilo para agendamentos - cor baseada no status
     const agendamento = event.resource as Agendamento;
     const tipoCor = getStatusColor(agendamento.status);
+    const atrasado = !!event.estaAtrasado;
 
     return {
       style: {
         backgroundColor: tipoCor.bg,
-        borderColor: tipoCor.border,
-        borderWidth: "1px",
-        borderRadius: "3px",
+        border: "none",
+        borderLeft: atrasado ? "3px solid rgba(0,0,0,0.45)" : `2px solid ${tipoCor.border}`,
+        borderRadius: "4px",
         color: "white",
-        padding: "1px 3px",
-          fontSize: "14px",
-        lineHeight: "1.2",
-        fontWeight: "500",
+        padding: "2px 6px",
+        fontSize: "13px",
+        lineHeight: "1.25",
+        fontWeight: 500,
+        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
       },
     };
   };
@@ -169,115 +264,140 @@ export function AgendamentosCalendar({
   };
 
   return (
-    <div className="w-full">
-      {/* Legenda */}
-      <div className="mb-3 flex flex-wrap gap-3">
-        {STATUS_LEGENDA.map(({ status, label }) => {
-          const cor = getStatusColor(status);
-          return (
-            <div key={status} className="flex items-center gap-1.5">
-              <div
-                className="w-3 h-3 rounded border"
-                style={{ backgroundColor: cor.bg, borderColor: cor.border }}
-              />
-              <span className="text-[13px] text-foreground font-medium">{label}</span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Calendário com estilos customizados */}
-      <div className="h-[500px] w-full calendar-compact">
+    <div className="flex flex-col w-full">
+      {/* Calendário */}
+      <div className="flex flex-col min-h-[640px] w-full calendar-modern">
         <style dangerouslySetInnerHTML={{__html: `
-          .calendar-compact .rbc-calendar {
-            font-size: 15px !important;
+          .calendar-modern {
+            --cal-line: #f1f3f5;
+            --cal-line-strong: #e7eaee;
           }
-          .calendar-compact .rbc-toolbar {
-            font-size: 14px !important;
-            position: relative !important;
-            z-index: 10 !important;
+          .calendar-modern .rbc-calendar {
+            font-size: 13px;
+            font-family: inherit;
           }
-          .calendar-compact .rbc-toolbar button {
-            font-size: 14px !important;
-            padding: 4px 8px !important;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-            opacity: 1 !important;
-            display: inline-block !important;
-            visibility: visible !important;
-            position: relative !important;
-            z-index: 11 !important;
-            user-select: none !important;
-            -webkit-user-select: none !important;
-            -moz-user-select: none !important;
-            -ms-user-select: none !important;
+          .calendar-modern .rbc-header {
+            padding: 10px 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: hsl(var(--muted-foreground));
+            border-bottom: 1px solid var(--cal-line-strong);
+            background: transparent;
           }
-          .calendar-compact .rbc-toolbar button:hover {
-            opacity: 0.8 !important;
-            transform: scale(1.05) !important;
+          .calendar-modern .rbc-header + .rbc-header {
+            border-left: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-toolbar button:active {
-            transform: scale(0.95) !important;
+          .calendar-modern .rbc-month-view,
+          .calendar-modern .rbc-time-view,
+          .calendar-modern .rbc-agenda-view {
+            border: 1px solid var(--cal-line-strong);
+            border-radius: 8px;
+            overflow: hidden;
+            background: hsl(var(--background));
           }
-          .calendar-compact .rbc-toolbar button:disabled {
-            opacity: 0.5 !important;
-            cursor: not-allowed !important;
+          /* Mês: divisórias de linhas e colunas */
+          .calendar-modern .rbc-month-row + .rbc-month-row {
+            border-top: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-toolbar button.rbc-active {
-            background-color: hsl(var(--primary)) !important;
-            color: hsl(var(--primary-foreground)) !important;
-            font-weight: 600 !important;
+          .calendar-modern .rbc-day-bg + .rbc-day-bg {
+            border-left: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-toolbar-label {
-            font-size: 14px !important;
-            font-weight: 600 !important;
+          /* Semana/Dia: divisórias verticais entre colunas de dias */
+          .calendar-modern .rbc-time-content > * + * > * {
+            border-left: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-header {
-            font-size: 14px !important;
-            padding: 4px 2px !important;
-            font-weight: 600 !important;
+          .calendar-modern .rbc-day-slot .rbc-time-slot {
+            border-top: 1px solid transparent;
           }
-          .calendar-compact .rbc-time-header-content {
-            font-size: 14px !important;
+          .calendar-modern .rbc-timeslot-group {
+            border-bottom: 1px solid var(--cal-line);
+            min-height: 40px;
           }
-          .calendar-compact .rbc-time-slot {
-            font-size: 14px !important;
+          .calendar-modern .rbc-time-header.rbc-overflowing {
+            border-right: none;
           }
-          .calendar-compact .rbc-event {
-            font-size: 14px !important;
-            padding: 1px 3px !important;
-            min-height: 16px !important;
-            line-height: 1.2 !important;
-            font-weight: 500 !important;
+          .calendar-modern .rbc-time-header-content {
+            border-left: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-event-content {
-            font-size: 14px !important;
-            line-height: 1.2 !important;
+          .calendar-modern .rbc-time-header-content > .rbc-row.rbc-row-resource {
+            border-bottom: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-event-label {
-            font-size: 13px !important;
+          .calendar-modern .rbc-off-range-bg {
+            background: hsl(var(--muted) / 0.35);
           }
-          .calendar-compact .rbc-day-slot .rbc-time-slot {
-            border-top: 1px solid #e5e7eb !important;
+          .calendar-modern .rbc-off-range {
+            color: hsl(var(--muted-foreground) / 0.6);
           }
-          .calendar-compact .rbc-time-content {
-            border-top: 1px solid #d1d5db !important;
+          .calendar-modern .rbc-today {
+            background-color: hsl(var(--primary) / 0.05) !important;
           }
-          .calendar-compact .rbc-time-header-gutter {
-            font-size: 14px !important;
-            padding: 2px !important;
+          .calendar-modern .rbc-date-cell {
+            padding: 6px 8px;
+            font-size: 12px;
+            font-weight: 500;
+            color: hsl(var(--foreground));
+            text-align: right;
           }
-          .calendar-compact .rbc-time-gutter {
-            font-size: 14px !important;
+          .calendar-modern .rbc-date-cell.rbc-now > button {
+            color: hsl(var(--primary));
+            font-weight: 700;
           }
-          .calendar-compact .rbc-day-slot {
-            min-height: 50px !important;
+          .calendar-modern .rbc-time-gutter,
+          .calendar-modern .rbc-time-header-gutter {
+            font-size: 11px;
+            color: hsl(var(--muted-foreground));
           }
-          .calendar-compact .rbc-time-view {
-            border: 1px solid #e5e7eb !important;
+          .calendar-modern .rbc-time-gutter .rbc-timeslot-group {
+            border-bottom: 1px solid var(--cal-line);
           }
-          .calendar-compact .rbc-today {
-            background-color: rgba(0, 0, 0, 0.02) !important;
+          .calendar-modern .rbc-time-slot {
+            border-top: 1px solid transparent;
+          }
+          .calendar-modern .rbc-timeslot-group > .rbc-time-slot + .rbc-time-slot {
+            border-top: 1px dashed var(--cal-line);
+          }
+          .calendar-modern .rbc-time-content {
+            border-top: 1px solid var(--cal-line-strong);
+          }
+          .calendar-modern .rbc-current-time-indicator {
+            background-color: hsl(var(--primary));
+            height: 2px;
+          }
+          .calendar-modern .rbc-event {
+            font-size: 12px !important;
+            line-height: 1.25 !important;
+            padding: 2px 6px !important;
+          }
+          .calendar-modern .rbc-event-label {
+            font-size: 11px;
+            opacity: 0.9;
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table {
+            font-size: 13px;
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+            padding: 10px 12px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: hsl(var(--muted-foreground));
+            font-weight: 600;
+            border-bottom: 1px solid hsl(var(--border));
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+            padding: 10px 12px;
+            border-bottom: 1px solid hsl(var(--border) / 0.6);
+          }
+          .calendar-modern .rbc-agenda-view table.rbc-agenda-table tbody > tr:hover {
+            background: hsl(var(--muted) / 0.4);
+          }
+          .calendar-modern .rbc-show-more {
+            font-size: 11px;
+            font-weight: 500;
+            color: hsl(var(--primary));
+            background: transparent;
           }
         `}} />
         <Calendar
@@ -285,12 +405,16 @@ export function AgendamentosCalendar({
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: "100%" }}
+          style={{ height: "640px" }}
           onSelectEvent={handleEventClick}
           selectable={false}
           eventPropGetter={eventStyleGetter}
-          defaultView="day"
-          views={["month", "week", "day", "agenda"]}
+          view={view}
+          onView={handleView}
+          date={date}
+          onNavigate={handleNavigate}
+          views={["agenda", "day", "week", "month"]}
+          components={{ toolbar: toolbarComponent }}
           messages={messages}
           culture="pt-BR"
           step={10}
@@ -298,6 +422,29 @@ export function AgendamentosCalendar({
           min={new Date(2000, 0, 1, 6, 0)}
           max={new Date(2000, 0, 1, 23, 0)}
         />
+
+        {/* Legenda discreta */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          {STATUS_LEGENDA.map(({ status, label }) => {
+            const cor = getStatusColor(status);
+            return (
+              <div key={status} className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: cor.bg }}
+                />
+                <span className="text-[11px] text-muted-foreground">{label}</span>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-[3px] rounded-sm"
+              style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+            />
+            <span className="text-[11px] text-muted-foreground">Atrasada</span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -26,6 +26,8 @@ const updatePacienteSchema = z.object({
   profissao: z.string().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).optional(),
   observacoes: z.string().optional(),
+  alergias: z.string().nullable().optional(),
+  medicamentosEmUso: z.string().nullable().optional(),
   ativo: z.boolean().optional(),
 });
 

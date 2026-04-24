@@ -71,6 +71,7 @@ import { ProcessingModal } from '@/components/processing-modal';
 import { MedicalAnalysisResults } from '@/components/medical-analysis-results';
 import { MicrophoneSelectorModal } from '@/components/microphone-selector-modal';
 import { DocumentosConsultaDialog } from '@/components/documentos-consulta-dialog';
+import { DadosSaudeDialog } from '@/components/atendimento/patient/DadosSaudeDialog';
 import { GuiaTissExamesModal, type ExameSolicitado, type PrioridadeTISS, type GuiaSADTDadosAdicionais } from '@/components/guia-tiss-exames-modal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -79,6 +80,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search, CalendarDays } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 // ─── Novos componentes do redesign ───────────────────────────────────────────
 import { PatientHistory } from '@/components/atendimento/patient/PatientHistory';
@@ -113,6 +115,8 @@ interface Consulta {
     email: string | null;
     dataNascimento: string;
     observacoes?: string | null;
+    alergias?: string | null;
+    medicamentosEmUso?: string | null;
     numeroProntuario: number | null;
     usuarioId: string | null;
     usuario: {
@@ -314,6 +318,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   } | null>(null);
   // DocumentoGeradoLocal type and documentosGerados → clinical reducer
   const [documentosDialogOpen, setDocumentosDialogOpen] = useState(false);
+  const [dadosSaudeDialogOpen, setDadosSaudeDialogOpen] = useState(false);
   const [tissModalOpen, setTissModalOpen] = useState(false);
   const [tissGerandoGuia, setTissGerandoGuia] = useState(false);
   const [examesPrioridade, setExamesPrioridade] = useState<PrioridadeTISS>("eletiva");
@@ -336,8 +341,8 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [loadingExames, setLoadingExames] = useState(false);
   const [uploadingExame, setUploadingExame] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [nomeExameInput, setNomeExameInput] = useState("");
-  const [arquivoExame, setArquivoExame] = useState<File | null>(null);
+  const [categoriaExame, setCategoriaExame] = useState<"Laboratorial" | "Imagem" | "Outros" | "">("");
+  const [arquivosExame, setArquivosExame] = useState<File[]>([]);
   // cidsManuais, protocolosManuais, examesManuais → clinical reducer
   const [cidDialogOpen, setCidDialogOpen] = useState(false);
   const [cidSearchDialogOpen, setCidSearchDialogOpen] = useState(false);
@@ -356,7 +361,6 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [examesParaIA, setExamesParaIA] = useState<Set<string>>(new Set());
   const [transcricaoFinalizada, setTranscricaoFinalizada] = useState(false);
   const [anamneseModoManual, setAnamneseModoManual] = useState(false);
-  const [examesDrawerOpen, setExamesDrawerOpen] = useState(false);
   const [resumoClinicoDialogOpen, setResumoClinicoDialogOpen] = useState(false);
   const [gerandoResumoClinico, setGerandoResumoClinico] = useState(false);
   const [resumoClinico, setResumoClinico] = useState<string | null>(null);
@@ -767,49 +771,74 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   };
 
   const handleUploadExame = async () => {
-    if (!nomeExameInput.trim() || !arquivoExame) {
-      toast.error("Preencha o nome do exame e selecione um arquivo");
+    if (!categoriaExame || arquivosExame.length === 0) {
+      toast.error("Selecione a categoria e ao menos um arquivo");
       return;
     }
 
     try {
       setUploadingExame(true);
-      const formData = new FormData();
-      formData.append("consultaId", consultaId);
-      formData.append("nomeExame", nomeExameInput.trim());
-      formData.append("file", arquivoExame);
 
-      const response = await fetch("/api/medico/exames/upload", {
-        method: "POST",
-        body: formData,
-      });
+      let sucessos = 0;
+      const falhas: string[] = [];
 
-      const contentType = response.headers.get("content-type") || "";
+      // Upload sequencial para garantir numeração correta (o servidor consulta
+      // o banco a cada request para calcular o próximo número).
+      for (const arquivo of arquivosExame) {
+        const formData = new FormData();
+        formData.append("consultaId", consultaId);
+        formData.append("categoria", categoriaExame);
+        formData.append("file", arquivo);
 
-      if (!response.ok) {
-        if (contentType.includes("application/json")) {
-          const error = await response.json();
-          throw new Error(error.error || "Erro ao fazer upload");
+        try {
+          const response = await fetch("/api/medico/exames/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          const contentType = response.headers.get("content-type") || "";
+
+          if (!response.ok) {
+            let msg = `Erro ${response.status}`;
+            if (contentType.includes("application/json")) {
+              const err = await response.json();
+              msg = err.error || msg;
+            }
+            falhas.push(`${arquivo.name}: ${msg}`);
+            continue;
+          }
+
+          if (!contentType.includes("application/json")) {
+            falhas.push(`${arquivo.name}: sessão expirada`);
+            continue;
+          }
+
+          await response.json();
+          sucessos++;
+        } catch (err: any) {
+          falhas.push(`${arquivo.name}: ${err.message || "erro de rede"}`);
         }
-        throw new Error("Erro ao fazer upload. Verifique sua conexão ou faça login novamente.");
       }
 
-      if (!contentType.includes("application/json")) {
-        throw new Error("Sessão expirada. Faça login novamente para continuar.");
+      if (sucessos > 0) {
+        toast.success(
+          sucessos === 1
+            ? "Exame anexado com sucesso!"
+            : `${sucessos} exames anexados com sucesso!`
+        );
+      }
+      if (falhas.length > 0) {
+        toast.error(`Falha em ${falhas.length} arquivo(s): ${falhas.slice(0, 3).join("; ")}`);
       }
 
-      const result = await response.json();
-      console.log("[Frontend] Upload bem-sucedido:", result);
-
-      toast.success("Exame anexado com sucesso!");
-      setUploadDialogOpen(false);
-      setNomeExameInput("");
-      setArquivoExame(null);
-      
-      // Aguardar um pouco para garantir que o banco foi atualizado
-      setTimeout(async () => {
-        await fetchExamesAnexados();
-      }, 500);
+      if (sucessos > 0) {
+        setUploadDialogOpen(false);
+        setCategoriaExame("");
+        setArquivosExame([]);
+        setTimeout(async () => {
+          await fetchExamesAnexados();
+        }, 500);
+      }
     } catch (error: any) {
       console.error("Erro ao fazer upload:", error);
       toast.error(error.message || "Erro ao fazer upload do exame");
@@ -2373,15 +2402,22 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
     handleGenerateDocument(modelId);
   };
 
-  const getPatientAllergies = () => {
-    // Extrair alergias das observações se houver
-    if (!consulta?.paciente?.observacoes) return [];
-    const obs = consulta.paciente.observacoes.toLowerCase();
-    if (obs.includes('alergia') || obs.includes('alérgico')) {
-      // Tentar extrair informações de alergia das observações
-      return ['Verificar observações do paciente'];
-    }
-    return [];
+  const getPatientAllergies = (): string[] => {
+    const alergiasRaw = consulta?.paciente?.alergias?.trim();
+    if (!alergiasRaw) return [];
+    return alergiasRaw
+      .split(/[,;\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  };
+
+  const getPatientMedicamentosEmUso = (): string[] => {
+    const medRaw = consulta?.paciente?.medicamentosEmUso?.trim();
+    if (!medRaw) return [];
+    return medRaw
+      .split(/[;\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   };
 
   if (loading) {
@@ -2404,6 +2440,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
     email: consulta.paciente.email || "-",
     bloodType: "Não informado", // Campo não disponível no schema atual
     allergies: getPatientAllergies(),
+    medicamentosEmUsoList: getPatientMedicamentosEmUso(),
     lastVisit: formatDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
   };
 
@@ -2423,6 +2460,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
     ? `Prontuário: ${String(consulta.paciente.numeroProntuario).padStart(6, "0")}`
     : "Prontuário: N/A";
   const hasAllergies = patient.allergies.length > 0;
+  const hasMedicamentosEmUso = patient.medicamentosEmUsoList.length > 0;
 
   const vitalStatusDot: Record<string, string> = {
     normal: "bg-emerald-500",
@@ -2435,20 +2473,68 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
       {/* Novo box do cabeçalho */}
       <div className="max-w-[1400px] mx-auto px-4 lg:px-8 pt-5 w-full">
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden w-full min-w-0">
-          {/* Faixa de alergias — só aparece se houver */}
-          {hasAllergies && (
-            <div className="px-6 py-1.5 border-b border-red-100 overflow-x-hidden w-full min-w-0" style={{ backgroundColor: "#FEF2F2" }}>
-              <div className="flex items-center gap-2 overflow-x-hidden w-full min-w-0">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
-                <span className="text-xs font-semibold text-red-700 uppercase tracking-wide whitespace-nowrap">Alergias:</span>
-                <div className="flex gap-1.5 min-w-0 overflow-x-hidden">
-                  {patient.allergies.map((a, i) => (
-                    <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap flex-shrink-0">
-                      {a}
-                    </span>
-                  ))}
+          {/* Faixas destacadas de alergias e medicamentos em uso */}
+          {(hasAllergies || hasMedicamentosEmUso || true) && (
+            <div className="border-b border-slate-100 overflow-x-hidden w-full min-w-0">
+              {hasAllergies && (
+                <div className="px-6 py-1.5 overflow-x-hidden w-full min-w-0 border-b border-red-100" style={{ backgroundColor: "#FEF2F2" }}>
+                  <div className="flex items-center gap-2 overflow-x-hidden w-full min-w-0">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-red-600" />
+                    <span className="text-xs font-semibold text-red-700 uppercase tracking-wide whitespace-nowrap">Alergias:</span>
+                    <div className="flex gap-1.5 flex-wrap min-w-0">
+                      {patient.allergies.map((a, i) => (
+                        <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200 whitespace-nowrap flex-shrink-0">
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+              {hasMedicamentosEmUso && (
+                <div className="px-6 py-1.5 overflow-x-hidden w-full min-w-0" style={{ backgroundColor: "#FFFBEB" }}>
+                  <div className="flex items-center gap-2 overflow-x-hidden w-full min-w-0">
+                    <Pill className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide whitespace-nowrap">Medicamentos em uso:</span>
+                    <div className="flex gap-1.5 flex-wrap min-w-0">
+                      {patient.medicamentosEmUsoList.map((m, i) => (
+                        <span key={i} className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 whitespace-nowrap flex-shrink-0">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!hasAllergies && !hasMedicamentosEmUso && (
+                <div className="px-6 py-1.5 overflow-x-hidden w-full min-w-0 bg-slate-50">
+                  <div className="flex items-center justify-between gap-2 overflow-x-hidden w-full min-w-0">
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>Sem alergias ou medicamentos em uso registrados para este paciente.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDadosSaudeDialogOpen(true)}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap"
+                    >
+                      Registrar
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(hasAllergies || hasMedicamentosEmUso) && (
+                <div className="px-6 py-1 flex justify-end bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setDadosSaudeDialogOpen(true)}
+                    className="text-[11px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Editar dados de saúde
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -3586,135 +3672,6 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         </DialogContent>
       </Dialog>
 
-      {/* ====== DIALOG: GERENCIAR EXAMES ====== */}
-      <Dialog open={examesDrawerOpen} onOpenChange={setExamesDrawerOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2.5 text-base">
-              <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
-                <FileImage className="w-3.5 h-3.5 text-white" />
-              </div>
-              Exames do Paciente
-              <Badge variant="outline" className="ml-auto text-xs font-normal">
-                {examesAnexados.length} {examesAnexados.length === 1 ? 'exame' : 'exames'}
-              </Badge>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-hidden flex flex-col gap-4 min-h-0">
-            {/* Upload novo exame */}
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="flex-1 grid grid-cols-2 gap-2">
-                <Input
-                  placeholder="Nome do exame (ex: Hemograma, RX Tórax...)"
-                  value={nomeExameInput}
-                  onChange={(e) => setNomeExameInput(e.target.value)}
-                  className="h-9 text-sm"
-                />
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    id="exame-upload-drawer"
-                    className="hidden"
-                    onChange={(e) => setArquivoExame(e.target.files?.[0] || null)}
-                  />
-                  <Button
-                    variant="outline"
-                    className="h-9 w-full text-sm gap-2 justify-start"
-                    onClick={() => document.getElementById('exame-upload-drawer')?.click()}
-                  >
-                    <Upload className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="truncate text-slate-500">
-                      {arquivoExame ? arquivoExame.name : 'Selecionar arquivo'}
-                    </span>
-                  </Button>
-                </div>
-              </div>
-              <Button
-                onClick={handleUploadExame}
-                disabled={uploadingExame || !nomeExameInput.trim() || !arquivoExame}
-                className="h-9 px-4 bg-slate-800 hover:bg-slate-700 text-white text-sm gap-2 flex-shrink-0"
-              >
-                {uploadingExame ? <Loader2 className="w-4 h-4 animate-spin" /> : <FilePlus className="w-4 h-4" />}
-                Anexar
-              </Button>
-            </div>
-
-            {/* Lista de exames */}
-            <ScrollArea className="flex-1 min-h-0">
-              {loadingExames ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                </div>
-              ) : examesAnexados.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                    <FileImage className="w-7 h-7 text-slate-300" />
-                  </div>
-                  <p className="text-sm font-medium text-slate-500">Nenhum exame anexado</p>
-                  <p className="text-xs text-slate-400 mt-1">Adicione imagens ou PDFs de exames acima</p>
-                </div>
-              ) : (
-                <div className="space-y-2 pr-1">
-                  {examesAnexados.map((exame) => (
-                    <div
-                      key={exame.id}
-                      className="group flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all"
-                    >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        exame.isImage ? 'bg-blue-100' : 'bg-red-50'
-                      }`}>
-                        {exame.isImage
-                          ? <FileImage className="w-4 h-4 text-blue-600" />
-                          : <FileText className="w-4 h-4 text-red-600" />
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-slate-800 truncate">{exame.nome}</p>
-                          {exame.isFromCurrentConsulta && (
-                            <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 flex-shrink-0">
-                              Atual
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {formatDate(new Date(exame.data))} · {exame.isImage ? 'Imagem' : 'PDF'}
-                          {exame.consultaData && !exame.isFromCurrentConsulta && (
-                            <> · Consulta {formatDate(new Date(exame.consultaData))}</>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-slate-700"
-                          onClick={() => handleDownloadExame(exame.id, exame.s3Key)}
-                          title="Visualizar"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-600"
-                          onClick={() => handleDeleteExame(exame.id)}
-                          title="Remover"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Modal de Processamento */}
       <ProcessingModal
         isOpen={isProcessing}
@@ -3736,6 +3693,31 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         consultaId={selectedConsultaForDocumentos || ""}
         consultaData={selectedConsultaDataForDocumentos || undefined}
       />
+
+      {/* Modal Dados de Saúde (Alergias / Medicamentos em uso) */}
+      {consulta?.paciente?.id && (
+        <DadosSaudeDialog
+          open={dadosSaudeDialogOpen}
+          onOpenChange={setDadosSaudeDialogOpen}
+          pacienteId={consulta.paciente.id}
+          initialAlergias={consulta.paciente.alergias ?? null}
+          initialMedicamentosEmUso={consulta.paciente.medicamentosEmUso ?? null}
+          onSaved={({ alergias, medicamentosEmUso }) => {
+            setConsulta((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    paciente: {
+                      ...prev.paciente,
+                      alergias,
+                      medicamentosEmUso,
+                    },
+                  }
+                : prev
+            );
+          }}
+        />
+      )}
 
       {/* Modal Guia Consulta TISS — coleta exames antes de gerar */}
       <GuiaTissExamesModal
@@ -4081,35 +4063,53 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
           <div className="space-y-4 py-4">
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Nome do Exame
+                Categoria
               </label>
-              <Input
-                placeholder="Ex: Hemograma completo, Raio-X tórax, etc."
-                value={nomeExameInput}
-                onChange={(e) => setNomeExameInput(e.target.value)}
-                className="w-full"
-              />
+              <Select
+                value={categoriaExame}
+                onValueChange={(v) => setCategoriaExame(v as "Laboratorial" | "Imagem" | "Outros")}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Laboratorial">Laboratorial</SelectItem>
+                  <SelectItem value="Imagem">Imagem</SelectItem>
+                  <SelectItem value="Outros">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Os arquivos serão renomeados automaticamente (ex: {categoriaExame || "Categoria"} 001, 002, ...)
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 block">
-                Arquivo (Imagem ou PDF)
+                Arquivos (Imagem ou PDF)
               </label>
               <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-slate-400 transition-colors">
                 <input
                   type="file"
+                  multiple
                   accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const maxSize = 30 * 1024 * 1024; // 30MB
-                      if (file.size > maxSize) {
-                        toast.error(`Arquivo muito grande (${(file.size / 1024 / 1024).toFixed(1)} MB). O tamanho máximo permitido é 30 MB.`);
-                        e.target.value = "";
-                        setArquivoExame(null);
-                        return;
+                    const files = Array.from(e.target.files || []);
+                    const maxSize = 30 * 1024 * 1024; // 30MB por arquivo
+                    const validos: File[] = [];
+                    const rejeitados: string[] = [];
+                    for (const f of files) {
+                      if (f.size > maxSize) {
+                        rejeitados.push(f.name);
+                      } else {
+                        validos.push(f);
                       }
-                      setArquivoExame(file);
                     }
+                    if (rejeitados.length > 0) {
+                      toast.error(
+                        `${rejeitados.length} arquivo(s) excedem 30 MB e foram ignorados: ${rejeitados.slice(0, 3).join(", ")}`
+                      );
+                    }
+                    setArquivosExame(validos);
+                    e.target.value = "";
                   }}
                   className="hidden"
                   id="exame-file-input"
@@ -4120,20 +4120,39 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                 >
                   <FilePlus className="w-8 h-8 text-slate-400" />
                   <span className="text-sm text-slate-600">
-                    {arquivoExame ? arquivoExame.name : "Clique para selecionar arquivo"}
+                    {arquivosExame.length > 0
+                      ? `${arquivosExame.length} arquivo(s) selecionado(s)`
+                      : "Clique para selecionar arquivos"}
                   </span>
                   <span className="text-xs text-slate-400">
-                    JPEG, PNG, WebP ou PDF (máx. 30MB)
+                    JPEG, PNG, WebP ou PDF (máx. 30MB por arquivo)
                   </span>
                 </label>
               </div>
-              {arquivoExame && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-                  <FileText className="w-4 h-4" />
-                  <span>{arquivoExame.name}</span>
-                  <span className="text-xs text-slate-400">
-                    ({(arquivoExame.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
+              {arquivosExame.length > 0 && (
+                <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                  {arquivosExame.map((arquivo, idx) => (
+                    <div
+                      key={`${arquivo.name}-${idx}`}
+                      className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 rounded px-2 py-1"
+                    >
+                      <FileText className="w-4 h-4 flex-shrink-0" />
+                      <span className="truncate flex-1">{arquivo.name}</span>
+                      <span className="text-xs text-slate-400 flex-shrink-0">
+                        ({(arquivo.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setArquivosExame((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="text-slate-400 hover:text-red-500 flex-shrink-0"
+                        aria-label="Remover arquivo"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -4143,21 +4162,23 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
               variant="outline"
               onClick={() => {
                 setUploadDialogOpen(false);
-                setNomeExameInput("");
-                setArquivoExame(null);
+                setCategoriaExame("");
+                setArquivosExame([]);
               }}
             >
               Cancelar
             </Button>
             <Button
               onClick={handleUploadExame}
-              disabled={uploadingExame || !nomeExameInput.trim() || !arquivoExame}
+              disabled={uploadingExame || !categoriaExame || arquivosExame.length === 0}
             >
               {uploadingExame ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Enviando...
                 </>
+              ) : arquivosExame.length > 1 ? (
+                `Anexar ${arquivosExame.length} Exames`
               ) : (
                 "Anexar Exame"
               )}

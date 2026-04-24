@@ -300,15 +300,15 @@ export function SiteHeader({ user }: SiteHeaderProps) {
 
   return (
     <header
-      className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border bg-background shadow-sm transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) text-foreground"
+      className="sticky top-0 z-20 flex h-(--header-height) shrink-0 items-center gap-2 border-b border-border/60 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/70 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height) text-foreground"
     >
-      <div className="relative z-10 flex w-full items-center gap-3 px-4 lg:gap-4 lg:px-6 text-foreground">
-        <SidebarTrigger className="-ml-1 hover:bg-muted text-foreground transition-all duration-200 hover:scale-105 active:scale-95" />
+      <div className="relative z-10 flex w-full items-center gap-2 px-3 lg:gap-3 lg:px-5 text-foreground">
+        <SidebarTrigger className="-ml-1 h-9 w-9 rounded-lg hover:bg-muted text-foreground transition-all duration-200 active:scale-95" />
 
         {/* Seletor de Clínica (esquerda) */}
         {mounted && user && session?.user?.tipo !== TipoUsuario.SUPER_ADMIN && (
           <>
-            <Separator orientation="vertical" className="h-6 bg-border" />
+            <Separator orientation="vertical" className="h-5 bg-border/60 mx-1" />
             <TenantSelector />
           </>
         )}
@@ -316,23 +316,22 @@ export function SiteHeader({ user }: SiteHeaderProps) {
         <div className="flex-1" />
 
         {user && (
-          <div className="flex items-center gap-2">
-            <Separator
-              orientation="vertical"
-              className="h-6 bg-border hidden md:block"
-            />
-
+          <div className="flex items-center gap-1">
             {/* Botão de Chat */}
             {(session?.user?.tipo === TipoUsuario.MEDICO || session?.user?.tipo === TipoUsuario.SECRETARIA) && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative hover:bg-muted text-foreground transition-all duration-200"
+                aria-label="Mensagens"
+                className="relative h-9 w-9 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
                 onClick={() => setIsOpen(!isOpen)}
               >
-                <IconMessage className="h-6 w-6" />
+                <IconMessage className="h-[18px] w-[18px]" />
                 {mensagensNaoLidas > 0 && (
-                  <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                  <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/70 opacity-75 animate-ping"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-background"></span>
+                  </span>
                 )}
               </Button>
             )}
@@ -344,26 +343,30 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="relative hover:bg-muted text-foreground transition-all duration-200"
+                    aria-label="Notificações"
+                    className="relative h-9 w-9 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
                   >
-                    <IconBell className="h-5 w-5" />
+                    <IconBell className="h-[18px] w-[18px]" />
                     {autorizacoesNaoLidas > 0 && (
-                      <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
+                      <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/70 opacity-75 animate-ping"></span>
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500 ring-2 ring-background"></span>
+                      </span>
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-[22rem] p-0 rounded-xl overflow-hidden">
+                  <DropdownMenuLabel className="px-4 py-3 bg-muted/30">
                     <div className="flex items-center justify-between">
-                      <span>Notificações</span>
+                      <span className="text-sm font-semibold tracking-tight">Notificações</span>
                       {autorizacoesNaoLidas > 0 && (
-                        <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">
-                          {autorizacoesNaoLidas}
+                        <span className="text-[11px] font-semibold bg-red-500 text-white px-2 py-0.5 rounded-full">
+                          {autorizacoesNaoLidas} nova{autorizacoesNaoLidas > 1 ? "s" : ""}
                         </span>
                       )}
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="m-0" />
                   {loadingAutorizacoes ? (
                     <div className="p-4 text-center text-sm text-muted-foreground">
                       Carregando...
@@ -443,15 +446,16 @@ export function SiteHeader({ user }: SiteHeaderProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative hover:bg-muted text-foreground transition-all duration-200"
+                aria-label="Notificações"
+                className="relative h-9 w-9 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-200"
               >
-                <IconBell className="h-5 w-5" />
+                <IconBell className="h-[18px] w-[18px]" />
               </Button>
             )}
 
             <Separator
               orientation="vertical"
-              className="h-6 bg-border"
+              className="h-5 bg-border/60 mx-1.5"
             />
 
             {/* Avatar com Dropdown */}
@@ -460,44 +464,52 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="flex items-center gap-2 px-2 hover:bg-muted text-foreground transition-all duration-200"
+                    className="flex items-center gap-2 h-9 pl-1 pr-2.5 rounded-full hover:bg-muted text-foreground transition-all duration-200"
                   >
-                    <Avatar className="h-8 w-8">
+                    <Avatar className="h-7 w-7 ring-1 ring-border/60">
                       <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback className="bg-muted text-foreground font-semibold">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                         {getInitials(user.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden font-medium md:inline-block text-foreground">
+                    <span className="hidden text-sm font-medium md:inline-block text-foreground tracking-tight max-w-[12rem] truncate">
                       {user.name}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {user.email}
-                      </p>
+                <DropdownMenuContent align="end" className="w-64 p-1.5 rounded-xl">
+                  <DropdownMenuLabel className="p-0">
+                    <div className="flex items-center gap-3 p-2.5">
+                      <Avatar className="h-10 w-10 ring-1 ring-border/60">
+                        <AvatarImage src={user.avatar} alt={user.name} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate tracking-tight">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.email}
+                        </p>
+                      </div>
                     </div>
                   </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="my-1" />
                   <DropdownMenuGroup>
                     <DropdownMenuItem
                       onClick={() => router.push("/perfil")}
-                      className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                      className="cursor-pointer rounded-lg py-2 px-2.5 hover:bg-accent/80 transition-colors duration-200 group"
                     >
-                      <IconUserCircle className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
-                      Perfil
+                      <IconUserCircle className="mr-2.5 h-[18px] w-[18px] text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                      <span className="text-sm">Perfil</span>
                     </DropdownMenuItem>
                     {session?.user?.tipo === TipoUsuario.PACIENTE && (
                       <DropdownMenuItem
                         onClick={() => router.push("/paciente/meus-dados")}
-                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                        className="cursor-pointer rounded-lg py-2 px-2.5 hover:bg-accent/80 transition-colors duration-200 group"
                       >
-                        <IconShieldLock className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
-                        Meus Dados
+                        <IconShieldLock className="mr-2.5 h-[18px] w-[18px] text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                        <span className="text-sm">Meus Dados</span>
                       </DropdownMenuItem>
                     )}
                     {session?.user?.tipo === TipoUsuario.SECRETARIA &&
@@ -511,10 +523,10 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                               "_blank"
                             );
                           }}
-                          className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                          className="cursor-pointer rounded-lg py-2 px-2.5 hover:bg-accent/80 transition-colors duration-200 group"
                         >
-                          <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
-                          Painel de Chamadas
+                          <IconPhoneCall className="mr-2.5 h-[18px] w-[18px] text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                          <span className="text-sm">Painel de Chamadas</span>
                         </DropdownMenuItem>
                       )}
                     {session?.user?.tipo === TipoUsuario.ADMIN_CLINICA && session?.user?.clinicaId && (
@@ -524,20 +536,20 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                           if (!id) return;
                           window.open(`/painel-chamadas?clinicaId=${encodeURIComponent(id)}`, "_blank");
                         }}
-                        className="cursor-pointer hover:bg-accent/80 transition-colors duration-200 group"
+                        className="cursor-pointer rounded-lg py-2 px-2.5 hover:bg-accent/80 transition-colors duration-200 group"
                       >
-                        <IconPhoneCall className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:scale-110" />
-                        Painel de Chamadas (TV)
+                        <IconPhoneCall className="mr-2.5 h-[18px] w-[18px] text-muted-foreground transition-transform duration-200 group-hover:scale-110" />
+                        <span className="text-sm">Painel de Chamadas (TV)</span>
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem
                     onClick={handleSignOut}
-                    className="text-destructive focus:text-destructive cursor-pointer hover:bg-destructive/10 transition-colors duration-200 group"
+                    className="text-destructive focus:text-destructive cursor-pointer rounded-lg py-2 px-2.5 hover:bg-destructive/10 transition-colors duration-200 group"
                   >
-                    <IconLogout className="mr-2 h-4 w-4 transition-transform duration-200 group-hover:rotate-12" />
-                    Sair
+                    <IconLogout className="mr-2.5 h-[18px] w-[18px] transition-transform duration-200 group-hover:-translate-x-0.5" />
+                    <span className="text-sm font-medium">Sair</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -545,15 +557,15 @@ export function SiteHeader({ user }: SiteHeaderProps) {
             {!mounted && (
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 px-2 text-foreground"
+                className="flex items-center gap-2 h-9 pl-1 pr-2.5 rounded-full text-foreground"
                 disabled
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-muted text-foreground font-semibold">
+                <Avatar className="h-7 w-7 ring-1 ring-border/60">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                     {user.name ? getInitials(user.name) : "U"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden font-medium md:inline-block text-foreground">
+                <span className="hidden text-sm font-medium md:inline-block text-foreground tracking-tight max-w-[12rem] truncate">
                   {user.name}
                 </span>
               </Button>

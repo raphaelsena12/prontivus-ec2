@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { formatTime, maskCPF } from "@/lib/utils";
-import { playPollyAnnouncement } from "@/lib/play-polly-announcement";
 import { PageHeader } from "@/components/page-header";
 
 interface Consulta {
@@ -202,14 +201,6 @@ export function FilaAtendimentoContent() {
       });
       if (!res.ok) throw new Error("Erro ao chamar paciente");
       toast.success(`${consulta.paciente.nome} chamado(a) no painel`);
-
-      const salaLabel = sala.trim();
-      const mensagem = `Atenção, ${consulta.paciente.nome}, favor se dirigir a ${salaLabel}.`;
-      void playPollyAnnouncement(mensagem).then((origem) => {
-        if (origem === "failed") {
-          toast.warning("Não foi possível reproduzir o chamado pelo alto-falante.");
-        }
-      });
     } catch {
       toast.error("Não foi possível enviar a chamada para o painel");
     } finally {

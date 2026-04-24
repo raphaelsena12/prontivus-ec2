@@ -33,6 +33,8 @@ const pacienteSchema = z.object({
   profissao: z.string().nullable().optional(),
   estadoCivil: z.enum(["SOLTEIRO", "CASADO", "DIVORCIADO", "VIUVO"]).nullable().optional(),
   observacoes: z.string().nullable().optional(),
+  alergias: z.string().nullable().optional(),
+  medicamentosEmUso: z.string().nullable().optional(),
 });
 
 // Helper para verificar autorização
@@ -132,22 +134,22 @@ export async function GET(request: NextRequest) {
     
     // Query para buscar pacientes - incluir numeroProntuario apenas se a coluna existir
     const pacientesQuery = hasNumeroProntuario ? `
-      SELECT 
-        id, "clinicaId", "usuarioId", "numeroProntuario", nome, cpf, rg, 
-        "dataNascimento", sexo, email, telefone, celular, cep, endereco, 
+      SELECT
+        id, "clinicaId", "usuarioId", "numeroProntuario", nome, cpf, rg,
+        "dataNascimento", sexo, email, telefone, celular, cep, endereco,
         numero, complemento, bairro, cidade, estado,
-        profissao, "estadoCivil", observacoes, ativo, "createdAt", "updatedAt"
+        profissao, "estadoCivil", observacoes, alergias, "medicamentosEmUso", ativo, "createdAt", "updatedAt"
       FROM pacientes
       WHERE ${whereConditions}
       ORDER BY "createdAt" DESC
       LIMIT ${limit}
       OFFSET ${skip}
     ` : `
-      SELECT 
-        id, "clinicaId", "usuarioId", NULL as "numeroProntuario", nome, cpf, rg, 
-        "dataNascimento", sexo, email, telefone, celular, cep, endereco, 
+      SELECT
+        id, "clinicaId", "usuarioId", NULL as "numeroProntuario", nome, cpf, rg,
+        "dataNascimento", sexo, email, telefone, celular, cep, endereco,
         numero, complemento, bairro, cidade, estado,
-        profissao, "estadoCivil", observacoes, ativo, "createdAt", "updatedAt"
+        profissao, "estadoCivil", observacoes, alergias, "medicamentosEmUso", ativo, "createdAt", "updatedAt"
       FROM pacientes
       WHERE ${whereConditions}
       ORDER BY "createdAt" DESC
@@ -314,12 +316,12 @@ export async function POST(request: NextRequest) {
       // Criar sem numeroProntuario usando query raw
       const insertQuery = `
         INSERT INTO pacientes (
-          id, "clinicaId", "usuarioId", nome, cpf, rg, "dataNascimento", sexo, 
-          email, telefone, celular, cep, endereco, numero, complemento, 
+          id, "clinicaId", "usuarioId", nome, cpf, rg, "dataNascimento", sexo,
+          email, telefone, celular, cep, endereco, numero, complemento,
           bairro, cidade, estado, profissao, "estadoCivil",
-          observacoes, ativo, "createdAt", "updatedAt"
+          observacoes, alergias, "medicamentosEmUso", ativo, "createdAt", "updatedAt"
         ) VALUES (
-          gen_random_uuid(), 
+          gen_random_uuid(),
           ${escapeSQL(auth.clinicaId || "")},
           ${escapeSQL(usuario.id)},
           ${escapeSQL(data.nome)},
@@ -340,6 +342,8 @@ export async function POST(request: NextRequest) {
           ${escapeSQL(data.profissao || null)},
           ${escapeSQL(data.estadoCivil || null)},
           ${escapeSQL(data.observacoes || null)},
+          ${escapeSQL(data.alergias || null)},
+          ${escapeSQL(data.medicamentosEmUso || null)},
           true,
           NOW(),
           NOW()

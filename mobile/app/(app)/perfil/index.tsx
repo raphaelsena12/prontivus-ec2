@@ -97,6 +97,15 @@ export default function PerfilScreen() {
             bgColor="#CCFBF1"
             onPress={() => router.push('/(app)/agendamentos/telemedicina')}
           />
+          <View style={styles.divider} />
+          <MenuItem
+            icon="heart-outline"
+            label="Dados de saúde"
+            subtitle="Alergias e medicamentos"
+            color="#E11D48"
+            bgColor="#FFE4E6"
+            onPress={() => router.push('/(app)/perfil/dados-saude')}
+          />
         </Card>
 
         {/* Logout */}

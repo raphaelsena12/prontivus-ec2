@@ -53,6 +53,8 @@ const agendamentoSchema = z.object({
   desconto: z.number().nullable().optional(),
   valorFinal: z.number().nullable().optional(),
   observacoes: z.string().optional(),
+  alergias: z.string().optional(),
+  medicamentosEmUso: z.string().optional(),
   anexos: z.array(z.instanceof(File)).optional(),
   encaixe: z.boolean(),
 });
@@ -67,6 +69,8 @@ interface Paciente {
   telefone?: string;
   celular?: string;
   dataNascimento?: string;
+  alergias?: string | null;
+  medicamentosEmUso?: string | null;
 }
 
 interface Medico {
@@ -443,6 +447,8 @@ export function EditarAgendamentoModal({
       desconto: null,
       valorFinal: null,
       observacoes: "",
+      alergias: "",
+      medicamentosEmUso: "",
       anexos: [],
       encaixe: false,
     },
@@ -573,6 +579,8 @@ export function EditarAgendamentoModal({
             email: consulta.paciente.email || undefined,
             telefone: consulta.paciente.telefone || undefined,
             celular: consulta.paciente.celular || undefined,
+            alergias: consulta.paciente.alergias ?? null,
+            medicamentosEmUso: consulta.paciente.medicamentosEmUso ?? null,
           });
           setPacienteSearchValue(maskCPF(consulta.paciente.cpf));
         }
@@ -609,6 +617,8 @@ export function EditarAgendamentoModal({
             ? Math.max(0, Number(consulta.valorCobrado) - (consulta.desconto ? Number(consulta.desconto) : 0))
             : null,
           observacoes: consulta.observacoes || "",
+          alergias: consulta.paciente?.alergias ?? "",
+          medicamentosEmUso: consulta.paciente?.medicamentosEmUso ?? "",
           anexos: [],
           encaixe: encaixeValue,
         });
@@ -763,6 +773,8 @@ export function EditarAgendamentoModal({
     if (paciente.id) {
       setPacienteSelecionado(paciente);
       form.setValue("pacienteId", paciente.id);
+      form.setValue("alergias", paciente.alergias ?? "");
+      form.setValue("medicamentosEmUso", paciente.medicamentosEmUso ?? "");
     }
   };
 
@@ -849,6 +861,30 @@ export function EditarAgendamentoModal({
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Erro ao atualizar agendamento");
+      }
+
+      // Atualiza dados de saúde do paciente (alergias / medicamentos em uso)
+      try {
+        const alergiasAtuais = (pacienteSelecionado?.alergias ?? "") || "";
+        const medicamentosAtuais = (pacienteSelecionado?.medicamentosEmUso ?? "") || "";
+        const alergiasNovas = (data.alergias ?? "").trim();
+        const medicamentosNovos = (data.medicamentosEmUso ?? "").trim();
+
+        if (
+          alergiasNovas !== alergiasAtuais.trim() ||
+          medicamentosNovos !== medicamentosAtuais.trim()
+        ) {
+          await fetch(`/api/admin-clinica/pacientes/${data.pacienteId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              alergias: alergiasNovas || null,
+              medicamentosEmUso: medicamentosNovos || null,
+            }),
+          });
+        }
+      } catch {
+        // Não bloqueia o sucesso do update do agendamento
       }
 
       toast.success("Agendamento atualizado com sucesso");
@@ -1306,6 +1342,48 @@ export function EditarAgendamentoModal({
                                   error={form.formState.errors.codigoTussId?.message}
                                 />
                               </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+
+                  {/* Dados de Saúde do Paciente */}
+                  {pacienteSelecionado && (
+                    <div className="flex flex-wrap items-start gap-2.5">
+                      <FormField
+                        control={form.control}
+                        name="alergias"
+                        render={({ field }) => (
+                          <FormItem className="flex-1 min-w-[200px]">
+                            <FormLabel className="text-xs font-medium">Alergias</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs w-full"
+                                maxLength={500}
+                              />
+                            </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="medicamentosEmUso"
+                        render={({ field }) => (
+                          <FormItem className="flex-1 min-w-[200px]">
+                            <FormLabel className="text-xs font-medium">Medicamentos em uso</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                className="h-8 text-xs w-full"
+                                maxLength={1000}
+                              />
+                            </FormControl>
                             <FormMessage className="text-xs" />
                           </FormItem>
                         )}

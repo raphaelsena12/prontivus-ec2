@@ -4,10 +4,15 @@ import { brazilToday } from "@/lib/timezone-utils";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarDays, List, Loader2, Printer, Filter, Calendar, CheckCircle2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2, Printer, Calendar, CheckCircle2, Settings } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { AgendamentosTable } from "./components/agendamentos-table";
 import { AgendamentosCalendar } from "./components/agendamentos-calendar";
 import { PageHeader } from "@/components/page-header";
 
@@ -48,7 +53,6 @@ export function AgendamentosContent() {
   const router = useRouter();
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"calendar" | "table">("calendar");
 
   const fetchAgendamentos = useCallback(async () => {
     try {
@@ -295,120 +299,56 @@ export function AgendamentosContent() {
 
       {/* Card Branco */}
       <Card className="bg-white border shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between pb-1 border-b px-6 pt-1.5">
-          <div className="flex items-center gap-1.5">
-            <Filter className="h-3 w-3 text-muted-foreground" />
-            <CardTitle className="text-sm font-semibold">Lista de Agendamentos</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Botão Autorizar Fechamento de Caixa */}
-            <Button
-              variant="default"
-              onClick={handleAutorizarFechamentoCaixa}
-              className="h-8 text-xs px-3"
-              title="Autorizar Fechamento de Caixa"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-              Autorizar Fechamento de Caixa
-            </Button>
-            {/* Tabs */}
-            <div className="flex items-center gap-1 -mb-px">
-              <button
-                onClick={() => setView("calendar")}
-                className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
-                  view === "calendar"
-                    ? 'text-slate-800'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <CalendarDays className="w-3.5 h-3.5 inline mr-1.5" />
-                Calendário
-                {view === "calendar" && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800" />
-                )}
-              </button>
-              <button
-                onClick={() => setView("table")}
-                className={`px-4 py-2.5 text-xs font-medium transition-colors relative ${
-                  view === "table"
-                    ? 'text-slate-800'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                <List className="w-3.5 h-3.5 inline mr-1.5" />
-                Lista
-                {view === "table" && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-800" />
-                )}
-              </button>
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleImprimirAgenda}
-              disabled={loading || agendamentos.length === 0}
-              className="h-8 w-8 p-0"
-              title="Imprimir Agenda"
-            >
-              <Printer className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </CardHeader>
         <CardContent className="p-0">
-          {/* Tab Content */}
-          <div className="min-h-[400px]">
-            {view === "calendar" && (
-              <div className="p-3">
-                {loading ? (
-                  <div className="flex items-center justify-center h-[600px]">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
-                    </div>
-                  </div>
-                ) : (
-                  <AgendamentosCalendar
-                    agendamentos={agendamentos}
-                    onEventClick={(agendamento) => {
-                      if (agendamento.status === "AGENDADO" || agendamento.status === "CONFIRMADO") {
-                        router.push(`/medico/atendimento?consultaId=${agendamento.id}`);
-                      }
-                    }}
-                  />
-                )}
+          <div className="p-4">
+            {loading ? (
+              <div className="flex items-center justify-center h-[640px]">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
+                </div>
               </div>
-            )}
-
-            {view === "table" && (
-              <div className="px-6 pt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <span className="text-xs text-muted-foreground font-medium">Carregando agendamentos...</span>
-                    </div>
-                  </div>
-                ) : agendamentos.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
-                        <CalendarDays className="h-7 w-7 text-muted-foreground/50" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-foreground">
-                          Nenhum agendamento encontrado
-                        </p>
-                        <p className="text-[10px] text-muted-foreground/70">
-                          Não há agendamentos no momento
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <AgendamentosTable
-                    data={agendamentos}
-                  />
-                )}
-              </div>
+            ) : (
+              <AgendamentosCalendar
+                agendamentos={agendamentos}
+                onEventClick={(agendamento) => {
+                  if (agendamento.status === "AGENDADO" || agendamento.status === "CONFIRMADO") {
+                    router.push(`/medico/atendimento?consultaId=${agendamento.id}`);
+                  }
+                }}
+                toolbarActions={
+                  <>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleImprimirAgenda}
+                      disabled={loading || agendamentos.length === 0}
+                      className="h-8 w-8"
+                      title="Imprimir Agenda"
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Ações"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-60">
+                        <DropdownMenuItem onClick={handleAutorizarFechamentoCaixa}>
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Fechar caixa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                }
+              />
             )}
           </div>
         </CardContent>

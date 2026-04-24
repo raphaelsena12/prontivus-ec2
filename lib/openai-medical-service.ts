@@ -256,16 +256,14 @@ Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, va
 4. "ANTECEDENTES FAMILIARES:"  
 Doenças hereditárias, neoplasias, cardiopatias, hepatopatias, doenças autoimunes.
 
-5. "MEDICAMENTOS EM USO ATUAL:"  
+5. "MEDICAMENTOS EM USO ATUAL:"
 Nome, dose, frequência, tempo de uso.
-
-6. "EXAMES FÍSICOS:"  
-Achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais).
 
 REGRAS DA ANAMNESE:
 - Use títulos em MAIÚSCULAS seguidos de dois pontos (:)
 - Se alguma seção não for mencionada na transcrição, exiba o título seguido de "N/A"
 - A seção "EXAMES REALIZADOS" deve conter APENAS exames que o paciente mencionou que JÁ realizou. NÃO inclua sugestões futuras nesta seção.
+- REGRA ABSOLUTA — EXAME FÍSICO: NUNCA gere, mencione, descreva ou inclua seção de "EXAMES FÍSICOS"/"EXAME FÍSICO" ou achados de exame físico (inspeção, palpação, percussão, ausculta, sinais vitais, etc.). Esse campo é preenchido exclusivamente pelo médico. Mesmo que a transcrição contenha esses achados, IGNORE-OS e não os registre em nenhuma seção.
 - NÃO inclua o nome do paciente em nenhuma parte da anamnese. Quando o nome do paciente for mencionado na transcrição (ex: cumprimentos, apresentações, chamadas pelo nome), ignore-o completamente. A anamnese deve conter apenas informações clínicas, sem identificação nominal do paciente.
 
 IMPORTANTE — EXAMES E PRESCRIÇÕES (baseados em protocolos por CID):
@@ -347,7 +345,7 @@ SCORES DE DIAGNÓSTICO:
 Formato JSON esperado:
 
 {
-  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...\\n\\nEXAMES FÍSICOS:\\n...",
+  "anamnese": "QUEIXA PRINCIPAL:\\n[resumo de 2 a 3 palavras]\\n\\nHISTÓRIA DA DOENÇA ATUAL:\\n...\\n\\nANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:\\n...\\n\\nANTECEDENTES FAMILIARES:\\n...\\n\\nMEDICAMENTOS EM USO ATUAL:\\n...",
   "cidCodes": [
     {"code": "I10", "description": "Hipertensão essencial (primária)", "score": 0.9}
   ],
@@ -525,7 +523,8 @@ ${sanitizedTranscription}
 ${examesContext}
 
 IMPORTANTE:
-- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "ANTECEDENTES FAMILIARES:", "MEDICAMENTOS EM USO ATUAL:", e "EXAMES FÍSICOS:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- O formato da anamnese deve seguir EXATAMENTE a ordem começando direto em "QUEIXA PRINCIPAL:" (SEM o tópico "ANAMNESE:"), depois "HISTÓRIA DA DOENÇA ATUAL:", "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:", "ANTECEDENTES FAMILIARES:" e "MEDICAMENTOS EM USO ATUAL:". Se alguma seção não for mencionada, exiba o título seguido de "N/A".
+- NUNCA inclua seção "EXAMES FÍSICOS" ou "EXAME FÍSICO" nem achados de exame físico (inspeção, palpação, percussão, ausculta, sinais vitais). Esse campo é preenchido exclusivamente pelo médico.
 - Na seção "EXAMES REALIZADOS" da anamnese, inclua APENAS exames que o paciente mencionou que JÁ realizou na transcrição. NÃO inclua sugestões de exames futuros.
 - Se o paciente não mencionou nenhum exame realizado, deixe a seção "EXAMES REALIZADOS" vazia ou omita-a.
 - Os exames sugeridos (no array "exames" do JSON) são para serem solicitados no futuro, não para a seção "EXAMES REALIZADOS".
@@ -637,7 +636,8 @@ A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULA
 3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
 5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
-6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta (inspeção, palpação, percussão, ausculta, sinais vitais, etc.)
+
+REGRA ABSOLUTA — EXAME FÍSICO: NUNCA gere, mencione, descreva ou inclua qualquer seção de "EXAMES FÍSICOS", "EXAME FÍSICO" ou achados de exame físico (inspeção, palpação, percussão, ausculta, sinais vitais, etc.). Esse campo é preenchido exclusivamente pelo médico. Mesmo que a transcrição contenha achados de exame físico, IGNORE-OS completamente — não crie a seção, não inclua o título, não registre os achados em nenhuma outra seção.
 
 Se alguma seção não for mencionada na transcrição, escreva o título seguido de "N/A".
 
@@ -688,7 +688,8 @@ A anamnese deve utilizar as seguintes seções possíveis (títulos em MAIÚSCUL
 3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
 5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
-6. EXAMES FÍSICOS: — achados do exame físico realizado na consulta
+
+REGRA ABSOLUTA — EXAME FÍSICO: NUNCA gere, mencione, descreva ou inclua qualquer seção de "EXAMES FÍSICOS", "EXAME FÍSICO" ou achados de exame físico (inspeção, palpação, percussão, ausculta, sinais vitais, etc.). Esse campo é preenchido exclusivamente pelo médico. Mesmo que a transcrição contenha achados de exame físico, IGNORE-OS completamente — não crie a seção, não inclua o título, não registre os achados em nenhuma outra seção.
 
 REGRA FUNDAMENTAL: Seja ESTRITAMENTE OBJETIVO. Inclua APENAS informações que foram explicitamente mencionadas na transcrição. Se uma seção inteira não foi abordada na transcrição, OMITA a seção completamente — NÃO inclua o título nem escreva "N/A". NUNCA escreva frases como "Paciente não relatou...", "Não foram mencionados...", "Sem informações sobre...", "Não foram fornecidos detalhes..." ou qualquer variação de negação sobre informações ausentes. A anamnese deve conter SOMENTE o que foi dito, nada mais.
 
