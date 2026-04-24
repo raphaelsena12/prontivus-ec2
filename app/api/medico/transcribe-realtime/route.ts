@@ -46,21 +46,19 @@ export async function POST() {
             "Se houver silêncio, ruído ou fala ininteligível, NÃO transcreva nada — retorne vazio. " +
             "Não invente palavras, não complete frases, não adicione saudações ou perguntas que não foram ditas.",
         },
-        // server_vad com threshold muito alto (0.85): só abre turno em fala
-        // claramente acima do ruído. Estratégia: preferir perder meia palavra
-        // no começo de uma fala baixa a aceitar alucinação em silêncio.
-        // Fala normal de consulta (voz próxima ao mic) fica bem acima de 0.85.
+        // server_vad com threshold 0.6: captura voz do paciente (distante do mic)
+        // em consulta presencial, mantendo margem segura acima do ruído ambiente.
+        // Proteção contra alucinação vem do prompt anti-alucinação + filtros client-side.
         turn_detection: {
           type: "server_vad",
-          threshold: 0.85,
+          threshold: 0.6,
           prefix_padding_ms: 300,
           silence_duration_ms: 900,
           create_response: false,
         },
-        // near_field é melhor quando o usuário fala próximo ao mic (laptop/headset).
-        // far_field amplifica ruído ambiente e aumenta falsos positivos de VAD.
+        // far_field capta melhor voz do paciente em consulta presencial (~1m do mic).
         input_audio_noise_reduction: {
-          type: "near_field",
+          type: "far_field",
         },
       }),
     });

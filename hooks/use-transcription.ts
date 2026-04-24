@@ -378,8 +378,11 @@ export function useTranscription() {
         // Antes era sequencial (~1-3s cada). Em paralelo, roda no tempo do mais lento.
         const micPromise = navigator.mediaDevices.getUserMedia({
           audio: {
+            // echoCancellation mantido: necessário pra telemedicina (evita áudio
+            // do paciente remoto voltar pelo alto-falante). noiseSuppression
+            // desligado: estava atenuando voz distante do paciente em presencial.
             echoCancellation: true,
-            noiseSuppression: true,
+            noiseSuppression: false,
             autoGainControl: true,
           },
         });
