@@ -36,6 +36,7 @@ import {
   IconChevronsLeft,
   IconChevronsRight,
 } from "@tabler/icons-react";
+import { formatAuditDetails } from "@/lib/audit-log-format";
 
 interface AuditLog {
   id: string;
@@ -102,36 +103,6 @@ function formatDateTime(dateStr: string) {
     minute: "2-digit",
     second: "2-digit",
   });
-}
-
-function formatDetailsSummary(details: Record<string, unknown> | null): string {
-  if (!details) return "-";
-
-  const parts: string[] = [];
-
-  if (details.pacienteNome) parts.push(`Paciente: ${details.pacienteNome}`);
-  if (details.usuarioNome) parts.push(`Usuário: ${details.usuarioNome}`);
-  if (details.tipoDocumento) parts.push(`Doc: ${details.tipoDocumento}`);
-  if (details.operacao) parts.push(`${details.operacao}`);
-  if (details.operation) parts.push(`${details.operation}`);
-
-  // IA clínica
-  if (details.model) parts.push(`Modelo: ${details.model}`);
-  if (typeof details.tokensUsed === "number") parts.push(`Tokens: ${details.tokensUsed}`);
-  if (typeof details.latencyMs === "number") parts.push(`Latência: ${details.latencyMs}ms`);
-  if (details.success === false) parts.push(`❌ ${details.errorMessage || "falha"}`);
-
-  if (details.camposAlterados && typeof details.camposAlterados === "object") {
-    const campos = Object.keys(details.camposAlterados as Record<string, unknown>);
-    if (campos.length > 0) {
-      parts.push(`Campos: ${campos.join(", ")}`);
-    }
-  }
-
-  if (details.senhaAlterada) parts.push("Senha alterada");
-  if (details.finalizado) parts.push("Atendimento finalizado");
-
-  return parts.length > 0 ? parts.join(" | ") : JSON.stringify(details);
 }
 
 function DetailDialog({ details, action, resource }: { details: Record<string, any>; action: string; resource: string }) {
@@ -427,14 +398,21 @@ export function AuditLogsContent() {
                             <span className="font-mono">{log.ipAddress || "-"}</span>
                           </TableCell>
                           <TableCell className="text-xs py-3">
-                            {log.details ? (
-                              <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground max-w-[200px] truncate block">
-                                  {formatDetailsSummary(log.details)}
-                                </span>
-                                <DetailDialog details={log.details} action={log.action} resource={log.resource} />
-                              </div>
-                            ) : "-"}
+                            <div className="flex items-center gap-1">
+                              <span
+                                className="text-muted-foreground max-w-[360px] truncate block"
+                                title={formatAuditDetails(log)}
+                              >
+                                {formatAuditDetails(log)}
+                              </span>
+                              {log.details && (
+                                <DetailDialog
+                                  details={log.details}
+                                  action={log.action}
+                                  resource={log.resource}
+                                />
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
