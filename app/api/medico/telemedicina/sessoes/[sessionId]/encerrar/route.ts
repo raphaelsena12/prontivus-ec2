@@ -269,6 +269,7 @@ export async function POST(
         dataConsulta: dataConsultaFormatada,
         horaConsulta: horaConsultaFormatada,
         anamnese: prontuario?.anamnese || "",
+        orientacoesConduta: prontuario?.orientacoesConduta || "",
         cidCodes,
         exames,
         prescricoes,

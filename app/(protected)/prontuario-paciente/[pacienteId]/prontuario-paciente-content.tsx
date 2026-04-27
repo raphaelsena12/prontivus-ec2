@@ -65,6 +65,7 @@ interface ProntuarioCompleto {
       diagnostico: string | null;
       conduta: string | null;
       orientacoesConduta: string | null;
+      orientacoes: string | null;
       evolucao: string | null;
       createdAt: string;
     }>;
@@ -471,17 +472,44 @@ function ConsultaRow({
           </div>
 
           {/* Prontuário / Registro clínico — oculto para secretária */}
-          {!isSecretaria && prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.orientacoesConduta || prontuario.evolucao) && (
+          {!isSecretaria && prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.orientacoesConduta || prontuario.orientacoes || prontuario.evolucao) && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Registro Clínico</p>
               <div className="space-y-3">
-                {prontuario.anamnese && <Detail label="Anamnese" value={prontuario.anamnese} full />}
+                {(prontuario.anamnese || prontuario.orientacoesConduta) && (
+                  <div>
+                    <p className="text-[10px] text-slate-400 mb-0.5">Anamnese</p>
+                    {prontuario.anamnese && (
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap text-justify">{prontuario.anamnese}</p>
+                    )}
+                    {prontuario.orientacoesConduta && (
+                      <div className={prontuario.anamnese ? "mt-3" : ""}>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
+                          Orientações e conduta
+                        </p>
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap text-justify">
+                          {prontuario.orientacoesConduta}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {prontuario.exameFisico && <Detail label="Exame Físico" value={prontuario.exameFisico} full />}
                 {prontuario.diagnostico && <Detail label="Diagnóstico" value={prontuario.diagnostico} full />}
                 {prontuario.conduta && <Detail label="Conduta" value={prontuario.conduta} full />}
-                {prontuario.orientacoesConduta && <Detail label="Orientações e Conduta" value={prontuario.orientacoesConduta} full />}
                 {prontuario.evolucao && <Detail label="Evolução" value={prontuario.evolucao} full />}
               </div>
+
+              {prontuario.orientacoes && (
+                <div className="mt-8 pt-5 border-t border-slate-100">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                    Orientações
+                  </p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap text-justify">
+                    {prontuario.orientacoes}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

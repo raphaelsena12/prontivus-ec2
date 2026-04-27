@@ -123,6 +123,8 @@ export async function GET(
               exameFisico: true,
               diagnostico: true,
               conduta: true,
+              orientacoesConduta: true,
+              orientacoes: true,
               evolucao: true,
               createdAt: true,
             },

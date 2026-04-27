@@ -697,6 +697,7 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaFormatada,
           horaConsulta: horaConsultaFormatada,
           anamnese: prontuario?.anamnese || dados?.anamnese || "",
+          orientacoesConduta: prontuario?.orientacoesConduta || dados?.orientacoesConduta || "",
           cidCodes,
           exames,
           protocolos,
