@@ -238,17 +238,27 @@ O formato deve ser EXATAMENTE nesta ordem (começando direto na QUEIXA PRINCIPAL
 
 1. "QUEIXA PRINCIPAL:" - Motivo da consulta, preferencialmente nas palavras do paciente, curta e objetiva (2-3 palavras)
 
-2. "HISTÓRIA DA DOENÇA ATUAL:"  
-Descrever cronologicamente:
-- início
-- evolução
-- localização
-- intensidade
-- características
-- fatores de melhora/piora
-- sintomas associados
-- tratamentos prévios
+2. "HISTÓRIA DA DOENÇA ATUAL:"
+Descrever cronologicamente, em LINGUAGEM MÉDICA FORMAL (não reproduza a fala do paciente — traduza para terminologia clínica):
+- início (use "início há X dias/semanas/meses", evite "começou faz uns dias")
+- evolução (curso "progressivo", "intermitente", "contínuo", "em piora", "estável")
+- localização (use termos anatômicos: "epigástrio" em vez de "boca do estômago", "região lombar" em vez de "fundo das costas", "precordial" em vez de "no peito", "retroesternal", "fossa ilíaca direita", etc.)
+- intensidade (escala 0-10 quando possível; "leve/moderada/intensa")
+- características (use descritores clínicos: "em queimação", "em pontada", "em aperto", "tipo cólica", "pulsátil", "contínua")
+- fatores de melhora/piora (ex.: "piora ao esforço físico", "alivia com repouso", "exacerbada à palpação")
+- sintomas associados (ex.: "associada a náuseas, sudorese e dispneia" em vez de "junto com enjoo e falta de ar")
+- tratamentos prévios e resposta
 - impacto funcional
+
+EXEMPLOS de tradução paciente → médico:
+- "tá com uma dor que aperta no peito quando sobe escada" → "dor precordial em aperto, desencadeada aos esforços"
+- "dor de barriga embaixo, do lado direito, faz dois dias" → "dor abdominal em fossa ilíaca direita há 2 dias"
+- "enjoo e vontade de vomitar" → "náuseas e vômitos"
+- "falta de ar" → "dispneia"
+- "tonteira" → "tontura/vertigem"
+- "queimação no estômago depois de comer" → "pirose pós-prandial em epigástrio"
+
+NÃO use aspas nem reproduza expressões coloquiais do paciente nesta seção. Escreva em terceira pessoa, no estilo de prontuário médico ("Paciente refere..." / "Relata..." / "Evolui com...").
 
 3. "ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL:"  
 Doenças prévias, internações, cirurgias, traumas, alergias, transfusões, vacinação, uso crônico de medicamentos; tabagismo, etilismo, drogas ilícitas, alimentação, atividade física, sono, ocupação e exposição ocupacional.
@@ -632,7 +642,7 @@ Sua função é estruturar a transcrição de uma consulta em uma anamnese médi
 
 A anamnese deve seguir EXATAMENTE esta ordem de seções (títulos em MAIÚSCULAS com dois pontos), começando direto na QUEIXA PRINCIPAL (SEM o tópico "ANAMNESE:"):
 1. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
-2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
+2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados. Escreva em LINGUAGEM MÉDICA FORMAL (terceira pessoa, estilo prontuário: "Paciente refere...", "Relata...", "Evolui com..."). NÃO reproduza a fala do paciente — traduza para terminologia clínica: use termos anatômicos ("epigástrio", "precordial", "fossa ilíaca direita", "região lombar"), descritores de dor ("em queimação", "em aperto", "tipo cólica", "pulsátil"), e nomes clínicos de sintomas ("dispneia" em vez de "falta de ar", "pirose" em vez de "queimação no estômago", "náuseas" em vez de "enjoo", "tontura/vertigem" em vez de "tonteira"). Ex.: "dor que aperta no peito ao subir escada" → "dor precordial em aperto desencadeada aos esforços".
 3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
 5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
@@ -684,7 +694,7 @@ Sua função é estruturar a transcrição de uma consulta em uma anamnese médi
 
 A anamnese deve utilizar as seguintes seções possíveis (títulos em MAIÚSCULAS com dois pontos), começando direto na QUEIXA PRINCIPAL (SEM o tópico "ANAMNESE:"):
 1. QUEIXA PRINCIPAL: — motivo da consulta em 2-3 palavras nas palavras do paciente
-2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados
+2. HISTÓRIA DA DOENÇA ATUAL: — início, evolução, localização, intensidade, fatores de melhora/piora, sintomas associados. Escreva em LINGUAGEM MÉDICA FORMAL (terceira pessoa, estilo prontuário: "Paciente refere...", "Relata...", "Evolui com..."). NÃO reproduza a fala do paciente — traduza para terminologia clínica: use termos anatômicos ("epigástrio", "precordial", "fossa ilíaca direita", "região lombar"), descritores de dor ("em queimação", "em aperto", "tipo cólica", "pulsátil"), e nomes clínicos de sintomas ("dispneia" em vez de "falta de ar", "pirose" em vez de "queimação no estômago", "náuseas" em vez de "enjoo", "tontura/vertigem" em vez de "tonteira"). Ex.: "dor que aperta no peito ao subir escada" → "dor precordial em aperto desencadeada aos esforços".
 3. ANTECEDENTES PESSOAIS / HÁBITOS DE VIDA / HISTÓRIA SOCIAL: — patologias prévias, cirurgias, alergias, medicamentos crônicos; tabagismo, etilismo, atividade física, ocupação e história social
 4. ANTECEDENTES FAMILIARES: — doenças hereditárias relevantes
 5. MEDICAMENTOS EM USO ATUAL: — nome, dose, frequência
