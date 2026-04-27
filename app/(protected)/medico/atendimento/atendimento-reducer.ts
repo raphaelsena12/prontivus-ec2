@@ -20,6 +20,11 @@ export type DocumentoGeradoLocal = {
   assinado: boolean;
   assinando?: boolean;
   erroAssinatura?: string;
+  // Snapshot dos dados que geraram o PDF — usado para reabrir o modal em modo edição.
+  // Mantido apenas em memória, não persiste no banco.
+  extraDados?: Record<string, any>;
+  medicamentosSelecionados?: number[];
+  examesSelecionados?: number[];
 };
 
 export type Prescricao = {

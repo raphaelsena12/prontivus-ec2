@@ -103,8 +103,12 @@ export function generateReceitaControleEspecialPDF(data: ReceitaControleEspecial
       if (med.posologia) {
         const posologiaX = startX + 12; // Indentado
         let posologiaText = med.posologia;
-        // Remover "por X" ou " — por X" da posologia se a duração estiver separada
-        if (med.duracao) {
+        // Só remove "por X dias" da posologia quando a duração separada realmente
+        // representa essa mesma duração — evita esconder "POR 3 DIAS" quando o
+        // campo separado contém outra coisa (ex.: quantidade "6 CP").
+        const durMatch = (med.duracao || "").match(/(\d+)\s*dias?/i);
+        const posMatch = posologiaText.match(/por\s+(\d+)\s*dias?/i);
+        if (durMatch && posMatch && durMatch[1] === posMatch[1]) {
           posologiaText = posologiaText.replace(/\s*—\s*por\s+\d+\s*dias?/i, "");
           posologiaText = posologiaText.replace(/\s*por\s+\d+\s*dias?/i, "");
         }

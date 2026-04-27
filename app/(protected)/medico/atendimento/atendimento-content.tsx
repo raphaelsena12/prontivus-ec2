@@ -385,6 +385,7 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
   const [retornoDias, setRetornoDias] = useState<number>(30);
   const [docConfigModalOpen, setDocConfigModalOpen] = useState(false);
   const [docConfigModelId, setDocConfigModelId] = useState<string>("");
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [docMedicamentosSelecionados, setDocMedicamentosSelecionados] = useState<Set<number>>(new Set());
   const [docExamesSelecionados, setDocExamesSelecionados] = useState<Set<number>>(new Set());
   const [sinaisVitaisFocusField, setSinaisVitaisFocusField] = useState<string | null>(null);
@@ -1340,6 +1341,37 @@ export function AtendimentoContent({ consultaId, telemedicinaProps }: Atendiment
 
   const handleDeleteDocument = (id: string) => {
     setDocumentosGerados((prev) => prev.filter((d) => d.id !== id));
+  };
+
+  const handleEditDocument = (id: string) => {
+    const doc = documentosGerados.find((d) => d.id === id);
+    if (!doc) return;
+    if (doc.tipoDocumento === "guia-consulta-tiss") {
+      toast.info("Edição de Guia TISS não disponível.");
+      return;
+    }
+    const snap = doc.extraDados || {};
+    setDocConfigOpts({
+      cpf: snap.ocultarCpf === true ? false : true,
+      endereco: !!snap.incluirEndereco,
+      assinar: !!snap.assinarAposGerar,
+      diasAfastamento: typeof snap.diasAfastamento === "number" ? snap.diasAfastamento : 1,
+      observacoes: snap.observacoes || "",
+      mesesValidade: snap.mesesValidade != null ? String(snap.mesesValidade) : "",
+      horaInicio: snap.horaInicio || "",
+      horaFim: snap.horaFim || "",
+      nomeAcompanhante: snap.nomeAcompanhante || "",
+      uf: snap.uf || "",
+      dataValidade: snap.dataValidade || "",
+      convenio: snap.convenio || "",
+      justificativa: snap.justificativa || "",
+      textoLivre: doc.tipoDocumento === "pedido-exames" ? "" : (snap.textoLaudo || ""),
+    });
+    setDocMedicamentosSelecionados(new Set(doc.medicamentosSelecionados || []));
+    setDocExamesSelecionados(new Set(doc.examesSelecionados || []));
+    setDocConfigModelId(doc.tipoDocumento);
+    setEditingDocId(id);
+    setDocConfigModalOpen(true);
   };
 
   const handleSignDocument = async (id: string) => {
@@ -2362,20 +2394,52 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         }
       }
 
-      // Adicionar à lista de documentos gerados
-      const novoDocumento = {
-        id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        tipoDocumento: modelId,
-        nomeDocumento,
-        createdAt: new Date().toISOString(),
-        pdfBlob,
-        assinado,
-      };
+      // Snapshot dos dados que geraram este PDF — permite reabrir o modal em modo edição.
+      // Removemos flags internas que não devem voltar pro modal.
+      const { _fromDocConfigModal: _fdc, _editingDocId: _edid, ...dadosSnapshot } = extraDados || {};
+      const medicamentosSnapshot = (modelId === "receita-medica" || modelId === "receita-controle-especial" || modelId === "receita-tipo-ba")
+        ? Array.from(docMedicamentosSelecionados)
+        : undefined;
+      const examesSnapshot = modelId === "pedido-exames"
+        ? Array.from(docExamesSelecionados)
+        : undefined;
 
-      setDocumentosGerados([...documentosGerados, novoDocumento]);
+      const editingId = extraDados?._editingDocId as string | undefined;
+      if (editingId) {
+        setDocumentosGerados(prev => prev.map(d => d.id === editingId
+          ? {
+              ...d,
+              tipoDocumento: modelId,
+              nomeDocumento,
+              createdAt: new Date().toISOString(),
+              pdfBlob,
+              assinado,
+              assinando: false,
+              erroAssinatura: undefined,
+              extraDados: dadosSnapshot,
+              medicamentosSelecionados: medicamentosSnapshot,
+              examesSelecionados: examesSnapshot,
+            }
+          : d
+        ));
+        if (!extraDados?.assinarAposGerar) toast.success("Documento atualizado com sucesso!");
+      } else {
+        const novoDocumento = {
+          id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          tipoDocumento: modelId,
+          nomeDocumento,
+          createdAt: new Date().toISOString(),
+          pdfBlob,
+          assinado,
+          extraDados: dadosSnapshot,
+          medicamentosSelecionados: medicamentosSnapshot,
+          examesSelecionados: examesSnapshot,
+        };
+        setDocumentosGerados([...documentosGerados, novoDocumento]);
+        if (!extraDados?.assinarAposGerar) toast.success("Documento adicionado com sucesso!");
+      }
       setDocumentoSearch("");
       setDocumentoSuggestions([]);
-      if (!extraDados?.assinarAposGerar) toast.success("Documento adicionado com sucesso!");
     } catch (error: any) {
       console.error("Erro ao gerar documento:", error);
       toast.error(error.message || "Erro ao gerar documento");
@@ -2937,6 +3001,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                   handleGenerateDocument={handleGenerateDocument}
                   onSignDocument={handleSignDocument}
                   onDeleteDocument={handleDeleteDocument}
+                  onEditDocument={handleEditDocument}
                   onGenerateSuggestions={handleGenerateSuggestions}
                   consultationMode={consultationMode}
                   historicoClinico={historicoClinico}
@@ -3069,12 +3134,15 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
         const hasSpecific = hasDias || hasObs || hasValidade || hasHorario || hasAcomp || hasUfValidade || hasConvenio || hasTextoLivre || isReceita || isPedidoExames;
 
         return (
-          <Dialog open={docConfigModalOpen} onOpenChange={setDocConfigModalOpen}>
+          <Dialog open={docConfigModalOpen} onOpenChange={(open) => {
+            setDocConfigModalOpen(open);
+            if (!open) setEditingDocId(null);
+          }}>
             <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
               <DialogTitle className="sr-only">Configurar {nomeDoc}</DialogTitle>
               <div className="px-5 py-4 border-b border-slate-100">
-                <p className="text-sm font-semibold text-slate-800">{nomeDoc}</p>
-                <p className="text-xs text-slate-400 mt-0.5">Configure as opções antes de gerar</p>
+                <p className="text-sm font-semibold text-slate-800">{editingDocId ? `Editar ${nomeDoc}` : nomeDoc}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{editingDocId ? "Atualize as informações e regenere o documento" : "Configure as opções antes de gerar"}</p>
               </div>
 
               <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -3339,7 +3407,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
               </div>
 
               <div className="px-5 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3">
-                <button onClick={() => setDocConfigModalOpen(false)}
+                <button onClick={() => { setDocConfigModalOpen(false); setEditingDocId(null); }}
                   className="px-4 py-2 text-xs text-slate-500 font-medium rounded-lg hover:bg-slate-100 transition-colors">
                   Cancelar
                 </button>
@@ -3350,7 +3418,9 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                     (isPedidoExames && (examesBox.length === 0 || docExamesSelecionados.size === 0))
                   }
                   onClick={() => {
+                    const editingId = editingDocId;
                     setDocConfigModalOpen(false);
+                    setEditingDocId(null);
                     const examesSelecionadosTexto = isPedidoExames
                       ? examesBox
                           .filter((_, i) => docExamesSelecionados.has(i))
@@ -3359,6 +3429,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                       : undefined;
                     handleGenerateDocument(docConfigModelId, {
                       _fromDocConfigModal: true,
+                      _editingDocId: editingId || undefined,
                       ocultarCpf: !opts.cpf,
                       incluirEndereco: opts.endereco,
                       assinarAposGerar: opts.assinar,
@@ -3379,7 +3450,7 @@ const handleSaveSinaisVitais = async (form: typeof sinaisVitaisForm) => {
                   style={{ background: "linear-gradient(135deg, #1E40AF 0%, #2563eb 100%)" }}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  Gerar Documento
+                  {editingDocId ? "Atualizar Documento" : "Gerar Documento"}
                 </button>
               </div>
             </DialogContent>

@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Pencil,
   History,
   Check,
   Brain,
@@ -124,6 +125,7 @@ interface AISidebarProps {
   handleGenerateDocument: (modelId: string, extraDados?: Record<string, any>) => Promise<void>;
   onSignDocument?: (id: string) => void | Promise<void>;
   onDeleteDocument?: (id: string) => void;
+  onEditDocument?: (id: string) => void;
   // Anexar exame
   onAttachExame?: () => void;
   // Action
@@ -190,6 +192,7 @@ export function AISidebar({
   handleGenerateDocument,
   onSignDocument,
   onDeleteDocument,
+  onEditDocument,
   onAttachExame,
   onGenerateSuggestions,
   historicoClinico = [],
@@ -1102,6 +1105,15 @@ export function AISidebar({
                       <span title={doc.erroAssinatura} className="p-1.5 text-red-500">
                         <AlertCircle className="w-3.5 h-3.5" />
                       </span>
+                    )}
+                    {onEditDocument && !doc.assinado && doc.tipoDocumento !== "guia-consulta-tiss" && (
+                      <button
+                        onClick={() => onEditDocument(doc.id)}
+                        title="Editar"
+                        className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     )}
                     {onSignDocument && doc.pdfBlob && !doc.assinado && (
                       <button

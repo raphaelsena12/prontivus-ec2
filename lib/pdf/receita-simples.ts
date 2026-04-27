@@ -106,7 +106,13 @@ export function generateReceitaSimplesPDF(data: ReceitaSimplesData): ArrayBuffer
       if (med.posologia) {
         const posologiaX = startX + 12;
         let posologiaText = med.posologia;
-        if (med.quantidade || med.duracao) {
+        // Só remove "por X dias" da posologia se o texto à direita realmente
+        // representa essa mesma duração — caso contrário (ex.: quantidade "6 CP"),
+        // manter a posologia íntegra para não esconder a duração.
+        const rightText = quantidadeText || "";
+        const rightMatch = rightText.match(/(\d+)\s*dias?/i);
+        const posMatch = posologiaText.match(/por\s+(\d+)\s*dias?/i);
+        if (rightMatch && posMatch && rightMatch[1] === posMatch[1]) {
           posologiaText = posologiaText.replace(/\s*—\s*por\s+\d+\s*dias?/i, "");
           posologiaText = posologiaText.replace(/\s*por\s+\d+\s*dias?/i, "");
         }
