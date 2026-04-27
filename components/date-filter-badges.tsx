@@ -10,6 +10,7 @@ interface DateFilterBadgesProps {
 
 const filters: { value: DateFilter; label: string }[] = [
   { value: "diario", label: "Diário" },
+  { value: "semanal", label: "Semanal" },
   { value: "mensal", label: "Mensal" },
   { value: "anual", label: "Anual" },
 ];

@@ -739,7 +739,10 @@ export async function POST(request: NextRequest) {
             dataConsulta: dataConsultaFmt,
             horaConsulta: horaConsultaFmt,
             anamnese: prontuario.anamnese || "",
-            orientacoesConduta: prontuario.orientacoesConduta || "",
+            orientacoesConduta: [
+              (prontuario.orientacoesConduta || "").trim(),
+              (prontuario.conduta || "").trim(),
+            ].filter(Boolean).join("\n\n"),
             cidCodes,
             exames,
             prescricoes: prescricoesFicha,

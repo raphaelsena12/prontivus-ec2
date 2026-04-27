@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
-    const dateFilter = (searchParams.get("filter") || "mensal") as "diario" | "mensal" | "anual";
+    const dateFilter = (searchParams.get("filter") || "mensal") as "diario" | "semanal" | "mensal" | "anual";
     const { start: dataInicio, end: dataFim } = getDateRangeFromFilter(dateFilter);
 
     // Build periods based on filter
@@ -30,6 +30,21 @@ export async function GET(request: NextRequest) {
           end: hourEnd,
         });
         hourNum++;
+      }
+    } else if (dateFilter === "semanal") {
+      const current = new Date(dataInicio);
+      while (current <= dataFim) {
+        const dayStart = new Date(current);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(current);
+        dayEnd.setHours(23, 59, 59, 999);
+        if (dayEnd > dataFim) dayEnd.setTime(dataFim.getTime());
+        periodos.push({
+          label: dayStart.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""),
+          start: dayStart,
+          end: dayEnd,
+        });
+        current.setDate(current.getDate() + 1);
       }
     } else if (dateFilter === "mensal") {
       const current = new Date(dataInicio);

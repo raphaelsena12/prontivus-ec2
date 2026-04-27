@@ -269,7 +269,10 @@ export async function POST(
         dataConsulta: dataConsultaFormatada,
         horaConsulta: horaConsultaFormatada,
         anamnese: prontuario?.anamnese || "",
-        orientacoesConduta: prontuario?.orientacoesConduta || "",
+        orientacoesConduta: [
+          (prontuario?.orientacoesConduta || "").trim(),
+          (prontuario?.conduta || "").trim(),
+        ].filter(Boolean).join("\n\n"),
         cidCodes,
         exames,
         prescricoes,

@@ -472,23 +472,28 @@ function ConsultaRow({
           </div>
 
           {/* Prontuário / Registro clínico — oculto para secretária */}
-          {!isSecretaria && prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.orientacoesConduta || prontuario.orientacoes || prontuario.evolucao) && (
+          {!isSecretaria && prontuario && (prontuario.anamnese || prontuario.exameFisico || prontuario.diagnostico || prontuario.conduta || prontuario.orientacoesConduta || prontuario.orientacoes || prontuario.evolucao) && (() => {
+            const condutaMerged = [prontuario.orientacoesConduta, prontuario.conduta]
+              .map(s => (s || "").trim())
+              .filter(Boolean)
+              .join("\n\n");
+            return (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-3">Registro Clínico</p>
               <div className="space-y-3">
-                {(prontuario.anamnese || prontuario.orientacoesConduta) && (
+                {(prontuario.anamnese || condutaMerged) && (
                   <div>
                     <p className="text-[10px] text-slate-400 mb-0.5">Anamnese</p>
                     {prontuario.anamnese && (
                       <p className="text-sm text-slate-700 whitespace-pre-wrap text-justify">{prontuario.anamnese}</p>
                     )}
-                    {prontuario.orientacoesConduta && (
+                    {condutaMerged && (
                       <div className={prontuario.anamnese ? "mt-3" : ""}>
                         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-0.5">
-                          Orientações e conduta
+                          Conduta
                         </p>
                         <p className="text-sm text-slate-700 whitespace-pre-wrap text-justify">
-                          {prontuario.orientacoesConduta}
+                          {condutaMerged}
                         </p>
                       </div>
                     )}
@@ -496,7 +501,6 @@ function ConsultaRow({
                 )}
                 {prontuario.exameFisico && <Detail label="Exame Físico" value={prontuario.exameFisico} full />}
                 {prontuario.diagnostico && <Detail label="Diagnóstico" value={prontuario.diagnostico} full />}
-                {prontuario.conduta && <Detail label="Conduta" value={prontuario.conduta} full />}
                 {prontuario.evolucao && <Detail label="Evolução" value={prontuario.evolucao} full />}
               </div>
 
@@ -511,7 +515,8 @@ function ConsultaRow({
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {/* CID / CIAP — oculto para secretária */}
           {!isSecretaria && cidsLegacy.length > 0 && (

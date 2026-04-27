@@ -274,7 +274,7 @@ export function generateFichaAtendimentoPDF(data: FichaAtendimentoData): ArrayBu
     }
 
     if (hasOrientacoesConduta) {
-      renderAnamneseBlock("Orientações e conduta", data.orientacoesConduta!.trim());
+      renderAnamneseBlock("Conduta", data.orientacoesConduta!.trim());
     }
 
     y += 2;

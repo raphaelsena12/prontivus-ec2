@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const { searchParams } = new URL(request.url);
-    const dateFilter = (searchParams.get("filter") || "diario") as "diario" | "mensal" | "anual";
+    const dateFilter = (searchParams.get("filter") || "diario") as "diario" | "semanal" | "mensal" | "anual";
     const { start: dataInicio, end: dataFim } = getDateRangeFromFilter(dateFilter);
 
     const baseWhere = {

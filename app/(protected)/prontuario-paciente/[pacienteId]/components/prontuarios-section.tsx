@@ -131,23 +131,21 @@ export function ProntuariosSection({ prontuarios, expanded, onToggle }: Prontuar
                       </div>
                     )}
 
-                    {prontuario.conduta && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 mb-1">Conduta</p>
-                        <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
-                          {prontuario.conduta}
-                        </p>
-                      </div>
-                    )}
-
-                    {prontuario.orientacoesConduta && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-500 mb-1">Orientações e Conduta</p>
-                        <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
-                          {prontuario.orientacoesConduta}
-                        </p>
-                      </div>
-                    )}
+                    {(() => {
+                      const condutaMerged = [prontuario.orientacoesConduta, prontuario.conduta]
+                        .map(s => (s || "").trim())
+                        .filter(Boolean)
+                        .join("\n\n");
+                      if (!condutaMerged) return null;
+                      return (
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 mb-1">Conduta</p>
+                          <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">
+                            {condutaMerged}
+                          </p>
+                        </div>
+                      );
+                    })()}
 
                     {prontuario.evolucao && (
                       <div>

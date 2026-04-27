@@ -715,7 +715,7 @@ export function Step2Anamnesis({
               {/* Campo manual exclusivo do médico */}
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-700 pl-0.5">
-                  Orientações e conduta
+                  Conduta
                 </label>
                 <Textarea
                   value={orientacoesConduta}

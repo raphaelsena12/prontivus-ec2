@@ -76,14 +76,14 @@ export function brazilTodayFormatted(): string {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: BRAZIL_TZ, day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 }
 
-export type DateFilter = "diario" | "mensal" | "anual";
+export type DateFilter = "diario" | "semanal" | "mensal" | "anual";
 
 /** Retorna o range de datas baseado no filtro selecionado */
 export function getDateRangeFromFilter(filter: DateFilter): { start: Date; end: Date } {
   const hoje = brazilToday();
   const [year, month, day] = hoje.split("-").map(Number);
   const hojeDate = new Date(Date.UTC(year, month - 1, day));
-  
+
   let start: Date;
   let end: Date = brazilTodayEnd();
 
@@ -91,6 +91,16 @@ export function getDateRangeFromFilter(filter: DateFilter): { start: Date; end: 
     case "diario": {
       // Apenas hoje
       start = brazilTodayStart();
+      break;
+    }
+    case "semanal": {
+      // Semana atual (segunda a domingo, contendo hoje)
+      // getUTCDay: 0=Dom, 1=Seg, ..., 6=Sáb. Queremos voltar até segunda.
+      const dow = hojeDate.getUTCDay();
+      const diasDesdeSegunda = (dow + 6) % 7; // Seg=0, Ter=1, ..., Dom=6
+      const segunda = new Date(Date.UTC(year, month - 1, day - diasDesdeSegunda));
+      const segStr = `${segunda.getUTCFullYear()}-${String(segunda.getUTCMonth() + 1).padStart(2, "0")}-${String(segunda.getUTCDate()).padStart(2, "0")}`;
+      start = brazilDayStart(segStr);
       break;
     }
     case "mensal": {

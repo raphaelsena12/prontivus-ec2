@@ -697,7 +697,10 @@ export async function POST(request: NextRequest) {
           dataConsulta: dataConsultaFormatada,
           horaConsulta: horaConsultaFormatada,
           anamnese: prontuario?.anamnese || dados?.anamnese || "",
-          orientacoesConduta: prontuario?.orientacoesConduta || dados?.orientacoesConduta || "",
+          orientacoesConduta: [
+            (prontuario?.orientacoesConduta || dados?.orientacoesConduta || "").trim(),
+            (prontuario?.conduta || dados?.conduta || "").trim(),
+          ].filter(Boolean).join("\n\n"),
           cidCodes,
           exames,
           protocolos,
