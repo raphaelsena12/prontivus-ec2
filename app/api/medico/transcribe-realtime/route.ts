@@ -46,20 +46,21 @@ export async function POST() {
             "Se houver silêncio, ruído ou fala ininteligível, NÃO transcreva nada — retorne vazio. " +
             "Não invente palavras, não complete frases, não adicione saudações ou perguntas que não foram ditas.",
         },
-        // server_vad com threshold 0.6: captura voz do paciente (distante do mic)
-        // em consulta presencial, mantendo margem segura acima do ruído ambiente.
-        // Proteção contra alucinação vem do prompt anti-alucinação + filtros client-side.
+        // server_vad com threshold 0.4: dispara mesmo na voz mais fraca do paciente
+        // (distante do mic). prefix_padding_ms 500 captura o início baixinho da fala
+        // que o VAD costumava perder. silence_duration_ms 1500 junta frases curtas
+        // ao invés de fragmentar. Foco: NÃO PERDER fala do paciente, mesmo ao custo
+        // de capturar mais ruído ambiente. Proteção contra alucinação vem do prompt
+        // anti-alucinação + filtros client-side.
         turn_detection: {
           type: "server_vad",
-          threshold: 0.6,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 900,
+          threshold: 0.4,
+          prefix_padding_ms: 500,
+          silence_duration_ms: 1500,
           create_response: false,
         },
-        // far_field capta melhor voz do paciente em consulta presencial (~1m do mic).
-        input_audio_noise_reduction: {
-          type: "far_field",
-        },
+        // input_audio_noise_reduction removido: far_field aplicava redução agressiva
+        // que atenuava as frequências fracas da voz distante do paciente.
       }),
     });
 

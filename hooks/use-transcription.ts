@@ -379,11 +379,12 @@ export function useTranscription() {
         const micPromise = navigator.mediaDevices.getUserMedia({
           audio: {
             // echoCancellation mantido: necessário pra telemedicina (evita áudio
-            // do paciente remoto voltar pelo alto-falante). noiseSuppression
-            // desligado: estava atenuando voz distante do paciente em presencial.
+            // do paciente remoto voltar pelo alto-falante). noiseSuppression e
+            // autoGainControl desligados: nivelavam o ganho ao falante mais alto
+            // (médico próximo do mic) e enterravam a voz do paciente distante.
             echoCancellation: true,
             noiseSuppression: false,
-            autoGainControl: true,
+            autoGainControl: false,
           },
         });
         const tokenPromise = fetch("/api/medico/transcribe-realtime", { method: "POST" })
